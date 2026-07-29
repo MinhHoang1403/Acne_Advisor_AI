@@ -45,6 +45,7 @@ ENV_SUMMARY_DEFAULTS = {
 }
 RERANK_PROVIDERS_WITHOUT_MODEL = {"local_rules"}
 RERANK_PROVIDERS_WITH_MODEL = {"hybrid", "local_semantic", "local_cross_encoder", "semantic", "local_model"}
+CORE_RUNTIME_DEPENDENCIES = ("postgres", "qdrant", "neo4j", "redis")
 
 
 def check(name: str, passed: bool, details: dict[str, Any] | None = None, severity: str = "error") -> dict[str, Any]:
@@ -53,6 +54,26 @@ def check(name: str, passed: bool, details: dict[str, Any] | None = None, severi
         "passed": bool(passed),
         "severity": severity,
         "details": sanitize_for_observability(details or {}),
+    }
+
+
+def _core_health_statuses(health: dict[str, Any]) -> dict[str, Any]:
+    health_checks = health.get("checks") if isinstance(health.get("checks"), dict) else {}
+    return {
+        name: health_checks.get(name, {}).get("status") or health.get(name)
+        for name in CORE_RUNTIME_DEPENDENCIES
+    }
+
+
+def _ollama_health_details(health: dict[str, Any]) -> dict[str, Any]:
+    health_checks = health.get("checks") if isinstance(health.get("checks"), dict) else {}
+    ollama = health_checks.get("ollama") if isinstance(health_checks.get("ollama"), dict) else {}
+    return {
+        "status": ollama.get("status") or health.get("ollama"),
+        "required": bool(ollama.get("required")),
+        "optional": bool(ollama.get("optional")),
+        "requirement_reason": ollama.get("requirement_reason"),
+        "detail": ollama.get("detail"),
     }
 
 
@@ -164,21 +185,40 @@ async def run_pre_ui_runtime_check() -> dict[str, Any]:
             response = await client.get("/health")
         health = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
         health_status = health.get("status")
+        core_statuses = _core_health_statuses(health)
+        core_health_ok = all(status == "ok" for status in core_statuses.values())
+        ollama_health = _ollama_health_details(health)
+        checks.append(check("core_health", core_health_ok, core_statuses))
+        health_checks = health.get("checks") if isinstance(health.get("checks"), dict) else {}
         checks.append(
             check(
                 "api_health",
-                response.status_code == 200 and health_status == "ok",
+                response.status_code == 200 and health_status == "ok" and core_health_ok,
                 {
                     "status_code": response.status_code,
                     "status": health_status,
-                    "postgres": health.get("postgres"),
-                    "qdrant": health.get("qdrant"),
-                    "neo4j": health.get("neo4j"),
-                    "redis": health.get("redis"),
-                    "ollama": health.get("ollama"),
+                    "core_dependencies": core_statuses,
+                    "generation": health_checks.get("generation"),
+                    "ollama": ollama_health,
                 },
             )
         )
+        if ollama_health["optional"]:
+            optional_ollama_ok = ollama_health["status"] == "ok"
+            checks.append(check("optional_ollama", optional_ollama_ok, ollama_health, severity="warning"))
+            if not optional_ollama_ok:
+                warnings.append(
+                    "Optional Ollama is unavailable; Gemini remains the configured runtime provider. "
+                    "Local fallback will be skipped until Ollama is started."
+                )
+        elif ollama_health["required"]:
+            checks.append(
+                check(
+                    "required_ollama",
+                    ollama_health["status"] == "ok",
+                    ollama_health,
+                )
+            )
         if health_status != "ok":
             warnings.append("API /health is not ok; UI can open but chat readiness may be degraded.")
     except Exception as exc:

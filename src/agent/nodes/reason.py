@@ -360,7 +360,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             ignored_out_of_domain_part=ignored_out_of_domain_part
         )
         
-        llm_provider = state.get("llm_provider", "gemini")
+        llm_provider = state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")
         llm_model = state.get("llm_model")
         allow_model_fallback = state.get("allow_model_fallback", True)
         settings = _runtime_settings(state)
