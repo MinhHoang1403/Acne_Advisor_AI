@@ -457,3 +457,42 @@ async def test_provider_generation_uses_same_formatting_contract(monkeypatch, pr
 
     assert ANSWER_FORMATTING_CONTRACT in captured["prompt"]
     assert "bảng Markdown GFM" in captured["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_generation_uses_configured_runtime_provider_when_request_omits_one(monkeypatch):
+    captured: dict[str, str] = {}
+
+    async def fake_generate_llm_response(**kwargs):
+        captured["provider"] = kwargs["provider"]
+        return {
+            "text": "Mụn đầu đen là nhân mụn mở.",
+            "provider": "ollama",
+            "model": "qwen3:8b",
+            "fallback_used": False,
+            "fallback_provider": None,
+            "fallback_model": None,
+            "resilience": {"provider": "ollama"},
+        }
+
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    monkeypatch.setattr(reason_node, "generate_llm_response", fake_generate_llm_response)
+
+    await reason_node.generate_answer_node(
+        {
+            "user_question": "Mụn đầu đen là gì?",
+            "vector_contexts": [],
+            "graph_facts": [],
+            "safety_flags": [],
+            "symptoms": [],
+            "conversation_history": [],
+            "use_history_context": False,
+            "ignored_out_of_domain_part": False,
+            "is_in_domain": True,
+            "llm_provider": None,
+            "llm_model": None,
+            "allow_model_fallback": False,
+        }
+    )
+
+    assert captured["provider"] == "ollama"

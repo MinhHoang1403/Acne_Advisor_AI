@@ -28,7 +28,7 @@ def build_generic_emergency_answer() -> str:
 
     return (
         "**Tóm tắt ngắn**\n"
-        "Bạn cần gọi cấp cứu hoặc đến cơ sở cấp cứu ngay nếu các triệu chứng này đang xảy ra hoặc tăng nhanh. "
+        "Bạn cần gọi cấp cứu hoặc đến cơ sở cấp cứu ngay; đây có thể là tình huống khẩn cấp nếu các triệu chứng này đang xảy ra hoặc tăng nhanh. "
         "Các dấu hiệu cần chú ý gồm khó thở, sưng môi/mặt/họng/quanh mắt, phát ban lan nhanh, "
         "sốt cao, đau dữ dội, phồng rộp hoặc bong tróc da.\n\n"
         "**Việc nên làm ngay**\n"
@@ -44,7 +44,7 @@ def build_anaphylaxis_like_emergency_answer() -> str:
 
     return (
         "**Tóm tắt ngắn**\n"
-        "Bạn cần gọi cấp cứu hoặc đến cơ sở cấp cứu ngay vì khó thở kèm sưng quanh mắt/môi/mặt/họng sau khi dùng thuốc hoặc sản phẩm trị mụn có thể là phản ứng dị ứng nghiêm trọng.\n\n"
+        "Bạn cần gọi cấp cứu hoặc đến cơ sở cấp cứu ngay; đây có thể là tình huống khẩn cấp vì khó thở kèm sưng quanh mắt/môi/mặt/họng sau khi dùng thuốc hoặc sản phẩm trị mụn có thể là phản ứng dị ứng nghiêm trọng.\n\n"
         "**Việc nên làm ngay**\n"
         "- Ngưng thuốc/sản phẩm nghi gây phản ứng nếu vừa dùng.\n"
         "- Không bôi thêm hoạt chất trị mụn, không thử lại sản phẩm và không chờ theo dõi tại nhà nếu khó thở còn tiếp diễn.\n"

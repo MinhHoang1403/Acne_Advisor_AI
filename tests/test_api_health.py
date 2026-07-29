@@ -65,6 +65,40 @@ async def test_health_returns_degraded_with_reachable_backend(monkeypatch):
     assert data["checks"]["qdrant"]["status"] == "unavailable"
 
 
+@pytest.mark.asyncio
+async def test_health_reports_optional_ollama_without_degrading_core_runtime(monkeypatch):
+    async def fake_preflight():
+        return {
+            "status": "ok",
+            "checks": {
+                "postgres": {"status": "ok"},
+                "qdrant": {"status": "ok"},
+                "neo4j": {"status": "ok"},
+                "redis": {"status": "ok"},
+                "ollama": {
+                    "status": "unavailable",
+                    "optional": True,
+                    "required": False,
+                    "requirement_reason": "gemini runtime uses Ollama only as an opportunistic fallback",
+                },
+                "generation": {"status": "ok", "provider": "gemini"},
+            },
+        }
+
+    monkeypatch.setattr("src.api.preflight.run_phase2_preflight", fake_preflight)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/health")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["ollama"] == "unavailable"
+    assert data["checks"]["ollama"]["optional"] is True
+
+
 def test_parse_cors_origins_defaults_and_dedupes():
     origins = parse_cors_origins(" http://localhost:5173/, http://127.0.0.1:5173, http://localhost:5173, * ")
 

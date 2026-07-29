@@ -22,6 +22,7 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 PREFLIGHT_CHECK_TIMEOUT_SECONDS = float(os.getenv("PREFLIGHT_CHECK_TIMEOUT_SECONDS", "4.0"))
+REQUIRED_CORE_CHECKS = ("postgres", "qdrant", "neo4j", "redis")
 
 
 @dataclass
@@ -37,6 +38,82 @@ class CheckResult:
         if self.extra:
             data.update(self.extra)
         return data
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    return value in {"1", "true", "yes", "on"}
+
+
+def _normalize_provider(value: str | None) -> str:
+    provider = (value or "gemini").strip().lower()
+    return "ollama" if provider == "local" else provider
+
+
+def get_runtime_provider_requirements() -> dict[str, Any]:
+    """Describe the configured generation runtime without probing paid providers.
+
+    Gemini is the default runtime provider. Its opportunistic Ollama fallback is
+    selected only when a local model is available, so it does not make Ollama a
+    core health dependency. An explicitly configured Ollama primary provider,
+    or an explicitly required local fallback, does make it required.
+    """
+
+    provider = _normalize_provider(os.getenv("LLM_PROVIDER", "gemini"))
+    fallback_enabled = _env_bool("LLM_PROVIDER_FALLBACK_ENABLED")
+    fallback_provider = _normalize_provider(os.getenv("LLM_FALLBACK_PROVIDER", "ollama"))
+    ollama_required = provider == "ollama" or (
+        fallback_enabled and fallback_provider == "ollama"
+    )
+    if provider == "ollama":
+        reason = "configured primary provider is ollama"
+    elif fallback_enabled and fallback_provider == "ollama":
+        reason = "configured fallback explicitly requires ollama"
+    else:
+        reason = "gemini runtime uses Ollama only as an opportunistic fallback"
+    return {
+        "provider": provider,
+        "fallback_enabled": fallback_enabled,
+        "fallback_provider": fallback_provider if fallback_enabled else None,
+        "ollama_required": ollama_required,
+        "ollama_requirement_reason": reason,
+    }
+
+
+def check_generation_provider(
+    requirements: dict[str, Any],
+    ollama: CheckResult,
+) -> CheckResult:
+    """Validate the configured primary provider without sending a chat request."""
+
+    provider = requirements["provider"]
+    if provider == "gemini":
+        if os.getenv("GOOGLE_API_KEY", "").strip():
+            return CheckResult(
+                "ok",
+                "Gemini is configured; external provider connectivity is not probed by health.",
+                {"provider": "gemini", "connectivity_probed": False},
+            )
+        return CheckResult(
+            "unavailable",
+            "GOOGLE_API_KEY is not configured for the default Gemini runtime.",
+            {"provider": "gemini", "connectivity_probed": False},
+        )
+    if provider == "ollama":
+        if ollama.status == "ok":
+            return CheckResult("ok", extra={"provider": "ollama", "connectivity_probed": True})
+        return CheckResult(
+            "unavailable",
+            f"Configured Ollama runtime is unavailable: {ollama.detail or ollama.status}",
+            {"provider": "ollama", "connectivity_probed": True},
+        )
+    return CheckResult(
+        "unavailable",
+        f"Unsupported configured runtime provider: {provider}",
+        {"provider": provider, "connectivity_probed": False},
+    )
 
 
 async def check_postgres() -> CheckResult:
@@ -192,13 +269,32 @@ async def run_phase2_preflight() -> dict[str, Any]:
         _bounded_check("redis", check_redis()),
         _bounded_check("ollama", check_ollama()),
     )
+    requirements = get_runtime_provider_requirements()
+    generation = check_generation_provider(requirements, ollama)
+    ollama_data = ollama.to_dict()
+    ollama_data.update(
+        {
+            "required": requirements["ollama_required"],
+            "optional": not requirements["ollama_required"],
+            "requirement_reason": requirements["ollama_requirement_reason"],
+        }
+    )
     checks = {
         "postgres": postgres.to_dict(),
         "qdrant": qdrant.to_dict(),
         "neo4j": neo4j.to_dict(),
         "redis": redis.to_dict(),
-        "ollama": ollama.to_dict(),
+        "ollama": ollama_data,
+        "generation": generation.to_dict(),
     }
-    required = [postgres, qdrant, neo4j, ollama]
+    check_results = {
+        "postgres": postgres,
+        "qdrant": qdrant,
+        "neo4j": neo4j,
+        "redis": redis,
+    }
+    required = [check_results[name] for name in REQUIRED_CORE_CHECKS] + [generation]
+    if requirements["ollama_required"]:
+        required.append(ollama)
     overall = "ok" if all(check.status == "ok" for check in required) else "degraded"
     return {"status": overall, "checks": checks}

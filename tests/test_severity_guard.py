@@ -53,6 +53,29 @@ def test_emergency_guard_replaces_routine_skincare_with_emergency_action():
     assert "rửa mặt dịu nhẹ" not in result.answer
 
 
+def test_sjs_like_emergency_uses_explicit_urgent_care_wording():
+    result = apply_severity_aware_answer_guard(
+        query="Uống thuốc trị mụn xong bị phồng rộp da, loét miệng và sốt cao",
+        answer="Bạn nên rửa mặt dịu nhẹ, dưỡng ẩm và dùng chống nắng.",
+    )
+
+    assert result.classification.severity == "emergency"
+    assert result.modified is True
+    assert "khẩn cấp" in result.answer
+    assert "cấp cứu" in result.answer
+
+
+def test_anaphylaxis_like_emergency_keeps_immediate_action_and_urgent_wording():
+    result = apply_severity_aware_answer_guard(
+        query="Tôi bôi thuốc trị mụn xong bị sưng môi, khó thở và nổi mề đay toàn thân",
+        answer="Bạn nên theo dõi thêm tại nhà.",
+    )
+
+    assert result.classification.severity == "emergency"
+    assert "khẩn cấp" in result.answer
+    assert "cấp cứu" in result.answer
+
+
 def test_urgent_guard_adds_clinician_review_and_isotretinoin_pregnancy_warning():
     result = apply_severity_aware_answer_guard(
         query="Tôi đang mang thai, có dùng isotretinoin trị mụn được không?",

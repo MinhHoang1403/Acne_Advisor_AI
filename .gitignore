@@ -143,6 +143,10 @@ log/
 reports/
 reports/evaluation/
 
+# Local thesis/report artifacts
+/output/
+/FINAL_KL_Acne_Rag.docx
+
 # ---------------------------------------------------------------------------
 # IDE / Editor
 # ---------------------------------------------------------------------------

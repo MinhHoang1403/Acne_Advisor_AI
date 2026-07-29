@@ -70,3 +70,27 @@ def test_pre_ui_reranker_status_rejects_active_hybrid_without_model(monkeypatch,
 
     assert result["passed"] is False
     assert result["details"]["semantic_model_path_exists"] is False
+
+
+def test_pre_ui_health_helpers_distinguish_core_health_from_optional_ollama():
+    health = {
+        "postgres": "ok",
+        "qdrant": "ok",
+        "neo4j": "ok",
+        "redis": "ok",
+        "ollama": "unavailable",
+        "checks": {
+            "ollama": {
+                "status": "unavailable",
+                "optional": True,
+                "required": False,
+                "requirement_reason": "gemini runtime uses Ollama only as an opportunistic fallback",
+            }
+        },
+    }
+
+    assert all(status == "ok" for status in pre_ui_runtime_check._core_health_statuses(health).values())
+    ollama = pre_ui_runtime_check._ollama_health_details(health)
+    assert ollama["optional"] is True
+    assert ollama["required"] is False
+    assert ollama["status"] == "unavailable"
