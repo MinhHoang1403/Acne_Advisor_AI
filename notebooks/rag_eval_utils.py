@@ -554,6 +554,9 @@ def create_judge_charts(
 
     scored = [row for row in judge_rows if isinstance(row.get("judge_score_100"), (int, float))]
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except Exception as exc:  # pragma: no cover - optional dependency
         return {"status": "skipped", "reason": f"matplotlib unavailable: {exc}", "plots": plot_paths}
@@ -653,6 +656,9 @@ def create_evaluation_charts(
     plot_paths = {name: str(plot_dir / filename) for name, filename in CHART_FILENAMES.items()}
 
     try:
+        import matplotlib
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except Exception as exc:  # pragma: no cover - depends on optional local dependency
         return {"status": "skipped", "reason": f"matplotlib unavailable: {exc}", "plots": plot_paths}

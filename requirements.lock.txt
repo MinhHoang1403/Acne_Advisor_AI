@@ -24,8 +24,10 @@ cffi==2.1.0               # via cryptography
 charset-normalizer==3.4.9  # via pdfminer-six, requests
 click==8.4.2              # via huggingface-hub, llama-cloud-services, nltk, uvicorn
 colorama==0.4.6           # via click, griffecli, pytest, tqdm, typer
+contourpy==1.3.3          # via matplotlib
 coverage==7.15.0          # via pytest-cov
 cryptography==49.0.0      # via google-auth, pdfminer-six
+cycler==0.12.1            # via matplotlib
 dataclasses-json==0.6.7   # via llama-index-core
 defusedxml==0.7.1         # via nltk
 deprecated==1.3.1         # via banks, llama-index-core, llama-index-instrumentation
@@ -36,6 +38,7 @@ faiss-cpu==1.14.3         # via -r requirements.txt
 fastapi==0.139.0          # via -r requirements.txt, sentry-sdk
 filelock==3.29.7          # via huggingface-hub, torch
 filetype==1.2.0           # via banks, langchain-google-genai, llama-index-core
+fonttools==4.63.0         # via matplotlib
 frozenlist==1.8.0         # via aiohttp, aiosignal
 fsspec==2026.6.0          # via huggingface-hub, llama-index-core, torch
 google-auth==2.55.2       # via google-genai
@@ -64,6 +67,7 @@ jiter==0.16.0             # via anthropic, openai
 joblib==1.5.3             # via nltk, scikit-learn
 jsonpatch==1.33           # via langchain-core
 jsonpointer==3.1.1        # via jsonpatch
+kiwisolver==1.5.0         # via matplotlib
 langchain==1.3.13         # via -r requirements.txt
 langchain-anthropic==1.4.8  # via -r requirements.txt
 langchain-classic==1.0.8  # via langchain-community
@@ -90,6 +94,7 @@ mako==1.3.12              # via alembic
 markdown-it-py==4.2.0     # via rich
 markupsafe==3.0.3         # via jinja2, mako
 marshmallow==3.26.2       # via dataclasses-json
+matplotlib==3.11.0        # via -r requirements.txt
 mdurl==0.1.2              # via markdown-it-py
 mpmath==1.3.0             # via sympy
 multidict==6.7.1          # via aiohttp, yarl
@@ -130,12 +135,14 @@ pydantic==2.13.4          # via -r requirements.txt, anthropic, banks, fastapi, 
 pydantic-core==2.46.4     # via pydantic
 pydantic-settings==2.14.2  # via -r requirements.txt, langchain-community
 pygments==2.20.0          # via pytest, rich
+pyparsing==3.3.2          # via matplotlib
 pypdf==6.14.2             # via -r requirements.txt
 pypdfium2==5.11.0         # via pdfplumber
 pytest==9.1.1             # via -r requirements.txt, pytest-asyncio, pytest-cov
 pytest-asyncio==1.4.0     # via -r requirements.txt
 pytest-cov==7.1.0         # via -r requirements.txt
 python-dotenv==1.2.2      # via -r requirements.txt, llama-cloud-services, pydantic-settings, uvicorn
+python-dateutil==2.9.0.post0  # via matplotlib
 python-multipart==0.0.32  # via -r requirements.txt
 pytz==2026.2              # via neo4j
 pywin32==312              # via portalocker
@@ -152,6 +159,7 @@ scipy==1.17.1             # via scikit-learn, sentence-transformers
 sentence-transformers==5.6.0  # via -r requirements.txt
 sentry-sdk==2.64.0        # via -r requirements.txt
 shellingham==1.5.4        # via typer
+six==1.17.0               # via python-dateutil
 sniffio==1.3.1            # via anthropic, google-genai, langsmith, openai
 soupsieve==2.8.4          # via beautifulsoup4
 sqlalchemy==2.0.51        # via -r requirements.txt, alembic, langchain-classic, langchain-community, llama-index-core
