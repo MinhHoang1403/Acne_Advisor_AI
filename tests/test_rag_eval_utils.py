@@ -100,16 +100,15 @@ def test_build_eval_set_generates_300_cases_with_unique_ids() -> None:
     assert all(case.get("category") and case.get("question") for case in cases)
 
 
-def test_notebook_validates_dataset_ids_before_case_lookup() -> None:
+def test_notebook_delegates_to_comprehensive_runner() -> None:
     notebook = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
     text = "\n".join("".join(cell.get("source", [])) for cell in notebook.get("cells", []))
 
-    assert "Invalid evaluation dataset" in text
-    assert "Every case must have unique id/category/question" in text
-    assert "python notebooks/eval_data/build_acne_eval_set.py" in text
-    assert "required_fields = {\"id\", \"category\", \"question\"}" in text
-    assert "case_by_id = {case[\"id\"]: case for case in cases}" in text
-    assert "DATASET_PATH = Path(\"notebooks/eval_data/acne_rag_eval_set.jsonl\")" in text
+    assert "ComprehensiveRunner" in text
+    assert "EvaluationConfig" in text
+    assert "DATASET_PATH = Path(\"notebooks/eval_data/acne_rag_eval_comprehensive_v1.jsonl\")" in text
+    assert "COMPREHENSIVE_EVALUATION" not in text
+    assert "run(resume=RESUME)" in text
 
     for legacy_name in [
         "EVAL_ALLOW_LIVE_CHAT",
@@ -120,34 +119,24 @@ def test_notebook_validates_dataset_ids_before_case_lookup() -> None:
         assert legacy_name not in text
 
 
-def test_notebook_defaults_to_ollama_judge_provider() -> None:
+def test_notebook_uses_safe_comprehensive_defaults() -> None:
     cells = _notebook_cells()
     text = "\n".join(_cell_source(cell) for cell in cells)
 
     required = [
-        'JUDGE_PROVIDER = "ollama"',
-        '"ollama" | "gemini"',
-        "JUDGE_OLLAMA_BASE_URL",
-        "JUDGE_OLLAMA_MODEL",
-        "JUDGE_OLLAMA_TIMEOUT_SECONDS",
-        "def call_ollama_judge",
-        "/api/generate",
-        '"format": "json"',
-        'fallback_payload.pop("format", None)',
-        "judge_provider not in",
-        'judge_provider == "gemini"',
-        'judge_provider == "ollama"',
-        "judge_call = call_ollama_judge",
-        "Judge provider:",
-        "LLM-as-Judge configuration:",
-        '"judge_provider": judge_provider',
-        '"judge_model": judge_model',
-        '"judge_error": last_error',
+        'RUN_LIVE_EVAL = False',
+        'RUN_LLM_JUDGE = False',
+        'JUDGE_PROVIDER = "gemini"',
+        'JUDGE_GEMINI_MODEL = "gemini-3.1-flash-lite"',
+        'LIVE_EVAL_PROVIDER = "ollama"',
+        'LIVE_EVAL_MODEL = "qwen3:8b"',
+        'BYPASS_RUNTIME_CACHE_FOR_LIVE_EVAL = True',
+        'RESUME = False',
+        'SMOKE_MODE = False',
+        'NO_PERSISTENCE = False',
     ]
     for item in required:
         assert item in text
-
-    assert 'judge_provider != "gemini"' not in text
 
     for index, cell in enumerate(cells, 1):
         assert not cell.get("outputs"), f"Notebook output not cleared in cell {index}"
@@ -158,34 +147,30 @@ def test_notebook_has_single_top_configuration_cell() -> None:
     cells = _notebook_cells()
     text = "\n".join(_cell_source(cell) for cell in cells)
 
-    assert "## 1. Configuration" in text
-    assert "edit this cell only" in text
-    assert "VS Code save warning" in text
-    assert "do not click Overwrite immediately" in text
-    assert "Notebook configuration loaded:" in text
+    assert "Comprehensive Evaluation V1" in text
+    assert "Edit this cell only" in text
 
     config_vars = [
         "API_BASE_URL",
         "RUN_LIVE_EVAL",
+        "RUN_LLM_JUDGE",
+        "RESUME",
         "QUESTION_LIMIT",
         "REQUEST_TIMEOUT_SECONDS",
-        "SLEEP_BETWEEN_REQUESTS_SECONDS",
-        "USE_SAVED_RESULTS_IF_AVAILABLE",
-        "SAVE_RAW_RESPONSES",
         "DATASET_PATH",
-        "SAVED_RAW_RESPONSES_PATH",
         "REPORT_ROOT",
-        "RUN_LLM_JUDGE",
+        "EVALUATION_PROFILE",
+        "LIVE_EVAL_PROVIDER",
+        "LIVE_EVAL_MODEL",
+        "BYPASS_RUNTIME_CACHE_FOR_LIVE_EVAL",
         "JUDGE_PROVIDER",
+        "JUDGE_GEMINI_MODEL",
         "JUDGE_SAMPLE_SIZE",
-        "JUDGE_RANDOM_SEED",
         "JUDGE_SCORE_THRESHOLD",
-        "JUDGE_DISAGREEMENT_THRESHOLD",
         "JUDGE_SLEEP_SECONDS",
-        "JUDGE_CACHE_PATH",
-        "JUDGE_OLLAMA_BASE_URL",
-        "JUDGE_OLLAMA_MODEL",
-        "JUDGE_OLLAMA_TIMEOUT_SECONDS",
+        "JUDGE_MAX_ATTEMPTS",
+        "SMOKE_MODE",
+        "NO_PERSISTENCE",
     ]
 
     locations = {}
@@ -202,8 +187,8 @@ def test_notebook_has_single_top_configuration_cell() -> None:
     assert config_cell_index <= 2
     assert 'RUN_LIVE_EVAL = False' in config_source
     assert 'RUN_LLM_JUDGE = False' in config_source
-    assert 'JUDGE_PROVIDER = "ollama"' in config_source
-    assert "SAVED_RAW_RESPONSES_PATH = None" in config_source
+    assert 'JUDGE_PROVIDER = "gemini"' in config_source
+    assert "acne_rag_eval_comprehensive_v1.jsonl" in config_source
     assert "API_BASE_URL" in config_source and "JUDGE_PROVIDER" in config_source
 
 
