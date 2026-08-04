@@ -115,6 +115,9 @@ pytest>=8.2.0
 pytest-asyncio>=0.23.7
 pytest-cov>=5.0.0
 
+# Required by the reproducible evaluation report charts.
+matplotlib>=3.11.0,<4.0.0
+
 
 # ---------------------------------------------------------------------------
 # Development / Linting
