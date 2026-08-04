@@ -6,6 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from src.agent import graph as graph_module
+from src.agent.emergency_contract import first_sentence_has_immediate_emergency_action
 from src.agent.nodes import fallback as fallback_node
 from src.agent.nodes import reason as reason_node
 from src.agent.nodes import retrieve as retrieve_node
@@ -124,6 +125,26 @@ def test_generation_output_validation_accepts_valid_answer():
 
 
 @pytest.mark.asyncio
+async def test_generation_fallback_repairs_complete_terminal_sentence_before_fallback():
+    result = await fallback_node.generation_fallback_decision_node(
+        {"draft_answer": "Mụn đầu đen là tổn thương không viêm thường gặp ở da dầu"}
+    )
+
+    assert result["fallback_applied"] is False
+    assert result["draft_answer"].endswith(".")
+
+
+@pytest.mark.asyncio
+async def test_generation_fallback_removes_an_empty_markdown_heading_before_fallback():
+    result = await fallback_node.generation_fallback_decision_node(
+        {"draft_answer": "Thông tin này đủ để trả lời câu hỏi hiện tại.\n\n**Lưu ý**"}
+    )
+
+    assert result["fallback_applied"] is False
+    assert "**Lưu ý**" not in result["draft_answer"]
+
+
+@pytest.mark.asyncio
 async def test_fallback_nodes_apply_answer_and_metadata():
     decision = await fallback_node.fallback_decision_node(
         {
@@ -146,6 +167,24 @@ async def test_fallback_nodes_apply_answer_and_metadata():
     assert fallback["fallback_model"] is None
     assert fallback["fallback_applied"] is True
     assert fallback["fallback_cache_eligible"] is False
+
+
+@pytest.mark.asyncio
+async def test_retrieval_error_fallback_keeps_emergency_action_first():
+    query = "Môi và lưỡi sưng sau khi dùng thuốc mới trị mụn, nên làm gì ngay?"
+    decision = await fallback_node.fallback_decision_node(
+        {
+            "standalone_question": query,
+            "retrieval_status": "recoverable_error",
+            "retrieval_error": "SSLEOFError: provider disconnected",
+        }
+    )
+    fallback = await fallback_node.safe_fallback_node({**decision, "standalone_question": query})
+
+    assert decision["medical_severity"] == "emergency"
+    assert first_sentence_has_immediate_emergency_action(decision["fallback_answer"]) is True
+    assert fallback["medical_severity"] == "emergency"
+    assert first_sentence_has_immediate_emergency_action(fallback["draft_answer"]) is True
 
 
 @pytest.mark.asyncio

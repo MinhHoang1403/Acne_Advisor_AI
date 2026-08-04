@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from src.agent import graph as graph_module
@@ -7,6 +10,7 @@ from src.agent.nodes import cache as cache_node
 from src.agent.nodes import quality as quality_node
 from src.agent.nodes.cache import cache_lookup_node, cache_store_node
 from src.agent.nodes.severity import severity_classification_node
+from src.agent.emergency_contract import first_sentence_has_immediate_emergency_action
 from src.resilience.exceptions import AgentTimeoutError
 from src.quality.severity_guard import apply_severity_aware_answer_guard, classify_medical_severity
 
@@ -63,6 +67,42 @@ def test_sjs_like_emergency_uses_explicit_urgent_care_wording():
     assert result.modified is True
     assert "khẩn cấp" in result.answer
     assert "cấp cứu" in result.answer
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Môi và lưỡi sưng sau khi dùng thuốc mới trị mụn, nên làm gì ngay?",
+        "Sau khi dùng thuốc mụn, da bong tróc diện rộng và mắt đau rát.",
+        "Có sốt, loét miệng và ban phồng rộp sau một thuốc điều trị mụn.",
+        "Phồng rộp niêm mạc miệng kèm sốt sau thuốc trị mụn có phải cần cấp cứu không?",
+        "Một người dùng isotretinoin có dấu hiệu sưng lưỡi và thở khó, nên làm gì?",
+    ],
+)
+def test_v1_emergency_regressions_route_to_immediate_emergency_action(query: str):
+    result = apply_severity_aware_answer_guard(query=query, answer="Bạn nên theo dõi thêm tại nhà.")
+
+    assert result.classification.severity == "emergency"
+    assert result.modified is True
+    assert first_sentence_has_immediate_emergency_action(result.answer) is True
+
+
+def test_all_canonical_emergency_cases_route_to_immediate_emergency_action():
+    dataset_path = Path("notebooks/eval_data/acne_rag_eval_comprehensive_v1.jsonl")
+    emergency_cases = [
+        json.loads(line)
+        for line in dataset_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and json.loads(line).get("category") == "urgent_emergency"
+    ]
+
+    assert len(emergency_cases) == 20
+    for case in emergency_cases:
+        result = apply_severity_aware_answer_guard(
+            query=case["question"],
+            answer="Bạn nên theo dõi thêm tại nhà.",
+        )
+        assert result.classification.severity == "emergency", case["id"]
+        assert first_sentence_has_immediate_emergency_action(result.answer), case["id"]
 
 
 def test_anaphylaxis_like_emergency_keeps_immediate_action_and_urgent_wording():
@@ -595,6 +635,26 @@ async def test_answer_quality_node_adds_severity_metadata(monkeypatch):
     assert result["answer_quality_report"]["metadata"]["severity_guard"]["version"] == (
         "severity_aware_answer_guard_v1"
     )
+
+
+@pytest.mark.asyncio
+async def test_emergency_quality_guard_reattributes_replaced_answer_to_system(monkeypatch):
+    monkeypatch.setenv("ANSWER_VERIFIER_ENABLED", "true")
+    result = await quality_node.answer_quality_node(
+        {
+            "user_question": "Môi và lưỡi sưng sau khi dùng thuốc mới trị mụn, nên làm gì ngay?",
+            "final_answer": "Bạn nên theo dõi thêm tại nhà.",
+            "actual_provider": "ollama",
+            "actual_model": "qwen3:8b",
+        }
+    )
+
+    assert result["medical_severity"] == "emergency"
+    assert result["actual_provider"] == "system"
+    assert result["actual_model"] is None
+    assert result["fallback_applied"] is True
+    assert result["fallback_type"] == "severity_emergency_safety_fallback"
+    assert "gọi cấp cứu" in result["final_answer"]
 
 
 @pytest.mark.asyncio

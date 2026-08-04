@@ -11,12 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class RuntimeResilienceSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    agent_total_timeout_seconds: float = Field(default=120.0, gt=0)
+    agent_total_timeout_seconds: float = Field(default=210.0, gt=0)
     retrieval_timeout_seconds: float = Field(default=20.0, gt=0)
     neo4j_timeout_seconds: float = Field(default=10.0, gt=0)
     rerank_timeout_seconds: float = Field(default=20.0, gt=0)
     gemini_timeout_seconds: float = Field(default=45.0, gt=0)
-    ollama_timeout_seconds: float = Field(default=90.0, gt=0)
+    ollama_timeout_seconds: float = Field(default=160.0, gt=0)
 
     llm_max_retries: int = Field(default=1, ge=0)
     llm_retry_base_delay_seconds: float = Field(default=1.0, ge=0)
@@ -55,12 +55,12 @@ def runtime_resilience_settings_from_env(env: dict[str, str] | None = None) -> R
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
     data: dict[str, Any] = {
-        "agent_total_timeout_seconds": get_float("AGENT_TOTAL_TIMEOUT_SECONDS", 120.0),
+        "agent_total_timeout_seconds": get_float("AGENT_TOTAL_TIMEOUT_SECONDS", 210.0),
         "retrieval_timeout_seconds": get_float("RETRIEVAL_TIMEOUT_SECONDS", 20.0),
         "neo4j_timeout_seconds": get_float("NEO4J_TIMEOUT_SECONDS", 10.0),
         "rerank_timeout_seconds": get_float("RERANK_TIMEOUT_SECONDS", 20.0),
         "gemini_timeout_seconds": get_float("GEMINI_TIMEOUT_SECONDS", 45.0),
-        "ollama_timeout_seconds": get_float("OLLAMA_TIMEOUT_SECONDS", 90.0),
+        "ollama_timeout_seconds": get_float("OLLAMA_TIMEOUT_SECONDS", 160.0),
         "llm_max_retries": get_int("LLM_MAX_RETRIES", 1),
         "llm_retry_base_delay_seconds": get_float("LLM_RETRY_BASE_DELAY_SECONDS", 1.0),
         "llm_retry_max_delay_seconds": get_float("LLM_RETRY_MAX_DELAY_SECONDS", 4.0),

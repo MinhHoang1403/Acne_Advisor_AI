@@ -5,13 +5,17 @@ Phase 2 preflight checks for API/runtime retrieval dependencies.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+
+logger = logging.getLogger(__name__)
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
@@ -23,6 +27,23 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 PREFLIGHT_CHECK_TIMEOUT_SECONDS = float(os.getenv("PREFLIGHT_CHECK_TIMEOUT_SECONDS", "4.0"))
 REQUIRED_CORE_CHECKS = ("postgres", "qdrant", "neo4j", "redis")
+
+
+def _preload_check_dependencies() -> None:
+    """Avoid concurrent cold imports consuming the bounded health-check budget."""
+
+    for module_name in (
+        "src.database.connection",
+        "src.cache.redis_cache",
+        "src.database.vector_store",
+        "qdrant_client",
+        "neo4j",
+    ):
+        try:
+            importlib.import_module(module_name)
+        except Exception as exc:
+            # The corresponding check owns the actionable availability error.
+            logger.debug("Preflight dependency preload failed for %s: %s", module_name, exc)
 
 
 @dataclass
@@ -262,6 +283,7 @@ async def _bounded_check(name: str, check_coro: Any) -> CheckResult:
 
 
 async def run_phase2_preflight() -> dict[str, Any]:
+    _preload_check_dependencies()
     postgres, qdrant, neo4j, redis, ollama = await asyncio.gather(
         _bounded_check("postgres", check_postgres()),
         _bounded_check("qdrant", check_qdrant()),

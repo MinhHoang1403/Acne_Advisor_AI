@@ -14,6 +14,11 @@ from src.quality.safe_fallback import sanitize_fallback_reason
 logger = logging.getLogger(__name__)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+_COMPACT_RETRY_INSTRUCTION = (
+    "Câu trả lời trước đã bị cắt vì quá dài. Hãy trả lời lại từ đầu, ngắn gọn và hoàn chỉnh "
+    "bằng tiếng Việt trong tối đa 160 từ. Giữ nguyên mọi yêu cầu về an toàn, thực thể, "
+    "định dạng và số lượng mục của câu hỏi gốc; không mô tả quá trình suy luận."
+)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -58,7 +63,7 @@ def build_ollama_chat_payload(
         "think": _env_bool("OLLAMA_THINK", False),
         "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m").strip() or "30m",
         "options": {
-            "num_predict": _env_int("OLLAMA_NUM_PREDICT", 192),
+            "num_predict": _env_int("OLLAMA_NUM_PREDICT", 640),
             "num_ctx": _env_int("OLLAMA_NUM_CTX", 4096),
             "temperature": _env_float("OLLAMA_TEMPERATURE", temperature),
             "top_k": _env_int("OLLAMA_TOP_K", 20),
@@ -94,34 +99,46 @@ async def generate_ollama_response(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
-    payload = build_ollama_chat_payload(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-    )
-
     try:
         timeout = request_timeout or float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))
+        # A single compact retry is enough to recover from occasional verbose
+        # generations without turning truncation into an unbounded request loop.
+        retry_attempts = max(0, min(_env_int("OLLAMA_TRUNCATION_RETRY_ATTEMPTS", 1), 1))
+        attempt_messages = messages
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-            response.raise_for_status()
-            data = response.json()
-            done_reason = data.get("done_reason")
-            eval_count = data.get("eval_count")
-            num_predict = payload.get("options", {}).get("num_predict")
-            truncated = str(done_reason or "").lower() in {"length", "num_predict", "context_length"}
-            logger.info(
-                "Ollama generation completed: model=%s done_reason=%s eval_count=%s num_predict=%s truncated=%s",
-                model,
-                done_reason,
-                eval_count,
-                num_predict,
-                truncated,
-            )
-            content = data.get("message", {}).get("content", "")
-            if truncated:
+            for attempt in range(retry_attempts + 1):
+                payload = build_ollama_chat_payload(
+                    model=model,
+                    messages=attempt_messages,
+                    temperature=temperature,
+                )
+                response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
+                response.raise_for_status()
+                data = response.json()
+                done_reason = data.get("done_reason")
+                eval_count = data.get("eval_count")
+                num_predict = payload.get("options", {}).get("num_predict")
+                truncated = str(done_reason or "").lower() in {"length", "num_predict", "context_length"}
+                logger.info(
+                    "Ollama generation completed: model=%s attempt=%s done_reason=%s eval_count=%s num_predict=%s truncated=%s",
+                    model,
+                    attempt + 1,
+                    done_reason,
+                    eval_count,
+                    num_predict,
+                    truncated,
+                )
+                content = data.get("message", {}).get("content", "")
+                if not truncated:
+                    return content
+                if attempt < retry_attempts:
+                    logger.warning(
+                        "Ollama generation reached output limit; retrying once with a compact-answer instruction: model=%s",
+                        model,
+                    )
+                    attempt_messages = [*messages, {"role": "user", "content": _COMPACT_RETRY_INSTRUCTION}]
+                    continue
                 return f"{content}\n...[truncated_generation]"
-            return content
     except httpx.ConnectError:
         raise ConnectionError("Model local hiện chưa khả dụng. Hãy mở Ollama rồi thử lại.")
     except httpx.HTTPStatusError as e:
