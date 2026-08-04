@@ -932,6 +932,37 @@ def _trim_incomplete_terminal_paragraph(text: str) -> str:
     return "\n\n".join(paragraphs[:-1]).strip()
 
 
+def repair_terminal_punctuation(text: str) -> str:
+    """Repair a complete final sentence that only lacks terminal punctuation.
+
+    Fragments with a dangling connective may be genuine truncations and are
+    deliberately left unchanged for the safe fallback flow to handle.
+    """
+
+    if not _has_incomplete_terminal_sentence(text):
+        return text
+    last = _remove_known_disclaimers(text).strip().splitlines()[-1].strip()
+    if _is_heading(last) or _is_table_row(last):
+        return text
+    folded = _fold(last)
+    dangling_endings = (
+        " va",
+        " nhung",
+        " co the",
+        " voi",
+        " do",
+        " vi",
+        " anh nang",
+        " nhay cam voi anh nang",
+        " trong khi",
+    )
+    if any(folded.endswith(ending) for ending in dangling_endings):
+        return text
+    if len(last.split()) >= 8 and not re.search(r"[.!?…)]$", last):
+        return text.rstrip() + "."
+    return text
+
+
 def _has_incomplete_terminal_sentence(text: str) -> bool:
     clean = _remove_known_disclaimers(text).strip()
     if not clean:

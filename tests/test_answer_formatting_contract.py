@@ -9,6 +9,7 @@ from src.agent.answer_formatting import (
     answer_format_instruction_for_question,
     finalize_answer_presentation,
     normalize_answer_markdown,
+    repair_terminal_punctuation,
     strip_leading_question_echo,
 )
 from src.agent.nodes import reason as reason_node
@@ -283,6 +284,14 @@ def test_structural_quality_detects_incomplete_and_truncated_output():
 
     truncated = assess_structural_quality("Câu trả lời\n...[truncated_generation]", user_question="Mụn là gì?")
     assert "truncated_generation" in {issue["code"] for issue in truncated}
+
+
+def test_terminal_punctuation_repair_keeps_true_truncation_blocking():
+    complete_without_stop = "Mụn đầu đen là tổn thương không viêm thường gặp ở da dầu"
+    assert repair_terminal_punctuation(complete_without_stop).endswith(".")
+
+    dangling_fragment = "Mụn đầu đen có thể xuất hiện khi da tiết dầu nhiều và"
+    assert repair_terminal_punctuation(dangling_fragment) == dangling_fragment
 
 
 def test_non_boolean_composition_does_not_start_with_yes_prefix():

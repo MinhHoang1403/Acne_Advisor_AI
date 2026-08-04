@@ -35,6 +35,17 @@ def test_runtime_resilience_settings_from_env(monkeypatch):
     assert settings.circuit_breaker_enabled is False
 
 
+def test_runtime_resilience_defaults_reserve_time_for_one_compact_ollama_retry(monkeypatch):
+    monkeypatch.delenv("AGENT_TOTAL_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("OLLAMA_TIMEOUT_SECONDS", raising=False)
+
+    settings = runtime_resilience_settings_from_env()
+
+    assert settings.ollama_timeout_seconds == 160
+    assert settings.agent_total_timeout_seconds == 210
+    assert settings.agent_total_timeout_seconds > settings.ollama_timeout_seconds
+
+
 def test_rerank_timeout_is_capped_below_retrieval_timeout(monkeypatch):
     monkeypatch.setenv("RETRIEVAL_TIMEOUT_SECONDS", "20")
     monkeypatch.setenv("RERANK_TIMEOUT_SECONDS", "20")

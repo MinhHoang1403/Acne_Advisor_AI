@@ -128,6 +128,68 @@ def classify_medical_severity(query: str) -> SeverityClassification:
         evidence.extend(item for item in items if item)
 
     # Emergency: airway/allergy, severe drug rash, systemic infection/necrosis.
+    drug_exposure = _has_any(
+        accentless,
+        [
+            "sau khi dung thuoc",
+            "sau dung thuoc",
+            "sau mot thuoc",
+            "sau thuoc",
+            "thuoc moi",
+            "uong thuoc",
+            "boi thuoc",
+            "dung isotretinoin",
+        ],
+    )
+    drug_reaction_context = drug_exposure or _has_any(
+        accentless,
+        [
+            "sau khi dung",
+            "sau khi uong",
+            "sau khi boi",
+            "sau san pham moi",
+            "sau phan ung thuoc",
+            "sau thuoc tri mun",
+        ],
+    )
+    airway_or_systemic_alarm = _has_any(
+        accentless,
+        [
+            "sung moi",
+            "sung luoi",
+            "sung hong",
+            "moi sung",
+            "luoi sung",
+            "hong sung",
+            "kho tho",
+            "tho gap",
+            "kho khe",
+            "ngat",
+            "choang",
+            "khong tinh tao",
+        ],
+    )
+    if drug_reaction_context and _has_any(accentless, ["phan ve", "phan ung di ung nang"]):
+        mark("emergency_explicit_anaphylaxis_or_severe_allergic_reaction", "nghi phản vệ/phản ứng dị ứng nặng sau thuốc")
+        return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
+
+    if drug_reaction_context and _has_any(accentless, ["goi cap cuu", "can cap cuu"]):
+        mark("emergency_drug_reaction_emergency_action_question", "hỏi dấu hiệu cần gọi cấp cứu sau thuốc")
+        return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
+
+    if drug_reaction_context and airway_or_systemic_alarm:
+        mark("emergency_airway_or_systemic_drug_reaction", "dấu hiệu đường thở/toàn thân sau dùng thuốc")
+        if is_anaphylaxis_like_emergency_query(query):
+            mark("emergency_anaphylaxis_like_reaction", "khó thở kèm sưng/phát ban")
+        return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
+
+    if drug_exposure and _has_any(
+        accentless,
+        ["sung moi", "sung luoi", "sung hong", "moi sung", "luoi sung", "hong sung"],
+    ):
+        mark("emergency_airway_swelling_after_drug", "sưng môi/lưỡi/họng sau dùng thuốc")
+        return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
+
     if is_anaphylaxis_like_emergency_query(query):
         mark("emergency_anaphylaxis_like_reaction", "khó thở kèm sưng/phát ban")
         return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
@@ -139,10 +201,12 @@ def classify_medical_severity(query: str) -> SeverityClassification:
         mark("emergency_anaphylaxis_like_reaction", "khó thở/sưng/phát ban")
         return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
 
-    if _has_any(accentless, ["phong rop", "bong troc da", "loet mieng", "loet mat", "loet sinh duc"]) and _has_any(
+    severe_mucocutaneous = _has_any(
         accentless,
-        ["sot cao", "sau khi dung thuoc", "uong thuoc", "boi thuoc", "stevens", "ten"],
-    ):
+        ["phong rop", "bong troc da", "bong troc dien rong", "loet mieng", "loet mat", "loet sinh duc", "niem mac"],
+    )
+    systemic_or_eye_alarm = _has_any(accentless, ["sot", "mat dau", "dau rat mat", "dau mat"])
+    if severe_mucocutaneous and drug_exposure and (systemic_or_eye_alarm or _has_any(accentless, ["phong rop", "loet mieng", "niem mac"])):
         mark("emergency_severe_drug_rash_sjs_ten_like", "phồng rộp/loét/sốt sau dùng thuốc")
         return SeverityClassification(severity="emergency", matched_rules=rules, evidence=evidence)
 

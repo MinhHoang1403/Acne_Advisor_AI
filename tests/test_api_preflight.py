@@ -83,6 +83,30 @@ async def test_preflight_keeps_optional_ollama_unavailability_out_of_core_status
 
 
 @pytest.mark.asyncio
+async def test_preflight_preloads_dependencies_before_starting_bounded_checks(monkeypatch):
+    events: list[str] = []
+
+    def preload():
+        events.append("preload")
+
+    async def ok_check():
+        assert events == ["preload"]
+        return preflight.CheckResult("ok")
+
+    monkeypatch.setattr(preflight, "_preload_check_dependencies", preload)
+    monkeypatch.setattr(preflight, "check_postgres", ok_check)
+    monkeypatch.setattr(preflight, "check_qdrant", ok_check)
+    monkeypatch.setattr(preflight, "check_neo4j", ok_check)
+    monkeypatch.setattr(preflight, "check_redis", ok_check)
+    monkeypatch.setattr(preflight, "check_ollama", ok_check)
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+
+    result = await preflight.run_phase2_preflight()
+
+    assert result["status"] == "ok"
+
+
+@pytest.mark.asyncio
 async def test_preflight_degrades_when_ollama_is_configured_as_primary(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "ollama")
 

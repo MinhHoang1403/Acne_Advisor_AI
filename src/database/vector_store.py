@@ -22,9 +22,16 @@ import logging
 import math
 import os
 import re
+import ssl
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+from src.resilience.exceptions import (
+    PermanentProviderError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 
 try:
     from dotenv import load_dotenv
@@ -86,16 +93,67 @@ def _embed_sync(text: str) -> list[float]:
 async def embed_query(text: str) -> list[float]:
     """Embed a query string asynchronously using Gemini.
 
+    Transient transport failures are retried locally because an unavailable
+    query embedding would otherwise force a safe fallback despite an intact
+    knowledge base. Permanent provider/configuration errors are never retried.
+
     Returns a dense vector of EMBEDDING_DIMENSIONS floats.
     """
-    embedding = await asyncio.to_thread(_embed_sync, text)
-    if len(embedding) != EMBEDDING_DIMENSIONS:
-        raise ValueError(
-            f"Query embedding dimension mismatch: got {len(embedding)}, "
-            f"expected {EMBEDDING_DIMENSIONS}. Check EMBEDDING_MODEL and "
-            "EMBEDDING_DIMENSIONS."
-        )
-    return embedding
+    max_attempts = _positive_int_env("EMBEDDING_QUERY_MAX_ATTEMPTS", 3)
+    retry_base_delay = _positive_float_env("EMBEDDING_QUERY_RETRY_BASE_DELAY", 1.0)
+    for attempt in range(1, max_attempts + 1):
+        try:
+            embedding = await asyncio.to_thread(_embed_sync, text)
+            if len(embedding) != EMBEDDING_DIMENSIONS:
+                raise ValueError(
+                    f"Query embedding dimension mismatch: got {len(embedding)}, "
+                    f"expected {EMBEDDING_DIMENSIONS}. Check EMBEDDING_MODEL and "
+                    "EMBEDDING_DIMENSIONS."
+                )
+            return embedding
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if attempt >= max_attempts or not _is_retryable_query_embedding_error(exc):
+                raise
+            delay_seconds = retry_base_delay * (2 ** (attempt - 1))
+            logger.warning(
+                "Retrying query embedding after retryable transport failure: attempt=%d/%d error_type=%s delay_seconds=%.2f",
+                attempt,
+                max_attempts,
+                exc.__class__.__name__,
+                delay_seconds,
+            )
+            await asyncio.sleep(delay_seconds)
+    raise RuntimeError("Query embedding retry loop exited unexpectedly.")
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
+def _positive_float_env(name: str, default: float) -> float:
+    try:
+        return max(0.0, float(os.getenv(name, str(default))))
+    except ValueError:
+        return default
+
+
+def _is_retryable_query_embedding_error(exc: Exception) -> bool:
+    """Return whether retrying one live query embedding is safe and useful."""
+
+    if isinstance(exc, PermanentProviderError):
+        return False
+    if isinstance(exc, (ProviderTimeoutError, ProviderUnavailableError, ssl.SSLError, OSError)):
+        return True
+    try:
+        import httpx
+    except ImportError:
+        return False
+    return isinstance(exc, httpx.TransportError)
 
 
 # ---------------------------------------------------------------------------

@@ -82,6 +82,7 @@ def _has_breathing_difficulty(text: str) -> bool:
             "kho tho",
             "bat dau kho tho",
             "tho gap",
+            "kho khe",
             "nghen tho",
             "hut hoi",
             "kho hit tho",

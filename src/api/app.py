@@ -260,6 +260,9 @@ class ChatMetadata(BaseModel):
     phase2_debug: Optional[dict[str, Any]] = None
     response_origin: Optional[str] = None
     guardrail_applied: Optional[bool] = None
+    medical_severity: Optional[str] = None
+    severity_guard: Optional[dict[str, Any]] = None
+    severity_guard_modified: Optional[bool] = None
 
 class ChatResponse(BaseModel):
     answer: str
@@ -286,6 +289,11 @@ def _chat_metadata_identity(
 def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> str:
     if result.get("cache_hit"):
         return "cache"
+    # The severity guard may replace a prior guardrail response with the
+    # deterministic emergency contract. Attribute that final response to the
+    # safety fallback so provenance reflects what the user actually received.
+    if result.get("fallback_type") == "severity_emergency_safety_fallback":
+        return "safe_fallback"
     if _guardrail_applied(result, is_in_domain):
         return "guardrail"
     if result.get("fallback_applied"):
@@ -858,6 +866,9 @@ async def chat_endpoint(request: ChatRequest):
                 "quality_reason": result.get("cache_metadata", {}).get("quality_reason") if result.get("cache_hit") else None
             },
             "runtime_resilience": result.get("runtime_resilience"),
+            "medical_severity": result.get("medical_severity"),
+            "severity_guard": result.get("severity_guard"),
+            "severity_guard_modified": result.get("severity_guard_modified"),
         }
         
         # If cache hit, retrieve original model info
@@ -940,6 +951,9 @@ async def chat_endpoint(request: ChatRequest):
                 phase2_debug=phase2_debug,
                 response_origin=response_origin,
                 guardrail_applied=guardrail_applied,
+                medical_severity=result.get("medical_severity"),
+                severity_guard=result.get("severity_guard"),
+                severity_guard_modified=result.get("severity_guard_modified"),
             )
         )
         

@@ -32,10 +32,11 @@ def main() -> int:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--no-persistence", action="store_true")
+    parser.add_argument("--report-label", default="comprehensive_v1")
     args = parser.parse_args()
     if args.judge_provider != "gemini":
         raise SystemExit("BLOCKED: canonical route-aware judge requires --judge-provider gemini.")
-    config = EvaluationConfig(dataset_path=args.dataset.resolve(), report_root=args.report_root.resolve(), api_base_url=args.api_base_url, question_limit=args.question_limit, live_provider=args.live_provider, live_model=args.live_model, judge_provider=args.judge_provider, judge_model=args.judge_model, run_live=args.run_live, run_judge=args.run_judge, bypass_cache=args.bypass_cache, smoke=args.smoke, no_persistence=args.no_persistence)
+    config = EvaluationConfig(dataset_path=args.dataset.resolve(), report_root=args.report_root.resolve(), api_base_url=args.api_base_url, question_limit=args.question_limit, live_provider=args.live_provider, live_model=args.live_model, judge_provider=args.judge_provider, judge_model=args.judge_model, run_live=args.run_live, run_judge=args.run_judge, bypass_cache=args.bypass_cache, smoke=args.smoke, no_persistence=args.no_persistence, report_label=args.report_label)
     report_dir = ComprehensiveRunner(config, ROOT).run(resume=args.resume)
     print(f"COMPREHENSIVE_EVALUATION_REPORT={report_dir}")
     return 0

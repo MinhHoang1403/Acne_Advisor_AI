@@ -103,7 +103,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             severity_guard.classification.severity,
             severity_guard.modified,
         )
-        return {
+        result: dict[str, Any] = {
             "final_answer": presented_answer,
             "answer_quality_report": report_data,
             "answer_guard_modified": guard.modified or severity_guard.modified,
@@ -114,6 +114,28 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             "severity_guard_cache_eligible": severity_guard.cache_eligible,
             "response_profile": response_profile,
         }
+        if (
+            severity_guard.modified
+            and severity_guard.classification.severity == "emergency"
+        ):
+            # The emergency template replaces the generated text completely, so
+            # provenance must describe the final deterministic answer, not the
+            # discarded provider draft.
+            result.update(
+                {
+                    "actual_provider": "system",
+                    "actual_model": None,
+                    "llm_fallback_used": False,
+                    "fallback_provider": None,
+                    "fallback_model": None,
+                    "fallback_applied": True,
+                    "fallback_type": "severity_emergency_safety_fallback",
+                    "fallback_reason": severity_guard.modification_reason,
+                    "fallback_answer": presented_answer,
+                    "fallback_cache_eligible": False,
+                }
+            )
+        return result
     except Exception as exc:
         safe_error = sanitize_fallback_reason(exc)
         logger.warning("Answer quality verifier failed safely: %s", safe_error)
