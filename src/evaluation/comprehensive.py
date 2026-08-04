@@ -139,6 +139,18 @@ def _pid_is_alive(pid: int) -> bool:
 
     if pid <= 0:
         return False
+    if os.name == "nt":
+        # ``os.kill(pid, 0)`` is not a safe signal-free existence probe on
+        # Windows. Query the process table instead so resume never interrupts
+        # the evaluation runner or the surrounding pytest process.
+        completed = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=5,
+        )
+        return completed.returncode == 0 and f'"{pid}"' in completed.stdout
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
