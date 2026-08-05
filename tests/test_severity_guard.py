@@ -87,8 +87,8 @@ def test_v1_emergency_regressions_route_to_immediate_emergency_action(query: str
     assert first_sentence_has_immediate_emergency_action(result.answer) is True
 
 
-def test_all_canonical_emergency_cases_route_to_immediate_emergency_action():
-    dataset_path = Path("notebooks/eval_data/acne_rag_eval_comprehensive_v1.jsonl")
+def test_all_v3_canonical_emergency_cases_route_to_immediate_emergency_action():
+    dataset_path = Path("evaluation/data/acne_system_eval_v3.jsonl")
     emergency_cases = [
         json.loads(line)
         for line in dataset_path.read_text(encoding="utf-8").splitlines()

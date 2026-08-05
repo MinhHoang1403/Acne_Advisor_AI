@@ -294,6 +294,39 @@ async def test_coreference_rewrite_resolves_tazorac_group_followup():
 
 
 @pytest.mark.asyncio
+async def test_coreference_rewrite_resolves_product_comparison_with_explicit_comparator():
+    result = await rewrite_question_node(
+        {
+            "user_question": "Sản phẩm đó khác Differin ở điểm nào?",
+            "normalized_question": "sản phẩm đó khác differin ở điểm nào?",
+            "conversation_history": [
+                {"role": "user", "content": "Tôi vừa hỏi về Epiduo."},
+                {"role": "assistant", "content": "Tôi đã ghi nhận thông tin này để trả lời câu tiếp theo."},
+            ],
+        }
+    )
+
+    assert result["standalone_question"] == "Epiduo khác Differin ở điểm nào?"
+    assert result["use_history_context"] is True
+
+
+@pytest.mark.asyncio
+async def test_coreference_rewrite_preserves_clindamycin_monotherapy_polarity():
+    result = await rewrite_question_node(
+        {
+            "user_question": "Có nên dùng riêng nó kéo dài không?",
+            "normalized_question": "có nên dùng riêng nó kéo dài không?",
+            "conversation_history": [
+                {"role": "user", "content": "Bác sĩ từng kê clindamycin bôi cho tôi."},
+            ],
+        }
+    )
+
+    assert result["standalone_question"] == "Có nên dùng clindamycin đơn độc hoặc kéo dài để trị mụn không?"
+    assert result["use_history_context"] is True
+
+
+@pytest.mark.asyncio
 async def test_generation_prompt_uses_standalone_question_after_rewrite(monkeypatch):
     captured: dict[str, str] = {}
 

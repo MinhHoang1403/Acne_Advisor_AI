@@ -75,7 +75,9 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
         "epiduo",
         "dalacin",
     ]
-    if any(entity in normalized for entity in explicit_primary_entities):
+    _, matching_question = build_matching_views(state.get("user_question", "") or normalized)
+    has_coreference = _has_coreference_marker(matching_question)
+    if any(entity in normalized for entity in explicit_primary_entities) and not has_coreference:
         return {
             "standalone_question": normalized,
             "use_history_context": False,
@@ -86,7 +88,7 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
         "nhắc lại", "tình trạng da", "tuổi của tôi", "bắt đầu chăm sóc", "chăm sóc như thế nào",
         "có cần", "kháng sinh không", "uống kháng sinh", "routine",
     ]
-    needs_rewrite = any(kw in normalized for kw in ambiguous_keywords)
+    needs_rewrite = has_coreference or any(kw in normalized for kw in ambiguous_keywords)
     
     if not needs_rewrite:
         return {
@@ -199,6 +201,7 @@ def _has_coreference_marker(text: str) -> bool:
             " no ",
             " no?",
             "thuoc do",
+            "san pham do",
             "loai do",
             "cai do",
             "hoat chat do",
@@ -212,6 +215,14 @@ def _has_coreference_marker(text: str) -> bool:
 
 def _rewrite_for_intent(question_norm: str, target: str, product: str | None) -> str:
     product_text = f" trong {product}" if product and product not in target else ""
+    comparison_target = _comparison_target(question_norm, target)
+    if comparison_target:
+        return f"{target} khác {comparison_target} ở điểm nào?"
+    if target.casefold() in {"clindamycin", "erythromycin"} and _contains_any(
+        question_norm,
+        ["dung rieng", "dung don doc", "keo dai"],
+    ):
+        return f"Có nên dùng {target} đơn độc hoặc kéo dài để trị mụn không?"
     if _contains_any(question_norm, ["khang sinh khong", "co phai khang sinh", "antibiotic"]):
         return f"{target}{product_text} có phải kháng sinh không?"
     if _contains_any(question_norm, ["thuoc nhom", "nhom nao", "nhom gi"]):
@@ -222,6 +233,19 @@ def _rewrite_for_intent(question_norm: str, target: str, product: str | None) ->
     ):
         return f"Vì sao {target}{product_text} có tác dụng kháng khuẩn/antimicrobial với C. acnes?"
     return f"{target}{product_text}: {question_norm}"
+
+
+def _comparison_target(question_norm: str, target: str) -> str | None:
+    """Return an explicit comparison entity while resolving the prior product."""
+
+    if not _contains_any(question_norm, ["khac", "so sanh", "voi"]):
+        return None
+    target_norm = build_matching_views(target)[1]
+    for candidate in ("Epiduo", "Differin", "Tazorac", "Dalacin T"):
+        candidate_norm = build_matching_views(candidate)[1]
+        if candidate_norm in question_norm and candidate_norm != target_norm:
+            return candidate
+    return None
 
 
 def _last_product_mention(history: list[dict]) -> str | None:

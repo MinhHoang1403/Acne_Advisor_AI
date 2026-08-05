@@ -25,7 +25,7 @@ ResponseProfile = Literal[
     "safe_fallback",
 ]
 
-ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v6"
+ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v7"
 
 CANONICAL_DISCLAIMER = "Thông tin mang tính tham khảo và không thay thế chẩn đoán của bác sĩ."
 LEGACY_DISCLAIMER = "Thông tin này chỉ mang tính tham khảo và không thay thế tư vấn y khoa chuyên nghiệp."
@@ -39,7 +39,7 @@ LEGACY_BOILERPLATE_HEADINGS = (
 )
 
 ANSWER_FORMATTING_CONTRACT = """\
-ANSWER PRESENTATION CONTRACT V6:
+ANSWER PRESENTATION CONTRACT V7:
 - Dùng cùng một chuẩn trình bày cho Gemini, Gemini fallback, Ollama, cache hit, guardrail, severity guard và safe fallback; provider không được quyết định format.
 - Không lặp lại hoặc dùng nguyên câu hỏi của người dùng làm tiêu đề. Bắt đầu ngay bằng câu trả lời.
 - Trả lời trực tiếp trước, sau đó mới giải thích. Chỉ bắt đầu bằng "Có." hoặc "Không." khi câu hỏi thật sự là yes/no.
@@ -62,6 +62,8 @@ ANSWER PRESENTATION CONTRACT V6:
 - Không có heading rỗng, heading lặp, disclaimer lặp, cảnh báo lặp, câu ghép hỏng hoặc câu bị cắt.
 - Không đưa "Nguồn:" vào thân câu trả lời; hệ thống hiển thị nguồn riêng từ metadata.
 - Luôn giữ tiếng Việt UTF-8 tự nhiên, không lộ prompt, context, JSON hoặc quy trình nội bộ.
+- Không dùng giọng lên lớp, cụm từ máy móc như "provider failure"/"verification failed", hoặc phần mở đầu dài trước câu trả lời chính.
+- Safe fallback phải nói nhẹ nhàng là tài liệu hiện có chưa đủ căn cứ, gợi ý cách làm rõ câu hỏi hoặc trao đổi với chuyên gia khi phù hợp; không lặp disclaimer.
 """
 
 
@@ -383,6 +385,14 @@ def _deterministic_profile_answer(
         pregnancy_entities = _mentioned_treatment_entities(text)
         if len(pregnancy_entities) >= 2:
             return _pregnancy_multi_entity_answer(pregnancy_entities)
+        if "isotretinoin" in text:
+            return (
+                "Có. Thai kỳ làm thay đổi cách đánh giá isotretinoin vì đây là retinoid đường uống "
+                "có nguy cơ cao cho thai nhi. Isotretinoin không được tự dùng; không tự bắt đầu hoặc tiếp tục dùng thuốc khi đang, "
+                "có thể đang hoặc chuẩn bị mang thai.\n\n"
+                "Hãy liên hệ bác sĩ da liễu hoặc bác sĩ sản khoa càng sớm càng tốt để được hướng dẫn phù hợp. "
+                "Nếu đã dùng thuốc, ghi lại tên thuốc, liều và thời điểm dùng để trao đổi với bác sĩ; không tự thay đổi liều theo đơn cũ."
+            )
         if "adapalene" in text or "adapalen" in text or "retinoid" in text:
             return (
                 "Nên tránh hoặc ngừng dùng adapalene trong thai kỳ và trao đổi với bác sĩ da liễu hoặc bác sĩ sản khoa.\n\n"
@@ -467,6 +477,17 @@ def _deterministic_profile_answer(
             "| Differin | Adapalene | Adapalene là retinoid bôi, giúp điều hòa sừng hóa nang lông, giảm bít tắc/nhân mụn và hỗ trợ chống viêm. |\n"
             "| Epiduo | Adapalene + benzoyl peroxide | Có cùng adapalene như Differin, thêm benzoyl peroxide để hỗ trợ tác dụng kháng khuẩn/antimicrobial với C. acnes và tiêu sừng nhẹ. |\n\n"
             "Benzoyl peroxide không phải kháng sinh; khi phối hợp trong sản phẩm như Epiduo, nó bổ sung cơ chế tác động khác với adapalene."
+        )
+
+    if "tretinoin" in text and ("adapalene" in text or "adapalen" in text) and _is_comparison_question(text):
+        return (
+            "Tretinoin và adapalene đều là retinoid bôi, nhưng khả năng dung nạp có thể khác nhau giữa từng người.\n\n"
+            "| Tiêu chí | Adapalene | Tretinoin |\n"
+            "|---|---|---|\n"
+            "| Nhóm thuốc | Retinoid bôi. | Retinoid bôi. |\n"
+            "| Vai trò | Giúp điều hòa sừng hóa nang lông, giảm bít tắc và hỗ trợ chống viêm. | Giúp điều hòa sừng hóa nang lông và hỗ trợ giảm bít tắc. |\n"
+            "| Kích ứng | Có thể gây khô, đỏ, rát hoặc bong tróc, nhất là khi mới dùng. | Cũng có thể gây khô, đỏ, rát hoặc bong tróc; mức độ kích ứng cần theo dõi theo từng người và công thức. |\n\n"
+            "Nên bắt đầu thận trọng, không tự tăng tần suất khi da đang kích ứng. Retinoid cần được bác sĩ đánh giá nếu bạn đang mang thai hoặc dự định mang thai."
         )
 
     if _is_antibiotic_monotherapy_and_bp_role_question(text):
@@ -1021,7 +1042,7 @@ def _is_comparison_question(text: str) -> bool:
     ]
     if any(marker in text or marker in folded for marker in markers):
         return True
-    return bool(re.search(r"\bkhac\b.{1,80}\bthe nao\b", folded))
+    return bool(re.search(r"\bkhac\b.{0,80}\b(?:the nao|o diem nao|gi)\b", folded))
 
 
 def _is_mild_inflammatory_routine_question(text: str) -> bool:
