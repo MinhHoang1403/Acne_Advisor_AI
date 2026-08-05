@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from evaluation.validators import load_cases, validate_cases
+from evaluation.validators import CANONICAL_SOURCE_REFERENCES, _known_references, load_cases, validate_cases
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,3 +53,9 @@ def test_dataset_v3_rejects_lossy_internal_question_markers() -> None:
 
     with pytest.raises(ValueError, match="encoding placeholder"):
         validate_cases(rows, ROOT)
+
+
+def test_versioned_source_references_do_not_require_a_runtime_manifest(tmp_path: Path) -> None:
+    _, source_refs = _known_references(tmp_path)
+
+    assert source_refs == set(CANONICAL_SOURCE_REFERENCES)

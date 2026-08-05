@@ -35,6 +35,18 @@ REQUIRED_FIELDS = {
     "notes",
 }
 
+# The Phase 1 manifest is intentionally runtime-only and absent in clean CI.
+# These are the document-level source names used by the frozen V3 dataset and
+# were verified against the current Phase 1 manifest before it was backed up.
+CANONICAL_SOURCE_REFERENCES = frozenset(
+    {
+        "PIIS0190962223033893.pdf",
+        "acne-vulgaris-management-pdf-66142088866501.pdf",
+        "qd_4416_cut.pdf",
+        "web_raw_dataset.json",
+    }
+)
+
 
 def normalize(value: Any) -> str:
     text = unicodedata.normalize("NFD", str(value or "").casefold())
@@ -78,7 +90,7 @@ def _known_references(project_root: Path) -> tuple[set[str], set[str]]:
                 entities.add(normalize(item.get("canonical_name")))
                 entities.update(normalize(alias) for alias in item.get("aliases", []) or [])
     manifest_path = project_root / "data" / "ingestion_manifest.json"
-    sources: set[str] = set()
+    sources: set[str] = set(CANONICAL_SOURCE_REFERENCES)
     if manifest_path.exists():
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         for entry in (manifest.get("documents") or {}).values():
