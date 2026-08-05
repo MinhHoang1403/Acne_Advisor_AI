@@ -28,9 +28,9 @@ def test_formatting_contract_avoids_mandatory_boilerplate_sections():
         graph_facts=[],
     )
 
-    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v6"
+    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v7"
     assert ANSWER_FORMATTING_CONTRACT in prompt
-    assert "ANSWER PRESENTATION CONTRACT V6" in prompt
+    assert "ANSWER PRESENTATION CONTRACT V7" in prompt
     assert "provider không được quyết định format" in prompt
     assert "Multi-intent" in prompt
     assert "Structured request" in prompt
@@ -315,6 +315,31 @@ def test_differin_epiduo_comparison_does_not_collapse_to_epiduo_only():
     assert "adapalene" in answer
     assert "benzoyl peroxide" in answer
     assert "| Thuốc | Thành phần chính | Ý nghĩa |" in answer
+
+
+def test_rewritten_epiduo_differin_comparison_uses_safe_product_specific_answer():
+    answer = finalize_answer_presentation(
+        "Benzoyl peroxide có thể sử dụng dưới dạng thuốc bôi hoặc thuốc uống.",
+        user_question="Epiduo khác Differin ở điểm nào?",
+    )
+
+    assert "Differin" in answer
+    assert "Epiduo" in answer
+    assert "adapalene" in answer
+    assert "benzoyl peroxide" in answer
+    assert "thuốc uống" not in answer
+
+
+def test_tretinoin_adapalene_comparison_uses_a_complete_markdown_table():
+    answer = finalize_answer_presentation(
+        "Tretinoin và adapalene là retinoid.",
+        user_question="Tretinoin khác adapalene như thế nào về nhóm thuốc và khả năng gây kích ứng? Hãy tóm tắt dạng bảng.",
+    )
+
+    assert "| Tiêu chí | Adapalene | Tretinoin |" in answer
+    assert "adapalene" in answer.lower()
+    assert "tretinoin" in answer.lower()
+    assert "kích ứng" in answer.lower()
 
 
 @pytest.mark.asyncio

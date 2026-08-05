@@ -136,7 +136,8 @@ async def run_clinical_agent(
     llm_provider: str | None = None,
     llm_model: str | None = None,
     allow_model_fallback: bool = True,
-    bypass_cache: bool = False
+    bypass_cache: bool = False,
+    evaluation_mode: bool = False,
 ) -> dict[str, Any]:
     """
     Entrypoint to run the agent with a user message.
@@ -225,7 +226,8 @@ async def run_clinical_agent(
         "fallback_provider": None,
         "fallback_model": None,
         "fallback_chain": None,
-        "bypass_cache": bypass_cache
+        "bypass_cache": bypass_cache,
+        "evaluation_mode": evaluation_mode,
     }
     
     # Invoke the graph asynchronously

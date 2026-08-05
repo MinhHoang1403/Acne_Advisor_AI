@@ -70,6 +70,9 @@ dmypy.json
 # Local notebook recovery backups
 local_notebook_backups/
 
+# Local evidence retained while replacing evaluation frameworks
+/local_eval_backup/
+
 # ---------------------------------------------------------------------------
 # Node.js / Web (src/frontend)
 # ---------------------------------------------------------------------------

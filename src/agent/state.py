@@ -93,3 +93,7 @@ class ClinicalState(TypedDict):
     
     # Cache bypass (for test scripts)
     bypass_cache: bool
+
+    # Internal-only execution mode used by the local evaluation runner. It is
+    # intentionally not exposed by the public API contract.
+    evaluation_mode: bool
