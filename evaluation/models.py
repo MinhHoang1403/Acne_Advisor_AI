@@ -10,6 +10,7 @@ from typing import Any
 DATASET_SCHEMA_VERSION = "evaluation_case_v3"
 METRICS_VERSION = "evaluation_metrics_v3"
 JUDGE_RUBRIC_VERSION = "route_aware_gemini_v3"
+CHECKPOINT_SCHEMA_VERSION = "evaluation_checkpoint_v2"
 JUDGE_SCORE_DELTA_MAX = 25.0
 FINAL_REPORT_NAME = "BAO_CAO_DANH_GIA_HE_THONG_V3.md"
 
@@ -66,9 +67,34 @@ class EvaluationConfig:
     request_timeout_seconds: int = 210
     judge_attempts: int = 5
     judge_retry_base_seconds: float = 2.0
+    run_dir: Path | None = None
 
     def as_json(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["dataset_path"] = str(self.dataset_path)
         payload["report_root"] = str(self.report_root)
+        payload["run_dir"] = str(self.run_dir) if self.run_dir is not None else None
         return payload
+
+    def resume_identity_json(self) -> dict[str, Any]:
+        """Return the stable semantic identity for a checkpointed run.
+
+        Invocation controls such as ``judge_limit`` and retry tuning are kept in
+        ``as_json`` for auditability, but must not prevent a 3-case smoke from
+        resuming the same 300-case judge run.
+        """
+
+        return {
+            "dataset_schema_version": DATASET_SCHEMA_VERSION,
+            "metrics_version": METRICS_VERSION,
+            "judge_rubric_version": JUDGE_RUBRIC_VERSION,
+            "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
+            "live_provider": self.live_provider,
+            "live_model": self.live_model,
+            "judge_provider": self.judge_provider,
+            "judge_model": self.judge_model,
+            "question_limit": self.question_limit,
+            "case_ids": list(self.case_ids),
+            "bypass_cache": self.bypass_cache,
+            "no_persistence": self.no_persistence,
+        }

@@ -10,6 +10,24 @@ from typing import Any
 from .models import JUDGE_RUBRIC_VERSION, EvaluationConfig
 
 
+def _retry_delay_seconds(error: Exception, attempt: int, base_delay: float) -> float:
+    """Use a server Retry-After hint when one is available, otherwise back off."""
+
+    match = re.search(r"retry[- ]after\s*[:=]?\s*(\d+(?:\.\d+)?)", str(error), flags=re.IGNORECASE)
+    if match:
+        return max(0.0, float(match.group(1)))
+    return base_delay * (2 ** (attempt - 1))
+
+
+def _is_transient_error(error: Exception) -> bool:
+    message = str(error).lower()
+    permanent_markers = ("401", "403", "authentication", "permission", "invalid model", "invalid request", "malformed")
+    if any(marker in message for marker in permanent_markers):
+        return False
+    transient_markers = ("429", "timeout", "timed out", "ssl", "connection", "service unavailable", "temporar")
+    return any(marker in message for marker in transient_markers) or bool(re.search(r"\b5\d\d\b", message))
+
+
 def _rubric_for(origin: str) -> tuple[str, list[str]]:
     if origin in {"llm_generated", "cautious_answer"}:
         return (
@@ -121,6 +139,7 @@ def judge_case(case: dict[str, Any], result: dict[str, Any], config: EvaluationC
     rubric, dimensions = _rubric_for(origin)
     prompt = judge_prompt(case, result)
     last_error: str | None = None
+    last_error_is_transient = False
     for attempt in range(1, config.judge_attempts + 1):
         try:
             response = generate_text_sync(
@@ -142,14 +161,17 @@ def judge_case(case: dict[str, Any], result: dict[str, Any], config: EvaluationC
                 "retry_count": attempt - 1,
                 "final_error": None,
                 "status": "ok",
+                "checkpoint_status": "success",
                 "deterministic_score": result.get("deterministic_score"),
                 "deterministic_pass": result.get("deterministic_pass"),
                 **parsed,
             }
         except Exception as exc:
             last_error = f"{exc.__class__.__name__}: {exc}"
-            if attempt < config.judge_attempts:
-                time.sleep(config.judge_retry_base_seconds * (2 ** (attempt - 1)))
+            last_error_is_transient = _is_transient_error(exc)
+            if not last_error_is_transient or attempt >= config.judge_attempts:
+                break
+            time.sleep(_retry_delay_seconds(exc, attempt, config.judge_retry_base_seconds))
     return {
         "case_id": case["id"],
         "category": case["category"],
@@ -161,6 +183,7 @@ def judge_case(case: dict[str, Any], result: dict[str, Any], config: EvaluationC
         "retry_count": config.judge_attempts - 1,
         "final_error": last_error,
         "status": "error",
+        "checkpoint_status": "transient_error" if last_error_is_transient else "final_error",
         "deterministic_score": result.get("deterministic_score"),
         "deterministic_pass": result.get("deterministic_pass"),
         "scores": {},

@@ -49,6 +49,30 @@ def completed_ids(path: Path) -> set[str]:
     return {str(row["case_id"]) for row in read_jsonl(path) if row.get("case_id")}
 
 
+def rows_by_case_id(path: Path) -> dict[str, dict[str, Any]]:
+    """Load a checkpoint while rejecting duplicate final records per case."""
+
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in read_jsonl(path):
+        case_id = str(row.get("case_id") or "")
+        if not case_id:
+            raise ValueError(f"Checkpoint {path} contains a row without case_id")
+        if case_id in indexed:
+            raise ValueError(f"Checkpoint {path} contains duplicate case_id: {case_id}")
+        indexed[case_id] = row
+    return indexed
+
+
+def successful_ids(path: Path) -> set[str]:
+    """Return only successful final rows; transient failures remain resumable."""
+
+    return {
+        case_id
+        for case_id, row in rows_by_case_id(path).items()
+        if row.get("status") == "ok" and row.get("checkpoint_status", "success") == "success"
+    }
+
+
 def assert_resume_compatible(
     manifest: dict[str, Any],
     *,
