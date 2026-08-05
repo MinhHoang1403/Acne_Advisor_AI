@@ -28,6 +28,7 @@ def _add_common_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--bypass-cache", action="store_true", default=True)
     parser.add_argument("--no-persistence", action="store_true", default=True)
     parser.add_argument("--checkpoint", action="store_true", default=True)
+    parser.add_argument("--run-dir", type=Path, help="Explicit run directory inside --report-root.")
 
 
 def _config(args: argparse.Namespace, *, judge: bool = False) -> EvaluationConfig:
@@ -44,6 +45,7 @@ def _config(args: argparse.Namespace, *, judge: bool = False) -> EvaluationConfi
         bypass_cache=args.bypass_cache,
         no_persistence=args.no_persistence,
         checkpoint=args.checkpoint,
+        run_dir=args.run_dir.resolve() if args.run_dir else None,
     )
 
 
@@ -52,6 +54,7 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="stage", required=True)
     live = subparsers.add_parser("live", help="Run direct, isolated Ollama live evaluation.")
     _add_common_options(live)
+    live.add_argument("--resume", action="store_true", help="Resume the explicit --run-dir.")
     live.add_argument("--resume-latest", action="store_true")
     judge = subparsers.add_parser("judge", help="Judge saved V3 live responses only.")
     _add_common_options(judge)
@@ -65,7 +68,9 @@ def main() -> int:
 
     if args.stage == "live":
         runner = FinalEvaluationRunner(_config(args), ROOT)
-        report_dir = runner.run_live(resume=args.resume_latest)
+        if args.run_dir and args.resume_latest:
+            raise SystemExit("--run-dir and --resume-latest cannot be combined.")
+        report_dir = runner.run_live(resume=args.resume or args.resume_latest)
     elif args.stage == "judge":
         if args.provider != "gemini":
             raise SystemExit("BLOCKED: Evaluation V3 judge provider must be gemini.")
