@@ -28,9 +28,9 @@ def test_formatting_contract_avoids_mandatory_boilerplate_sections():
         graph_facts=[],
     )
 
-    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v7"
+    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v9"
     assert ANSWER_FORMATTING_CONTRACT in prompt
-    assert "ANSWER PRESENTATION CONTRACT V7" in prompt
+    assert "ANSWER PRESENTATION CONTRACT V9" in prompt
     assert "provider không được quyết định format" in prompt
     assert "Multi-intent" in prompt
     assert "Structured request" in prompt
@@ -375,6 +375,17 @@ def test_tazorac_differin_comparison_does_not_introduce_epiduo_or_bpo():
     assert "Adapalene" in answer
     assert "Epiduo" not in answer
     assert "benzoyl peroxide" not in answer.lower()
+
+
+def test_tazorac_group_identity_preserves_product_and_active_ingredient():
+    answer = finalize_answer_presentation(
+        "Tazorac la retinoid boi.",
+        user_question="Tazorac (tazarotene) thuộc nhóm thuốc nào?",
+    )
+
+    assert "Tazorac" in answer
+    assert "tazarotene" in answer.lower()
+    assert "retinoid bôi" in answer.lower()
 
 
 @pytest.mark.asyncio

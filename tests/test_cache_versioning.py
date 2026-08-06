@@ -49,32 +49,28 @@ def test_answer_verifier_version_is_in_manifest_and_changes_fingerprint():
 
 
 def test_answer_formatting_contract_version_is_in_manifest_and_changes_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v0",
-        }
-    )
+    old_manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v5"})
+    old_manifest["answer_formatting_contract_version"] = "answer_formatting_contract_v6"
     new_manifest = build_pipeline_version_manifest(
         {
             "CACHE_ANSWER_VERSION": "v5",
-            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v6",
+            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v9",
         }
     )
 
-    assert new_manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v6"
+    assert new_manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v9"
     assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v6():
+def test_legacy_answer_formatting_contract_is_promoted_to_v9():
     manifest = build_pipeline_version_manifest(
         {
             "CACHE_ANSWER_VERSION": "v5",
-            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v5",
+            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8",
         }
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v6"
+    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v9"
 
 
 def test_llm_fallback_policy_and_google_fallback_models_change_fingerprint():

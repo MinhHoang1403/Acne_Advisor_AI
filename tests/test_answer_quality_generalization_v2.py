@@ -290,7 +290,7 @@ async def test_coreference_rewrite_resolves_tazorac_group_followup():
         }
     )
 
-    assert result["standalone_question"] == "tazarotene thuộc nhóm thuốc nào?"
+    assert result["standalone_question"] == "Tazorac (tazarotene) thuộc nhóm thuốc nào?"
 
 
 @pytest.mark.asyncio
@@ -323,6 +323,34 @@ async def test_coreference_rewrite_preserves_clindamycin_monotherapy_polarity():
     )
 
     assert result["standalone_question"] == "Có nên dùng clindamycin đơn độc hoặc kéo dài để trị mụn không?"
+    assert result["use_history_context"] is True
+
+
+@pytest.mark.asyncio
+async def test_coreference_rewrite_resolves_name_reference_to_prior_product():
+    result = await rewrite_question_node(
+        {
+            "user_question": "Tên đó liên quan đến hoạt chất nào?",
+            "normalized_question": "tên đó liên quan đến hoạt chất nào?",
+            "conversation_history": [{"role": "user", "content": "Tôi đang nói về Dalacin T."}],
+        }
+    )
+
+    assert result["standalone_question"].startswith("Dalacin T:")
+    assert result["use_history_context"] is True
+
+
+@pytest.mark.asyncio
+async def test_coreference_rewrite_carries_active_product_for_context_dependent_routine_followup():
+    result = await rewrite_question_node(
+        {
+            "user_question": "Vì sao không nên thêm nhiều hoạt chất mạnh cùng lúc?",
+            "normalized_question": "vì sao không nên thêm nhiều hoạt chất mạnh cùng lúc?",
+            "conversation_history": [{"role": "user", "content": "Tôi có dùng Epiduo."}],
+        }
+    )
+
+    assert result["standalone_question"].startswith("Epiduo:")
     assert result["use_history_context"] is True
 
 

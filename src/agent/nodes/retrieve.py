@@ -88,7 +88,11 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
         "nhắc lại", "tình trạng da", "tuổi của tôi", "bắt đầu chăm sóc", "chăm sóc như thế nào",
         "có cần", "kháng sinh không", "uống kháng sinh", "routine",
     ]
-    needs_rewrite = has_coreference or any(kw in normalized for kw in ambiguous_keywords)
+    has_implicit_treatment_followup = _has_implicit_treatment_followup(
+        matching_question,
+        history,
+    )
+    needs_rewrite = has_coreference or has_implicit_treatment_followup or any(kw in normalized for kw in ambiguous_keywords)
     
     if not needs_rewrite:
         return {
@@ -106,6 +110,7 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
         normalized=normalized,
         original_question=state.get("user_question", ""),
         history=history,
+        allow_implicit_context=has_implicit_treatment_followup,
     )
     if deterministic_rewrite:
         logger.info("Rewrote follow-up question with deterministic coreference resolver.")
@@ -168,11 +173,12 @@ def _deterministic_followup_rewrite(
     normalized: str,
     original_question: str,
     history: list[dict],
+    allow_implicit_context: bool = False,
 ) -> str | None:
     """Resolve common acne-drug coreference before falling back to LLM rewrite."""
 
     _, question_norm = build_matching_views(original_question or normalized)
-    if not _has_coreference_marker(question_norm):
+    if not _has_coreference_marker(question_norm) and not allow_implicit_context:
         return None
 
     product = _last_product_mention(history)
@@ -207,8 +213,28 @@ def _has_coreference_marker(text: str) -> bool:
             "hoat chat do",
             "hoat chat thu hai",
             "thanh phan thu hai",
+            "ten do",
+            "day la",
+            "day la thuoc",
             "vay",
             "vay thi",
+        ],
+    )
+
+
+def _has_implicit_treatment_followup(question_norm: str, history: list[dict]) -> bool:
+    """Carry the active treatment forward for narrow, context-dependent follow-ups."""
+
+    if not (_last_product_mention(history) or _last_active_ingredient_mention(history)):
+        return False
+    return _contains_any(
+        question_norm,
+        [
+            "nhieu hoat chat",
+            "them hoat chat",
+            "dieu chinh tan suat",
+            "ban ngay co buoc",
+            "thoi quen nao",
         ],
     )
 
@@ -226,6 +252,8 @@ def _rewrite_for_intent(question_norm: str, target: str, product: str | None) ->
     if _contains_any(question_norm, ["khang sinh khong", "co phai khang sinh", "antibiotic"]):
         return f"{target}{product_text} có phải kháng sinh không?"
     if _contains_any(question_norm, ["thuoc nhom", "nhom nao", "nhom gi"]):
+        if product and product not in target:
+            return f"{product} ({target}) thuộc nhóm thuốc nào?"
         return f"{target} thuộc nhóm thuốc nào?"
     if _contains_any(question_norm, ["tai sao", "vi sao", "why", "how"]) and _contains_any(
         question_norm,

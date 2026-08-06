@@ -117,6 +117,11 @@ class CrossEncoderSemanticBackend:
             raw_scores.extend(float(score) for score in predicted)
         return raw_scores
 
+    def warmup(self) -> None:
+        """Load the local CrossEncoder before a latency-sensitive request."""
+
+        self._load_model()
+
     def _load_model(self):
         if self._model is not None:
             return self._model
@@ -170,6 +175,14 @@ class LocalSemanticReranker:
     @property
     def available(self) -> bool:
         return bool(self.config.model_path and Path(self.config.model_path).exists())
+
+    def warmup(self) -> None:
+        """Eagerly load the built-in local backend without scoring a query."""
+
+        if not self.available and isinstance(self.backend, CrossEncoderSemanticBackend):
+            raise RerankerUnavailable("Local semantic reranker model is not provisioned.")
+        if isinstance(self.backend, CrossEncoderSemanticBackend):
+            self.backend.warmup()
 
     def rerank(
         self,

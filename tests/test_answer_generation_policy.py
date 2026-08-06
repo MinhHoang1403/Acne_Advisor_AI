@@ -316,6 +316,145 @@ async def test_finalize_dedupes_duplicate_section_headers():
 
 
 @pytest.mark.asyncio
+async def test_finalize_antibiotic_review_question_adds_one_actionable_stewardship_note():
+    result = await finalize_response_node(
+        {
+            "user_question": "Dấu hiệu nào cho thấy cần đánh giá lại kế hoạch kháng sinh trị mụn?",
+            "draft_answer": "- Mụn không cải thiện sau một liệu trình phù hợp.\n- Mụn tái phát hoặc nặng hơn.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "không tự bắt đầu, kéo dài, ngừng hoặc đổi kháng sinh" in answer
+    assert "bác sĩ da liễu" in answer
+    assert answer.count("không tự bắt đầu, kéo dài, ngừng hoặc đổi kháng sinh") == 1
+
+
+@pytest.mark.asyncio
+async def test_finalize_bpo_clindamycin_comparison_resolves_bpo_alias_and_uses_table():
+    result = await finalize_response_node(
+        {
+            "user_question": "BPO khác clindamycin ở chỗ nào và có thể phối hợp không?",
+            "draft_answer": "Clindamycin có thể điều trị mụn.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| tiêu chí | benzoyl peroxide | clindamycin |" in answer
+    assert "không phải kháng sinh" in answer
+    assert "kháng kháng sinh" in answer
+
+
+@pytest.mark.asyncio
+async def test_finalize_epiduo_dalacin_comparison_keeps_both_products_and_stewardship():
+    result = await finalize_response_node(
+        {
+            "user_question": "Epiduo khác Dalacin T ở hoạt chất và kháng kháng sinh ra sao?",
+            "draft_answer": "Epiduo có adapalene.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| tiêu chí | epiduo | dalacin t |" in answer
+    assert "adapalene + benzoyl peroxide" in answer
+    assert "clindamycin" in answer
+    assert "kháng kháng sinh" in answer
+
+
+@pytest.mark.asyncio
+async def test_finalize_retinoid_bpo_comparison_uses_complete_table():
+    result = await finalize_response_node(
+        {
+            "user_question": "Retinoid bôi và benzoyl peroxide khác nhau theo cơ chế nào?",
+            "draft_answer": "Retinoid có thể điều trị mụn.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| tiêu chí | retinoid bôi | benzoyl peroxide |" in answer
+    assert "không phải kháng sinh" in answer
+
+
+@pytest.mark.asyncio
+async def test_finalize_boolean_cardinality_answer_starts_with_clear_negative():
+    result = await finalize_response_node(
+        {
+            "user_question": "Epiduo có phải chỉ chứa một hoạt chất không?",
+            "draft_answer": "Epiduo chứa hai hoạt chất chính là adapalene và benzoyl peroxide.",
+            "is_in_domain": True,
+        }
+    )
+
+    assert result["final_answer"].startswith("Không. Epiduo chứa hai hoạt chất")
+
+
+@pytest.mark.asyncio
+async def test_finalize_tazarotene_adapalene_comparison_handles_which_drug_question():
+    result = await finalize_response_node(
+        {
+            "user_question": "Tazarotene và adapalene: thuốc nào thuộc nhóm gì và cần lưu ý gì về kích ứng?",
+            "draft_answer": "Cả hai có thể dùng cho mụn.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| tiêu chí | tazarotene | adapalene |" in answer
+    assert "retinoid bôi" in answer
+    assert "kích ứng" in answer
+
+
+@pytest.mark.asyncio
+async def test_finalize_retinoid_bpo_comparison_honors_doi_chieu_table_request():
+    result = await finalize_response_node(
+        {
+            "user_question": "Retinoid bôi và benzoyl peroxide tác động vào mụn theo hai cơ chế gì? Hãy đối chiếu bằng bảng.",
+            "draft_answer": "Hai hoạt chất có tác dụng khác nhau.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| tiêu chí | retinoid bôi | benzoyl peroxide |" in answer
+    assert "không phải kháng sinh" in answer
+
+
+@pytest.mark.asyncio
+async def test_finalize_morning_evening_routine_comparison_uses_safe_table():
+    result = await finalize_response_node(
+        {
+            "user_question": "Routine trị mụn buổi sáng và buổi tối nên khác nhau ở những bước nào? Lập bảng giúp tôi.",
+            "draft_answer": "Bạn nên chăm sóc da phù hợp.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| bước | buổi sáng | buổi tối |" in answer
+    assert "chống nắng" in answer
+    assert "không thêm nhiều hoạt chất mạnh cùng lúc" in answer
+
+
+@pytest.mark.asyncio
+async def test_finalize_back_and_face_acne_comparison_keeps_both_locations_in_table():
+    result = await finalize_response_node(
+        {
+            "user_question": "Mụn ở lưng khác mụn ở mặt ở vị trí chăm sóc và dấu hiệu cần khám như thế nào?",
+            "draft_answer": "Cần chăm sóc phù hợp.",
+            "is_in_domain": True,
+        }
+    )
+
+    answer = result["final_answer"].lower()
+    assert "| tiêu chí | mụn ở mặt | mụn ở lưng |" in answer
+    assert "khi cần khám" in answer
+
+
+@pytest.mark.asyncio
 async def test_rewrite_preserves_explicit_primary_entity_with_history():
     result = await rewrite_question_node(
         {

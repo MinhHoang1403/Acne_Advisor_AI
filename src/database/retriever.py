@@ -249,6 +249,18 @@ class RetrievalResult:
     """Timing and scoring breakdown for observability."""
 
 
+def _sources_for_contexts(contexts: list[dict[str, Any]]) -> list[str]:
+    """Return every distinct document source used in the packed prompt context."""
+
+    return list(
+        dict.fromkeys(
+            str(context.get("source_file"))
+            for context in contexts
+            if context.get("source_file") and context.get("retrieval_source") != "entity"
+        )
+    )
+
+
 # ---------------------------------------------------------------------------
 # Hybrid Retriever
 # ---------------------------------------------------------------------------
@@ -496,11 +508,7 @@ class HybridRetriever:
         )
 
         # ── Step 7: Build sources list ───────────────────────────────
-        sources = list(dict.fromkeys(
-            c.get("source_file", "")
-            for c in top_chunks
-            if c.get("source_file") and c.get("retrieval_source") != "entity"
-        ))[:2]
+        sources = _sources_for_contexts(top_chunks)
 
         t_total = time.time() - t_start
         trace = RetrievalTrace(
@@ -612,7 +620,6 @@ class HybridRetriever:
                 "packed_context": packed_context.model_dump(mode="json"),
             },
         )
-
     # ------------------------------------------------------------------
     # RRF fusion
     # ------------------------------------------------------------------

@@ -7,14 +7,31 @@ Topic guardrail for Acne Advisor AI.
 import os
 import json
 import logging
+import re
 from src.agent.llm.provider import generate_llm_response
 
 from src.agent.state import ClinicalState
 from src.resilience.budget import DeadlineBudget
 from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilience_settings_from_env
 from src.quality.safe_fallback import sanitize_fallback_reason
+from src.quality.vietnamese_text import build_matching_views
 
 logger = logging.getLogger(__name__)
+
+
+def _has_unsafe_prescription_request(query: str, markers: list[str]) -> bool:
+    """Recognize a request to prescribe while preserving safety-constrained questions."""
+
+    _, folded_query = build_matching_views(query)
+    for marker in markers:
+        _, folded_marker = build_matching_views(marker)
+        start = 0
+        while (position := folded_query.find(folded_marker, start)) >= 0:
+            prefix = folded_query[max(0, position - 24) : position].strip()
+            if not re.search(r"(?:^|\s)(?:khong|dung)(?:\s+can|\s+yeu\s+cau)?$", prefix):
+                return True
+            start = position + len(folded_marker)
+    return False
 
 
 def _runtime_settings(state: ClinicalState) -> RuntimeResilienceSettings:
@@ -116,7 +133,7 @@ async def domain_guard_node(state: ClinicalState) -> dict:
             )
         }
 
-    if any(marker in query_lower for marker in prescription_markers) and any(med in query_lower for med in high_risk_meds):
+    if _has_unsafe_prescription_request(query, prescription_markers) and any(med in query_lower for med in high_risk_meds):
         return {
             "is_in_domain": False,
             "guardrail": "unsafe_prescription_request",
@@ -198,6 +215,12 @@ async def domain_guard_node(state: ClinicalState) -> dict:
         "acne",
         "benzoyl peroxide",
         "adapalene",
+        "clindamycin",
+        "erythromycin",
+        "doxycycline",
+        "dalacin",
+        "azelaic acid",
+        "salicylic acid",
         "differin",
         "epiduo",
         "tazarotene",
@@ -224,6 +247,9 @@ async def domain_guard_node(state: ClinicalState) -> dict:
         "có cần",
         "nhắc lại",
         "tình trạng da",
+        "hoạt chất",
+        "lúc này",
+        "nên làm gì",
     ]
     if any(marker in query_lower for marker in in_domain_markers):
         return {

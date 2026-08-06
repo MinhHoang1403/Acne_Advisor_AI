@@ -25,7 +25,7 @@ ResponseProfile = Literal[
     "safe_fallback",
 ]
 
-ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v7"
+ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v9"
 
 CANONICAL_DISCLAIMER = "Thông tin mang tính tham khảo và không thay thế chẩn đoán của bác sĩ."
 LEGACY_DISCLAIMER = "Thông tin này chỉ mang tính tham khảo và không thay thế tư vấn y khoa chuyên nghiệp."
@@ -39,7 +39,7 @@ LEGACY_BOILERPLATE_HEADINGS = (
 )
 
 ANSWER_FORMATTING_CONTRACT = """\
-ANSWER PRESENTATION CONTRACT V7:
+ANSWER PRESENTATION CONTRACT V9:
 - Dùng cùng một chuẩn trình bày cho Gemini, Gemini fallback, Ollama, cache hit, guardrail, severity guard và safe fallback; provider không được quyết định format.
 - Không lặp lại hoặc dùng nguyên câu hỏi của người dùng làm tiêu đề. Bắt đầu ngay bằng câu trả lời.
 - Trả lời trực tiếp trước, sau đó mới giải thích. Chỉ bắt đầu bằng "Có." hoặc "Không." khi câu hỏi thật sự là yes/no.
@@ -201,6 +201,8 @@ def finalize_answer_presentation(
     if replacement:
         draft = replacement
 
+    draft = _ensure_boolean_cardinality_polarity(draft, question_folded)
+    draft = _ensure_antibiotic_stewardship_guidance(draft, question_folded, profile)
     draft = strip_leading_question_echo(draft, user_question)
     if not _is_boolean_question(question_folded):
         draft = _strip_unexpected_boolean_prefix(draft)
@@ -370,6 +372,15 @@ def _deterministic_profile_answer(
     if structured_answer:
         return structured_answer
 
+    if "tazorac" in text and not _is_comparison_question(text) and any(
+        marker in text for marker in ["thuoc nhom", "nhom thuoc", "nhom nao", "nhom gi"]
+    ):
+        return (
+            "Tazorac là tên thương mại chứa tazarotene và thuộc nhóm retinoid bôi ngoài da.\n\n"
+            "Tazarotene giúp điều hòa sừng hóa nang lông và thường cần được sử dụng theo hướng dẫn của bác sĩ da liễu. "
+            "Đây không phải là kháng sinh."
+        )
+
     if _is_retinoid_shared_class_question(text):
         return (
             "Có. Các hoạt chất này đều thuộc nhóm retinoid, nhưng khác đường dùng và bối cảnh chỉ định.\n\n"
@@ -490,6 +501,82 @@ def _deterministic_profile_answer(
             "Nên bắt đầu thận trọng, không tự tăng tần suất khi da đang kích ứng. Retinoid cần được bác sĩ đánh giá nếu bạn đang mang thai hoặc dự định mang thai."
         )
 
+    if "isotretinoin" in text and _mentions_oral_antibiotic(text) and _is_comparison_question(text):
+        return (
+            "Isotretinoin và kháng sinh uống đều cần bác sĩ đánh giá, nhưng thường được cân nhắc trong bối cảnh khác nhau.\n\n"
+            "| Tiêu chí | Isotretinoin | Kháng sinh uống |\n"
+            "|---|---|---|\n"
+            "| Bối cảnh | Retinoid đường uống thường được cân nhắc cho mụn nặng, nguy cơ sẹo hoặc không đáp ứng điều trị chuẩn. | Có thể được cân nhắc cho mụn viêm phù hợp theo bác sĩ đánh giá. |\n"
+            "| Theo dõi | Cần bác sĩ da liễu đánh giá chỉ định, tác dụng phụ và thai kỳ khi có khả năng mang thai. | Cần bác sĩ kê đơn, đánh giá đáp ứng và tránh dùng kéo dài tùy tiện. |\n"
+            "| Điều không nên làm | Không tự bắt đầu, đổi liều hoặc dùng lại đơn cũ. | Không tự mua, tự kéo dài hoặc phối hợp nhiều kháng sinh. |\n\n"
+            "Bảng này không thay thế việc kê đơn; lựa chọn cụ thể cần dựa trên mức độ mụn và đánh giá trực tiếp của bác sĩ."
+        )
+
+    if "tazarotene" in text and ("adapalene" in text or "adapalen" in text) and _is_comparison_question(text):
+        return (
+            "Tazarotene và adapalene đều là retinoid bôi, nhưng dung nạp có thể khác nhau giữa từng người.\n\n"
+            "| Tiêu chí | Tazarotene | Adapalene |\n"
+            "|---|---|---|\n"
+            "| Nhóm thuốc | Retinoid bôi. | Retinoid bôi. |\n"
+            "| Vai trò | Hỗ trợ điều hòa sừng hóa nang lông và giảm bít tắc trong điều trị mụn khi phù hợp. | Hỗ trợ điều hòa sừng hóa nang lông, giảm bít tắc/nhân mụn và chống viêm. |\n"
+            "| Kích ứng | Có thể gây khô, đỏ, rát hoặc bong tróc; cần theo dõi dung nạp. | Cũng có thể gây khô, đỏ, rát hoặc bong tróc, nhất là khi mới dùng. |\n\n"
+            "Không tự tăng tần suất khi da đang kích ứng; retinoid cần được bác sĩ đánh giá nếu bạn đang mang thai hoặc dự định mang thai."
+        )
+
+    if _is_morning_evening_routine_comparison(text):
+        return (
+            "Routine buổi sáng và buổi tối đều nên ưu tiên làm sạch dịu nhẹ, dưỡng ẩm phù hợp, nhưng có mục tiêu khác nhau.\n\n"
+            "| Bước | Buổi sáng | Buổi tối |\n"
+            "|---|---|---|\n"
+            "| Làm sạch | Rửa mặt dịu nhẹ, tránh chà xát quá mức. | Rửa mặt dịu nhẹ để loại bỏ kem chống nắng, bụi bẩn và dầu thừa trong ngày. |\n"
+            "| Bảo vệ/điều trị | Dưỡng ẩm phù hợp và dùng chống nắng ban ngày. | Có thể dùng hoạt chất trị mụn theo kế hoạch đang dung nạp; không thêm nhiều hoạt chất mạnh cùng lúc. |\n"
+            "| Khi kích ứng | Giảm các sản phẩm dễ gây rát và ưu tiên phục hồi hàng rào da. | Giảm tần suất hoặc tạm ngưng hoạt chất gây kích ứng rõ, rồi trao đổi với bác sĩ nếu không cải thiện. |\n\n"
+            "Điều chỉnh từng bước để theo dõi dung nạp, thay vì đổi toàn bộ routine cùng lúc."
+        )
+
+    if _is_back_vs_face_acne_comparison(text):
+        return (
+            "Mụn ở lưng và mụn ở mặt đều cần chăm sóc dịu nhẹ, nhưng nên chú ý các yếu tố tại vùng da bị ảnh hưởng.\n\n"
+            "| Tiêu chí | Mụn ở mặt | Mụn ở lưng |\n"
+            "|---|---|---|\n"
+            "| Chăm sóc tại chỗ | Dùng sản phẩm phù hợp da mặt, tránh cạy hoặc nặn tổn thương viêm. | Giữ vùng lưng sạch sau khi ra mồ hôi, tránh ma sát kéo dài từ quần áo hoặc dụng cụ. |\n"
+            "| Theo dõi | Lưu ý tổn thương viêm kéo dài, đau hoặc có nguy cơ để lại sẹo. | Cũng cần lưu ý mụn viêm lan rộng, đau nhiều hoặc để lại sẹo. |\n"
+            "| Khi cần khám | Khám da liễu khi mụn viêm nặng, đau, có sẹo hoặc không cải thiện. | Khám da liễu với các dấu hiệu tương tự, nhất là khi vùng tổn thương rộng hoặc đau nhiều. |\n\n"
+            "Không tự nặn/bóp mụn hoặc tự dùng thuốc kê đơn; bác sĩ có thể đánh giá kế hoạch phù hợp cho từng vùng da."
+        )
+
+    if "epiduo" in text and "dalacin" in text and _is_comparison_question(text):
+        return (
+            "Epiduo và Dalacin T khác nhau chủ yếu ở hoạt chất và vai trò trong điều trị mụn.\n\n"
+            "| Tiêu chí | Epiduo | Dalacin T |\n"
+            "|---|---|---|\n"
+            "| Hoạt chất chính | Adapalene + benzoyl peroxide. | Clindamycin. |\n"
+            "| Nhóm/vai trò | Phối hợp retinoid bôi và benzoyl peroxide; benzoyl peroxide không phải kháng sinh. | Kháng sinh bôi, có thể hỗ trợ mụn viêm khi được chỉ định. |\n"
+            "| Lưu ý về kháng kháng sinh | Benzoyl peroxide có thể hỗ trợ giảm nguy cơ kháng kháng sinh khi phối hợp phù hợp. | Không nên dùng đơn trị liệu hoặc kéo dài tùy tiện; cần bác sĩ đánh giá. |\n\n"
+            "Cả hai có thể gây kích ứng tại chỗ; không tự thay thế hoặc phối hợp thuốc nếu chưa được bác sĩ hướng dẫn."
+        )
+
+    if _mentions_benzoyl_peroxide(text) and "clindamycin" in text and _is_comparison_question(text):
+        return (
+            "Benzoyl peroxide và clindamycin đều có thể xuất hiện trong điều trị mụn, nhưng không cùng nhóm thuốc.\n\n"
+            "| Tiêu chí | Benzoyl peroxide | Clindamycin |\n"
+            "|---|---|---|\n"
+            "| Bản chất | Không phải kháng sinh; là hoạt chất bôi có tác dụng kháng khuẩn/antimicrobial và hỗ trợ tiêu sừng nhẹ. | Kháng sinh bôi. |\n"
+            "| Vai trò | Tác động lên C. acnes và hỗ trợ giảm bít tắc. | Có thể hỗ trợ mụn viêm khi bác sĩ chỉ định. |\n"
+            "| Khi phối hợp | Có thể hỗ trợ tăng hiệu quả và giảm nguy cơ kháng kháng sinh. | Không nên dùng đơn trị liệu hoặc kéo dài tùy tiện. |\n\n"
+            "Không tự bắt đầu, kéo dài hoặc đổi kháng sinh; hãy trao đổi với bác sĩ da liễu nếu cần phối hợp thuốc."
+        )
+
+    if _mentions_benzoyl_peroxide(text) and _mentions_topical_retinoid(text) and _is_comparison_question(text):
+        return (
+            "Retinoid bôi và benzoyl peroxide cùng dùng cho mụn nhưng tác động vào các cơ chế khác nhau.\n\n"
+            "| Tiêu chí | Retinoid bôi | Benzoyl peroxide |\n"
+            "|---|---|---|\n"
+            "| Vai trò chính | Điều hòa sừng hóa nang lông, hỗ trợ giảm bít tắc và nhân mụn. | Không phải kháng sinh; có tác dụng kháng khuẩn/antimicrobial với C. acnes và tiêu sừng nhẹ. |\n"
+            "| Lưu ý | Có thể gây khô, đỏ, bong tróc; cần cẩn trọng trong thai kỳ. | Có thể gây khô, đỏ, bong tróc và làm bạc màu vải/tóc. |\n"
+            "| Phối hợp | Có thể phối hợp trong một số phác đồ khi da dung nạp và có hướng dẫn phù hợp. | Bổ sung cơ chế khác với retinoid bôi. |"
+        )
+
     if _is_antibiotic_monotherapy_and_bp_role_question(text):
         return (
             "Không nên dùng clindamycin bôi hoặc kháng sinh uống đơn độc/kéo dài để điều trị mụn nếu chưa có bác sĩ đánh giá.\n\n"
@@ -515,7 +602,7 @@ def _deterministic_profile_answer(
             "Hai hoạt chất này có thể gây khô, đỏ, rát hoặc bong tróc; benzoyl peroxide còn có thể làm bạc màu vải/tóc."
         )
 
-    if "adapalene" in text and "benzoyl peroxide" in text and _is_comparison_question(text):
+    if "adapalene" in text and _mentions_benzoyl_peroxide(text) and _is_comparison_question(text):
         return (
             "Adapalene và benzoyl peroxide đều là hoạt chất bôi trị mụn, nhưng tác động lên các cơ chế khác nhau.\n\n"
             "| Tiêu chí | Adapalene | Benzoyl peroxide |\n"
@@ -526,7 +613,7 @@ def _deterministic_profile_answer(
             "Hai hoạt chất này có thể được phối hợp trong một số phác đồ vì tác động lên các cơ chế khác nhau."
         )
 
-    if "benzoyl peroxide" in text and ("khang sinh" in text or "antibiotic" in text):
+    if _mentions_benzoyl_peroxide(text) and ("khang sinh" in text or "antibiotic" in text):
         return (
             "Không, benzoyl peroxide không phải là kháng sinh.\n\n"
             "Benzoyl peroxide là hoạt chất bôi trị mụn có tác dụng kháng khuẩn/antimicrobial với C. acnes và hỗ trợ giảm bít tắc nang lông/tiêu sừng nhẹ. "
@@ -813,6 +900,56 @@ def _is_bp_antimicrobial_mechanism_followup(text: str) -> bool:
     return bool(has_bp and asks_why and antimicrobial)
 
 
+def _mentions_benzoyl_peroxide(text: str) -> bool:
+    return "benzoyl peroxide" in text or bool(re.search(r"(?<![a-z0-9])bpo?(?![a-z0-9])", text))
+
+
+def _mentions_oral_antibiotic(text: str) -> bool:
+    return any(
+        marker in text
+        for marker in ("khang sinh uong", "khang sinh duong uong", "oral antibiotic", "doxycycline")
+    )
+
+
+def _mentions_topical_retinoid(text: str) -> bool:
+    return any(marker in text for marker in ("retinoid boi", "topical retinoid"))
+
+
+def _ensure_boolean_cardinality_polarity(draft: str, question_folded: str) -> str:
+    """Make a negative one-versus-many answer explicit without changing medical facts."""
+
+    if not re.search(r"\bco phai\s+chi(?:\s+co|\s+chua)?\s+.*\bkhong\b", question_folded):
+        return draft
+    opening = _fold(next((line for line in draft.splitlines() if line.strip()), ""))
+    if opening.startswith(("khong", "co")):
+        return draft
+    if any(marker in opening for marker in ("hai hoat chat", "2 hoat chat", "nhieu hoat chat")):
+        return f"Không. {draft.lstrip()}"
+    return draft
+
+
+def _ensure_antibiotic_stewardship_guidance(
+    draft: str,
+    question_folded: str,
+    profile: ResponseProfile,
+) -> str:
+    """Add one concise action when an antibiotic answer lacks stewardship guidance."""
+
+    if profile in {"out_of_domain_emergency", "safe_fallback"}:
+        return draft
+    antibiotic_markers = ("khang sinh", "antibiotic", "clindamycin", "erythromycin", "doxycycline")
+    if not any(marker in question_folded for marker in antibiotic_markers):
+        return draft
+    folded_draft = _fold(draft)
+    if any(marker in folded_draft for marker in ("khong tu", "khong nen", "bac si", "khang khang sinh")):
+        return draft
+    guidance = (
+        "Không tự bắt đầu, kéo dài, ngừng hoặc đổi kháng sinh; hãy trao đổi với bác sĩ da liễu "
+        "hoặc bác sĩ kê đơn để được đánh giá lại."
+    )
+    return f"{draft.rstrip()}\n\n{guidance}".strip()
+
+
 def _asks_acne_mechanism(text: str) -> bool:
     return any(marker in text for marker in ["co che", "cơ chế", "vi sao gay mun", "hinh thanh mun"]) or (
         "mun" in text and any(marker in text for marker in ["ba nhon", "c. acnes", "viem", "day sung"])
@@ -1037,12 +1174,26 @@ def _is_comparison_question(text: str) -> bool:
         "khac nhau o",
         "so sánh",
         "so sanh",
+        "đối chiếu",
+        "doi chieu",
         " vs ",
         "versus",
     ]
     if any(marker in text or marker in folded for marker in markers):
         return True
-    return bool(re.search(r"\bkhac\b.{0,80}\b(?:the nao|o diem nao|gi)\b", folded))
+    if "thuoc nao" in folded and " va " in f" {folded} ":
+        return True
+    return bool(re.search(r"\bkhac\b.{0,80}\b(?:the nao|o diem nao|o cho nao|ra sao|gi)\b", folded))
+
+
+def _is_morning_evening_routine_comparison(text: str) -> bool:
+    return _is_comparison_question(text) and "buoi sang" in text and "buoi toi" in text and any(
+        marker in text for marker in ("routine", "cham soc", "tri mun")
+    )
+
+
+def _is_back_vs_face_acne_comparison(text: str) -> bool:
+    return _is_comparison_question(text) and "mun o lung" in text and "mun o mat" in text
 
 
 def _is_mild_inflammatory_routine_question(text: str) -> bool:
