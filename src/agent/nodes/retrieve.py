@@ -11,6 +11,7 @@ import os
 import re
 from src.agent.llm.provider import generate_llm_response
 from src.agent.state import ClinicalState
+from src.agent.source_presentation import build_source_allowlist
 from src.database.retriever import HybridRetriever
 from src.knowledge import DrugEntityNormalizer
 from src.quality.vietnamese_text import build_matching_views
@@ -47,15 +48,79 @@ async def normalize_question_node(state: ClinicalState) -> dict:
     return {"normalized_question": normalized}
 
 
+_CONVERSATION_TOPIC_MARKERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("mụn đầu đen", ("mụn đầu đen", "mun dau den", "open comedone")),
+    ("mụn đầu trắng", ("mụn đầu trắng", "mun dau trang", "closed comedone")),
+    ("mụn lưng", ("mụn lưng", "mun lung", "acne on the back", "back acne")),
+)
+
+
+def build_conversation_context(history: list[dict[str, str]] | None) -> dict[str, object]:
+    """Extract only user-provided follow-up facts for the current request."""
+
+    user_messages = [
+        str(message.get("content") or "")
+        for message in (history or [])[-8:]
+        if str(message.get("role") or "").casefold() == "user"
+    ]
+    joined = "\n".join(user_messages)
+    _, folded = build_matching_views(joined)
+    active_topic = next(
+        (
+            topic
+            for topic, markers in _CONVERSATION_TOPIC_MARKERS
+            if any(marker in folded for marker in markers)
+        ),
+        None,
+    )
+    tolerance = next(
+        (
+            label
+            for label, markers in (
+                ("khô nhẹ", ("khô nhẹ", "kho nhe")),
+                ("rát", ("rát", "rat", "châm chích", "cham chich")),
+                ("bong tróc", ("bong tróc", "bong troc", "bong da")),
+            )
+            if any(marker in folded for marker in markers)
+        ),
+        None,
+    )
+    candidate_entities = _user_entity_candidates(history or [])
+    active_treatment_class = next(
+        (
+            label
+            for label, markers in (
+                ("retinoid bôi", ("retinoid bôi", "retinoid boi", "topical retinoid")),
+            )
+            if any(marker in folded for marker in markers)
+        ),
+        None,
+    )
+    return {
+        "active_topic": active_topic,
+        "active_product": _last_product_mention(history or [], user_only=True),
+        "active_ingredient": _last_active_ingredient_mention(history or [], user_only=True),
+        "active_treatment_class": active_treatment_class,
+        "tolerance_context": tolerance,
+        "pregnancy_context": any(marker in folded for marker in ("mang thai", "co thai", "thai ky", "cho con bu")),
+        "antibiotic_context": any(marker in folded for marker in ("kháng sinh", "khang sinh", "clindamycin", "erythromycin", "doxycycline")),
+        "last_user_message": user_messages[-1] if user_messages else None,
+        "candidate_entities": candidate_entities,
+        "unresolved_user_reference": False,
+    }
+
+
 async def rewrite_question_node(state: ClinicalState) -> dict:
     """Rewrite question based on conversation history for multi-turn context."""
     normalized = state.get("normalized_question", "")
     history = state.get("conversation_history", [])
+    conversation_context = build_conversation_context(history)
     
     if not history:
         return {
             "standalone_question": normalized,
             "use_history_context": False,
+            "conversation_context": conversation_context,
         }
 
     explicit_primary_entities = [
@@ -81,6 +146,7 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
         return {
             "standalone_question": normalized,
             "use_history_context": False,
+            "conversation_context": conversation_context,
         }
         
     ambiguous_keywords = [
@@ -91,7 +157,23 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
     has_implicit_treatment_followup = _has_implicit_treatment_followup(
         matching_question,
         history,
+        conversation_context,
     )
+    ambiguity_options = _ambiguous_reference_options(
+        matching_question,
+        conversation_context,
+        has_coreference=has_coreference,
+    )
+    if ambiguity_options:
+        return {
+            "standalone_question": normalized,
+            "use_history_context": True,
+            "conversation_context": {
+                **conversation_context,
+                "unresolved_user_reference": True,
+                "clarification_options": ambiguity_options,
+            },
+        }
     needs_rewrite = has_coreference or has_implicit_treatment_followup or any(kw in normalized for kw in ambiguous_keywords)
     
     if not needs_rewrite:
@@ -104,12 +186,14 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
                     "routine",
                 ]
             ),
+            "conversation_context": conversation_context,
         }
 
     deterministic_rewrite = _deterministic_followup_rewrite(
         normalized=normalized,
         original_question=state.get("user_question", ""),
         history=history,
+        conversation_context=conversation_context,
         allow_implicit_context=has_implicit_treatment_followup,
     )
     if deterministic_rewrite:
@@ -117,6 +201,7 @@ async def rewrite_question_node(state: ClinicalState) -> dict:
         return {
             "standalone_question": deterministic_rewrite,
             "use_history_context": True,
+            "conversation_context": conversation_context,
         }
         
     logger.info("Question contains ambiguous keywords, attempting rewrite based on history.")
@@ -156,6 +241,7 @@ Câu hỏi độc lập:
         return {
             "standalone_question": rewritten,
             "use_history_context": True,
+            "conversation_context": conversation_context,
         }
     except Exception as e:
         logger.error(
@@ -165,6 +251,7 @@ Câu hỏi độc lập:
         return {
             "standalone_question": normalized,
             "use_history_context": True,
+            "conversation_context": conversation_context,
         }
 
 
@@ -173,6 +260,7 @@ def _deterministic_followup_rewrite(
     normalized: str,
     original_question: str,
     history: list[dict],
+    conversation_context: dict[str, object] | None = None,
     allow_implicit_context: bool = False,
 ) -> str | None:
     """Resolve common acne-drug coreference before falling back to LLM rewrite."""
@@ -181,13 +269,39 @@ def _deterministic_followup_rewrite(
     if not _has_coreference_marker(question_norm) and not allow_implicit_context:
         return None
 
-    product = _last_product_mention(history)
+    context = conversation_context or {}
+    product = str(context.get("active_product") or "") or _last_product_mention(history)
+    active_topic = str(context.get("active_topic") or "")
+    active_tolerance = str(context.get("tolerance_context") or "")
+    active_treatment_class = str(context.get("active_treatment_class") or "")
+    if active_tolerance and _contains_any(question_norm, ["hoat chat", "luc nay"]):
+        return (
+            f"Da đang {active_tolerance} khi dùng các hoạt chất bôi: nên giảm hoặc tạm ngưng hoạt chất nào "
+            "và dưỡng ẩm thế nào để hạn chế kích ứng?"
+        )
+    if _is_frequency_adjustment_followup(question_norm) and active_tolerance:
+        target = str(context.get("active_ingredient") or "") or product
+        if target:
+            return (
+                f"Da {active_tolerance} khi dùng {target}: nên điều chỉnh tần suất thế nào và có cần dưỡng ẩm không?"
+            )
+    if active_topic == "mụn đầu đen" and _contains_any(question_norm, ["dang do", "mun viem"]):
+        return "Mụn đầu đen có phải là mụn viêm không?"
+    if active_topic == "mụn lưng" and _contains_any(question_norm, ["thoi quen", "chu y them"]):
+        return "Với mụn lưng sau khi tập, thói quen nào liên quan đến mồ hôi và ma sát nên chú ý thêm?"
+    if active_treatment_class == "retinoid bôi" and _contains_any(question_norm, ["ban ngay", "chong nang"]):
+        return "Khi dùng retinoid bôi buổi tối, ban ngày cần làm gì để bảo vệ da và hạn chế kích ứng?"
     if _contains_any(question_norm, ["hoat chat thu hai", "thanh phan thu hai"]):
         ingredient = _ingredient_for_product(product, position=2)
         if ingredient:
             return _rewrite_for_intent(question_norm, ingredient, product)
 
-    target = _last_active_ingredient_mention(history)
+    if product and _contains_any(question_norm, ["hoat chat chinh", "thanh phan chinh"]):
+        ingredient = _ingredient_for_product(product, position=1)
+        if ingredient:
+            return f"Hoạt chất chính của {product} là gì? (Theo taxonomy: {ingredient}.)"
+
+    target = str(context.get("active_ingredient") or "") or _last_active_ingredient_mention(history)
     if not target and product:
         ingredient = _ingredient_for_product(product, position=1)
         if ingredient and _contains_any(question_norm, ["thuoc nhom", "nhom nao", "nhom gi", "thuoc gi"]):
@@ -210,6 +324,7 @@ def _has_coreference_marker(text: str) -> bool:
             "san pham do",
             "loai do",
             "cai do",
+            "dang do",
             "hoat chat do",
             "hoat chat thu hai",
             "thanh phan thu hai",
@@ -222,10 +337,23 @@ def _has_coreference_marker(text: str) -> bool:
     )
 
 
-def _has_implicit_treatment_followup(question_norm: str, history: list[dict]) -> bool:
+def _has_implicit_treatment_followup(
+    question_norm: str,
+    history: list[dict],
+    conversation_context: dict[str, object] | None = None,
+) -> bool:
     """Carry the active treatment forward for narrow, context-dependent follow-ups."""
 
-    if not (_last_product_mention(history) or _last_active_ingredient_mention(history)):
+    context = conversation_context or {}
+    if not (
+        context.get("active_product")
+        or context.get("active_ingredient")
+        or context.get("active_treatment_class")
+        or context.get("active_topic")
+        or context.get("tolerance_context")
+        or _last_product_mention(history)
+        or _last_active_ingredient_mention(history)
+    ):
         return False
     return _contains_any(
         question_norm,
@@ -235,7 +363,18 @@ def _has_implicit_treatment_followup(question_norm: str, history: list[dict]) ->
             "dieu chinh tan suat",
             "ban ngay co buoc",
             "thoi quen nao",
+            "tan suat the nao",
+            "dang do",
+            "hoat chat",
+            "luc nay",
         ],
+    )
+
+
+def _is_frequency_adjustment_followup(question_norm: str) -> bool:
+    return _contains_any(
+        question_norm,
+        ["dieu chinh tan suat", "tan suat the nao", "dung may lan", "giam tan suat"],
     )
 
 
@@ -276,8 +415,10 @@ def _comparison_target(question_norm: str, target: str) -> str | None:
     return None
 
 
-def _last_product_mention(history: list[dict]) -> str | None:
+def _last_product_mention(history: list[dict], *, user_only: bool = False) -> str | None:
     for message in reversed(history[-8:]):
+        if user_only and str(message.get("role") or "").casefold() != "user":
+            continue
         _, text = build_matching_views(str(message.get("content") or ""))
         for product in ["Epiduo", "Tazorac", "Differin", "Dalacin T"]:
             _, product_norm = build_matching_views(product)
@@ -286,7 +427,7 @@ def _last_product_mention(history: list[dict]) -> str | None:
     return None
 
 
-def _last_active_ingredient_mention(history: list[dict]) -> str | None:
+def _last_active_ingredient_mention(history: list[dict], *, user_only: bool = False) -> str | None:
     aliases = [
         ("benzoyl peroxide", ["benzoyl peroxide", "bpo", "bp"]),
         ("adapalene", ["adapalene", "adapalen"]),
@@ -296,11 +437,59 @@ def _last_active_ingredient_mention(history: list[dict]) -> str | None:
         ("tretinoin", ["tretinoin"]),
     ]
     for message in reversed(history[-8:]):
+        if user_only and str(message.get("role") or "").casefold() != "user":
+            continue
         _, text = build_matching_views(str(message.get("content") or ""))
         for label, values in aliases:
             if any(re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", f" {text} ") for alias in values):
                 return label
     return None
+
+
+def _user_entity_candidates(history: list[dict]) -> list[str]:
+    """Return distinct explicit entities from user turns, newest turn first."""
+
+    candidates: list[str] = []
+    known_entities = [
+        "Epiduo",
+        "Tazorac",
+        "Differin",
+        "Dalacin T",
+        "benzoyl peroxide",
+        "adapalene",
+        "tazarotene",
+        "clindamycin",
+        "isotretinoin",
+        "tretinoin",
+    ]
+    for message in reversed(history[-8:]):
+        if str(message.get("role") or "").casefold() != "user":
+            continue
+        _, text = build_matching_views(str(message.get("content") or ""))
+        for entity in known_entities:
+            _, entity_norm = build_matching_views(entity)
+            if entity_norm in text and entity not in candidates:
+                candidates.append(entity)
+    return candidates
+
+
+def _ambiguous_reference_options(
+    question_norm: str,
+    conversation_context: dict[str, object],
+    *,
+    has_coreference: bool,
+) -> list[str]:
+    """Return choices only when an implicit reference has competing user entities."""
+
+    if not has_coreference:
+        return []
+    explicit_entities = _user_entity_candidates(
+        [{"role": "user", "content": question_norm}]
+    )
+    if explicit_entities:
+        return []
+    candidates = [str(value) for value in conversation_context.get("candidate_entities", []) if value]
+    return candidates[:2] if len(candidates) >= 2 else []
 
 
 def _ingredient_for_product(product: str | None, *, position: int) -> str | None:
@@ -365,7 +554,9 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
         return {
             "vector_contexts": [],
             "graph_facts": [],
+            "graph_relation_found": False,
             "sources": [],
+            "source_allowlist": [],
             "retrieval_status": "empty_query",
             "retrieval_error": None,
         }
@@ -384,10 +575,24 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
         payload = {
             "vector_contexts": result.vector_contexts,
             "graph_facts": result.graph_facts,
+            "graph_relation_found": any(
+                fact.get("predicate") or fact.get("relationship")
+                for fact in result.graph_facts
+                if isinstance(fact, dict)
+            ),
             "sources": result.sources,
+            "source_allowlist": build_source_allowlist(result.sources, result.vector_contexts),
             "retrieval_trace": result.metadata.get("retrieval_trace"),
             "packed_context": result.metadata.get("packed_context"),
             "retrieval_error": None,
+            "performance_timings": {
+                **(state.get("performance_timings") or {}),
+                **{
+                    f"retrieval_{name}": float(value)
+                    for name, value in (result.metadata.get("retrieval_trace", {}).get("timings_ms", {}) or {}).items()
+                    if isinstance(value, (int, float))
+                },
+            },
         }
         payload["retrieval_status"] = "success" if has_usable_evidence(payload) else "no_evidence"
         return {
@@ -407,7 +612,9 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
         return {
             "vector_contexts": [],
             "graph_facts": [],
+            "graph_relation_found": False,
             "sources": [],
+            "source_allowlist": [],
             "retrieval_trace": None,
             "packed_context": None,
             "retrieval_status": "recoverable_error",

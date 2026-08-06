@@ -6,6 +6,7 @@ LangGraph nodes for safety checks and reasoning (generating answers).
 
 import logging
 import re
+import time
 from typing import Any
 
 from src.agent.state import ClinicalState
@@ -332,6 +333,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
     safety_flags = state.get("safety_flags", [])
     symptoms = state.get("symptoms", [])
     conversation_history = state.get("conversation_history", [])
+    source_allowlist = state.get("source_allowlist", [])
     prompt_history = conversation_history if state.get("use_history_context") else []
     ignored_out_of_domain_part = state.get("ignored_out_of_domain_part", False)
     
@@ -350,6 +352,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             limit=10,
         )
         
+        prompt_started = time.perf_counter()
         prompt = build_medical_prompt(
             question=question,
             symptoms=symptoms,
@@ -357,8 +360,10 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             contexts=answer_contexts,
             graph_facts=prompt_graph_facts,
             conversation_history=prompt_history,
-            ignored_out_of_domain_part=ignored_out_of_domain_part
+            ignored_out_of_domain_part=ignored_out_of_domain_part,
+            available_sources=source_allowlist,
         )
+        prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         
         llm_provider = state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")
         llm_model = state.get("llm_model")
@@ -367,6 +372,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         
         logger.info(f"Generating answer with LLM: provider={llm_provider}, model={llm_model}")
         
+        generation_started = time.perf_counter()
         response_data = await generate_llm_response(
             prompt=prompt,
             provider=llm_provider,
@@ -376,17 +382,24 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             budget=_runtime_budget(state, settings),
             resilience_settings=settings,
         )
+        generation_ms = round((time.perf_counter() - generation_started) * 1000, 3)
         
         draft = response_data.get("text")
         logger.info("LLM generation successful.")
         
         return {
             "draft_answer": draft,
-            "sources": list(dict.fromkeys(
+            "sources": [
+                str(entry.get("source_id"))
+                for entry in source_allowlist
+                if entry.get("source_id") and not str(entry.get("source_id")).startswith("entity:")
+            ]
+            or list(dict.fromkeys(
                 ctx.get("source_file", "")
                 for ctx in answer_contexts
-                if ctx.get("source_file")
-            ))[:2] or state.get("sources", [])[:2],
+                if ctx.get("source_file") and not str(ctx.get("source_file")).startswith("entity:")
+            ))
+            or state.get("sources", []),
             "requested_provider": response_data.get("requested_provider"),
             "requested_model": response_data.get("requested_model"),
             "actual_provider": response_data["provider"],
@@ -396,9 +409,15 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "fallback_model": response_data["fallback_model"],
             "fallback_reason": response_data.get("fallback_reason"),
             "fallback_chain": response_data.get("fallback_chain"),
+            "graph_relation_found": bool(prompt_graph_facts),
             "runtime_resilience": {
                 **(state.get("runtime_resilience") or {}),
                 "llm": response_data.get("resilience"),
+            },
+            "performance_timings": {
+                **(state.get("performance_timings") or {}),
+                "prompt_construction": prompt_ms,
+                "llm_generation": generation_ms,
             },
         }
         

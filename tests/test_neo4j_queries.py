@@ -34,6 +34,13 @@ def test_runtime_queries_project_stable_fact_contract() -> None:
         "related_type",
         "related_description",
         "evidence",
+        "subject",
+        "predicate",
+        "object",
+        "confidence",
+        "evidence_source",
+        "subject_graph_node_id",
+        "object_graph_node_id",
     ):
         assert f" AS {field}" in ENTITY_CONTEXT_CYPHER
         assert f" AS {field}" in KEYWORD_SEARCH_CYPHER

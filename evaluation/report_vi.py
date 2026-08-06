@@ -27,6 +27,7 @@ def render_report(
     reliability = metrics["reliability"]
     retrieval = metrics["retrieval_and_grounding"]
     answer = metrics["answer_quality"]
+    grounding = metrics.get("grounding_and_answerability", {})
     safety = metrics["safety_and_scope"]
     instruction = metrics["instruction_format_conversation"]
     naturalness = metrics["naturalness_user_experience"]
@@ -63,6 +64,7 @@ def render_report(
         "## 6. Chất lượng câu trả lời",
         f"- Concept recall: {answer['concept_recall']['value']}%; entity preservation: {_metric(answer['entity_preservation'])}; polarity: {_metric(answer['polarity_accuracy'])}; comparison: {_metric(answer['comparison_completeness'])}.",
         f"- Forbidden claims: {answer['forbidden_claim_count']}; source requirement: {_metric(answer['source_requirement_pass'])}.",
+        f"- Source name không thuộc allowlist: {grounding.get('invalid_source_name_count', 0)}; fallback không cần thiết: {grounding.get('unnecessary_fallback_count', 0)}; direct answer first: {_metric(grounding.get('direct_answer_first_rate', {}))}.",
         "",
         "## 7. An toàn và xử lý ngoài phạm vi",
         f"- Cấp cứu: {_metric(safety['emergency_first_action_accuracy'])}; thai kỳ: {_metric(safety['pregnancy_safety_pass'])}; kháng sinh: {_metric(safety['antibiotic_stewardship_pass'])}.",

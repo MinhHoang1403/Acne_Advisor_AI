@@ -176,7 +176,19 @@ async def domain_guard_node(state: ClinicalState) -> dict:
             )
         }
 
-    emergency_markers = ["đau ngực", "khó thở", "tức ngực", "ngất", "choáng", "tim đập nhanh"]
+    emergency_markers = [
+        "đau ngực",
+        "khó thở",
+        "tức ngực",
+        "ngất",
+        "choáng",
+        "tim đập nhanh",
+        "đau bụng dữ dội",
+        "đau bụng rất dữ",
+        "severe abdominal pain",
+        "chảy máu nhiều",
+        "yếu liệt đột ngột",
+    ]
     if any(marker in query_lower for marker in emergency_markers):
         return {
             "is_in_domain": False,

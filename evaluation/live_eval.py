@@ -21,24 +21,22 @@ def assert_isolated(config: EvaluationConfig) -> None:
         raise ValueError("Evaluation V3 requires --no-persistence.")
 
 
-def run_live_case(case: dict[str, Any], config: EvaluationConfig) -> dict[str, Any]:
-    """Run one case through the production graph without the HTTP/API persistence layer."""
+async def run_live_case_async(case: dict[str, Any], config: EvaluationConfig) -> dict[str, Any]:
+    """Run one case on the caller's event loop without persistence or cache."""
 
     assert_isolated(config)
     started = time.perf_counter()
     try:
-        result = asyncio.run(
-            run_clinical_agent(
-                message=str(case["question"]),
-                user_id=None,
-                session_id=f"evaluation-v3-{case['id']}",
-                conversation_history=list(case.get("conversation_history") or []),
-                llm_provider=config.live_provider,
-                llm_model=config.live_model,
-                allow_model_fallback=False,
-                bypass_cache=True,
-                evaluation_mode=True,
-            )
+        result = await run_clinical_agent(
+            message=str(case["question"]),
+            user_id=None,
+            session_id=f"evaluation-v3-{case['id']}",
+            conversation_history=list(case.get("conversation_history") or []),
+            llm_provider=config.live_provider,
+            llm_model=config.live_model,
+            allow_model_fallback=False,
+            bypass_cache=True,
+            evaluation_mode=True,
         )
         return {
             "case_id": case["id"],
@@ -71,6 +69,39 @@ def run_live_case(case: dict[str, Any], config: EvaluationConfig) -> dict[str, A
         }
 
 
+async def close_evaluation_runtime_clients() -> None:
+    """Release shared async read clients on the loop that created them.
+
+    Batch evaluation intentionally keeps these clients warm across cases. The
+    synchronous single-case compatibility wrapper, however, creates a fresh
+    event loop each time, so it must release them before that loop closes.
+    """
+
+    from src.database.graph_store import Neo4jGraphStore
+    from src.database.vector_store import QdrantVectorStore
+    from src.retrieval.entity_retriever import EntityRetriever
+
+    await asyncio.gather(
+        QdrantVectorStore.close_shared_client(),
+        Neo4jGraphStore.close_shared_driver(),
+        EntityRetriever.close_shared_client(),
+        return_exceptions=True,
+    )
+
+
+async def _run_isolated_live_case(case: dict[str, Any], config: EvaluationConfig) -> dict[str, Any]:
+    try:
+        return await run_live_case_async(case, config)
+    finally:
+        await close_evaluation_runtime_clients()
+
+
+def run_live_case(case: dict[str, Any], config: EvaluationConfig) -> dict[str, Any]:
+    """Compatibility wrapper for one isolated live-evaluation case."""
+
+    return asyncio.run(_run_isolated_live_case(case, config))
+
+
 def component_checks() -> dict[str, Any]:
     """Static checks describing the runner's non-mutating execution boundary."""
 
@@ -97,4 +128,10 @@ def component_checks() -> dict[str, Any]:
     }
 
 
-__all__ = ["assert_isolated", "component_checks", "run_live_case"]
+__all__ = [
+    "assert_isolated",
+    "close_evaluation_runtime_clients",
+    "component_checks",
+    "run_live_case",
+    "run_live_case_async",
+]

@@ -245,10 +245,15 @@ class QdrantVectorStore(VectorStore):
     - Named sparse vector: ``"bm25"`` (hashed sparse BM25)
     """
 
+    _shared_client: Any | None = None
+
     def __init__(self) -> None:
         from qdrant_client import AsyncQdrantClient  # type: ignore[import]
 
-        self._client = AsyncQdrantClient(**qdrant_client_kwargs())
+        if self.__class__._shared_client is None:
+            self.__class__._shared_client = AsyncQdrantClient(**qdrant_client_kwargs())
+            logger.debug("Created process-level Qdrant client for read operations.")
+        self._client = self.__class__._shared_client
         self._collection = QDRANT_COLLECTION_NAME
 
     async def upsert(self, id: str, vector: list[float], payload: dict) -> None:
@@ -345,8 +350,17 @@ class QdrantVectorStore(VectorStore):
         )
 
     async def close(self) -> None:
-        """Close the Qdrant client connection."""
-        await self._client.close()
+        """Keep the shared read client alive for the process lifetime."""
+
+        return None
+
+    @classmethod
+    async def close_shared_client(cls) -> None:
+        """Close the shared client explicitly during controlled process shutdown."""
+
+        if cls._shared_client is not None:
+            await cls._shared_client.close()
+            cls._shared_client = None
 
 
 # ---------------------------------------------------------------------------

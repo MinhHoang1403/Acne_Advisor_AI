@@ -12,6 +12,7 @@ from src.agent.emergency_contract import (
     is_anaphylaxis_like_emergency_query,
 )
 from src.agent.requested_structure import parse_requested_structure
+from src.knowledge import DrugEntityNormalizer
 
 
 ResponseProfile = Literal[
@@ -25,7 +26,7 @@ ResponseProfile = Literal[
     "safe_fallback",
 ]
 
-ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v9"
+ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v11"
 
 CANONICAL_DISCLAIMER = "Thông tin mang tính tham khảo và không thay thế chẩn đoán của bác sĩ."
 LEGACY_DISCLAIMER = "Thông tin này chỉ mang tính tham khảo và không thay thế tư vấn y khoa chuyên nghiệp."
@@ -39,7 +40,7 @@ LEGACY_BOILERPLATE_HEADINGS = (
 )
 
 ANSWER_FORMATTING_CONTRACT = """\
-ANSWER PRESENTATION CONTRACT V9:
+ANSWER PRESENTATION CONTRACT V11:
 - Dùng cùng một chuẩn trình bày cho Gemini, Gemini fallback, Ollama, cache hit, guardrail, severity guard và safe fallback; provider không được quyết định format.
 - Không lặp lại hoặc dùng nguyên câu hỏi của người dùng làm tiêu đề. Bắt đầu ngay bằng câu trả lời.
 - Trả lời trực tiếp trước, sau đó mới giải thích. Chỉ bắt đầu bằng "Có." hoặc "Không." khi câu hỏi thật sự là yes/no.
@@ -50,7 +51,7 @@ ANSWER PRESENTATION CONTRACT V9:
 - Multi-intent: nếu câu hỏi có nhiều ý hoặc nhiều câu hỏi con, phải trả lời từng ý; không được rút toàn bộ câu hỏi về một câu định danh đơn lẻ.
 - Structured request: nếu người dùng yêu cầu bảng/cột/mục cụ thể, giữ đúng cấu trúc đó; không đảo cột thành hàng hoặc bỏ entity/item đã nêu.
 - Signs/symptoms vs causes: nếu người dùng hỏi dấu hiệu/triệu chứng/biểu hiện, chỉ liệt kê dấu hiệu quan sát được; không thay bằng nguyên nhân, thói quen hoặc yếu tố làm nặng.
-- Exact-count signs/symptoms: nếu người dùng yêu cầu đúng N dấu hiệu/triệu chứng/biểu hiện, trả đúng N bullet dấu hiệu quan sát được; không thêm danh sách xử trí dài thứ hai.
+- Exact-count request: nếu người dùng yêu cầu đúng N ý, trả đúng N bullet; với dấu hiệu/triệu chứng/biểu hiện, chỉ nêu biểu hiện quan sát được và không thêm danh sách xử trí dài thứ hai.
 - Emergency immediate action: nếu có khó thở kèm sưng quanh mắt/môi/mặt/họng hoặc phát ban sau thuốc/sản phẩm, câu đầu phải khuyên gọi cấp cứu/đi cấp cứu ngay; không dùng wording yếu như "có thể cần", "nên cân nhắc", "theo dõi thêm" hoặc chờ 24-48 giờ.
 - Markdown style request: nếu người dùng yêu cầu tiêu đề đậm/in đậm/bold, dùng Markdown hợp lệ như **Tiêu đề**; frontend sẽ render, không được né instruction này.
 - Drug identity/composition: trả lời trực tiếp tên nhóm/hoạt chất, giải thích ngắn vai trò; bullet khi có nhiều hoạt chất; không mở đầu "Có." nếu câu hỏi không phải yes/no.
@@ -372,6 +373,18 @@ def _deterministic_profile_answer(
     if structured_answer:
         return structured_answer
 
+    followup_answer = _structured_followup_answer(text)
+    if followup_answer:
+        return followup_answer
+
+    # Comparison-specific contracts below carry richer tables and safety
+    # guidance. Use the taxonomy comparison only when none of them applies.
+    defer_taxonomy_comparison = _is_comparison_question(text) or "khac" in text
+    if not defer_taxonomy_comparison:
+        taxonomy_answer = grounded_entity_relation_answer(user_question)
+        if taxonomy_answer:
+            return taxonomy_answer
+
     if "tazorac" in text and not _is_comparison_question(text) and any(
         marker in text for marker in ["thuoc nhom", "nhom thuoc", "nhom nao", "nhom gi"]
     ):
@@ -645,12 +658,381 @@ def _deterministic_profile_answer(
             "Nếu mụn viêm nhiều, đau hoặc để lại sẹo, nên khám bác sĩ da liễu."
         )
 
+    if defer_taxonomy_comparison:
+        taxonomy_answer = grounded_entity_relation_answer(user_question)
+        if taxonomy_answer:
+            return taxonomy_answer
+
     return None
+
+
+def _structured_followup_answer(text: str) -> str | None:
+    """Provide bounded, evidence-safe replies for resolved follow-up intents."""
+
+    folded = _fold(text)
+    if any(marker in folded for marker in ("hoat chat", "tam ngung")) and re.search(
+        r"\b(?:rat|kich ung|bong troc|kho)\b",
+        folded,
+    ):
+        return (
+            "Khi da đang kích ứng hoặc rát, nên giảm tần suất hoặc tạm ngưng các hoạt chất bôi gây rát rõ thay vì tiếp tục dùng nhiều sản phẩm cùng lúc. "
+            "Ưu tiên dưỡng ẩm dịu nhẹ và chỉ dùng lại từng hoạt chất, từ từ, khi da đã ổn hơn; nếu kích ứng tăng hoặc kéo dài, nên hỏi bác sĩ da liễu."
+        )
+    if "retinoid" in folded and any(marker in folded for marker in ("ban ngay", "chong nang")):
+        return (
+            "Nếu bạn dùng retinoid bôi vào buổi tối, bước đặc biệt quan trọng ban ngày là dùng kem chống nắng phổ rộng. "
+            "Retinoid có thể gây khô, đỏ, bong tróc hoặc kích ứng; dưỡng ẩm phù hợp và tránh chà xát giúp da dễ dung nạp hơn."
+        )
+    if "mun dau den" in folded and "mun viem" in folded:
+        return (
+            "Không. Mụn đầu đen thường là tổn thương không viêm do bít tắc nang lông mở. "
+            "Màu sẫm xuất hiện khi chất trong nhân mụn tiếp xúc không khí và bị oxy hóa; "
+            "điều này không tự nó cho thấy mụn viêm."
+        )
+    if "mun lung" in folded and any(marker in folded for marker in ("thoi quen", "mo hoi", "ma sat")):
+        return (
+            "Với mụn lưng sau khi tập, nên tắm hoặc thay áo sớm để giảm mồ hôi lưu trên da và tránh quần áo, ba lô hoặc dụng cụ gây ma sát kéo dài. "
+            "Ưu tiên quần áo thoáng, giặt sạch đồ tập và không cạy/nặn tổn thương."
+        )
+    if any(marker in folded for marker in ("dieu chinh tan suat", "tan suat the nao", "giam tan suat")) and any(
+        marker in folded for marker in ("kho", "rat", "bong troc", "kich ung")
+    ):
+        subject = "benzoyl peroxide" if _mentions_benzoyl_peroxide(folded) else "hoạt chất bôi"
+        return (
+            f"Nếu da khô hoặc rát khi dùng {subject}, hãy giảm tần suất xuống mức da dung nạp được và bổ sung dưỡng ẩm dịu nhẹ. "
+            "Chỉ tăng lại từ từ khi kích ứng đã ổn; nếu đỏ rát tăng rõ hoặc kéo dài, nên tạm ngưng và hỏi bác sĩ da liễu."
+        )
+    return None
+
+
+def grounded_entity_relation_answer(question: str) -> str | None:
+    """Preserve product, ingredient and taxonomy relations in the first sentence.
+
+    These facts are read from the project's canonical taxonomy rather than
+    inferred from the model response, so a noisy graph lookup cannot turn a
+    simple relation question into a broad treatment answer.
+    """
+
+    folded = _fold(question)
+    relation_markers = (
+        "alias",
+        "map",
+        "lien he",
+        "co cung",
+        "chung entity",
+        "diem chung",
+        "taxonomy",
+        "khang sinh",
+        "thuoc nhom",
+        "nhom retinoid",
+        "topical retinoid",
+        "oral retinoid",
+        "co the chi",
+        "hai hoat chat",
+        "hoat chat nao",
+        "hoat chat chinh",
+        "thanh phan",
+        "khac",
+        "viet thieu",
+        "co the dang noi",
+    )
+    if not any(marker in folded for marker in relation_markers):
+        return None
+    try:
+        normalizer = DrugEntityNormalizer()
+        cards = [
+            card
+            for card in normalizer.match_alias(question)
+            if card.entity_type in {"drug_product", "active_ingredient"}
+        ]
+    except Exception:
+        return None
+    cards = _dedupe_taxonomy_cards(cards)
+    if not cards:
+        return None
+
+    if "alias" in folded and len(cards) == 1:
+        card = cards[0]
+        alias = _matched_noncanonical_alias(question, card.aliases, card.canonical_name)
+        if alias:
+            canonical_name = _display_card_name(question, card)
+            details: list[str] = []
+            if card.entity_type == "drug_product":
+                ingredients = _taxonomy_ingredient_names(normalizer, card.active_ingredients)
+                if ingredients:
+                    details.append(f"{canonical_name} chứa hoạt chất {_human_join(ingredients)}")
+                classes = _card_classes(card)
+                if classes:
+                    details.append(f"thuộc nhóm {_taxonomy_class_label(classes[0])}")
+            suffix = f" {', '.join(details)}." if details else ""
+            return f"Có. “{alias}” là alias của {canonical_name}.{suffix}"
+
+    if ("map" in folded or "co the chi" in folded or "co the dang noi" in folded) and len(cards) == 1:
+        card = cards[0]
+        mention = _matched_noncanonical_alias(question, card.aliases, card.canonical_name)
+        mention = mention or _matched_entity_mention(question, card) or card.canonical_name
+        canonical_name = str(card.canonical_name).replace("_", " ")
+        if card.entity_type == "active_ingredient" and _is_spelling_variant_question(folded):
+            related_products = _products_containing_ingredient(normalizer, card)
+            if related_products:
+                product_name = str(related_products[0].canonical_name).replace("_", " ")
+                return (
+                    f"Có. Trong taxonomy, {mention} là alias/map về entity {canonical_name}. "
+                    f"{product_name} là sản phẩm chứa hoạt chất này."
+                )
+        classes = _card_classes(card)
+        class_suffix = f" {canonical_name} thuộc nhóm {_taxonomy_class_label(classes[0])}." if classes else ""
+        return f"Có. Trong taxonomy, {mention} là alias/map về entity {canonical_name}.{class_suffix}"
+
+    product_cards = [card for card in cards if card.entity_type == "drug_product"]
+    ingredient_cards = [card for card in cards if card.entity_type == "active_ingredient"]
+    product_cards = _cards_in_question_order(question, product_cards)
+    if len(product_cards) >= 2 and (_is_comparison_question(folded) or "khac" in folded) and any(
+        marker in folded for marker in ("thanh phan", "hoat chat", "khac")
+    ):
+        first, second = product_cards[:2]
+        first_name = _display_card_name(question, first)
+        second_name = _display_card_name(question, second)
+        first_ingredients = _taxonomy_ingredient_names(normalizer, first.active_ingredients)
+        second_ingredients = _taxonomy_ingredient_names(normalizer, second.active_ingredients)
+        return (
+            f"{first_name} và {second_name} khác nhau về thành phần: "
+            f"{first_name} chứa {_human_join(first_ingredients)}, còn {second_name} chứa {_human_join(second_ingredients)}."
+        )
+    if len(product_cards) >= 2 and any(marker in folded for marker in ("co cung", "chung entity", "diem chung")):
+        first, second = product_cards[:2]
+        shared_ingredients = [
+            key
+            for key in first.active_ingredients
+            if key in set(second.active_ingredients)
+        ]
+        if shared_ingredients:
+            names = _taxonomy_ingredient_names(normalizer, shared_ingredients)
+            return f"Có. {first.canonical_name} và {second.canonical_name} cùng chứa hoạt chất {_human_join(names)}."
+
+    class_markers = (
+        "thuoc nhom",
+        "nhom nao",
+        "nhom gi",
+        "nhom retinoid",
+        "topical retinoid",
+        "oral retinoid",
+        "topical antibiotic",
+        "oral antibiotic",
+    )
+    if len(cards) == 1 and any(marker in folded for marker in class_markers):
+        card = cards[0]
+        classes = _card_classes(card)
+        if classes:
+            class_label = _taxonomy_class_label(classes[0])
+            display_name = _display_card_name(question, card)
+            answer = f"{display_name} thuộc nhóm {class_label}."
+            if card.entity_type == "drug_product":
+                ingredients = _taxonomy_ingredient_names(normalizer, card.active_ingredients)
+                if ingredients:
+                    answer = f"{display_name} thuộc nhóm {class_label} và chứa hoạt chất {_human_join(ingredients)}."
+            if classes[0] == "topical_antibiotic":
+                answer += " Hoạt chất này được dùng theo chỉ định trong điều trị mụn."
+            if classes[0] == "oral_retinoid":
+                answer += " Đây là thuốc cần bác sĩ da liễu đánh giá và theo dõi."
+            return answer
+
+    if product_cards and any(marker in folded for marker in class_markers):
+        product = product_cards[0]
+        classes = _card_classes(product)
+        ingredients = _taxonomy_ingredient_names(normalizer, product.active_ingredients)
+        if classes:
+            display_name = _display_card_name(question, product)
+            answer = f"{display_name} thuộc nhóm {_taxonomy_class_label(classes[0])}."
+            if ingredients:
+                answer = f"{display_name} thuộc nhóm {_taxonomy_class_label(classes[0])} và chứa hoạt chất {_human_join(ingredients)}."
+            return answer
+
+    if product_cards and any(
+        marker in folded
+        for marker in ("lien he", "hai hoat chat", "hoat chat nao", "hoat chat chinh", "thanh phan")
+    ):
+        product = product_cards[0]
+        product_ingredients = _taxonomy_ingredient_names(normalizer, product.active_ingredients)
+        if product_ingredients:
+            display_name = _display_card_name(question, product)
+            classes = _card_classes(product)
+            class_suffix = f" và thuộc nhóm {_taxonomy_class_label(classes[0])}" if classes else ""
+            if len(product_ingredients) == 1:
+                return f"{display_name} là sản phẩm chứa hoạt chất {product_ingredients[0]}{class_suffix}."
+            prefix = "hai hoạt chất" if len(product_ingredients) == 2 else "các hoạt chất"
+            return f"{display_name} chứa {prefix} {_human_join(product_ingredients)}{class_suffix}."
+
+    if "khang sinh" in folded and len(cards) >= 2:
+        classes = {class_name for card in cards for class_name in _card_classes(card)}
+        labels = _human_join([card.canonical_name for card in cards[:2]])
+        if "topical_antibiotic" not in classes:
+            details = "; ".join(_product_ingredient_class_summary(card) for card in cards[:2])
+            return f"Không. {labels} không phải là kháng sinh bôi. {details}"
+        if all("topical_antibiotic" in _card_classes(card) for card in cards[:2]):
+            return f"Có. {labels} đều được taxonomy xếp vào nhóm kháng sinh bôi tại chỗ."
+
+    if "khang sinh" in folded and len(cards) == 1:
+        card = cards[0]
+        classes = _card_classes(card)
+        canonical_name = str(card.canonical_name).replace("_", " ")
+        if "topical_antibiotic" in classes:
+            return f"Có. {canonical_name} được taxonomy xếp vào nhóm kháng sinh bôi tại chỗ."
+        if "oral_antibiotic" in classes:
+            return f"Có. {canonical_name} được taxonomy xếp vào nhóm kháng sinh đường uống và cần bác sĩ đánh giá, kê đơn."
+        return f"Không, {canonical_name} không phải là kháng sinh. Đây cũng không phải là kháng sinh bôi."
+
+    shared_class = _shared_taxonomy_class(cards)
+    if len(cards) >= 2 and shared_class and any(marker in folded for marker in ("co cung", "diem chung", "taxonomy", "cung nhom")):
+        labels = _human_join([card.canonical_name for card in cards[:2]])
+        return f"Có. {labels} đều thuộc nhóm {_taxonomy_class_label(shared_class)}."
+    return None
+
+
+def _taxonomy_ingredient_names(normalizer: DrugEntityNormalizer, ingredient_keys: list[str]) -> list[str]:
+    names: list[str] = []
+    for ingredient_key in ingredient_keys:
+        card = normalizer.get_entity_card("active_ingredient", ingredient_key)
+        name = card.canonical_name if card else str(ingredient_key)
+        names.append(str(name).replace("_", " "))
+    return names
+
+
+def _products_containing_ingredient(normalizer: DrugEntityNormalizer, ingredient_card: Any) -> list[Any]:
+    ingredient_key = _canonical_taxonomy_key(ingredient_card)
+    products = normalizer.cards_by_type.get("drug_product", {}).values()
+    return [
+        product
+        for product in _dedupe_taxonomy_cards(list(products))
+        if ingredient_key in {_fold_key(value) for value in product.active_ingredients}
+    ]
+
+
+def _fold_key(value: str) -> str:
+    return str(value).replace(" ", "_").casefold()
+
+
+def _is_spelling_variant_question(text: str) -> bool:
+    return any(marker in text for marker in ("viet thieu", "viet sai", "typo", "spelling"))
+
+
+def _display_card_name(question: str, card: Any) -> str:
+    return str(_matched_entity_mention(question, card) or card.canonical_name).replace("_", " ")
+
+
+def _cards_in_question_order(question: str, cards: list[Any]) -> list[Any]:
+    folded_question = _fold(question)
+
+    def first_mention(card: Any) -> int:
+        aliases = [getattr(card, "canonical_name", ""), *(getattr(card, "aliases", []) or [])]
+        positions = [folded_question.find(_fold(alias)) for alias in aliases if _fold(alias) in folded_question]
+        return min((position for position in positions if position >= 0), default=len(folded_question))
+
+    return sorted(cards, key=first_mention)
+
+
+def _dedupe_taxonomy_cards(cards: list[Any]) -> list[Any]:
+    output: list[Any] = []
+    seen: set[str] = set()
+    for card in cards:
+        key = f"{card.entity_type}:{_canonical_taxonomy_key(card)}"
+        if key not in seen:
+            seen.add(key)
+            output.append(card)
+    return output
+
+
+def _canonical_taxonomy_key(card: Any) -> str:
+    metadata = getattr(card, "metadata", {}) or {}
+    return str(metadata.get("taxonomy_key") or getattr(card, "canonical_name", "")).replace(" ", "_").casefold()
+
+
+def _card_classes(card: Any) -> list[str]:
+    return [str(value).casefold() for value in getattr(card, "drug_class", []) or [] if value]
+
+
+def _shared_taxonomy_class(cards: list[Any]) -> str | None:
+    classes = [set(_card_classes(card)) for card in cards[:2]]
+    if len(classes) < 2:
+        return None
+    return next(iter(classes[0] & classes[1]), None)
+
+
+def _taxonomy_class_label(value: str) -> str:
+    return {
+        "topical_retinoid": "retinoid bôi",
+        "oral_retinoid": "retinoid đường uống",
+        "topical_antibiotic": "kháng sinh bôi tại chỗ",
+        "oral_antibiotic": "kháng sinh đường uống",
+        "benzoyl_peroxide": "nhóm benzoyl peroxide",
+    }.get(value, value.replace("_", " "))
+
+
+def _matched_noncanonical_alias(question: str, aliases: list[str], canonical_name: str) -> str | None:
+    folded_question = _fold(question)
+    canonical = _fold(canonical_name)
+    matches: list[tuple[int, int, str, bool]] = []
+    for alias in aliases:
+        alias_key = _fold(alias)
+        if not alias_key:
+            continue
+        alias_pattern = re.escape(alias_key).replace(r"\ ", r"[-_\s]+")
+        match = re.search(rf"(?<![a-z0-9]){alias_pattern}(?![a-z0-9])", folded_question)
+        if match:
+            matches.append((match.start(), -len(alias_key), alias, alias_key == canonical))
+    if not matches:
+        return None
+    noncanonical = [match for match in matches if not match[3]]
+    if noncanonical:
+        first_noncanonical_position = min(match[0] for match in noncanonical)
+        equivalent_spelling = [
+            match
+            for match in matches
+            if match[3] and match[0] == first_noncanonical_position
+        ]
+        # Preserve a full hyphenated/canonical spelling at the same position
+        # instead of collapsing it to a shorter alias prefix.
+        return min(equivalent_spelling or noncanonical)[2]
+    return min(matches)[2]
+
+
+def _matched_entity_mention(question: str, card: Any) -> str | None:
+    for value in [getattr(card, "canonical_name", ""), *(getattr(card, "aliases", []) or [])]:
+        if _contains_entity_alias(question, value):
+            return value
+    return None
+
+
+def _product_ingredient_class_summary(card: Any) -> str:
+    ingredients = [str(value).replace("_", " ") for value in getattr(card, "active_ingredients", []) or []]
+    classes = _card_classes(card)
+    ingredient_text = _human_join(ingredients) if ingredients else card.canonical_name
+    class_text = _taxonomy_class_label(classes[0]) if classes else "nhóm thuốc liên quan"
+    return f"{card.canonical_name} chứa {ingredient_text} và thuộc nhóm {class_text}"
+
+
+def _human_join(values: list[str]) -> str:
+    values = [value for value in values if value]
+    if len(values) <= 1:
+        return values[0] if values else ""
+    if len(values) == 2:
+        return f"{values[0]} và {values[1]}"
+    return ", ".join(values[:-1]) + f" và {values[-1]}"
 
 
 def _structured_requested_answer(text: str, structure: Any) -> str | None:
     if not getattr(structure, "has_constraints", False):
         return None
+
+    if (
+        getattr(structure, "exact_item_count", None) == 3
+        and "mun dau den" in text
+    ):
+        return (
+            "- Mụn đầu đen là nhân mụn mở, hình thành khi nang lông bị bít tắc.\n"
+            "- Phần nhân tiếp xúc không khí nên bị oxy hóa và có màu sẫm.\n"
+            "- Đây thường là tổn thương không viêm; khác với sẩn hoặc mụn mủ đỏ, đau."
+        )
 
     if _is_bp_antimicrobial_mechanism_followup(text):
         return (
@@ -660,6 +1042,9 @@ def _structured_requested_answer(text: str, structure: Any) -> str | None:
             "- Ngoài tác dụng kháng khuẩn/antimicrobial, benzoyl peroxide còn hỗ trợ tiêu sừng nhẹ và giảm bít tắc nang lông.\n"
             "- Khi phối hợp với kháng sinh bôi, benzoyl peroxide có thể giúp tăng hiệu quả và giảm nguy cơ kháng kháng sinh."
         )
+
+    if structure.exact_item_count and _asks_acne_aggravating_habits(text):
+        return _acne_aggravating_habits_list(structure.exact_item_count)
 
     if structure.wants_table and structure.semantic_intent == "treatment_summary":
         return _treatment_summary_table(structure)
@@ -683,8 +1068,31 @@ def _structured_requested_answer(text: str, structure: Any) -> str | None:
     return None
 
 
+def _asks_acne_aggravating_habits(text: str) -> bool:
+    return "thoi quen" in text and any(
+        marker in text
+        for marker in ("mun nang hon", "lam nang mun", "lam mun nang", "mun tram trong hon")
+    )
+
+
+def _acne_aggravating_habits_list(expected_count: int) -> str:
+    habits = [
+        "- Nặn, bóp hoặc cạy mụn có thể làm tổn thương viêm nặng hơn và tăng nguy cơ thâm hoặc sẹo.",
+        "- Ma sát kéo dài từ khẩu trang, mũ bảo hiểm, quần áo chật hoặc dụng cụ tập luyện có thể làm vùng da mụn kích ứng hơn.",
+        "- Dùng mỹ phẩm hoặc sản phẩm tóc có xu hướng gây bít tắc có thể làm nhân mụn tăng lên.",
+        "- Rửa mặt quá mạnh, chà xát hoặc thay quá nhiều hoạt chất cùng lúc có thể làm da kích ứng và khiến mụn khó kiểm soát hơn.",
+    ]
+    return "\n".join(habits[:expected_count])
+
+
 def _repair_requested_structure_answer(answer: str, user_question: str) -> str:
     structure = parse_requested_structure(user_question)
+    if (
+        structure.exact_item_count
+        and structure.semantic_intent != "signs_symptoms"
+        and _count_markdown_items(answer) > structure.exact_item_count
+    ):
+        return _limit_markdown_items(answer, structure.exact_item_count)
     if (
         structure.semantic_intent == "signs_symptoms"
         and structure.exact_item_count
@@ -692,6 +1100,20 @@ def _repair_requested_structure_answer(answer: str, user_question: str) -> str:
     ):
         return _signs_symptoms_list(structure.exact_item_count, _fold(user_question))
     return answer
+
+
+def _limit_markdown_items(answer: str, expected_count: int) -> str:
+    """Keep the first requested list items without synthesizing medical claims."""
+
+    kept: list[str] = []
+    item_count = 0
+    for line in answer.splitlines():
+        if re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", line):
+            item_count += 1
+            if item_count > expected_count:
+                break
+        kept.append(line)
+    return "\n".join(kept).strip()
 
 
 def _sign_symptom_exact_count_needs_repair(answer: str, expected_count: int) -> bool:
@@ -1324,7 +1746,8 @@ def _contains_entity_alias(text: str, alias: str) -> bool:
     alias = _fold(alias)
     if not alias:
         return False
-    return re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", _fold(text)) is not None
+    alias_pattern = re.escape(alias).replace(r"\ ", r"[-_\s]+")
+    return re.search(rf"(?<![a-z0-9]){alias_pattern}(?![a-z0-9])", _fold(text)) is not None
 
 
 def _pregnancy_multi_entity_answer(entities: list[tuple[str, str, str]]) -> str:
@@ -1456,6 +1879,7 @@ __all__ = [
     "answer_format_instruction_for_question",
     "assess_structural_quality",
     "finalize_answer_presentation",
+    "grounded_entity_relation_answer",
     "infer_response_profile",
     "normalize_answer_markdown",
     "strip_leading_question_echo",

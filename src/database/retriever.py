@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
+import contextlib
 import os
 import time
 from dataclasses import dataclass, field
@@ -315,31 +316,57 @@ class HybridRetriever:
         expansion = expand_normalized_query(normalized_query)
         t_norm = time.time() - t_norm_start
 
-        # ── Step 1: Embed query ──────────────────────────────────────
+        # ── Step 1: Embed query + resolve entity cards ───────────────
+        # Entity-card lookup only needs normalized query metadata, so it can
+        # overlap the remote embedding request without changing retrieval
+        # semantics.
         t_embed_start = time.time()
-        query_vector = await embed_query(query)
+        t_entity_start = time.time()
+        embedding_task = asyncio.create_task(embed_query(query))
+        entity_task = asyncio.create_task(
+            self._entity_retriever.retrieve(
+                normalized_query=normalized_query,
+                expansion=expansion,
+                limit=8,
+            )
+        )
+        try:
+            query_vector = await embedding_task
+        except BaseException:
+            # The entity lookup overlaps the embedding call.  Do not leave it
+            # running after an embedding failure because its result can no
+            # longer contribute to this request.
+            entity_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await entity_task
+            raise
         t_embed = time.time() - t_embed_start
         logger.info("Embedded query in %.2fs (dim=%d)", t_embed, len(query_vector))
+
+        entity_candidates = []
+        try:
+            entity_candidates = await entity_task
+        except Exception as exc:
+            warning = f"Entity retrieval skipped: {sanitize_fallback_reason(exc)}"
+            warnings.append(warning)
+            logger.warning(warning)
+        t_entity = time.time() - t_entity_start
 
         # ── Step 2: Dense search ─────────────────────────────────────
         fetch_k = max(top_k * 3, 15)  # Fetch more candidates for fusion
 
+        # ── Step 2 + 3: Dense and sparse search ─────────────────────
+        # Both queries are independent once the dense embedding is available.
         t_dense_start = time.time()
-        dense_results = await self._vector_store.search(
-            query_vector=query_vector,
-            top_k=fetch_k,
+        t_sparse_start = t_dense_start
+        sparse_query = " ".join(expansion.expanded_terms) or query
+        dense_results, sparse_results = await asyncio.gather(
+            self._vector_store.search(query_vector=query_vector, top_k=fetch_k),
+            self._vector_store.search_sparse(text=sparse_query, top_k=fetch_k),
         )
         t_dense = time.time() - t_dense_start
-        logger.info("Dense search: %d results in %.2fs", len(dense_results), t_dense)
-
-        # ── Step 3: Sparse BM25 search ───────────────────────────────
-        t_sparse_start = time.time()
-        sparse_query = " ".join(expansion.expanded_terms) or query
-        sparse_results = await self._vector_store.search_sparse(
-            text=sparse_query,
-            top_k=fetch_k,
-        )
         t_sparse = time.time() - t_sparse_start
+        logger.info("Dense search: %d results in %.2fs", len(dense_results), t_dense)
         logger.info("Sparse search: %d results in %.2fs", len(sparse_results), t_sparse)
 
         # ── Step 4: RRF Fusion ───────────────────────────────────────
@@ -382,21 +409,7 @@ class HybridRetriever:
             t_boost,
         )
 
-        # ── Step 4.6: Entity-card retrieval + candidate merge ────────
-        t_entity_start = time.time()
-        entity_candidates = []
-        try:
-            entity_candidates = await self._entity_retriever.retrieve(
-                normalized_query=normalized_query,
-                expansion=expansion,
-                limit=8,
-            )
-        except Exception as exc:
-            warning = f"Entity retrieval skipped: {sanitize_fallback_reason(exc)}"
-            warnings.append(warning)
-            logger.warning(warning)
-        t_entity = time.time() - t_entity_start
-
+        # ── Step 4.6: Candidate merge ────────────────────────────────
         merged_candidates = merge_candidates(
             entity_candidates=entity_candidates,
             chunk_candidates=chunk_candidates,

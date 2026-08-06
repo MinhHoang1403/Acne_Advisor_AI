@@ -20,6 +20,7 @@ class ClinicalState(TypedDict):
     # Processed Input
     standalone_question: str | None
     use_history_context: bool | None
+    conversation_context: dict[str, Any] | None
     normalized_question: str
     patient_profile: dict[str, Any]
     symptoms: list[str]
@@ -34,7 +35,10 @@ class ClinicalState(TypedDict):
     # Retrieval
     vector_contexts: list[dict[str, Any]]
     graph_facts: list[dict[str, Any]]
+    graph_relation_found: bool
     sources: list[str]
+    source_allowlist: list[dict[str, Any]]
+    source_validation: dict[str, Any] | None
     retrieval_status: str | None
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
@@ -45,6 +49,7 @@ class ClinicalState(TypedDict):
     runtime_budget: Any
     runtime_resilience_settings: dict[str, Any] | None
     runtime_resilience: dict[str, Any] | None
+    performance_timings: dict[str, float]
     
     # Reasoning & Generation
     safety_flags: list[str]
@@ -62,6 +67,7 @@ class ClinicalState(TypedDict):
     fallback_reason: str | None
     fallback_answer: str | None
     fallback_cache_eligible: bool | None
+    answerability: dict[str, Any] | None
     
     # Error handling
     errors: list[str]

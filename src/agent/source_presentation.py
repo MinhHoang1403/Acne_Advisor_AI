@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +30,28 @@ SOURCE_TYPE_ORDER = {
     "dataset": 1,
     "other": 2,
 }
+
+SOURCE_NORMALIZATION_VERSION = "source_normalization_v1"
+_KNOWN_SOURCE_IDS = {
+    source_id.casefold(): source_id
+    for source_id in (*ENTITY_SOURCE_DISPLAY_NAMES, *FILE_SOURCE_DISPLAY_NAMES)
+}
+_SOURCE_FILENAME_RE = re.compile(r"(?<![\w-])([\wÀ-ỹ][\wÀ-ỹ_()\-]{0,180}\.(?:pdf|json))(?![\w-])", re.IGNORECASE)
+_GENERIC_SOURCE_LABEL_RE = re.compile(r"\b(?:tài\s+liệu|tai\s+lieu|document)\s+\d+\b", re.IGNORECASE)
+_UNATTRIBUTED_SOURCE_CLAIM_RE = re.compile(
+    r"\b(?:the|this)\s+(?:guideline|document)\s+(?:says|states)\b|"
+    r"\b(?:theo\s+)?(?:hướng\s+dẫn|tài\s+liệu)\s+(?:này|đó)\s+(?:cho\s+biết|nêu|nói)\b",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class SourceValidationResult:
+    """A request-scoped source validation result for internal diagnostics."""
+
+    answer: str
+    removed_mentions: tuple[str, ...]
+    allowlist_source_ids: tuple[str, ...]
 
 
 def build_source_metadata(
@@ -60,6 +84,133 @@ def build_source_metadata(
     return entries
 
 
+def build_source_allowlist(
+    sources: list[Any] | None,
+    contexts: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Return the canonical, request-scoped sources eligible for answer citations."""
+
+    return build_source_metadata(sources, contexts)
+
+
+def normalize_source_identifier(value: Any) -> str:
+    """Normalize a source ID across paths, separators, case and Unicode form."""
+
+    if isinstance(value, dict):
+        raw = _first_text(
+            value.get("source_id"),
+            value.get("source_file"),
+            value.get("source_path"),
+            value.get("display_name"),
+        ) or ""
+    else:
+        raw = str(value or "").strip()
+    if not raw:
+        return ""
+    normalized = unicodedata.normalize("NFC", raw.strip().strip("`'\""))
+    if normalized.casefold().startswith("entity:"):
+        prefix, _, suffix = normalized.partition(":")
+        return f"{prefix.casefold()}:{suffix.strip().casefold()}"
+    path_like = normalized.replace("\\", "/")
+    filename = path_like.rsplit("/", 1)[-1].strip()
+    if not filename:
+        return ""
+    return _KNOWN_SOURCE_IDS.get(filename.casefold(), filename)
+
+
+def is_source_request(question: str) -> bool:
+    """Return whether the user is asking for retrieved documents rather than facts."""
+
+    folded = _fold_source_text(question)
+    markers = (
+        "nguon nao",
+        "tai lieu nao",
+        "xem nguon nao",
+        "xem tai lieu nao",
+        "theo kho du lieu",
+        "nguon tham khao",
+    )
+    return any(marker in folded for marker in markers)
+
+
+def build_grounded_source_answer(question: str, allowlist: list[dict[str, Any]] | None) -> str:
+    """Answer source-selection questions only from the current retrieval allowlist."""
+
+    entries = [entry for entry in (allowlist or []) if entry.get("source_id")]
+    if not entries:
+        return "Tài liệu hiện được truy hồi chưa cung cấp nguồn phù hợp để trả lời câu hỏi này."
+
+    labels = [str(entry.get("display_name") or entry["source_id"]).strip() for entry in entries]
+    subject = "thông tin này"
+    folded = _fold_source_text(question)
+    if "benzoyl peroxide" in folded or re.search(r"\bbp\b", folded):
+        subject = "thông tin về benzoyl peroxide dạng bôi"
+    elif "retinoid" in folded:
+        subject = "thông tin về điều trị mụn bằng retinoid"
+    return (
+        f"Các nguồn đang được truy hồi có thể hỗ trợ {subject}:\n"
+        + "\n".join(f"- {label}" for label in labels)
+    )
+
+
+def validate_answer_source_mentions(
+    answer: str,
+    allowlist: list[dict[str, Any]] | None,
+) -> SourceValidationResult:
+    """Remove source labels that are absent from this response's retrieval allowlist.
+
+    This is deliberately conservative: it never guesses a replacement source.
+    It only removes unsupported source labels or replaces generic numbered
+    document labels with a neutral reference to retrieved context.
+    """
+
+    allowed_ids = tuple(str(entry.get("source_id") or "") for entry in allowlist or [] if entry.get("source_id"))
+    allowed = {
+        _source_match_key(candidate)
+        for entry in allowlist or []
+        for candidate in _source_aliases(entry)
+        if candidate
+    }
+    removed: list[str] = []
+    lines: list[str] = []
+    for raw_line in str(answer or "").splitlines():
+        line = raw_line
+        generic_matches = _GENERIC_SOURCE_LABEL_RE.findall(line)
+        if generic_matches:
+            removed.extend(generic_matches)
+            if line.lstrip().startswith("|"):
+                # A numbered source table cannot be attributed safely. Keeping
+                # it would make an invented source label visible to the user.
+                continue
+            line = _GENERIC_SOURCE_LABEL_RE.sub("tài liệu đã truy hồi", line)
+
+        # Generic claims about an unnamed guideline/document still imply an
+        # attribution.  Keep the clinical sentence, but make the attribution
+        # neutral instead of presenting an unverifiable source reference.
+        unmatched_claim = _UNATTRIBUTED_SOURCE_CLAIM_RE.search(line)
+        if unmatched_claim:
+            removed.append(unmatched_claim.group(0))
+            line = _UNATTRIBUTED_SOURCE_CLAIM_RE.sub("Theo nội dung đang được truy hồi", line)
+
+        def replace_filename(match: re.Match[str]) -> str:
+            mention = match.group(1)
+            if _source_match_key(mention) in allowed:
+                return mention
+            removed.append(mention)
+            return "tài liệu đã truy hồi"
+
+        line = _SOURCE_FILENAME_RE.sub(replace_filename, line)
+        lines.append(line)
+
+    cleaned = "\n".join(lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return SourceValidationResult(
+        answer=cleaned,
+        removed_mentions=tuple(dict.fromkeys(removed)),
+        allowlist_source_ids=allowed_ids,
+    )
+
+
 def display_names_for_sources(
     sources: list[Any] | None,
     contexts: list[dict[str, Any]] | None = None,
@@ -82,10 +233,14 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
     display_name = _display_name(source_id, document_title=document_title, source_type=source_type)
     return {
         "source_id": source_id,
+        "canonical_filename": Path(source_id.replace("\\", "/")).name if source_type in {"document", "dataset"} else None,
         "source_type": source_type,
         "source_path": source_path,
         "document_title": document_title,
         "display_name": display_name,
+        "chunk_id": _first_text(context.get("chunk_id"), _metadata_value(context, "chunk_id")),
+        "page": context.get("page") or _metadata_value(context, "page"),
+        "origin": _first_text(context.get("source_type"), _metadata_value(context, "source_type")) or source_type,
     }
 
 
@@ -109,20 +264,22 @@ def _display_name(source_id: str, *, document_title: str | None, source_type: st
 
 
 def _source_id_from_context(context: dict[str, Any]) -> str:
-    return _first_text(
+    return normalize_source_identifier(_first_text(
         context.get("source_file"),
         context.get("source_id"),
         context.get("source_path"),
         _metadata_value(context, "source_file"),
         _metadata_value(context, "source_id"),
         _metadata_value(context, "source_path"),
-    ) or ""
+    ))
 
 
 def _source_id_from_value(source: Any) -> str:
     if isinstance(source, dict):
-        return _first_text(source.get("source_id"), source.get("source_file"), source.get("source_path"), source.get("display_name")) or ""
-    return str(source or "").strip()
+        raw = _first_text(source.get("source_id"), source.get("source_file"), source.get("source_path"), source.get("display_name")) or ""
+    else:
+        raw = str(source or "").strip()
+    return normalize_source_identifier(raw) if raw else ""
 
 
 def _source_type(source_id: str, context: dict[str, Any]) -> str:
@@ -134,6 +291,8 @@ def _source_type(source_id: str, context: dict[str, Any]) -> str:
             return explicit
     if source_id.startswith("entity:"):
         return "entity"
+    if source_id.casefold().endswith(".json"):
+        return "dataset"
     if Path(source_id.replace("\\", "/")).suffix:
         return "document"
     return "other"
@@ -153,4 +312,36 @@ def _first_text(*values: Any) -> str | None:
     return None
 
 
-__all__ = ["build_source_metadata", "display_names_for_sources"]
+def _source_aliases(entry: dict[str, Any]) -> set[str]:
+    values = {
+        str(entry.get("source_id") or ""),
+        str(entry.get("canonical_filename") or ""),
+        str(entry.get("display_name") or ""),
+        str(entry.get("document_title") or ""),
+        str(entry.get("source_path") or ""),
+    }
+    return {value for value in values if value.strip()}
+
+
+def _source_match_key(value: Any) -> str:
+    return _fold_source_text(normalize_source_identifier(value) or str(value or ""))
+
+
+def _fold_source_text(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    text = text.replace("đ", "d").replace("Đ", "D").casefold()
+    return re.sub(r"\s+", " ", text).strip()
+
+
+__all__ = [
+    "SOURCE_NORMALIZATION_VERSION",
+    "SourceValidationResult",
+    "build_grounded_source_answer",
+    "build_source_allowlist",
+    "build_source_metadata",
+    "display_names_for_sources",
+    "is_source_request",
+    "normalize_source_identifier",
+    "validate_answer_source_mentions",
+]

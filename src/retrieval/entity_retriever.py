@@ -33,6 +33,9 @@ ENTITY_PAYLOAD_FIELDS = (
 class EntityRetriever:
     """Read-only exact payload matcher for entity cards."""
 
+    _shared_client: Any | None = None
+    _payload_cache: dict[str, list[dict[str, Any]]] = {}
+
     def __init__(self, collection_name: str | None = None) -> None:
         self.collection_name = collection_name or get_entity_collection_name()
         self._client: Any | None = None
@@ -57,8 +60,12 @@ class EntityRetriever:
     async def _scroll_entity_payloads(self) -> list[dict[str, Any]]:
         from qdrant_client import AsyncQdrantClient  # type: ignore[import]
 
-        if self._client is None:
-            self._client = AsyncQdrantClient(**qdrant_client_kwargs())
+        cached = self.__class__._payload_cache.get(self.collection_name)
+        if cached is not None:
+            return [dict(payload) for payload in cached]
+        if self.__class__._shared_client is None:
+            self.__class__._shared_client = AsyncQdrantClient(**qdrant_client_kwargs())
+        self._client = self.__class__._shared_client
 
         points, _ = await self._client.scroll(
             collection_name=self.collection_name,
@@ -72,12 +79,20 @@ class EntityRetriever:
             payload = dict(getattr(point, "payload", None) or {})
             payload["_qdrant_point_id"] = str(getattr(point, "id", ""))
             payloads.append(payload)
+        self.__class__._payload_cache[self.collection_name] = [dict(payload) for payload in payloads]
         return payloads
 
     async def close(self) -> None:
-        if self._client is not None:
-            await self._client.close()
-            self._client = None
+        """Keep the immutable entity-card cache and shared client for reuse."""
+
+        return None
+
+    @classmethod
+    async def close_shared_client(cls) -> None:
+        if cls._shared_client is not None:
+            await cls._shared_client.close()
+            cls._shared_client = None
+        cls._payload_cache.clear()
 
 
 def retrieve_entity_candidates_from_payloads(

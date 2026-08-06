@@ -78,6 +78,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
         report_data = guard.report.model_dump(mode="json")
         severity_data = severity_guard.classification.model_dump(mode="json")
         report_data.setdefault("metadata", {})
+        report_data["metadata"]["source_validation"] = dict(state.get("source_validation") or {})
         report_data["metadata"]["severity_guard"] = {
             **severity_data,
             "version": "severity_aware_answer_guard_v1",
