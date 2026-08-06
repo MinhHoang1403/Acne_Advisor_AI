@@ -172,14 +172,18 @@ src/
 scripts/          Init, ingestion, validation, eval, diagnostics
 tests/            Python test suite
 data/             Local runtime data, taxonomy, cache, manifests
-reports/          Audit/review reports; report runtime/debug tạm thời nên để untracked
 .github/          GitHub Actions workflows
+docs/             Architecture, release-readiness and operational documentation
 ```
 
 `data/taxonomy/` là dữ liệu nguồn có kiểm soát. Các thư mục runtime như
 `data/postgres`, `data/qdrant`, `data/neo4j`, `data/redis_data`, `data/cache`,
 frontend `dist/`, logs và report debug tạm thời không nên commit. Một số
-audit/review report ổn định có thể được commit nếu maintainer chủ động muốn lưu.
+audit/review report lịch sử được giữ trong Git history; report evaluation mới
+và debug output luôn là local-only.
+
+Tài liệu [cấu trúc project](docs/PROJECT_STRUCTURE.md) xác định entry point,
+evaluation entry point, dataset canonical và vai trò từng thư mục tracked.
 
 ## Yêu Cầu Môi Trường
 

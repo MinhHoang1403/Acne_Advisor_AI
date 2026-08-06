@@ -5,7 +5,9 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import subprocess
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +34,12 @@ from .models import (
 from .plots import create_plots
 from .report_vi import render_report
 from .validators import load_cases, sha256_file, validate_cases
+from src.retrieval.reranking.providers import (
+    PROVIDER_HYBRID,
+    PROVIDER_LOCAL_SEMANTIC,
+    canonical_provider_name,
+    get_cached_semantic_reranker_from_env,
+)
 
 
 def _utc_now() -> str:
@@ -215,6 +223,36 @@ class FinalEvaluationRunner:
         self._write_manifest(run_dir, manifest)
         return run_dir, manifest
 
+    def _prewarm_semantic_reranker(self) -> dict[str, Any]:
+        """Keep CrossEncoder initialization outside the first case's deadline."""
+
+        enabled = str(os.getenv("RERANK_ENABLED", "true")).strip().lower() not in {"0", "false", "no", "off"}
+        provider = canonical_provider_name(os.getenv("RERANK_PROVIDER", "local_rules"))
+        details: dict[str, Any] = {
+            "enabled": enabled,
+            "requested_provider": provider,
+            "status": "skipped",
+        }
+        if not enabled or provider not in {PROVIDER_HYBRID, PROVIDER_LOCAL_SEMANTIC}:
+            return details
+
+        started = time.perf_counter()
+        try:
+            reranker = get_cached_semantic_reranker_from_env()
+            if not reranker.available:
+                details["status"] = "unavailable"
+                return details
+            reranker.warmup()
+            details["status"] = "ready"
+        except Exception as exc:
+            # Hybrid/local-rules fallback remains responsible for an unavailable
+            # semantic model; warm-up must not turn into an evaluation failure.
+            details["status"] = "unavailable"
+            details["error_type"] = type(exc).__name__
+        finally:
+            details["duration_ms"] = round((time.perf_counter() - started) * 1000, 3)
+        return details
+
     def run_live(self, *, resume: bool = False) -> Path:
         assert_isolated(self.config)
         run_dir, manifest = self._ensure_run(resume=resume)
@@ -222,6 +260,7 @@ class FinalEvaluationRunner:
         self._write_manifest(run_dir, manifest)
         if manifest.get("live_stage") == "live_completed":
             return run_dir
+        manifest["semantic_reranker_warmup"] = self._prewarm_semantic_reranker()
         manifest["live_stage"] = "live_running"
         manifest["live_started_at"] = manifest.get("live_started_at") or _utc_now()
         self._write_manifest(run_dir, manifest)
