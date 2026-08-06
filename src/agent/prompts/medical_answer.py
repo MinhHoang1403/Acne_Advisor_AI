@@ -20,6 +20,12 @@ NGUYÊN TẮC TÀI LIỆU-FIRST:
 5. Nếu các tài liệu khác nhau về chi tiết áp dụng, trả lời thận trọng: "Các tài liệu có thể khác nhau về chi tiết áp dụng; cần bác sĩ đánh giá theo tình trạng cụ thể."
 6. Không bịa citation. Nếu cần nói về nguồn, chỉ nói "theo tài liệu hiện có" hoặc nhắc source_file nếu đã được cung cấp rõ.
 
+SOURCE GROUNDING CONTRACT:
+- AVAILABLE_SOURCES là allowlist duy nhất cho tên tài liệu, filename, document title và citation trong câu trả lời này.
+- Không tự suy ra tên file, không đặt nhãn như "Tài liệu 1", và không nói "theo hướng dẫn X" nếu X không có trong AVAILABLE_SOURCES.
+- Nếu câu hỏi hỏi về nguồn, trả lời trực tiếp bằng đúng canonical display label trong AVAILABLE_SOURCES.
+- Nếu AVAILABLE_SOURCES rỗng, nói rằng context truy hồi chưa cung cấp nguồn phù hợp; không bịa hoặc thay bằng một nguồn gần đúng.
+
 THỨ TỰ ƯU TIÊN NGUỒN:
 1. NICE NG198: điều trị, referral, isotretinoin, thai kỳ, maintenance, skin care.
 2. AAD 2024: evidence-based recommendations, nhóm thuốc, cơ chế, mức độ khuyến nghị.
@@ -88,7 +94,8 @@ def build_medical_prompt(
     contexts: list[dict],
     graph_facts: list[dict],
     conversation_history: list[dict[str, str]] | None = None,
-    ignored_out_of_domain_part: bool = False
+    ignored_out_of_domain_part: bool = False,
+    available_sources: list[dict] | None = None,
 ) -> str:
     """Builds the complete prompt string to send to the LLM."""
     
@@ -115,6 +122,19 @@ def build_medical_prompt(
         prompt += "\nCẢNH BÁO AN TOÀN:\n"
         for flag in safety_flags:
             prompt += f"- {flag}\n"
+
+    prompt += "\n--- AVAILABLE_SOURCES (ALLOWLIST CHO TÊN NGUỒN) ---\n"
+    if not available_sources:
+        prompt += "(Không có nguồn hợp lệ được truy hồi)\n"
+    else:
+        for entry in available_sources:
+            source_id = entry.get("source_id", "")
+            label = entry.get("display_name", source_id)
+            title = entry.get("document_title")
+            prompt += f"- canonical_label={label}; source_id={source_id}"
+            if title:
+                prompt += f"; document_title={title}"
+            prompt += "\n"
             
     prompt += "\n--- TÀI LIỆU Y KHOA (VECTOR CONTEXTS) ---\n"
     if not contexts:

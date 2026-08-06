@@ -8,7 +8,7 @@ from typing import Any
 
 
 DATASET_SCHEMA_VERSION = "evaluation_case_v3"
-METRICS_VERSION = "evaluation_metrics_v3"
+METRICS_VERSION = "evaluation_metrics_v4"
 JUDGE_RUBRIC_VERSION = "route_aware_gemini_v3"
 CHECKPOINT_SCHEMA_VERSION = "evaluation_checkpoint_v2"
 JUDGE_SCORE_DELTA_MAX = 25.0

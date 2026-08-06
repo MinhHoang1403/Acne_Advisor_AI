@@ -18,7 +18,7 @@ def test_report_v3_uses_single_vietnamese_main_report(tmp_path: Path) -> None:
     }
     path = render_report(
         tmp_path,
-        {"dataset_sha256": "abc", "metrics_version": "evaluation_metrics_v3", "judge_rubric_version": "route_aware_gemini_v3", "live_provider": "ollama", "live_model": "qwen3:8b", "judge_provider": "gemini", "judge_model": "gemini-3.1-flash-lite"},
+        {"dataset_sha256": "abc", "metrics_version": "evaluation_metrics_v4", "judge_rubric_version": "route_aware_gemini_v3", "live_provider": "ollama", "live_model": "qwen3:8b", "judge_provider": "gemini", "judge_model": "gemini-3.1-flash-lite"},
         metrics,
         {"judge_final_errors": 0, "average_score_1_to_5": 4.5, "judge_success_rate": 100, "agreement_rate": 100},
         [],

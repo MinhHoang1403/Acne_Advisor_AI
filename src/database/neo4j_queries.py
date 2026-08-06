@@ -12,13 +12,20 @@ WHERE n.canonical_name IN $canonical_names
    OR ANY(alias IN n.aliases WHERE toLower(alias) IN $lookup_names)
 OPTIONAL MATCH (n)-[r]-(m)
 RETURN n.canonical_name AS entity,
+       n.canonical_name AS subject,
+       n.entity_id AS subject_graph_node_id,
        n.entity_type AS entity_type,
        n.metadata_json AS description,
        type(r) AS relationship,
+       type(r) AS predicate,
        m.canonical_name AS related_entity,
+       m.canonical_name AS object,
+       CASE WHEN m IS NULL THEN null ELSE m.entity_id END AS object_graph_node_id,
        CASE WHEN m IS NULL THEN null ELSE m.entity_type END AS related_type,
        m.metadata_json AS related_description,
-       CASE WHEN r IS NULL THEN null ELSE r.source END AS evidence
+       CASE WHEN r IS NULL THEN null ELSE r.source END AS evidence,
+       CASE WHEN r IS NULL THEN null ELSE r.source END AS evidence_source,
+       CASE WHEN r IS NULL THEN null ELSE coalesce(r.confidence, 1.0) END AS confidence
 LIMIT $limit
 """
 
@@ -32,13 +39,20 @@ WHERE ANY(
 )
 OPTIONAL MATCH (n)-[r]-(m)
 RETURN n.canonical_name AS entity,
+       n.canonical_name AS subject,
+       n.entity_id AS subject_graph_node_id,
        n.entity_type AS entity_type,
        n.metadata_json AS description,
        type(r) AS relationship,
+       type(r) AS predicate,
        m.canonical_name AS related_entity,
+       m.canonical_name AS object,
+       CASE WHEN m IS NULL THEN null ELSE m.entity_id END AS object_graph_node_id,
        CASE WHEN m IS NULL THEN null ELSE m.entity_type END AS related_type,
        m.metadata_json AS related_description,
-       CASE WHEN r IS NULL THEN null ELSE r.source END AS evidence
+       CASE WHEN r IS NULL THEN null ELSE r.source END AS evidence,
+       CASE WHEN r IS NULL THEN null ELSE r.source END AS evidence_source,
+       CASE WHEN r IS NULL THEN null ELSE coalesce(r.confidence, 1.0) END AS confidence
 LIMIT $limit
 """
 

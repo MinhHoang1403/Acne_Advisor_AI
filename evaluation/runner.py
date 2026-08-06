@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import asyncio
 import hashlib
 import json
 import os
@@ -23,7 +24,7 @@ from .checkpoint import (
 )
 from .deterministic import deterministic_result, judge_agrees_with_deterministic, summarize_metrics
 from .judge_gemini import judge_case, summarize_judge
-from .live_eval import assert_isolated, component_checks, run_live_case
+from .live_eval import assert_isolated, close_evaluation_runtime_clients, component_checks, run_live_case_async
 from .models import (
     CHECKPOINT_SCHEMA_VERSION,
     DATASET_SCHEMA_VERSION,
@@ -269,15 +270,7 @@ class FinalEvaluationRunner:
         done = completed_ids(raw_path)
         cases = self._selected_cases(self.config.question_limit)
         by_id = {case["id"]: case for case in cases}
-        for case in cases:
-            if case["id"] in done:
-                continue
-            raw = run_live_case(case, self.config)
-            result = deterministic_result(raw, case, self.config.live_provider, self.config.live_model)
-            append_jsonl(raw_path, raw)
-            append_jsonl(result_path, result)
-            manifest["live_completed_case_count"] = len(completed_ids(raw_path))
-            self._write_manifest(run_dir, manifest)
+        asyncio.run(self._run_pending_live_cases(cases, done, raw_path, result_path, manifest, run_dir))
         raw_rows = [row for row in read_jsonl(raw_path) if row.get("case_id") in by_id]
         results = [row for row in read_jsonl(result_path) if row.get("case_id") in by_id]
         if len(raw_rows) != len(cases) or len(results) != len(cases):
@@ -310,6 +303,30 @@ class FinalEvaluationRunner:
         manifest.update({"live_stage": "live_completed", "live_finished_at": _utc_now(), "live_result_count": len(results)})
         self._write_manifest(run_dir, manifest)
         return run_dir
+
+    async def _run_pending_live_cases(
+        self,
+        cases: list[dict[str, Any]],
+        done: set[str],
+        raw_path: Path,
+        result_path: Path,
+        manifest: dict[str, Any],
+        run_dir: Path,
+    ) -> None:
+        """Keep all live cases on one loop so async clients remain valid and warm."""
+
+        try:
+            for case in cases:
+                if case["id"] in done:
+                    continue
+                raw = await run_live_case_async(case, self.config)
+                result = deterministic_result(raw, case, self.config.live_provider, self.config.live_model)
+                append_jsonl(raw_path, raw)
+                append_jsonl(result_path, result)
+                manifest["live_completed_case_count"] = len(completed_ids(raw_path))
+                self._write_manifest(run_dir, manifest)
+        finally:
+            await close_evaluation_runtime_clients()
 
     def run_judge(self, *, resume: bool = True) -> Path:
         run_dir, manifest = self._ensure_run(resume=resume)

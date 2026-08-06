@@ -54,15 +54,15 @@ def test_answer_formatting_contract_version_is_in_manifest_and_changes_fingerpri
     new_manifest = build_pipeline_version_manifest(
         {
             "CACHE_ANSWER_VERSION": "v5",
-            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v9",
+            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v11",
         }
     )
 
-    assert new_manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v9"
+    assert new_manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v11"
     assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v9():
+def test_legacy_answer_formatting_contract_is_promoted_to_v11():
     manifest = build_pipeline_version_manifest(
         {
             "CACHE_ANSWER_VERSION": "v5",
@@ -70,7 +70,7 @@ def test_legacy_answer_formatting_contract_is_promoted_to_v9():
         }
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v9"
+    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v11"
 
 
 def test_llm_fallback_policy_and_google_fallback_models_change_fingerprint():
@@ -131,6 +131,36 @@ def test_entity_foundation_version_is_in_manifest_and_changes_fingerprint():
 
     assert new_manifest["entity_foundation_version"] == "entity_foundation_v2"
     assert new_manifest["answer_cache_version"] == "v5"
+    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
+
+
+def test_grounding_context_and_performance_versions_change_fingerprint():
+    old_manifest = build_pipeline_version_manifest(
+        {
+            "CACHE_ANSWER_VERSION": "v5",
+            "SOURCE_NORMALIZATION_VERSION": "source_normalization_v0",
+            "ANSWERABILITY_POLICY_VERSION": "answerability_policy_v0",
+            "CONVERSATION_CONTEXT_VERSION": "conversation_context_v0",
+            "GRAPH_ENTITY_ANSWER_VERSION": "graph_entity_answer_v0",
+            "PERFORMANCE_INSTRUMENTATION_VERSION": "performance_instrumentation_v0",
+        }
+    )
+    new_manifest = build_pipeline_version_manifest(
+        {
+            "CACHE_ANSWER_VERSION": "v5",
+            "SOURCE_NORMALIZATION_VERSION": "source_normalization_v1",
+            "ANSWERABILITY_POLICY_VERSION": "answerability_policy_v1",
+            "CONVERSATION_CONTEXT_VERSION": "conversation_context_v1",
+            "GRAPH_ENTITY_ANSWER_VERSION": "graph_entity_answer_v1",
+            "PERFORMANCE_INSTRUMENTATION_VERSION": "performance_instrumentation_v1",
+        }
+    )
+
+    assert new_manifest["source_normalization_version"] == "source_normalization_v1"
+    assert new_manifest["answerability_policy_version"] == "answerability_policy_v1"
+    assert new_manifest["conversation_context_version"] == "conversation_context_v1"
+    assert new_manifest["graph_entity_answer_version"] == "graph_entity_answer_v1"
+    assert new_manifest["performance_instrumentation_version"] == "performance_instrumentation_v1"
     assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
 
 

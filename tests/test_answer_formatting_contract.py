@@ -28,9 +28,9 @@ def test_formatting_contract_avoids_mandatory_boilerplate_sections():
         graph_facts=[],
     )
 
-    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v9"
+    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v11"
     assert ANSWER_FORMATTING_CONTRACT in prompt
-    assert "ANSWER PRESENTATION CONTRACT V9" in prompt
+    assert "ANSWER PRESENTATION CONTRACT V11" in prompt
     assert "provider không được quyết định format" in prompt
     assert "Multi-intent" in prompt
     assert "Structured request" in prompt

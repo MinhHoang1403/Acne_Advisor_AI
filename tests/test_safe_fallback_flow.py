@@ -145,6 +145,38 @@ async def test_generation_fallback_removes_an_empty_markdown_heading_before_fall
 
 
 @pytest.mark.asyncio
+async def test_generation_fallback_recovers_verified_entity_relation_instead_of_refusal():
+    result = await fallback_node.generation_fallback_decision_node(
+        {
+            "standalone_question": "Tazarotene có alias tazaroten không?",
+            "draft_answer": "",
+        }
+    )
+
+    assert result["fallback_type"] == "grounded_direct_recovery"
+    assert "alias" in result["draft_answer"].lower()
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_reference_requests_clarification_without_guessing():
+    result = await fallback_node.fallback_decision_node(
+        {
+            "standalone_question": "Nó có phải kháng sinh không?",
+            "conversation_context": {
+                "unresolved_user_reference": True,
+                "clarification_options": ["Differin", "Dalacin T"],
+            },
+            "retrieval_status": "success",
+            "vector_contexts": [{"text": "Some usable context."}],
+        }
+    )
+
+    assert result["fallback_type"] == "ambiguous_reference"
+    assert "Differin" in result["fallback_answer"]
+    assert "Dalacin T" in result["fallback_answer"]
+
+
+@pytest.mark.asyncio
 async def test_fallback_nodes_apply_answer_and_metadata():
     decision = await fallback_node.fallback_decision_node(
         {

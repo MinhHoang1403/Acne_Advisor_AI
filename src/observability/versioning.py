@@ -13,9 +13,14 @@ DEFAULT_RERANKER_VERSION = "reranker_pipeline_v2"
 DEFAULT_GOOGLE_GENAI_SDK_VERSION = "google_genai_sdk_v1"
 DEFAULT_REPRODUCIBLE_ENVIRONMENT_VERSION = "reproducible_environment_v1"
 DEFAULT_END_TO_END_RELEASE_READINESS_VERSION = "end_to_end_release_readiness_v1"
-DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v9"
+DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v11"
 DEFAULT_LLM_FALLBACK_POLICY_VERSION = "llm_fallback_policy_v2"
 DEFAULT_ENTITY_FOUNDATION_VERSION = "entity_foundation_v2"
+DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v1"
+DEFAULT_ANSWERABILITY_POLICY_VERSION = "answerability_policy_v1"
+DEFAULT_CONVERSATION_CONTEXT_VERSION = "conversation_context_v1"
+DEFAULT_GRAPH_ENTITY_ANSWER_VERSION = "graph_entity_answer_v1"
+DEFAULT_PERFORMANCE_INSTRUMENTATION_VERSION = "performance_instrumentation_v1"
 LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4"}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
     "answer_formatting_contract_v1",
@@ -26,6 +31,8 @@ LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
     "answer_formatting_contract_v6",
     "answer_formatting_contract_v7",
     "answer_formatting_contract_v8",
+    "answer_formatting_contract_v9",
+    "answer_formatting_contract_v10",
 }
 
 _SECRET_KEY_MARKERS = (
@@ -127,6 +134,26 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_rerank_weight": _env_float(value("RETRIEVAL_RERANK_WEIGHT", "0.10"), default=0.10),
         "answer_verifier_enabled": _env_bool(value("ANSWER_VERIFIER_ENABLED", "true"), default=True),
         "answer_guard_mode": value("ANSWER_GUARD_MODE", "metadata_only") or "metadata_only",
+        "source_normalization_version": value(
+            "SOURCE_NORMALIZATION_VERSION",
+            DEFAULT_SOURCE_NORMALIZATION_VERSION,
+        ),
+        "answerability_policy_version": value(
+            "ANSWERABILITY_POLICY_VERSION",
+            DEFAULT_ANSWERABILITY_POLICY_VERSION,
+        ),
+        "conversation_context_version": value(
+            "CONVERSATION_CONTEXT_VERSION",
+            DEFAULT_CONVERSATION_CONTEXT_VERSION,
+        ),
+        "graph_entity_answer_version": value(
+            "GRAPH_ENTITY_ANSWER_VERSION",
+            DEFAULT_GRAPH_ENTITY_ANSWER_VERSION,
+        ),
+        "performance_instrumentation_version": value(
+            "PERFORMANCE_INSTRUMENTATION_VERSION",
+            DEFAULT_PERFORMANCE_INSTRUMENTATION_VERSION,
+        ),
     }
     return _strip_secret_keys(manifest)
 
@@ -197,6 +224,11 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
         "semantic_rerank_max_candidates",
         "answer_verifier_enabled",
         "answer_guard_mode",
+        "source_normalization_version",
+        "answerability_policy_version",
+        "conversation_context_version",
+        "graph_entity_answer_version",
+        "performance_instrumentation_version",
     ]
     return {key: manifest.get(key) for key in summary_keys if key in manifest}
 

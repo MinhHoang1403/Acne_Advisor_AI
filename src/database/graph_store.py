@@ -62,14 +62,18 @@ class Neo4jGraphStore:
     await store.close()
     """
 
+    _shared_driver: Any | None = None
+
     def __init__(self) -> None:
         from neo4j import AsyncGraphDatabase  # type: ignore[import]
 
-        self._driver = AsyncGraphDatabase.driver(
-            NEO4J_URI,
-            auth=(NEO4J_USERNAME, NEO4J_PASSWORD),
-        )
-        logger.debug("Neo4j driver created for %s", NEO4J_URI)
+        if self.__class__._shared_driver is None:
+            self.__class__._shared_driver = AsyncGraphDatabase.driver(
+                NEO4J_URI,
+                auth=(NEO4J_USERNAME, NEO4J_PASSWORD),
+            )
+            logger.debug("Created process-level Neo4j driver for %s", NEO4J_URI)
+        self._driver = self.__class__._shared_driver
 
     async def get_entity_context(
         self,
@@ -189,6 +193,14 @@ class Neo4jGraphStore:
         return facts
 
     async def close(self) -> None:
-        """Close the Neo4j driver."""
-        await self._driver.close()
-        logger.debug("Neo4j driver closed.")
+        """Keep the shared read driver alive for the process lifetime."""
+
+        return None
+
+    @classmethod
+    async def close_shared_driver(cls) -> None:
+        """Close the shared driver explicitly during controlled process shutdown."""
+
+        if cls._shared_driver is not None:
+            await cls._shared_driver.close()
+            cls._shared_driver = None
