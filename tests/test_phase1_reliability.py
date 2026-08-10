@@ -449,12 +449,15 @@ def test_strict_graph_record_validation_detects_stale_aggregate_count() -> None:
     assert "node count mismatch" in validation["errors"][0]
 
 
-def test_full_phase1_plan_and_dry_run_are_non_mutating() -> None:
-    plan, records = build_full_phase1_plan(ingestion.SAMPLE_DATA_DIR)
-    result = asyncio.run(run_full_phase1(source_dir=ingestion.SAMPLE_DATA_DIR, dry_run=True))
+def test_full_phase1_plan_and_dry_run_are_non_mutating(tmp_path) -> None:
+    source_dir = tmp_path / "sample_data"
+    source_dir.mkdir()
+    (source_dir / "knowledge.json").write_text("[]", encoding="utf-8")
+    plan, records = build_full_phase1_plan(source_dir)
+    result = asyncio.run(run_full_phase1(source_dir=source_dir, dry_run=True))
 
     assert not plan.errors
-    assert len(plan.source_paths) >= 1
+    assert len(plan.source_paths) == 1
     assert plan.entity_count > 0
     assert len(records["relationships"]) == plan.graph_relationship_count
     assert result["passed"] is True
