@@ -80,7 +80,7 @@ import urllib.request
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from typing import Any
 
 
@@ -155,6 +155,8 @@ MARKDOWN_CACHE_DIR: Path = CACHE_DIR / "markdown"
 GRAPH_CACHE_DIR: Path = CACHE_DIR / "graph"
 DEFAULT_MANIFEST_PATH: Path = DATA_DIR / "ingestion_manifest.json"
 INGESTION_MANIFEST_VERSION: int = 1
+INGESTION_CONFIG_SCHEMA_VERSION = "phase1_ingestion_config_v1"
+SPARSE_VECTOR_SCHEMA_VERSION = "hashed_bm25_v1"
 
 CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "2000"))
 LLM_CONCURRENCY: int = int(os.getenv("LLM_CONCURRENCY", "2"))
@@ -251,6 +253,34 @@ class GraphPayload:
 
 
 @dataclass
+class Neo4jUpsertResult:
+    nodes_upserted: int = 0
+    relationships_upserted: int = 0
+    missing_source_endpoint: int = 0
+    missing_target_endpoint: int = 0
+    database_errors: int = 0
+
+    @property
+    def has_failures(self) -> bool:
+        return any(
+            (
+                self.missing_source_endpoint,
+                self.missing_target_endpoint,
+                self.database_errors,
+            )
+        )
+
+
+@dataclass(frozen=True)
+class ParserCompleteness:
+    """Structural parser validation without assuming provider-specific page metadata."""
+
+    passed: bool
+    status: str
+    error: str | None = None
+
+
+@dataclass
 class IngestionStats:
     pdf_files: int = 0
     markdown_cache_hits: int = 0
@@ -269,6 +299,10 @@ class IngestionStats:
     vectors_upserted_qdrant: int = 0
     llm_errors: int = 0
     parse_errors: int = 0
+    chunks_rejected_noise: int = 0
+    chunks_rescued_short_safety: int = 0
+    chunks_accepted_normal: int = 0
+    neo4j_missing_endpoints: int = 0
 
     def report(self) -> None:
         logger.info("─" * 56)
@@ -291,6 +325,10 @@ class IngestionStats:
         logger.info("  Qdrant vectors upserted   : %d", self.vectors_upserted_qdrant)
         logger.info("  LLM extraction errors     : %d", self.llm_errors)
         logger.info("  Parse errors              : %d", self.parse_errors)
+        logger.info("  Chunks rejected as noise  : %d", self.chunks_rejected_noise)
+        logger.info("  Short safety chunks kept  : %d", self.chunks_rescued_short_safety)
+        logger.info("  Normal chunks accepted    : %d", self.chunks_accepted_normal)
+        logger.info("  Neo4j missing endpoints  : %d", self.neo4j_missing_endpoints)
         logger.info("─" * 56)
 
 
@@ -346,8 +384,53 @@ def _source_path_key(path: Path) -> str:
         return str(path)
 
 
-def document_id_from_source_path(source_path: str) -> str:
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"acne-advisor-ai:{source_path}"))
+def canonical_source_identity(
+    source_path: str | Path,
+    *,
+    source_root: Path | None = None,
+) -> str:
+    """Return a portable source identity instead of an absolute machine path.
+
+    The normal Phase 1 source directory is ``sample_data``. Retaining that
+    directory marker makes identities stable across checkouts on different
+    drives while preserving nested paths. Callers with an arbitrary source
+    directory can pass ``source_root`` to retain the same property.
+    """
+
+    raw = str(source_path).replace("\\", "/")
+    path = Path(source_path)
+    if source_root is not None:
+        try:
+            relative = path.resolve().relative_to(source_root.resolve())
+            return (PurePosixPath(source_root.name) / PurePosixPath(relative)).as_posix()
+        except (OSError, ValueError):
+            pass
+
+    try:
+        relative_to_project = path.resolve().relative_to(PROJECT_ROOT.resolve())
+        return PurePosixPath(relative_to_project).as_posix()
+    except (OSError, ValueError):
+        pass
+
+    windows_parts = PureWindowsPath(raw).parts
+    posix_parts = PurePosixPath(raw).parts
+    parts = windows_parts if len(windows_parts) > len(posix_parts) else posix_parts
+    marker_index = next(
+        (index for index, part in enumerate(parts) if part.lower() == "sample_data"),
+        None,
+    )
+    if marker_index is not None:
+        return PurePosixPath(*parts[marker_index:]).as_posix()
+
+    # External sources do not have a repository anchor. Preserve their final
+    # relative shape rather than a drive-specific path; source roots should be
+    # provided by production callers for full uniqueness.
+    return PurePath(raw).name
+
+
+def document_id_from_source_path(source_path: str, *, source_root: Path | None = None) -> str:
+    identity = canonical_source_identity(source_path, source_root=source_root)
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"acne-advisor-ai:{identity}"))
 
 
 def web_json_record_document_id(
@@ -356,7 +439,8 @@ def web_json_record_document_id(
     source_url: str | None = None,
 ) -> str:
     identity = (source_url or "").strip() or f"record:{record_index}"
-    key = f"acne-advisor-ai:web_json:{source_path}:{identity}"
+    source_identity = canonical_source_identity(source_path)
+    key = f"acne-advisor-ai:web_json:{source_identity}:{identity}"
     return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
 
 
@@ -369,7 +453,33 @@ def _manifest_base() -> dict[str, Any]:
         "manifest_version": INGESTION_MANIFEST_VERSION,
         "updated_at": None,
         "documents": {},
+        "full_phase1_validation": {
+            "status": "not_validated",
+            "updated_at": None,
+        },
     }
+
+
+def ingestion_config_fingerprint() -> str:
+    """Fingerprint only material Phase 1 derivation settings."""
+
+    config = {
+        "config_schema_version": INGESTION_CONFIG_SCHEMA_VERSION,
+        "ingestion_pipeline_version": expected_kb_payload_metadata().get(
+            "ingestion_pipeline_version"
+        ),
+        "chunk_size": CHUNK_SIZE,
+        "chunk_overlap": max(100, CHUNK_SIZE // 5),
+        "parser_result_type": "markdown",
+        "parser_instruction": LLAMAPARSE_INSTRUCTION,
+        "embedding_model": EMBEDDING_MODEL,
+        "embedding_dimensions": EMBEDDING_DIMENSIONS,
+        "sparse_vector_schema_version": SPARSE_VECTOR_SCHEMA_VERSION,
+        "graph_cache_version": GRAPH_CACHE_VERSION,
+        "graph_prompt_schema_version": GRAPH_PROMPT_SCHEMA_VERSION,
+    }
+    encoded = json.dumps(config, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:24]
 
 
 def load_ingestion_manifest(path: Path) -> dict[str, Any]:
@@ -388,6 +498,10 @@ def load_ingestion_manifest(path: Path) -> dict[str, Any]:
 
     data.setdefault("manifest_version", INGESTION_MANIFEST_VERSION)
     data.setdefault("updated_at", None)
+    data.setdefault(
+        "full_phase1_validation",
+        {"status": "not_validated", "updated_at": None},
+    )
     documents = data.setdefault("documents", {})
     if not isinstance(documents, dict):
         raise ValueError(f"Ingestion manifest 'documents' must be an object: {path}")
@@ -415,6 +529,42 @@ def save_ingestion_manifest(path: Path, data: dict[str, Any]) -> None:
                 logger.warning("[MANIFEST] Failed to remove temp manifest %s", tmp_path.name)
 
 
+def finalize_full_phase1_manifest(
+    manifest_path: Path,
+    *,
+    validation: dict[str, Any],
+) -> None:
+    """Record the full-build gate and complete only validated pending sources."""
+
+    manifest = load_ingestion_manifest(manifest_path)
+    passed = bool(validation.get("passed"))
+    now = utc_now_iso()
+    manifest["full_phase1_validation"] = {
+        "status": "completed" if passed else "failed",
+        "updated_at": now,
+        "report": validation,
+    }
+
+    for entry in _manifest_documents(manifest).values():
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("status") != "knowledge_indexed_pending_phase1_validation":
+            continue
+        if passed:
+            entry["status"] = "completed"
+            entry["graph_validated"] = True
+            entry["phase1_validation_status"] = "completed_full_phase1"
+            entry.pop("error_message", None)
+        else:
+            entry["phase1_validation_status"] = "full_phase1_validation_failed"
+            entry["error_message"] = _short_error_message(
+                "Full Phase 1 validation failed; source remains retryable."
+            )
+        entry["last_full_phase1_validation_at"] = now
+
+    save_ingestion_manifest(manifest_path, manifest)
+
+
 def _manifest_documents(manifest: dict[str, Any]) -> dict[str, Any]:
     documents = manifest.setdefault("documents", {})
     if not isinstance(documents, dict):
@@ -438,15 +588,17 @@ def _find_manifest_entry(
     return None, None
 
 
-def _file_manifest_info(path: Path) -> dict[str, Any]:
+def _file_manifest_info(path: Path, *, source_root: Path | None = None) -> dict[str, Any]:
     source_path = _source_path_key(path)
     stat = path.stat()
+    source_identity = canonical_source_identity(path, source_root=source_root)
     return {
         "path": path,
         "source_path": source_path,
+        "source_identity": source_identity,
         "source_file": path.name,
         "source_type": "web_json" if is_web_json_source(path) else "source_document",
-        "document_id": document_id_from_source_path(source_path),
+        "document_id": document_id_from_source_path(source_identity),
         "content_hash": compute_file_hash(path),
         "file_size": stat.st_size,
         "modified_time": _file_modified_time_iso(path),
@@ -481,13 +633,18 @@ def _manifest_source_metadata(source_metadata: dict[str, Any] | None) -> dict[st
         return {}
 
     fields = (
+        "source_identity",
         "source_type",
         "document_count",
         "json_record_count",
         "skipped_record_count",
+        "parser_completeness",
+        "parser_validation_error",
         "graph_extraction_skipped",
         "neo4j_skipped",
         "qdrant_indexed",
+        "graph_validated",
+        "phase1_validation_status",
     )
     output: dict[str, Any] = {}
     for field_name in fields:
@@ -500,6 +657,7 @@ def get_incremental_file_plan(
     files: list[Path],
     manifest: dict[str, Any],
     force_reingest: bool = False,
+    source_root: Path | None = None,
 ) -> dict[str, Any]:
     scanned: list[dict[str, Any]] = []
     to_ingest: list[dict[str, Any]] = []
@@ -511,12 +669,13 @@ def get_incremental_file_plan(
         "changed": 0,
         "retry": 0,
         "force": 0,
+        "config_changed": 0,
         "skipped": 0,
         "to_ingest": 0,
     }
 
     for path in files:
-        info = _file_manifest_info(path)
+        info = _file_manifest_info(path, source_root=source_root)
         manifest_key, previous = _find_manifest_entry(manifest, info["source_path"])
         previous_status = str(previous.get("status", "")) if previous else None
         previous_hash = str(previous.get("content_hash", "")) if previous else None
@@ -537,17 +696,15 @@ def get_incremental_file_plan(
                 reason = "retry"
         elif previous_hash != info["content_hash"]:
             reason = "changed"
-        elif previous_status in {
-            "completed",
-            "completed_with_warnings",
-            "completed_with_graph_skipped",
-        }:
+        elif previous.get("ingestion_config_fingerprint") != ingestion_config_fingerprint():
+            reason = "config_changed"
+        elif previous_status == "completed" and previous.get("graph_validated") is True:
             reason = "skip"
         else:
             reason = "retry"
 
         info["reason"] = reason
-        info["cleanup_required"] = reason in {"changed", "retry", "force"} and previous is not None
+        info["cleanup_required"] = reason in {"changed", "config_changed", "retry", "force"} and previous is not None
         scanned.append(info)
 
         if reason == "skip":
@@ -574,6 +731,7 @@ def log_incremental_file_plan(plan: dict[str, Any]) -> None:
     logger.info("[INCREMENTAL] Changed files          : %d", summary["changed"])
     logger.info("[INCREMENTAL] Failed/partial retries : %d", summary["retry"])
     logger.info("[INCREMENTAL] Force reingest files   : %d", summary["force"])
+    logger.info("[INCREMENTAL] Config changed files   : %d", summary["config_changed"])
     logger.info("[INCREMENTAL] Skipped unchanged      : %d", summary["skipped"])
     logger.info("[INCREMENTAL] Files to ingest        : %d", summary["to_ingest"])
 
@@ -616,6 +774,7 @@ def update_manifest_before_ingest(
             key: file_info[key]
             for key in (
                 "source_path",
+                "source_identity",
                 "document_id",
                 "content_hash",
                 "file_size",
@@ -630,6 +789,9 @@ def update_manifest_before_ingest(
         "last_ingested_at": None,
         "ingestion_run_id": ingestion_run_id,
         "error_message": "ingestion started but has not completed",
+        "ingestion_config_fingerprint": ingestion_config_fingerprint(),
+        "graph_validated": False,
+        "phase1_validation_status": "pending",
     }
 
 
@@ -650,6 +812,8 @@ def update_manifest_after_success(
     graph_error_tolerance: float | None = None,
     warning: str | None = None,
     source_metadata: dict[str, Any] | None = None,
+    graph_validated: bool = False,
+    phase1_validation_status: str = "knowledge_only",
 ) -> None:
     documents = _manifest_documents(manifest)
     qdrant_metadata = _manifest_qdrant_metadata(qdrant_point_ids)
@@ -666,6 +830,9 @@ def update_manifest_after_success(
         **qdrant_metadata,
         "last_ingested_at": last_ingested_at or utc_now_iso(),
         "ingestion_run_id": ingestion_run_id,
+        "ingestion_config_fingerprint": ingestion_config_fingerprint(),
+        "graph_validated": graph_validated,
+        "phase1_validation_status": phase1_validation_status,
     }
     if error_message:
         entry["error_message"] = _short_error_message(error_message)
@@ -726,6 +893,9 @@ def update_manifest_after_failure(
         "last_ingested_at": last_ingested_at or utc_now_iso(),
         "ingestion_run_id": ingestion_run_id,
         "error_message": _short_error_message(error),
+        "ingestion_config_fingerprint": ingestion_config_fingerprint(),
+        "graph_validated": False,
+        "phase1_validation_status": "failed",
     }
     if graph_error_count is not None:
         entry["graph_error_count"] = graph_error_count
@@ -752,6 +922,7 @@ def enrich_chunks_with_ingestion_metadata(
                 "source_type": source_type,
                 "source_file": str(file_info.get("source_file") or chunk.source_file),
                 "source_path": str(file_info["source_path"]),
+                "source_identity": str(file_info.get("source_identity") or ""),
                 "content_hash": str(file_info["content_hash"]),
                 "file_size": int(file_info["file_size"]),
                 "modified_time": str(file_info["modified_time"]),
@@ -775,6 +946,18 @@ def qdrant_point_ids_for_chunks(chunks: list[SemanticChunk]) -> list[str]:
         for chunk in chunks
         if not chunk.metadata.get("is_noisy", False)
     ]
+
+
+def account_chunk_quality(chunks: list[SemanticChunk], stats: IngestionStats) -> None:
+    """Record mutually exclusive eligibility outcomes for rebuild reconciliation."""
+
+    for chunk in chunks:
+        if chunk.metadata.get("is_noisy", False):
+            stats.chunks_rejected_noise += 1
+        elif chunk.metadata.get("is_short_medical_safety_rescue", False):
+            stats.chunks_rescued_short_safety += 1
+        else:
+            stats.chunks_accepted_normal += 1
 
 
 def graph_error_tolerance_for_chunks(total_chunks: int) -> float:
@@ -803,6 +986,8 @@ def finalize_manifest_for_documents(
     qdrant_ids_available: bool,
     limit_chunks_truncated: bool,
     global_error: str | None = None,
+    defer_completion: bool = False,
+    require_zero_graph_errors: bool = False,
 ) -> None:
     payloads_by_chunk_id = {payload.chunk_id: payload for payload in payloads}
 
@@ -854,7 +1039,7 @@ def finalize_manifest_for_documents(
             and not global_error
             and bool(chunks)
         )
-        if graph_errors > 0 and not graph_errors_within_tolerance:
+        if graph_errors > 0 and (require_zero_graph_errors or not graph_errors_within_tolerance):
             reasons.append(
                 f"graph extraction failed for {graph_errors} chunk(s); "
                 f"tolerance={graph_tolerance:g}"
@@ -877,6 +1062,17 @@ def finalize_manifest_for_documents(
             )
             continue
 
+        graph_validated = (
+            graph_errors == 0
+            and not skip_graph_extraction
+            and not skip_neo4j
+            and not skip_qdrant
+            and bool(qdrant_point_ids)
+        )
+        file_info["graph_validated"] = graph_validated
+        file_info["phase1_validation_status"] = (
+            "pending_full_validation" if defer_completion else "knowledge_only"
+        )
         update_manifest_after_success(
             manifest=manifest,
             source_path=str(file_info["source_path"]),
@@ -889,7 +1085,9 @@ def finalize_manifest_for_documents(
             ingestion_run_id=ingestion_run_id,
             last_ingested_at=ingested_at,
             status=(
-                "completed_with_graph_skipped"
+                "knowledge_indexed_pending_phase1_validation"
+                if defer_completion
+                else "completed_with_graph_skipped"
                 if intentional_graph_skip
                 else "completed_with_warnings" if graph_warning else "completed"
             ),
@@ -898,6 +1096,8 @@ def finalize_manifest_for_documents(
             graph_error_tolerance=graph_tolerance,
             warning=graph_warning,
             source_metadata=file_info,
+            graph_validated=graph_validated,
+            phase1_validation_status=str(file_info["phase1_validation_status"]),
         )
 
 
@@ -911,11 +1111,10 @@ def warn_changed_document_cleanup(
         return
 
     if not skip_neo4j:
-        logger.warning(
-            "[INCREMENTAL] Changed file detected: %s. New graph facts will be "
-            "MERGEd into Neo4j, but old Neo4j facts may remain stale. TODO: "
-            "add document ownership metadata before cleanup by document_id; "
-            "current nodes/edges are global clinical entities keyed by name.",
+        logger.info(
+            "[INCREMENTAL] Changed file detected: %s. Source-managed Neo4j "
+            "relationship provenance will be reconciled by document_id before upsert. "
+            "Legacy relationships without provenance are left untouched.",
             file_info["source_path"],
         )
 
@@ -1363,18 +1562,53 @@ def build_llamaparse_parser() -> Any:
     )
 
 
+def validate_parser_documents(documents: Any) -> ParserCompleteness:
+    """Reject explicit parser failures while retaining valid small documents.
+
+    LlamaParse does not guarantee a portable page-completion field on every
+    returned document. This validator therefore rejects only observable
+    structural failures and records ``partial_observability`` otherwise.
+    """
+
+    if not isinstance(documents, (list, tuple)) or not documents:
+        return ParserCompleteness(False, "failed", "parser returned no document objects")
+
+    text_count = 0
+    for index, document in enumerate(documents):
+        metadata = getattr(document, "metadata", {}) or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        status = str(metadata.get("status") or metadata.get("parse_status") or "").lower()
+        explicit_error = metadata.get("error") or metadata.get("page_error") or metadata.get("failed")
+        if explicit_error or status in {"failed", "error", "incomplete", "partial_failure"}:
+            return ParserCompleteness(
+                False,
+                "failed",
+                f"parser document {index} reported failure: {explicit_error or status}",
+            )
+        if str(getattr(document, "text", "") or "").strip():
+            text_count += 1
+
+    if text_count == 0:
+        return ParserCompleteness(False, "failed", "parser returned no meaningful text")
+    return ParserCompleteness(True, "partial_observability")
+
+
 async def stage1_extract_one_source(
     source_path: Path,
     parser: Any,
     refresh_markdown: bool = False,
     stats: IngestionStats | None = None,
-) -> tuple[str, str] | None:
+) -> tuple[str, str, ParserCompleteness] | None:
     cache_path = markdown_cache_path(source_path)
 
     if not refresh_markdown:
         cached_markdown = load_markdown_cache(cache_path, source_path.name, stats=stats)
         if cached_markdown is not None:
-            return source_path.name, cached_markdown
+            return source_path.name, cached_markdown, ParserCompleteness(
+                True,
+                "cached_partial_observability",
+            )
 
         legacy_cache_path = legacy_markdown_cache_path(source_path)
         if legacy_cache_path != cache_path:
@@ -1391,7 +1625,10 @@ async def stage1_extract_one_source(
                 save_text(cache_path, legacy_markdown)
                 if stats:
                     stats.markdown_cache_hits += 1
-                return source_path.name, legacy_markdown
+                return source_path.name, legacy_markdown, ParserCompleteness(
+                    True,
+                    "cached_partial_observability",
+                )
 
     if stats:
         stats.markdown_cache_misses += 1
@@ -1399,16 +1636,20 @@ async def stage1_extract_one_source(
     try:
         logger.info("[STAGE 1] Parsing with LlamaParse: %s", source_path.name)
         documents = await parser.aload_data(str(source_path))
+        parser_completeness = validate_parser_documents(documents)
+        if not parser_completeness.passed:
+            raise ValueError(parser_completeness.error or "parser completeness validation failed")
         markdown = "\n\n".join(doc.text for doc in documents if getattr(doc, "text", None))
         if not markdown.strip():
             raise ValueError("LlamaParse returned empty Markdown")
         save_text(cache_path, markdown)
         logger.info(
-            "[STAGE 1] ✓ %s — %d chars extracted",
+            "[STAGE 1] ✓ %s — %d chars extracted (parser=%s)",
             source_path.name,
             len(markdown),
+            parser_completeness.status,
         )
-        return source_path.name, markdown
+        return source_path.name, markdown, parser_completeness
     except Exception as exc:
         logger.error("[STAGE 1] ✗ Failed to parse %s: %s", source_path.name, exc)
         if stats:
@@ -1447,7 +1688,7 @@ async def stage1_extract_pdfs(
         )
     )
     results = [
-        (_file_manifest_info(source_path), item[0], item[1])
+        (_file_manifest_info(source_path, source_root=source_dir), item[0], item[1])
         for source_path, item in zip(source_files, raw_results)
         if item is not None
     ]
@@ -1489,9 +1730,10 @@ async def stage1_extract_sources(
     parser = None
     results: list[tuple[dict[str, Any], str, str | None]] = []
     for source_path in source_files:
-        file_info = _file_manifest_info(source_path)
+        file_info = _file_manifest_info(source_path, source_root=source_dir)
         if is_web_json_source(source_path):
             logger.info("[STAGE 1] Found JSON file: %s", source_path.name)
+            file_info["parser_completeness"] = "not_applicable_json"
             results.append((file_info, source_path.name, None))
             continue
 
@@ -1504,6 +1746,7 @@ async def stage1_extract_sources(
             stats=stats,
         )
         if parsed is not None:
+            file_info["parser_completeness"] = parsed[2].status
             results.append((file_info, parsed[0], parsed[1]))
 
     logger.info(
@@ -1586,6 +1829,34 @@ _MEDICAL_RESCUE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Short clinical warnings must carry both an action and a safety context. This
+# preserves meaningful evidence without turning every short navigation label
+# into an indexed chunk.
+_SHORT_SAFETY_ACTION_RE = re.compile(
+    r"(?:do\s+not\s+use|avoid(?:\s+use|\s+using)?|contraindicat(?:ed|ion)?|"
+    r"stop\s+(?:use|using)|seek\s+(?:medical\s+)?(?:care|help)|"
+    r"không\s+(?:dùng|sử\s+dụng)|tránh\s+(?:dùng|sử\s+dụng)|"
+    r"chống\s+chỉ\s+định|ngừng\s+(?:dùng|sử\s+dụng)|đi\s+khám)",
+    re.IGNORECASE,
+)
+_SHORT_SAFETY_CONTEXT_RE = re.compile(
+    r"(?:pregnan(?:cy|t)?|breastfeed(?:ing)?|lactat(?:ion|ing)?|"
+    r"allerg(?:y|ic)|swelling|angioedema|anaphyla|severe\s+(?:reaction|irritation)|"
+    r"adverse\s+(?:reaction|effect)|antibiotic|mang\s+thai|thai\s+kỳ|"
+    r"cho\s+con\s+bú|dị\s+ứng|sưng|phản\s+ứng\s+nặng|kháng\s+sinh)",
+    re.IGNORECASE,
+)
+
+
+def is_short_medical_safety_statement(text: str, header: str | None = None) -> bool:
+    """Recognise general short safety evidence without matching fixed examples."""
+
+    combined = "\n".join(part for part in ((header or "").strip(), text.strip()) if part)
+    return bool(
+        _SHORT_SAFETY_ACTION_RE.search(combined)
+        and _SHORT_SAFETY_CONTEXT_RE.search(combined)
+    )
+
 
 def is_noisy_chunk(
     text: str,
@@ -1629,7 +1900,11 @@ def is_noisy_chunk(
     # ── Rule 5: very short text ──────────────────────────────────────
     if text_len < 80:
         # Rescue if text or header contains medical keywords
-        if _MEDICAL_RESCUE_RE.search(stripped) or _MEDICAL_RESCUE_RE.search(hdr):
+        if (
+            _MEDICAL_RESCUE_RE.search(stripped)
+            or _MEDICAL_RESCUE_RE.search(hdr)
+            or is_short_medical_safety_statement(stripped, hdr)
+        ):
             return False, ""
         return True, f"too_short (len={text_len})"
 
@@ -1739,6 +2014,11 @@ def chunk_markdown_text(
             noisy, noise_reason = is_noisy_chunk(text, header_path)
             enriched["is_noisy"] = noisy
             enriched["noise_reason"] = noise_reason if noisy else None
+            enriched["is_short_medical_safety_rescue"] = (
+                len(text) < 80
+                and not noisy
+                and is_short_medical_safety_statement(text, header_path)
+            )
 
             chunks.append(
                 SemanticChunk(
@@ -2067,7 +2347,12 @@ def incremental_plan_has_no_work(args: argparse.Namespace) -> bool:
         return False
 
     manifest = load_ingestion_manifest(args.manifest_path)
-    plan = get_incremental_file_plan(source_files, manifest, force_reingest=False)
+    plan = get_incremental_file_plan(
+        source_files,
+        manifest,
+        force_reingest=False,
+        source_root=args.source,
+    )
     return not plan["to_ingest"]
 
 
@@ -2210,9 +2495,13 @@ async def ensure_neo4j_constraints(session: Any) -> None:
 async def upsert_neo4j_payloads(
     session: Any,
     payloads: list[GraphPayload],
-) -> tuple[int, int]:
-    nodes_count = 0
-    edges_count = 0
+    *,
+    payload_document_ids: dict[str, str] | None = None,
+) -> Neo4jUpsertResult:
+    """Upsert extracted graph facts and report only materialized relationships."""
+
+    result_summary = Neo4jUpsertResult()
+    payload_document_ids = payload_document_ids or {}
 
     all_nodes: list[GraphNode] = []
     all_edges: list[GraphEdge] = []
@@ -2225,18 +2514,23 @@ async def upsert_neo4j_payloads(
     for node in all_nodes:
         unique_nodes.setdefault((node.entity_type, node.name), node)
 
-    unique_edges: dict[tuple[str, str, str, str, str], GraphEdge] = {}
-    for edge in all_edges:
-        unique_edges.setdefault(
-            (
+    unique_edges: dict[tuple[str, str, str, str, str], tuple[GraphEdge, set[str]]] = {}
+    for payload in payloads:
+        document_id = str(payload_document_ids.get(payload.chunk_id) or "").strip()
+        for edge in payload.edges:
+            key = (
                 edge.source_type,
                 edge.source_name,
                 edge.relation,
                 edge.target_type,
                 edge.target_name,
-            ),
-            edge,
-        )
+            )
+            existing = unique_edges.get(key)
+            if existing is None:
+                existing = (edge, set())
+                unique_edges[key] = existing
+            if document_id:
+                existing[1].add(document_id)
 
     for node in unique_nodes.values():
         cypher = (
@@ -2247,48 +2541,170 @@ async def upsert_neo4j_payloads(
             f"ON MATCH SET "
             f"n.description = CASE "
             f"WHEN n.description IS NULL OR n.description = '' "
-            f"THEN $description ELSE n.description END"
+            f"THEN $description ELSE n.description END "
+            f"RETURN count(n) AS node_count"
         )
 
-        await session.run(
+        node_result = await session.run(
             cypher,
             name=node.name,
             description=node.properties.get("description", ""),
         )
-        nodes_count += 1
+        node_record = await _neo4j_single(node_result)
+        result_summary.nodes_upserted += _neo4j_record_int(node_record, "node_count", default=1)
 
-    for edge in unique_edges.values():
-        cypher = (
-            f"MATCH (src:{edge.source_type} {{name: $src_name}}) "
-            f"MATCH (tgt:{edge.target_type} {{name: $tgt_name}}) "
-            f"MERGE (src)-[r:{edge.relation}]->(tgt) "
-            f"ON CREATE SET "
-            f"r.evidence = $evidence, "
-            f"r.created_at = timestamp() "
-            f"ON MATCH SET "
-            f"r.evidence = CASE "
-            f"WHEN r.evidence IS NULL OR r.evidence = '' "
-            f"THEN $evidence ELSE r.evidence END"
-        )
-
+    for edge, source_document_ids in unique_edges.values():
         try:
-            await session.run(
-                cypher,
+            source_result = await session.run(
+                f"MATCH (src:{edge.source_type} {{name: $src_name}}) "
+                "RETURN count(src) AS source_count",
+                src_name=edge.source_name,
+            )
+            source_count = _neo4j_record_int(
+                await _neo4j_single(source_result), "source_count"
+            )
+            if source_count == 0:
+                result_summary.missing_source_endpoint += 1
+                logger.error(
+                    "[STAGE 4A] Missing source endpoint for edge (%s)-[%s]->(%s)",
+                    edge.source_name,
+                    edge.relation,
+                    edge.target_name,
+                )
+                continue
+            if source_count != 1:
+                result_summary.database_errors += 1
+                logger.error(
+                    "[STAGE 4A] Source endpoint is not unique for edge (%s)-[%s]->(%s): %d",
+                    edge.source_name,
+                    edge.relation,
+                    edge.target_name,
+                    source_count,
+                )
+                continue
+
+            target_result = await session.run(
+                f"MATCH (tgt:{edge.target_type} {{name: $tgt_name}}) "
+                "RETURN count(tgt) AS target_count",
+                tgt_name=edge.target_name,
+            )
+            target_count = _neo4j_record_int(
+                await _neo4j_single(target_result), "target_count"
+            )
+            if target_count == 0:
+                result_summary.missing_target_endpoint += 1
+                logger.error(
+                    "[STAGE 4A] Missing target endpoint for edge (%s)-[%s]->(%s)",
+                    edge.source_name,
+                    edge.relation,
+                    edge.target_name,
+                )
+                continue
+            if target_count != 1:
+                result_summary.database_errors += 1
+                logger.error(
+                    "[STAGE 4A] Target endpoint is not unique for edge (%s)-[%s]->(%s): %d",
+                    edge.source_name,
+                    edge.relation,
+                    edge.target_name,
+                    target_count,
+                )
+                continue
+
+            edge_result = await session.run(
+                (
+                    f"MATCH (src:{edge.source_type} {{name: $src_name}}) "
+                    f"MATCH (tgt:{edge.target_type} {{name: $tgt_name}}) "
+                    f"MERGE (src)-[r:{edge.relation}]->(tgt) "
+                    f"ON CREATE SET "
+                    f"r.evidence = $evidence, "
+                    f"r.created_at = timestamp(), "
+                    f"r.source_document_ids = $source_document_ids "
+                    f"ON MATCH SET "
+                    f"r.evidence = CASE "
+                    f"WHEN r.evidence IS NULL OR r.evidence = '' "
+                    f"THEN $evidence ELSE r.evidence END, "
+                    f"r.source_document_ids = reduce(ids = coalesce(r.source_document_ids, []), "
+                    f"document_id IN $source_document_ids | "
+                    f"CASE WHEN document_id IN ids THEN ids ELSE ids + document_id END) "
+                    f"RETURN count(r) AS relationship_count"
+                ),
                 src_name=edge.source_name,
                 tgt_name=edge.target_name,
                 evidence=edge.properties.get("evidence", ""),
+                source_document_ids=sorted(source_document_ids),
             )
-            edges_count += 1
+            record = await _neo4j_single(edge_result)
+            relationship_count = _neo4j_record_int(record, "relationship_count")
+            if relationship_count == 1:
+                result_summary.relationships_upserted += 1
+            else:
+                result_summary.database_errors += 1
+                logger.error(
+                    "[STAGE 4A] Edge did not materialize (%s)-[%s]->(%s)",
+                    edge.source_name,
+                    edge.relation,
+                    edge.target_name,
+                )
         except Exception as exc:
-            logger.debug(
-                "[STAGE 4A] Edge skipped (%s)-[%s]->(%s): %s",
+            result_summary.database_errors += 1
+            logger.error(
+                "[STAGE 4A] Edge database error (%s)-[%s]->(%s): %s",
                 edge.source_name,
                 edge.relation,
                 edge.target_name,
                 exc,
             )
 
-    return nodes_count, edges_count
+    return result_summary
+
+
+async def _neo4j_single(result: Any) -> Any:
+    single = getattr(result, "single", None)
+    if single is None:
+        return None
+    record = single()
+    if hasattr(record, "__await__"):
+        record = await record
+    return record
+
+
+def _neo4j_record_int(record: Any, key: str, default: int = 0) -> int:
+    if record is None:
+        return default
+    try:
+        value = record.get(key, default) if hasattr(record, "get") else record[key]
+        return int(value or 0)
+    except (KeyError, TypeError, ValueError):
+        return default
+
+
+async def reconcile_neo4j_document_graph(session: Any, document_id: str) -> dict[str, int]:
+    """Remove only source-managed graph facts before a changed document is rebuilt."""
+
+    source_document_id = str(document_id).strip()
+    if not source_document_id:
+        return {"deleted": 0, "detached": 0}
+
+    delete_result = await session.run(
+        "MATCH ()-[r]->() "
+        "WHERE $document_id IN coalesce(r.source_document_ids, []) "
+        "AND size(r.source_document_ids) = 1 "
+        "DELETE r RETURN count(r) AS deleted",
+        document_id=source_document_id,
+    )
+    detach_result = await session.run(
+        "MATCH ()-[r]->() "
+        "WHERE $document_id IN coalesce(r.source_document_ids, []) "
+        "AND size(r.source_document_ids) > 1 "
+        "SET r.source_document_ids = [item IN r.source_document_ids WHERE item <> $document_id] "
+        "RETURN count(r) AS detached",
+        document_id=source_document_id,
+    )
+    return {
+        "deleted": _neo4j_record_int(await _neo4j_single(delete_result), "deleted"),
+        "detached": _neo4j_record_int(await _neo4j_single(detach_result), "detached"),
+    }
 
 
 # =============================================================================
@@ -2731,6 +3147,7 @@ async def stage3_and_optional_neo4j_incremental(
     skip_graph_extraction: bool,
     skip_neo4j: bool,
     stats: IngestionStats,
+    replace_document_ids: set[str] | None = None,
 ) -> list[GraphPayload]:
     logger.info("=" * 60)
     logger.info("[STAGE 3] Knowledge Graph Extraction (Ollama/%s)", OLLAMA_MODEL)
@@ -2763,6 +3180,14 @@ async def stage3_and_optional_neo4j_incremental(
         neo4j_driver = await create_neo4j_driver()
         neo4j_session = neo4j_driver.session()
         await ensure_neo4j_constraints(neo4j_session)
+        for document_id in sorted(replace_document_ids or set()):
+            reconciliation = await reconcile_neo4j_document_graph(neo4j_session, document_id)
+            logger.info(
+                "[STAGE 4A] Reconciled managed graph facts for document %s: deleted=%d detached=%d",
+                document_id,
+                reconciliation["deleted"],
+                reconciliation["detached"],
+            )
 
     try:
         batches = chunk_list(chunks, GRAPH_BATCH_SIZE)
@@ -2811,17 +3236,35 @@ async def stage3_and_optional_neo4j_incremental(
             )
 
             if not dry_run and not skip_neo4j and neo4j_session is not None:
-                n_nodes, n_edges = await upsert_neo4j_payloads(neo4j_session, payloads)
-                stats.nodes_upserted_neo4j += n_nodes
-                stats.edges_upserted_neo4j += n_edges
+                payload_document_ids = {
+                    chunk.chunk_id: str(chunk.metadata.get("file_document_id") or chunk.metadata.get("document_id") or "")
+                    for chunk in batch
+                }
+                upsert_result = await upsert_neo4j_payloads(
+                    neo4j_session,
+                    payloads,
+                    payload_document_ids=payload_document_ids,
+                )
+                stats.nodes_upserted_neo4j += upsert_result.nodes_upserted
+                stats.edges_upserted_neo4j += upsert_result.relationships_upserted
+                stats.neo4j_missing_endpoints += (
+                    upsert_result.missing_source_endpoint + upsert_result.missing_target_endpoint
+                )
+                if upsert_result.has_failures:
+                    raise RuntimeError(
+                        "Neo4j graph upsert was incomplete: "
+                        f"missing_source={upsert_result.missing_source_endpoint}, "
+                        f"missing_target={upsert_result.missing_target_endpoint}, "
+                        f"database_errors={upsert_result.database_errors}"
+                    )
 
                 logger.info(
                     "[STAGE 4A] ✓ Batch %d/%d Neo4j upsert — nodes=%d, edges=%d",
                     batch_idx,
                     len(batches),
-                    n_nodes,
-                    n_edges,
-            )
+                    upsert_result.nodes_upserted,
+                    upsert_result.relationships_upserted,
+                )
 
         if skip_graph_extraction:
             cache_misses_due_to_skip = stats.graph_cache_misses - skip_graph_cache_misses_before
@@ -2890,6 +3333,7 @@ async def ingest_pipeline_incremental(
         files=source_files,
         manifest=manifest,
         force_reingest=force_reingest,
+        source_root=source_dir,
     )
     log_incremental_file_plan(plan)
 
@@ -2956,7 +3400,8 @@ async def ingest_pipeline_incremental(
                 if parsed is None:
                     stage1_already_recorded_error = True
                     raise RuntimeError("Stage 1 extraction failed")
-                filename, markdown = parsed
+                filename, markdown, parser_completeness = parsed
+                file_info["parser_completeness"] = parser_completeness.status
                 chunks = stage2_chunk_markdown(filename, markdown)
                 display_name = filename
 
@@ -2990,6 +3435,7 @@ async def ingest_pipeline_incremental(
             )
 
             stats.chunks_created += len(chunks)
+            account_chunk_quality(chunks, stats)
             logger.info("[STAGE 2] Total semantic chunks for document: %d", len(chunks))
 
             payloads = await stage3_and_optional_neo4j_incremental(
@@ -3000,6 +3446,11 @@ async def ingest_pipeline_incremental(
                 skip_graph_extraction=skip_graph_extraction,
                 skip_neo4j=skip_neo4j,
                 stats=stats,
+                replace_document_ids=(
+                    {str(file_info["document_id"])}
+                    if file_info.get("cleanup_required") and not skip_neo4j
+                    else None
+                ),
             )
 
             graph_errors = sum(1 for payload in payloads if payload.extraction_error)
@@ -3082,6 +3533,14 @@ async def ingest_pipeline_incremental(
             file_info["graph_extraction_skipped"] = bool(skip_graph_extraction)
             file_info["neo4j_skipped"] = bool(skip_neo4j)
             file_info["qdrant_indexed"] = bool(qdrant_point_ids)
+            file_info["graph_validated"] = (
+                graph_errors == 0
+                and not skip_graph_extraction
+                and not skip_neo4j
+                and not skip_qdrant
+                and bool(qdrant_point_ids)
+            )
+            file_info["phase1_validation_status"] = "knowledge_only"
 
             if skip_neo4j and not intentional_graph_skip:
                 skipped_components.append("Neo4j")
@@ -3166,6 +3625,8 @@ async def ingest_pipeline_incremental(
                 graph_error_tolerance=graph_tolerance,
                 warning=graph_warning,
                 source_metadata=file_info,
+                graph_validated=bool(file_info["graph_validated"]),
+                phase1_validation_status="knowledge_only",
             )
             save_ingestion_manifest(manifest_path, manifest)
             logger.info(
@@ -3214,6 +3675,8 @@ async def ingest_pipeline(
     incremental: bool = False,
     force_reingest: bool = False,
     manifest_path: Path = DEFAULT_MANIFEST_PATH,
+    defer_manifest_completion: bool = False,
+    require_zero_graph_errors: bool = False,
 ) -> IngestionStats:
     if incremental or force_reingest:
         return await ingest_pipeline_incremental(
@@ -3302,6 +3765,7 @@ async def ingest_pipeline(
     ]
 
     stats.chunks_created = len(all_chunks)
+    account_chunk_quality(all_chunks, stats)
 
     logger.info("[STAGE 2] Total semantic chunks: %d", stats.chunks_created)
 
@@ -3366,6 +3830,8 @@ async def ingest_pipeline(
             qdrant_ids_available=qdrant_upsert_succeeded,
             limit_chunks_truncated=limit_chunks_truncated,
             global_error=global_error,
+            defer_completion=defer_manifest_completion,
+            require_zero_graph_errors=require_zero_graph_errors,
         )
         save_ingestion_manifest(manifest_path, manifest)
         logger.info("[MANIFEST] Full ingestion manifest updated: %s", manifest_path)

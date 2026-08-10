@@ -14,7 +14,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.ingest_knowledge import _file_manifest_info, get_incremental_file_plan
+from scripts.ingest_knowledge import (
+    _file_manifest_info,
+    get_incremental_file_plan,
+    ingestion_config_fingerprint,
+)
 from src.ingestion.cleanup import is_safe_chunk_collection_for_cleanup
 from src.ingestion.domain_metadata import enrich_domain_metadata
 from src.knowledge import DrugEntityNormalizer
@@ -275,6 +279,8 @@ def _check_cleanup_safety(failures: list[str]) -> None:
                 info["source_path"]: {
                     **{key: value for key, value in info.items() if key != "path"},
                     "status": "completed",
+                    "graph_validated": True,
+                    "ingestion_config_fingerprint": ingestion_config_fingerprint(),
                 }
             }
         }

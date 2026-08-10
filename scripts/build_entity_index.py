@@ -37,6 +37,12 @@ from src.knowledge.versioning import get_embedding_metadata  # noqa: E402
 
 PREVIEW_NAMES = {"Dalacin T", "Epiduo", "Differin", "Tazorac", "benzoyl_peroxide", "tazarotene"}
 
+__all__ = [
+    "build_and_index_entities",
+    "build_dry_run_summary",
+    "embed_entity_texts_sync",
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build the acne entity-card Qdrant index.")
@@ -149,21 +155,69 @@ async def main() -> int:
             f"{args.collection!r}. Chunk collection remains {get_chunk_collection_name()!r}."
         )
 
-    await ensure_entity_collection(
-        collection_name=args.collection,
-        recreate=recreate,
-    )
-    embeddings = embed_entity_texts_sync(
-        [build_entity_point_payload(card, kb_version=args.kb_version)["text"] for card in cards]
-    )
-    count = await upsert_entity_cards(
-        cards,
-        embeddings=embeddings,
+    result = await build_and_index_entities(
+        cards=cards,
         collection_name=args.collection,
         kb_version=args.kb_version,
+        recreate=recreate,
     )
-    print(f"Upserted {count} entity cards into Qdrant collection {args.collection!r}.")
+    print(f"Upserted {result['upserted']} entity cards into Qdrant collection {args.collection!r}.")
     return 0
+
+
+async def build_and_index_entities(
+    *,
+    cards: list[EntityCard] | None = None,
+    collection_name: str | None = None,
+    kb_version: str | None = None,
+    recreate: bool = False,
+    embeddings: list[list[float]] | None = None,
+) -> dict[str, object]:
+    """Build, embed, and upsert entity cards for the authoritative Phase 1 workflow."""
+
+    resolved_cards = cards or build_entity_cards_from_taxonomy()
+    resolved_collection = collection_name or os.getenv(
+        "ENTITY_QDRANT_COLLECTION_NAME", ENTITY_COLLECTION_DEFAULT
+    )
+    resolved_kb_version = kb_version or os.getenv("KB_VERSION", "acne_kb_v1")
+    protected_targets = {
+        "acne_knowledge",
+        "acne_chunks_v1",
+        os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge"),
+        get_chunk_collection_name(),
+    }
+    if resolved_collection in protected_targets:
+        raise RuntimeError(
+            "Refusing to write entity cards to a chunk collection target: "
+            f"{resolved_collection!r}."
+        )
+
+    await ensure_entity_collection(
+        collection_name=resolved_collection,
+        recreate=recreate,
+    )
+    resolved_embeddings = embeddings or embed_entity_texts_sync(
+        [
+            build_entity_point_payload(card, kb_version=resolved_kb_version)["text"]
+            for card in resolved_cards
+        ]
+    )
+    count = await upsert_entity_cards(
+        resolved_cards,
+        embeddings=resolved_embeddings,
+        collection_name=resolved_collection,
+        kb_version=resolved_kb_version,
+    )
+    return {
+        "cards": resolved_cards,
+        "collection": resolved_collection,
+        "kb_version": resolved_kb_version,
+        "upserted": count,
+        "expected_entity_ids": {
+            build_entity_point_payload(card, kb_version=resolved_kb_version)["entity_id"]
+            for card in resolved_cards
+        },
+    }
 
 
 if __name__ == "__main__":
