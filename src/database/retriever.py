@@ -263,6 +263,19 @@ def _sources_for_contexts(contexts: list[dict[str, Any]]) -> list[str]:
     )
 
 
+async def _get_graph_facts_with_fallback(
+    graph_store: Neo4jGraphStore,
+    entity_names: set[str],
+    query: str,
+) -> list[dict[str, Any]]:
+    """Resolve graph facts, using keywords when optional semantic hints are empty."""
+
+    if entity_names:
+        return await graph_store.get_entity_context(list(entity_names))
+    logger.info("No graph_nodes in payloads, falling back to keyword search.")
+    return await graph_store.search_by_keywords(query.lower().split())
+
+
 # ---------------------------------------------------------------------------
 # Hybrid Retriever
 # ---------------------------------------------------------------------------
@@ -498,17 +511,11 @@ class HybridRetriever:
         neo4j_timeout_seconds = float(os.getenv("NEO4J_TIMEOUT_SECONDS", "10"))
         try:
             async with asyncio.timeout(neo4j_timeout_seconds):
-                if entity_names:
-                    graph_facts = await self._graph_store.get_entity_context(
-                        list(entity_names),
-                    )
-                else:
-                    # Fallback: keyword search from query tokens
-                    logger.info(
-                        "No graph_nodes in payloads, falling back to keyword search."
-                    )
-                    keywords = query.lower().split()
-                    graph_facts = await self._graph_store.search_by_keywords(keywords)
+                graph_facts = await _get_graph_facts_with_fallback(
+                    self._graph_store,
+                    entity_names,
+                    query,
+                )
         except asyncio.CancelledError:
             raise
         except TimeoutError:

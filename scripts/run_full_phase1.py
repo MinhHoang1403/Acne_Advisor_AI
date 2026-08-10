@@ -88,10 +88,14 @@ class FullPhase1Plan:
             "knowledge_collection": self.knowledge_collection,
             "entity_collection": self.entity_collection,
             "kb_version": self.kb_version,
+            "semantic_enrichment": {
+                "status": "not_run",
+                "required": False,
+            },
             "stages": [
                 "preflight",
                 "source_validation",
-                "knowledge_ingestion",
+                "core_knowledge_ingestion",
                 "knowledge_qdrant_validation",
                 "entity_index",
                 "entity_qdrant_validation",
@@ -150,8 +154,8 @@ def _preflight_args(source_dir: Path, manifest_path: Path) -> argparse.Namespace
         source=source_dir,
         manifest_path=manifest_path,
         dry_run=False,
-        skip_graph_extraction=False,
-        skip_neo4j=False,
+        skip_graph_extraction=True,
+        skip_neo4j=True,
         skip_qdrant=False,
         incremental=False,
         force_reingest=False,
@@ -192,7 +196,8 @@ async def run_full_phase1(
     try:
         preflight_passed = await run_preflight_checks(
             _preflight_args(source_dir, manifest_path),
-            graph_resume_enabled=True,
+            graph_resume_enabled=False,
+            require_neo4j=True,
         )
         if plan.errors:
             report.errors.extend(plan.errors)
@@ -203,6 +208,10 @@ async def run_full_phase1(
         stage_results["preflight"] = "passed"
 
         stage_results["source_validation"] = "passed"
+        stage_results["semantic_enrichment"] = {
+            "status": "not_run",
+            "required": False,
+        }
 
         ingestion_started = True
         ingestion_stats = await ingest_pipeline(
@@ -213,16 +222,17 @@ async def run_full_phase1(
             refresh_markdown=False,
             use_resume=True,
             refresh_graph_cache=False,
-            skip_graph_extraction=False,
-            skip_neo4j=False,
+            skip_graph_extraction=True,
+            skip_neo4j=True,
             skip_qdrant=False,
             incremental=False,
             force_reingest=False,
             manifest_path=manifest_path,
             defer_manifest_completion=True,
-            require_zero_graph_errors=True,
+            require_zero_graph_errors=False,
+            skip_semantic_enrichment=True,
         )
-        stage_results["knowledge_ingestion"] = ingestion_stats.__dict__.copy()
+        stage_results["core_knowledge_ingestion"] = ingestion_stats.__dict__.copy()
         if ingestion_stats.parse_errors or ingestion_stats.pdf_files != len(plan.source_paths):
             report.errors.append(
                 "Knowledge ingestion did not account for every required source: "

@@ -157,6 +157,7 @@ DEFAULT_MANIFEST_PATH: Path = DATA_DIR / "ingestion_manifest.json"
 INGESTION_MANIFEST_VERSION: int = 1
 INGESTION_CONFIG_SCHEMA_VERSION = "phase1_ingestion_config_v1"
 SPARSE_VECTOR_SCHEMA_VERSION = "hashed_bm25_v1"
+SEMANTIC_ENRICHMENT_VERSION = "semantic_graph_enrichment_v1"
 
 CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "2000"))
 LLM_CONCURRENCY: int = int(os.getenv("LLM_CONCURRENCY", "2"))
@@ -453,9 +454,18 @@ def _manifest_base() -> dict[str, Any]:
         "manifest_version": INGESTION_MANIFEST_VERSION,
         "updated_at": None,
         "documents": {},
+        "core_phase1": {
+            "status": "not_validated",
+            "updated_at": None,
+        },
         "full_phase1_validation": {
             "status": "not_validated",
             "updated_at": None,
+        },
+        "semantic_enrichment": {
+            "status": "not_run",
+            "updated_at": None,
+            "fingerprint": None,
         },
     }
 
@@ -475,8 +485,21 @@ def ingestion_config_fingerprint() -> str:
         "embedding_model": EMBEDDING_MODEL,
         "embedding_dimensions": EMBEDDING_DIMENSIONS,
         "sparse_vector_schema_version": SPARSE_VECTOR_SCHEMA_VERSION,
+    }
+    encoded = json.dumps(config, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:24]
+
+
+def semantic_enrichment_fingerprint() -> str:
+    """Fingerprint only stochastic document semantic-enrichment settings."""
+
+    config = {
+        "semantic_enrichment_version": SEMANTIC_ENRICHMENT_VERSION,
         "graph_cache_version": GRAPH_CACHE_VERSION,
         "graph_prompt_schema_version": GRAPH_PROMPT_SCHEMA_VERSION,
+        "ollama_model": OLLAMA_MODEL,
+        "entity_types": ENTITY_TYPES,
+        "relation_types": RELATION_TYPES,
     }
     encoded = json.dumps(config, sort_keys=True, ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:24]
@@ -499,8 +522,16 @@ def load_ingestion_manifest(path: Path) -> dict[str, Any]:
     data.setdefault("manifest_version", INGESTION_MANIFEST_VERSION)
     data.setdefault("updated_at", None)
     data.setdefault(
+        "core_phase1",
+        {"status": "not_validated", "updated_at": None},
+    )
+    data.setdefault(
         "full_phase1_validation",
         {"status": "not_validated", "updated_at": None},
+    )
+    data.setdefault(
+        "semantic_enrichment",
+        {"status": "not_run", "updated_at": None, "fingerprint": None},
     )
     documents = data.setdefault("documents", {})
     if not isinstance(documents, dict):
@@ -539,11 +570,26 @@ def finalize_full_phase1_manifest(
     manifest = load_ingestion_manifest(manifest_path)
     passed = bool(validation.get("passed"))
     now = utc_now_iso()
+    manifest["core_phase1"] = {
+        "status": "completed_validated" if passed else "failed",
+        "updated_at": now,
+        "report": validation,
+    }
     manifest["full_phase1_validation"] = {
         "status": "completed" if passed else "failed",
         "updated_at": now,
         "report": validation,
     }
+    semantic_state = manifest.setdefault(
+        "semantic_enrichment",
+        {"status": "not_run", "updated_at": None, "fingerprint": None},
+    )
+    if not isinstance(semantic_state, dict):
+        manifest["semantic_enrichment"] = {
+            "status": "not_run",
+            "updated_at": None,
+            "fingerprint": None,
+        }
 
     for entry in _manifest_documents(manifest).values():
         if not isinstance(entry, dict):
@@ -552,10 +598,16 @@ def finalize_full_phase1_manifest(
             continue
         if passed:
             entry["status"] = "completed"
-            entry["graph_validated"] = True
+            entry["core_phase1_status"] = "completed_validated"
+            entry["graph_validated"] = False
             entry["phase1_validation_status"] = "completed_full_phase1"
+            entry.setdefault(
+                "semantic_enrichment",
+                {"status": "not_run", "updated_at": now, "fingerprint": None},
+            )
             entry.pop("error_message", None)
         else:
+            entry["core_phase1_status"] = "failed"
             entry["phase1_validation_status"] = "full_phase1_validation_failed"
             entry["error_message"] = _short_error_message(
                 "Full Phase 1 validation failed; source remains retryable."
@@ -563,6 +615,41 @@ def finalize_full_phase1_manifest(
         entry["last_full_phase1_validation_at"] = now
 
     save_ingestion_manifest(manifest_path, manifest)
+
+
+def update_semantic_enrichment_manifest(
+    manifest: dict[str, Any],
+    *,
+    status: str,
+    report: dict[str, Any] | None = None,
+    document_results: dict[str, dict[str, Any]] | None = None,
+) -> None:
+    """Record optional semantic-enrichment state without changing core validity."""
+
+    now = utc_now_iso()
+    root_state: dict[str, Any] = {
+        "status": status,
+        "updated_at": now,
+        "fingerprint": semantic_enrichment_fingerprint(),
+    }
+    if report is not None:
+        root_state["report"] = report
+    manifest["semantic_enrichment"] = root_state
+
+    for source_path, result in (document_results or {}).items():
+        entry = _manifest_documents(manifest).get(source_path)
+        if not isinstance(entry, dict):
+            continue
+        entry["semantic_enrichment"] = {
+            "status": str(result.get("status") or status),
+            "updated_at": now,
+            "fingerprint": semantic_enrichment_fingerprint(),
+            **{
+                key: value
+                for key, value in result.items()
+                if key != "status" and value is not None
+            },
+        }
 
 
 def _manifest_documents(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -698,6 +785,8 @@ def get_incremental_file_plan(
             reason = "changed"
         elif previous.get("ingestion_config_fingerprint") != ingestion_config_fingerprint():
             reason = "config_changed"
+        elif previous.get("core_phase1_status") == "completed_validated":
+            reason = "skip"
         elif previous_status == "completed" and previous.get("graph_validated") is True:
             reason = "skip"
         else:
@@ -790,6 +879,12 @@ def update_manifest_before_ingest(
         "ingestion_run_id": ingestion_run_id,
         "error_message": "ingestion started but has not completed",
         "ingestion_config_fingerprint": ingestion_config_fingerprint(),
+        "core_phase1_status": "pending",
+        "semantic_enrichment": (
+            dict(previous.get("semantic_enrichment", {}))
+            if isinstance(previous, dict) and isinstance(previous.get("semantic_enrichment"), dict)
+            else {"status": "not_run", "updated_at": None, "fingerprint": None}
+        ),
         "graph_validated": False,
         "phase1_validation_status": "pending",
     }
@@ -814,8 +909,10 @@ def update_manifest_after_success(
     source_metadata: dict[str, Any] | None = None,
     graph_validated: bool = False,
     phase1_validation_status: str = "knowledge_only",
+    core_phase1_status: str = "knowledge_indexed",
 ) -> None:
     documents = _manifest_documents(manifest)
+    previous = documents.get(source_path)
     qdrant_metadata = _manifest_qdrant_metadata(qdrant_point_ids)
     entry: dict[str, Any] = {
         "source_path": source_path,
@@ -831,6 +928,12 @@ def update_manifest_after_success(
         "last_ingested_at": last_ingested_at or utc_now_iso(),
         "ingestion_run_id": ingestion_run_id,
         "ingestion_config_fingerprint": ingestion_config_fingerprint(),
+        "core_phase1_status": core_phase1_status,
+        "semantic_enrichment": (
+            dict(previous.get("semantic_enrichment", {}))
+            if isinstance(previous, dict) and isinstance(previous.get("semantic_enrichment"), dict)
+            else {"status": "not_run", "updated_at": None, "fingerprint": None}
+        ),
         "graph_validated": graph_validated,
         "phase1_validation_status": phase1_validation_status,
     }
@@ -894,6 +997,12 @@ def update_manifest_after_failure(
         "ingestion_run_id": ingestion_run_id,
         "error_message": _short_error_message(error),
         "ingestion_config_fingerprint": ingestion_config_fingerprint(),
+        "core_phase1_status": "failed",
+        "semantic_enrichment": (
+            dict(previous.get("semantic_enrichment", {}))
+            if isinstance(previous, dict) and isinstance(previous.get("semantic_enrichment"), dict)
+            else {"status": "not_run", "updated_at": None, "fingerprint": None}
+        ),
         "graph_validated": False,
         "phase1_validation_status": "failed",
     }
@@ -2419,7 +2528,11 @@ async def preflight_neo4j() -> bool:
             await driver.close()
 
 
-async def run_preflight_checks(args: argparse.Namespace, graph_resume_enabled: bool) -> bool:
+async def run_preflight_checks(
+    args: argparse.Namespace,
+    graph_resume_enabled: bool,
+    require_neo4j: bool | None = None,
+) -> bool:
     checks_ok = True
 
     checks_ok = preflight_source_documents(args.source) and checks_ok
@@ -2455,7 +2568,11 @@ async def run_preflight_checks(args: argparse.Namespace, graph_resume_enabled: b
     elif graph_resume_enabled:
         logger.info("[PREFLIGHT] Ollama check skipped because graph extraction is disabled.")
 
-    if not args.dry_run and not args.skip_neo4j:
+    should_check_neo4j = (
+        not args.dry_run
+        and (not args.skip_neo4j if require_neo4j is None else require_neo4j)
+    )
+    if should_check_neo4j:
         checks_ok = await preflight_neo4j() and checks_ok
     else:
         logger.info("[PREFLIGHT] Neo4j check skipped.")
@@ -2514,7 +2631,9 @@ async def upsert_neo4j_payloads(
     for node in all_nodes:
         unique_nodes.setdefault((node.entity_type, node.name), node)
 
-    unique_edges: dict[tuple[str, str, str, str, str], tuple[GraphEdge, set[str]]] = {}
+    unique_edges: dict[
+        tuple[str, str, str, str, str], tuple[GraphEdge, set[str], set[str]]
+    ] = {}
     for payload in payloads:
         document_id = str(payload_document_ids.get(payload.chunk_id) or "").strip()
         for edge in payload.edges:
@@ -2527,21 +2646,26 @@ async def upsert_neo4j_payloads(
             )
             existing = unique_edges.get(key)
             if existing is None:
-                existing = (edge, set())
+                existing = (edge, set(), set())
                 unique_edges[key] = existing
             if document_id:
                 existing[1].add(document_id)
+            existing[2].add(payload.chunk_id)
 
     for node in unique_nodes.values():
         cypher = (
             f"MERGE (n:{node.entity_type} {{name: $name}}) "
             f"ON CREATE SET "
             f"n.description = $description, "
+            f"n.extraction_source = $extraction_source, "
+            f"n.extraction_model = $extraction_model, "
             f"n.created_at = timestamp() "
             f"ON MATCH SET "
             f"n.description = CASE "
             f"WHEN n.description IS NULL OR n.description = '' "
-            f"THEN $description ELSE n.description END "
+            f"THEN $description ELSE n.description END, "
+            f"n.extraction_source = coalesce(n.extraction_source, $extraction_source), "
+            f"n.extraction_model = coalesce(n.extraction_model, $extraction_model) "
             f"RETURN count(n) AS node_count"
         )
 
@@ -2549,11 +2673,13 @@ async def upsert_neo4j_payloads(
             cypher,
             name=node.name,
             description=node.properties.get("description", ""),
+            extraction_source="ollama_semantic_enrichment",
+            extraction_model=OLLAMA_MODEL,
         )
         node_record = await _neo4j_single(node_result)
         result_summary.nodes_upserted += _neo4j_record_int(node_record, "node_count", default=1)
 
-    for edge, source_document_ids in unique_edges.values():
+    for edge, source_document_ids, source_chunk_ids in unique_edges.values():
         try:
             source_result = await session.run(
                 f"MATCH (src:{edge.source_type} {{name: $src_name}}) "
@@ -2618,21 +2744,32 @@ async def upsert_neo4j_payloads(
                     f"MERGE (src)-[r:{edge.relation}]->(tgt) "
                     f"ON CREATE SET "
                     f"r.evidence = $evidence, "
+                    f"r.extraction_source = $extraction_source, "
+                    f"r.extraction_model = $extraction_model, "
                     f"r.created_at = timestamp(), "
-                    f"r.source_document_ids = $source_document_ids "
+                    f"r.source_document_ids = $source_document_ids, "
+                    f"r.source_chunk_ids = $source_chunk_ids "
                     f"ON MATCH SET "
                     f"r.evidence = CASE "
                     f"WHEN r.evidence IS NULL OR r.evidence = '' "
                     f"THEN $evidence ELSE r.evidence END, "
+                    f"r.extraction_source = coalesce(r.extraction_source, $extraction_source), "
+                    f"r.extraction_model = coalesce(r.extraction_model, $extraction_model), "
                     f"r.source_document_ids = reduce(ids = coalesce(r.source_document_ids, []), "
                     f"document_id IN $source_document_ids | "
-                    f"CASE WHEN document_id IN ids THEN ids ELSE ids + document_id END) "
+                    f"CASE WHEN document_id IN ids THEN ids ELSE ids + document_id END), "
+                    f"r.source_chunk_ids = reduce(ids = coalesce(r.source_chunk_ids, []), "
+                    f"chunk_id IN $source_chunk_ids | "
+                    f"CASE WHEN chunk_id IN ids THEN ids ELSE ids + chunk_id END) "
                     f"RETURN count(r) AS relationship_count"
                 ),
                 src_name=edge.source_name,
                 tgt_name=edge.target_name,
                 evidence=edge.properties.get("evidence", ""),
                 source_document_ids=sorted(source_document_ids),
+                source_chunk_ids=sorted(source_chunk_ids),
+                extraction_source="ollama_semantic_enrichment",
+                extraction_model=OLLAMA_MODEL,
             )
             record = await _neo4j_single(edge_result)
             relationship_count = _neo4j_record_int(record, "relationship_count")
@@ -3677,6 +3814,7 @@ async def ingest_pipeline(
     manifest_path: Path = DEFAULT_MANIFEST_PATH,
     defer_manifest_completion: bool = False,
     require_zero_graph_errors: bool = False,
+    skip_semantic_enrichment: bool = False,
 ) -> IngestionStats:
     if incremental or force_reingest:
         return await ingest_pipeline_incremental(
@@ -3780,15 +3918,25 @@ async def ingest_pipeline(
             update_manifest_before_ingest(manifest, file_info, ingestion_run_id)
         save_ingestion_manifest(manifest_path, manifest)
 
-    payloads = await stage3_and_optional_neo4j_incremental(
-        chunks=all_chunks,
-        dry_run=dry_run,
-        use_resume=use_resume,
-        refresh_graph_cache=refresh_graph_cache,
-        skip_graph_extraction=skip_graph_extraction,
-        skip_neo4j=skip_neo4j,
-        stats=stats,
-    )
+    if skip_semantic_enrichment:
+        if not skip_graph_extraction or not skip_neo4j:
+            raise ValueError(
+                "skip_semantic_enrichment requires skip_graph_extraction and skip_neo4j"
+            )
+        logger.info(
+            "[STAGE 3/4A] Optional semantic enrichment is not part of this core ingestion run."
+        )
+        payloads = [GraphPayload(chunk_id=chunk.chunk_id) for chunk in all_chunks]
+    else:
+        payloads = await stage3_and_optional_neo4j_incremental(
+            chunks=all_chunks,
+            dry_run=dry_run,
+            use_resume=use_resume,
+            refresh_graph_cache=refresh_graph_cache,
+            skip_graph_extraction=skip_graph_extraction,
+            skip_neo4j=skip_neo4j,
+            stats=stats,
+        )
 
     if dry_run:
         logger.info("─" * 60)
