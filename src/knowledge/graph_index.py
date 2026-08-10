@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections import Counter
 from typing import Any
 
 from src.knowledge.graph_schema import (
@@ -60,17 +61,24 @@ async def upsert_entity_graph(driver: Any, records: dict[str, list[dict[str, Any
             properties = sanitize_neo4j_properties(
                 {key: value for key, value in node.items() if key != "label"}
             )
-            await session.run(
+            result = await session.run(
                 (
                     f"MERGE (n:{label} {{canonical_name: $canonical_name}}) "
                     "ON CREATE SET n.created_at = datetime() "
                     "SET n += $properties, "
-                    "n.updated_at = datetime()"
+                    "n.updated_at = datetime() "
+                    "RETURN count(n) AS materialized_count"
                 ),
                 canonical_name=node["canonical_name"],
                 properties=properties,
             )
-            node_count += 1
+            materialized = _record_count(await _result_single(result), "materialized_count")
+            if materialized != 1:
+                raise RuntimeError(
+                    "Entity graph node did not materialize: "
+                    f"{label}:{node['canonical_name']} (count={materialized})"
+                )
+            node_count += materialized
 
         for relationship in records.get("relationships", []):
             source_label = _safe_label(relationship["source_label"])
@@ -79,20 +87,33 @@ async def upsert_entity_graph(driver: Any, records: dict[str, list[dict[str, Any
             properties = sanitize_neo4j_properties(
                 dict(relationship.get("properties") or {})
             )
-            await session.run(
+            result = await session.run(
                 (
                     f"MATCH (src:{source_label} {{canonical_name: $source_name}}) "
                     f"MATCH (tgt:{target_label} {{canonical_name: $target_name}}) "
                     f"MERGE (src)-[r:{rel_type}]->(tgt) "
                     "ON CREATE SET r.created_at = datetime() "
                     "SET r += $properties, "
-                    "r.updated_at = datetime()"
+                    "r.updated_at = datetime() "
+                    "RETURN count(src) AS source_count, count(tgt) AS target_count, "
+                    "count(r) AS materialized_count"
                 ),
                 source_name=relationship["source_name"],
                 target_name=relationship["target_name"],
                 properties=properties,
             )
-            relationship_count += 1
+            record = await _result_single(result)
+            source_count = _record_count(record, "source_count")
+            target_count = _record_count(record, "target_count")
+            materialized = _record_count(record, "materialized_count")
+            if source_count != 1 or target_count != 1 or materialized != 1:
+                raise RuntimeError(
+                    "Entity graph relationship did not materialize: "
+                    f"{source_label}:{relationship['source_name']}-[{rel_type}]->"
+                    f"{target_label}:{relationship['target_name']} "
+                    f"(source={source_count}, target={target_count}, relationship={materialized})"
+                )
+            relationship_count += materialized
 
     logger.info(
         "Entity graph upsert complete: nodes=%d relationships=%d",
@@ -180,6 +201,136 @@ async def validate_entity_graph(driver: Any) -> dict[str, Any]:
     return results
 
 
+async def validate_entity_graph_records(
+    driver: Any,
+    records: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Strictly reconcile the deterministic graph records expected for a clean build."""
+
+    expected_nodes = records.get("nodes", [])
+    expected_relationships = records.get("relationships", [])
+    node_counts = Counter(str(node["label"]) for node in expected_nodes)
+    relationship_counts = Counter(
+        str(relationship["relationship"]) for relationship in expected_relationships
+    )
+    expected_nodes_by_label = {
+        label: node_counts.get(label, 0)
+        for label in ENTITY_GRAPH_LABELS
+    }
+    expected_relationships_by_type = {
+        rel_type: relationship_counts.get(rel_type, 0)
+        for rel_type in ENTITY_GRAPH_RELATIONSHIPS
+    }
+    results: dict[str, Any] = {
+        "passed": True,
+        "expected_nodes": len(expected_nodes),
+        "expected_relationships": len(expected_relationships),
+        "nodes_by_label": expected_nodes_by_label,
+        "relationships_by_type": expected_relationships_by_type,
+        "actual_nodes_by_label": {},
+        "actual_relationships_by_type": {},
+        "node_checks": [],
+        "relationship_checks": [],
+        "errors": [],
+    }
+
+    async with driver.session() as session:
+        for node in expected_nodes:
+            label = _safe_label(node["label"])
+            result = await session.run(
+                f"MATCH (n:{label} {{canonical_name: $canonical_name}}) "
+                "RETURN count(n) AS count",
+                canonical_name=node["canonical_name"],
+            )
+            count = _record_count(await _result_single(result), "count")
+            passed = count == 1
+            check = {
+                "label": label,
+                "canonical_name": node["canonical_name"],
+                "count": count,
+                "passed": passed,
+            }
+            results["node_checks"].append(check)
+            if not passed:
+                results["errors"].append(
+                    f"expected exactly one node {label}:{node['canonical_name']}, got {count}"
+                )
+
+        for relationship in expected_relationships:
+            source_label = _safe_label(relationship["source_label"])
+            target_label = _safe_label(relationship["target_label"])
+            rel_type = _safe_relationship(relationship["relationship"])
+            result = await session.run(
+                (
+                    f"MATCH (src:{source_label} {{canonical_name: $source_name}}) "
+                    f"MATCH (tgt:{target_label} {{canonical_name: $target_name}}) "
+                    f"MATCH (src)-[r:{rel_type}]->(tgt) "
+                    "RETURN count(r) AS count"
+                ),
+                source_name=relationship["source_name"],
+                target_name=relationship["target_name"],
+            )
+            count = _record_count(await _result_single(result), "count")
+            passed = count == 1
+            check = {
+                "source": f"{source_label}:{relationship['source_name']}",
+                "relationship": rel_type,
+                "target": f"{target_label}:{relationship['target_name']}",
+                "count": count,
+                "passed": passed,
+            }
+            results["relationship_checks"].append(check)
+            if not passed:
+                results["errors"].append(
+                    "expected exactly one relationship "
+                    f"{check['source']}-[{rel_type}]->{check['target']}, got {count}"
+                )
+
+        for label, expected_count in sorted(expected_nodes_by_label.items()):
+            result = await session.run(f"MATCH (n:{_safe_label(label)}) RETURN count(n) AS count")
+            actual_count = _record_count(await _result_single(result), "count")
+            results["actual_nodes_by_label"][label] = actual_count
+            if actual_count != expected_count:
+                results["errors"].append(
+                    f"node count mismatch for {label}: expected {expected_count}, got {actual_count}"
+                )
+
+        for rel_type, expected_count in sorted(expected_relationships_by_type.items()):
+            result = await session.run(
+                f"MATCH ()-[r:{_safe_relationship(rel_type)}]->() RETURN count(r) AS count"
+            )
+            actual_count = _record_count(await _result_single(result), "count")
+            results["actual_relationships_by_type"][rel_type] = actual_count
+            if actual_count != expected_count:
+                results["errors"].append(
+                    "relationship count mismatch for "
+                    f"{rel_type}: expected {expected_count}, got {actual_count}"
+                )
+
+    results["passed"] = not results["errors"]
+    return results
+
+
+async def _result_single(result: Any) -> Any:
+    single = getattr(result, "single", None)
+    if single is None:
+        return None
+    record = single()
+    if hasattr(record, "__await__"):
+        record = await record
+    return record
+
+
+def _record_count(record: Any, key: str) -> int:
+    if record is None:
+        return 0
+    try:
+        value = record.get(key, 0) if hasattr(record, "get") else record[key]
+        return int(value or 0)
+    except (KeyError, TypeError, ValueError):
+        return 0
+
+
 def sanitize_neo4j_properties(properties: dict[str, Any]) -> dict[str, Any]:
     """Return Neo4j-safe flat properties.
 
@@ -235,4 +386,5 @@ __all__ = [
     "sanitize_neo4j_properties",
     "upsert_entity_graph",
     "validate_entity_graph",
+    "validate_entity_graph_records",
 ]

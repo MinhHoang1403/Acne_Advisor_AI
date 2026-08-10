@@ -26,6 +26,7 @@ from src.knowledge.graph_index import (  # noqa: E402
     get_neo4j_driver,
     upsert_entity_graph,
     validate_entity_graph,
+    validate_entity_graph_records,
 )
 from src.knowledge.graph_schema import (  # noqa: E402
     build_entity_graph_records,
@@ -86,7 +87,14 @@ async def main() -> int:
             counts = await upsert_entity_graph(driver, records)
             print(json.dumps({"upserted": counts}, ensure_ascii=False, indent=2))
         if args.validate:
-            validation = await validate_entity_graph(driver)
+            baseline_validation = await validate_entity_graph(driver)
+            records_validation = await validate_entity_graph_records(driver, records)
+            validation = {
+                "passed": bool(baseline_validation.get("passed"))
+                and bool(records_validation.get("passed")),
+                "baseline": baseline_validation,
+                "records": records_validation,
+            }
             print(json.dumps({"validation": validation}, ensure_ascii=False, indent=2, default=str))
             return 0 if validation.get("passed") else 1
     finally:

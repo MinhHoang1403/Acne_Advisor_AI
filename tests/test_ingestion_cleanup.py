@@ -11,6 +11,7 @@ from scripts.ingest_knowledge import (
     _file_manifest_info,
     finalize_manifest_for_documents,
     get_incremental_file_plan,
+    ingestion_config_fingerprint,
     update_manifest_after_success,
 )
 
@@ -168,6 +169,8 @@ def test_unchanged_completed_skips_cleanup(tmp_path) -> None:
                 **file_info,
                 "path": None,
                 "status": "completed",
+                "graph_validated": True,
+                "ingestion_config_fingerprint": ingestion_config_fingerprint(),
             }
         }
     }

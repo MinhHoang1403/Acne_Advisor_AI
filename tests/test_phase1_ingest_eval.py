@@ -9,7 +9,11 @@ from scripts.eval_phase1_readiness import (
     relationship_set,
     run_phase1_readiness_eval,
 )
-from scripts.ingest_knowledge import _file_manifest_info, get_incremental_file_plan
+from scripts.ingest_knowledge import (
+    _file_manifest_info,
+    get_incremental_file_plan,
+    ingestion_config_fingerprint,
+)
 from src.ingestion.cleanup import is_safe_chunk_collection_for_cleanup
 from src.ingestion.domain_metadata import enrich_domain_metadata
 from src.knowledge import DrugEntityNormalizer
@@ -228,6 +232,8 @@ def test_phase1_cleanup_safety_eval(tmp_path: Path) -> None:
             file_info["source_path"]: {
                 **{key: value for key, value in file_info.items() if key != "path"},
                 "status": "completed",
+                "graph_validated": True,
+                "ingestion_config_fingerprint": ingestion_config_fingerprint(),
             }
         }
     }

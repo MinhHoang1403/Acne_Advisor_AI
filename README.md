@@ -516,9 +516,25 @@ ba tích hợp, nên tạo endpoint public riêng như `/v1/chat`.
 ## Ingestion Và Knowledge Base
 
 Không cần chạy ingestion chỉ để mở UI nếu local data foundation đã sẵn sàng.
-Ingestion có thể gọi external services và có thể phát sinh chi phí.
+Ingestion có thể gọi external services và có thể phát sinh chi phí. Với một
+database trống, lệnh authoritative cho **Full Phase 1** là:
 
-Lệnh ingestion chính:
+```powershell
+.\venv\Scripts\python.exe scripts\run_full_phase1.py --source sample_data
+```
+
+Workflow này chạy theo thứ tự: preflight, source validation, knowledge
+ingestion, đối soát Qdrant knowledge, entity index, đối soát entity Qdrant,
+deterministic Neo4j graph, graph validation, rồi mới hoàn tất manifest. Dịch vụ
+Qdrant, Neo4j, Ollama và các API key cần thiết phải sẵn sàng. Lệnh chỉ trả exit
+code `0` khi mọi validation pass. Có thể kiểm tra plan không ghi dữ liệu bằng:
+
+```powershell
+.\venv\Scripts\python.exe scripts\run_full_phase1.py --source sample_data --dry-run
+```
+
+`ingest_knowledge.py` là knowledge-layer entrypoint cho debug hoặc incremental,
+không tương đương Full Phase 1:
 
 ```powershell
 .\venv\Scripts\python.exe scripts\ingest_knowledge.py --source sample_data
@@ -538,10 +554,14 @@ data/ingestion_manifest.json
 
 Logic manifest:
 
-- `completed` và `completed_with_warnings` được skip khi content hash không đổi.
-- `partial`, `failed`, file mới hoặc file đổi hash sẽ được ingest lại.
-- `completed_with_warnings` dùng cho lỗi graph extraction nhẹ trong ngưỡng cho
-  phép; Qdrant/Neo4j đã upsert phần lớn dữ liệu thành công.
+- Chỉ entry `completed` có `graph_validated=true` và ingestion fingerprint không
+  đổi mới được skip khi content hash không đổi.
+- `partial`, `failed`, `completed_with_warnings`,
+  `completed_with_graph_skipped`, entry thiếu graph validation, file mới, file
+  đổi hash hoặc config fingerprint đổi đều retry.
+- Khi Full Phase 1 đang chạy, knowledge source ở trạng thái
+  `knowledge_indexed_pending_phase1_validation`; chỉ orchestrator mới chuyển
+  chúng sang `completed` sau khi entity và graph reconciliation pass.
 
 Entity index và graph rebuild là thao tác mutating, chỉ chạy khi có kế hoạch:
 
