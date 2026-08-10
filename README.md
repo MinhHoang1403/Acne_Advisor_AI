@@ -526,12 +526,26 @@ database trống, lệnh authoritative cho **Full Phase 1** là:
 Workflow này chạy theo thứ tự: preflight, source validation, knowledge
 ingestion, đối soát Qdrant knowledge, entity index, đối soát entity Qdrant,
 deterministic Neo4j graph, graph validation, rồi mới hoàn tất manifest. Dịch vụ
-Qdrant, Neo4j, Ollama và các API key cần thiết phải sẵn sàng. Lệnh chỉ trả exit
-code `0` khi mọi validation pass. Có thể kiểm tra plan không ghi dữ liệu bằng:
+Qdrant, Neo4j và các API key parser/embedding cần thiết phải sẵn sàng. **Ollama
+không phải dependency của core Phase 1.** Lệnh vẫn xây deterministic Neo4j
+taxonomy/entity graph và chỉ trả exit code `0` khi mọi core validation pass. Có
+thể kiểm tra plan không ghi dữ liệu bằng:
 
 ```powershell
 .\venv\Scripts\python.exe scripts\run_full_phase1.py --source sample_data --dry-run
 ```
+
+Document-derived semantic graph enrichment là workflow **tùy chọn**, chạy sau
+khi core Phase 1 đã validated. Job này đọc chunks đã index, không parse lại PDF
+hoặc tạo embedding lại, nhưng yêu cầu Ollama và có thể mất nhiều thời gian:
+
+```powershell
+.\venv\Scripts\python.exe scripts\run_semantic_enrichment.py --source sample_data
+```
+
+Deterministic Neo4j taxonomy/entity graph thuộc core Phase 1; semantic document
+graph do Ollama trích xuất là enrichment độc lập, không quyết định core validity.
+Chỉ xem plan optional job mà không gọi Ollama bằng `--dry-run`.
 
 `ingest_knowledge.py` là knowledge-layer entrypoint cho debug hoặc incremental,
 không tương đương Full Phase 1:
@@ -554,14 +568,17 @@ data/ingestion_manifest.json
 
 Logic manifest:
 
-- Chỉ entry `completed` có `graph_validated=true` và ingestion fingerprint không
-  đổi mới được skip khi content hash không đổi.
-- `partial`, `failed`, `completed_with_warnings`,
-  `completed_with_graph_skipped`, entry thiếu graph validation, file mới, file
-  đổi hash hoặc config fingerprint đổi đều retry.
+- Core source `completed` với `core_phase1_status=completed_validated` được
+  skip khi content hash và core fingerprint không đổi, kể cả khi semantic
+  enrichment là `not_run`.
+- `partial`, `failed`, file mới, file đổi hash hoặc core fingerprint đổi vẫn
+  retry. Semantic model/prompt/cache version dùng fingerprint riêng và không
+  ép core Phase 1 rebuild.
 - Khi Full Phase 1 đang chạy, knowledge source ở trạng thái
   `knowledge_indexed_pending_phase1_validation`; chỉ orchestrator mới chuyển
-  chúng sang `completed` sau khi entity và graph reconciliation pass.
+  chúng sang `completed` sau khi entity và deterministic graph reconciliation
+  pass. Manifest ghi `semantic_enrichment=not_run/completed/completed_with_warnings/failed`
+  độc lập với core completion.
 
 Entity index và graph rebuild là thao tác mutating, chỉ chạy khi có kế hoạch:
 

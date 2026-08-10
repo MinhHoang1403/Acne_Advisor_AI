@@ -513,4 +513,7 @@ def test_manifest_is_completed_only_after_full_phase1_validation(tmp_path) -> No
     )
     completed = ingestion.load_ingestion_manifest(manifest_path)
     assert completed["full_phase1_validation"]["status"] == "completed"
+    assert completed["core_phase1"]["status"] == "completed_validated"
+    assert completed["semantic_enrichment"]["status"] == "not_run"
     assert completed["documents"]["sample_data/a.pdf"]["status"] == "completed"
+    assert completed["documents"]["sample_data/a.pdf"]["graph_validated"] is False
