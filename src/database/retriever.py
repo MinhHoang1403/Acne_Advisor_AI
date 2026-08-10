@@ -31,6 +31,7 @@ from src.database.vector_store import QdrantVectorStore, embed_query
 from src.retrieval.candidate_merge import candidate_debug_summary, merge_candidates
 from src.retrieval.contracts import RerankTrace, RetrievalTrace
 from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
+from src.retrieval.diagnostics import ConceptMatcher, build_retrieval_diagnostic_trace
 from src.retrieval.entity_retriever import EntityRetriever
 from src.retrieval.metadata_boost import boost_chunk_results
 from src.retrieval.query_expansion import expand_normalized_query
@@ -291,6 +292,10 @@ class HybridRetriever:
         dense_weight: float = 1.0,
         sparse_weight: float = 1.0,
         rrf_k: int = 60,
+        diagnostic_expected_concepts: list[str] | None = None,
+        diagnostic_original_query: str | None = None,
+        diagnostic_concept_matcher: ConceptMatcher | None = None,
+        diagnostic_critical: bool = False,
     ) -> RetrievalResult:
         """Run the full hybrid retrieval pipeline.
 
@@ -548,6 +553,34 @@ class HybridRetriever:
                 "total": round(t_total * 1000, 3),
             },
         )
+        retrieval_diagnostics = None
+        if diagnostic_expected_concepts and diagnostic_concept_matcher is not None:
+            try:
+                retrieval_diagnostics = build_retrieval_diagnostic_trace(
+                    expected_concepts=diagnostic_expected_concepts,
+                    critical=diagnostic_critical,
+                    original_query=diagnostic_original_query or query,
+                    retrieval_query=query,
+                    normalized_query=normalized_query,
+                    expansion=expansion,
+                    dense_results=dense_results,
+                    sparse_results=sparse_results,
+                    entity_candidates=entity_candidates,
+                    fused_results=fused,
+                    chunk_candidates=chunk_candidates,
+                    merged_candidates=merged_candidates,
+                    reranked_candidates=reranked_candidates,
+                    packed_context=packed_context,
+                    rerank_trace=rerank_trace,
+                    context_max_items=context_max_items,
+                    context_max_chars=context_max_chars,
+                    warnings=warnings,
+                    concept_matcher=diagnostic_concept_matcher,
+                ).model_dump(mode="json")
+            except Exception as exc:
+                warning = f"Evaluation retrieval diagnostics unavailable: {sanitize_fallback_reason(exc)}"
+                warnings.append(warning)
+                logger.warning(warning)
 
         return RetrievalResult(
             vector_contexts=top_chunks,
@@ -631,6 +664,7 @@ class HybridRetriever:
                 "retrieval_trace": trace.model_dump(mode="json"),
                 "rerank_trace": rerank_trace.model_dump(mode="json"),
                 "packed_context": packed_context.model_dump(mode="json"),
+                "retrieval_diagnostics": retrieval_diagnostics,
             },
         )
     # ------------------------------------------------------------------

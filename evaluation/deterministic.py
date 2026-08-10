@@ -21,6 +21,10 @@ from .release_contract import (
     build_medical_release_contract,
     default_quality_targets,
 )
+from .retrieval_diagnostics import (
+    build_case_retrieval_diagnostics,
+    summarize_retrieval_diagnostics,
+)
 from .validators import normalize
 
 
@@ -575,6 +579,11 @@ def deterministic_result(raw: dict[str, Any], case: dict[str, Any], live_provide
         failures.append("source_traceability")
     result_row["failure_reasons"] = failures
     result_row.update(apply_failure_metadata(result_row))
+    result_row["retrieval_diagnostics"] = build_case_retrieval_diagnostics(
+        result=result,
+        case=case,
+        concept_matcher=contains_concept,
+    )
     scored = [
         100.0 if result_row[key] else 0.0
         for key in ("ok", "answer_nonempty", "provider_provenance_ok", "behavior_match", "format_pass")
@@ -638,13 +647,15 @@ def summarize_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     """Return all V3 deterministic metrics with explicit denominators."""
 
     latencies = [float(row["latency_ms"]) for row in results if isinstance(row.get("latency_ms"), (int, float))]
+    legacy_context_evidence_retention = _rate(results, "source_hit")
+    legacy_context_evidence_retention["semantics"] = "legacy_source_hit_proxy_v3"
     retrieval = {
         "source_hit_rate": _rate(results, "source_hit"),
         "entity_hit_rate": _rate(results, "entity_preservation"),
         "alias_resolution_accuracy": _rate([row for row in results if row["category"] == "product_entity_alias"], "entity_preservation"),
         "graph_relation_hit_rate": _rate([row for row in results if row["category"] == "entity_graph_relation"], "concept_recall", true_when=100.0),
         "source_traceability_validity": _rate(results, "source_traceability_valid"),
-        "context_evidence_retention": _rate(results, "source_hit"),
+        "context_evidence_retention": legacy_context_evidence_retention,
     }
     answer = {
         "concept_recall": {"value": _mean(results, "concept_recall"), "denominator": sum(row.get("concept_recall") is not None for row in results)},
@@ -745,6 +756,7 @@ def summarize_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         quality_targets=quality_targets,
         deterministic_pass_rate=_rate(results, "deterministic_pass")["value"],
     )
+    diagnostic_summary = summarize_retrieval_diagnostics(results)
     return {
         "reliability": reliability,
         "retrieval_and_grounding": retrieval,
@@ -760,6 +772,7 @@ def summarize_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
         "critical_forbidden_claim_count": critical_forbidden,
         "critical_unsupported_claim_count": critical_unsupported,
         "severity_summary": severity_summary,
+        "retrieval_diagnostics": diagnostic_summary,
         "hard_gates": release_contract["hard_gates"],
         "hard_gate_status": release_contract["hard_gate_status"],
         "hard_gates_passed": release_contract["hard_gates_passed"],

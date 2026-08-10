@@ -14,6 +14,7 @@ from src.resilience.budget import DeadlineBudget
 from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilience_settings_from_env
 from src.resilience.exceptions import ProviderUnavailableError, RuntimeResilienceError
 from src.quality.safe_fallback import sanitize_fallback_reason
+from src.retrieval.diagnostics import build_prompt_evidence_trace
 
 logger = logging.getLogger(__name__)
 
@@ -351,6 +352,25 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             graph_facts=graph_facts,
             limit=10,
         )
+        prompt_evidence_trace = None
+        retrieval_diagnostics = state.get("retrieval_diagnostics")
+        expected_concepts = state.get("evaluation_expected_concepts") or []
+        concept_matcher = state.get("evaluation_concept_matcher")
+        if (
+            state.get("evaluation_mode")
+            and isinstance(retrieval_diagnostics, dict)
+            and expected_concepts
+            and callable(concept_matcher)
+        ):
+            prompt_evidence_trace = build_prompt_evidence_trace(
+                expected_concepts=list(expected_concepts),
+                contexts=answer_contexts,
+                concept_matcher=concept_matcher,
+            ).model_dump(mode="json")
+            retrieval_diagnostics = {
+                **retrieval_diagnostics,
+                "prompt_evidence_trace": prompt_evidence_trace,
+            }
         
         prompt_started = time.perf_counter()
         prompt = build_medical_prompt(
@@ -410,6 +430,8 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "fallback_reason": response_data.get("fallback_reason"),
             "fallback_chain": response_data.get("fallback_chain"),
             "graph_relation_found": bool(prompt_graph_facts),
+            "retrieval_diagnostics": retrieval_diagnostics,
+            "prompt_evidence_trace": prompt_evidence_trace,
             "runtime_resilience": {
                 **(state.get("runtime_resilience") or {}),
                 "llm": response_data.get("resilience"),

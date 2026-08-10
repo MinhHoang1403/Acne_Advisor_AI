@@ -138,6 +138,9 @@ async def run_clinical_agent(
     allow_model_fallback: bool = True,
     bypass_cache: bool = False,
     evaluation_mode: bool = False,
+    evaluation_expected_concepts: list[str] | None = None,
+    evaluation_critical_case: bool = False,
+    evaluation_concept_matcher: Any = None,
 ) -> dict[str, Any]:
     """
     Entrypoint to run the agent with a user message.
@@ -184,6 +187,8 @@ async def run_clinical_agent(
         "retrieval_error": None,
         "retrieval_trace": None,
         "packed_context": None,
+        "retrieval_diagnostics": None,
+        "prompt_evidence_trace": None,
         "pipeline_manifest": pipeline_manifest,
         "pipeline_fingerprint": pipeline_fingerprint,
         "observability_exported": None,
@@ -234,6 +239,9 @@ async def run_clinical_agent(
         "fallback_chain": None,
         "bypass_cache": bypass_cache,
         "evaluation_mode": evaluation_mode,
+        "evaluation_expected_concepts": list(evaluation_expected_concepts or []),
+        "evaluation_critical_case": evaluation_critical_case,
+        "evaluation_concept_matcher": evaluation_concept_matcher,
     }
     
     # Invoke the graph asynchronously
@@ -265,6 +273,8 @@ async def run_clinical_agent(
         "retrieval_error": final_state.get("retrieval_error"),
         "retrieval_trace": final_state.get("retrieval_trace"),
         "packed_context": final_state.get("packed_context"),
+        "retrieval_diagnostics": final_state.get("retrieval_diagnostics"),
+        "prompt_evidence_trace": final_state.get("prompt_evidence_trace"),
         "pipeline_manifest": final_state.get("pipeline_manifest"),
         "pipeline_fingerprint": final_state.get("pipeline_fingerprint"),
         "observability_exported": final_state.get("observability_exported"),
