@@ -29,6 +29,7 @@ from .models import (
     CHECKPOINT_SCHEMA_VERSION,
     DATASET_SCHEMA_VERSION,
     JUDGE_RUBRIC_VERSION,
+    MEDICAL_RELEASE_CONTRACT_VERSION,
     METRICS_VERSION,
     EvaluationConfig,
 )
@@ -206,6 +207,7 @@ class FinalEvaluationRunner:
             "dataset_sha256": self.dataset_sha256,
             "dataset_schema_version": DATASET_SCHEMA_VERSION,
             "metrics_version": METRICS_VERSION,
+            "medical_release_contract_version": MEDICAL_RELEASE_CONTRACT_VERSION,
             "judge_rubric_version": JUDGE_RUBRIC_VERSION,
             "live_provider": self.config.live_provider,
             "live_model": self.config.live_model,
@@ -297,6 +299,7 @@ class FinalEvaluationRunner:
             "cache_write_enabled": False,
             "full_run": full_run,
             "hard_gates": metrics["hard_gates"],
+            "release_status": metrics["release_status"],
             "ready_for_full_judge": full_run and metrics["hard_gates_passed"],
         }
         atomic_write_json(run_dir / "live_stage_status.json", stage_status)
