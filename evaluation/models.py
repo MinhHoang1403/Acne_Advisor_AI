@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ DATASET_SCHEMA_VERSION = "evaluation_case_v3"
 METRICS_VERSION = "evaluation_metrics_v4"
 JUDGE_RUBRIC_VERSION = "route_aware_gemini_v3"
 CHECKPOINT_SCHEMA_VERSION = "evaluation_checkpoint_v2"
+MEDICAL_RELEASE_CONTRACT_VERSION = "medical_release_contract_v1"
 JUDGE_SCORE_DELTA_MAX = 25.0
 FINAL_REPORT_NAME = "BAO_CAO_DANH_GIA_HE_THONG_V3.md"
 
@@ -46,6 +48,76 @@ ACCEPTABLE_ORIGINS = {
     "emergency_response",
 }
 SAFETY_LEVELS = {"normal", "caution", "urgent", "emergency", "out_of_domain"}
+
+
+class FailureSeverity(str, Enum):
+    """Deterministic medical-release severity levels for evaluation findings."""
+
+    S0 = "S0"
+    S1 = "S1"
+    S2 = "S2"
+    S3 = "S3"
+    S4 = "S4"
+
+
+class FailureCategory(str, Enum):
+    """Machine-readable classes for deterministic evaluation findings."""
+
+    FORMAT = "FORMAT"
+    INSTRUCTION = "INSTRUCTION"
+    MINOR_OMISSION = "MINOR_OMISSION"
+    MEDICAL_OMISSION = "MEDICAL_OMISSION"
+    UNSUPPORTED_CLAIM = "UNSUPPORTED_CLAIM"
+    UNSAFE_ADVICE = "UNSAFE_ADVICE"
+    EMERGENCY = "EMERGENCY"
+    PREGNANCY_LACTATION = "PREGNANCY_LACTATION"
+    ANTIBIOTIC_STEWARDSHIP = "ANTIBIOTIC_STEWARDSHIP"
+    ADVERSE_REACTION = "ADVERSE_REACTION"
+    OUT_OF_DOMAIN = "OUT_OF_DOMAIN"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    FORBIDDEN_CLAIM = "FORBIDDEN_CLAIM"
+    CITATION_SOURCE = "CITATION_SOURCE"
+    ENTITY_PRESERVATION = "ENTITY_PRESERVATION"
+    OTHER = "OTHER"
+
+
+class ReleaseStatus(str, Enum):
+    """Internal status for medical evaluation artifacts, not a clinical claim."""
+
+    PASS = "PASS"
+    PASS_WITH_QUALITY_LIMITATIONS = "PASS_WITH_QUALITY_LIMITATIONS"
+    FAIL = "FAIL"
+
+
+SEVERITY_ORDER = (
+    FailureSeverity.S0,
+    FailureSeverity.S1,
+    FailureSeverity.S2,
+    FailureSeverity.S3,
+    FailureSeverity.S4,
+)
+
+
+@dataclass(frozen=True)
+class EvaluationFailure:
+    """One deterministic evaluation finding with stable JSON representation."""
+
+    metric: str
+    category: FailureCategory
+    severity: FailureSeverity
+    critical_failure: bool
+    message: str
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "metric": self.metric,
+            "category": self.category.value,
+            "severity": self.severity.value,
+            "critical_failure": self.critical_failure,
+            "message": self.message,
+            "evidence": self.evidence,
+        }
 
 
 @dataclass(frozen=True)
@@ -87,6 +159,7 @@ class EvaluationConfig:
         return {
             "dataset_schema_version": DATASET_SCHEMA_VERSION,
             "metrics_version": METRICS_VERSION,
+            "medical_release_contract_version": MEDICAL_RELEASE_CONTRACT_VERSION,
             "judge_rubric_version": JUDGE_RUBRIC_VERSION,
             "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
             "live_provider": self.live_provider,
