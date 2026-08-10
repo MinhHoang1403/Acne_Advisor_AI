@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 from src.agent.graph import run_clinical_agent
 
+from .deterministic import contains_concept
 from .models import EvaluationConfig
 
 
@@ -37,6 +38,9 @@ async def run_live_case_async(case: dict[str, Any], config: EvaluationConfig) ->
             allow_model_fallback=False,
             bypass_cache=True,
             evaluation_mode=True,
+            evaluation_expected_concepts=list(case.get("expected_concepts") or []),
+            evaluation_critical_case=bool(case.get("critical_case")),
+            evaluation_concept_matcher=contains_concept,
         )
         return {
             "case_id": case["id"],

@@ -58,6 +58,7 @@ nosetests.xml
 
 # Type checking
 .mypy_cache/
+.ruff_cache/
 .dmypy.json
 dmypy.json
 .pytype/
@@ -149,6 +150,10 @@ reports/evaluation/
 # Local thesis/report artifacts
 /output/
 /FINAL_KL_Acne_Rag.docx
+/.audit_work/
+~$*.docx
+~$*.xlsx
+~$*.pptx
 
 # ---------------------------------------------------------------------------
 # IDE / Editor
@@ -178,6 +183,9 @@ ehthumbs.db
 # Misc
 # ---------------------------------------------------------------------------
 *.bak
+*.old
+*.orig
+*.rej
 *.tmp
 *.temp
 .cache/

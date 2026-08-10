@@ -43,6 +43,8 @@ class ClinicalState(TypedDict):
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
     packed_context: dict[str, Any] | None
+    retrieval_diagnostics: dict[str, Any] | None
+    prompt_evidence_trace: dict[str, Any] | None
     pipeline_manifest: dict[str, Any] | None
     pipeline_fingerprint: str | None
     observability_exported: bool | None
@@ -103,3 +105,6 @@ class ClinicalState(TypedDict):
     # Internal-only execution mode used by the local evaluation runner. It is
     # intentionally not exposed by the public API contract.
     evaluation_mode: bool
+    evaluation_expected_concepts: list[str]
+    evaluation_critical_case: bool
+    evaluation_concept_matcher: Any

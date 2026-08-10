@@ -13,6 +13,7 @@ METRICS_VERSION = "evaluation_metrics_v4"
 JUDGE_RUBRIC_VERSION = "route_aware_gemini_v3"
 CHECKPOINT_SCHEMA_VERSION = "evaluation_checkpoint_v2"
 MEDICAL_RELEASE_CONTRACT_VERSION = "medical_release_contract_v1"
+RETRIEVAL_DIAGNOSTICS_VERSION = "retrieval_diagnostics_v1"
 JUDGE_SCORE_DELTA_MAX = 25.0
 FINAL_REPORT_NAME = "BAO_CAO_DANH_GIA_HE_THONG_V3.md"
 
@@ -160,6 +161,7 @@ class EvaluationConfig:
             "dataset_schema_version": DATASET_SCHEMA_VERSION,
             "metrics_version": METRICS_VERSION,
             "medical_release_contract_version": MEDICAL_RELEASE_CONTRACT_VERSION,
+            "retrieval_diagnostics_version": RETRIEVAL_DIAGNOSTICS_VERSION,
             "judge_rubric_version": JUDGE_RUBRIC_VERSION,
             "checkpoint_schema_version": CHECKPOINT_SCHEMA_VERSION,
             "live_provider": self.live_provider,

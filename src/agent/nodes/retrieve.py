@@ -557,6 +557,7 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "graph_relation_found": False,
             "sources": [],
             "source_allowlist": [],
+            "retrieval_diagnostics": None,
             "retrieval_status": "empty_query",
             "retrieval_error": None,
         }
@@ -570,8 +571,20 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
         timeout_seconds = budget.cap_timeout(settings.retrieval_timeout_seconds)
         if timeout_seconds <= 0:
             raise StageTimeoutError("No remaining deadline budget for retrieval.")
+        retrieve_kwargs: dict[str, object] = {"top_k": 5}
+        expected_concepts = state.get("evaluation_expected_concepts") or []
+        concept_matcher = state.get("evaluation_concept_matcher")
+        if state.get("evaluation_mode") and expected_concepts and callable(concept_matcher):
+            retrieve_kwargs.update(
+                {
+                    "diagnostic_expected_concepts": list(expected_concepts),
+                    "diagnostic_original_query": str(state.get("user_question") or query),
+                    "diagnostic_concept_matcher": concept_matcher,
+                    "diagnostic_critical": bool(state.get("evaluation_critical_case")),
+                }
+            )
         async with asyncio.timeout(timeout_seconds):
-            result = await retriever.retrieve(query, top_k=5)
+            result = await retriever.retrieve(query, **retrieve_kwargs)
         payload = {
             "vector_contexts": result.vector_contexts,
             "graph_facts": result.graph_facts,
@@ -584,6 +597,7 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "source_allowlist": build_source_allowlist(result.sources, result.vector_contexts),
             "retrieval_trace": result.metadata.get("retrieval_trace"),
             "packed_context": result.metadata.get("packed_context"),
+            "retrieval_diagnostics": result.metadata.get("retrieval_diagnostics"),
             "retrieval_error": None,
             "performance_timings": {
                 **(state.get("performance_timings") or {}),
@@ -617,6 +631,7 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "source_allowlist": [],
             "retrieval_trace": None,
             "packed_context": None,
+            "retrieval_diagnostics": None,
             "retrieval_status": "recoverable_error",
             "retrieval_error": safe_error,
             "errors": state.get("errors", []) + [f"Retrieval failed: {safe_error}"],

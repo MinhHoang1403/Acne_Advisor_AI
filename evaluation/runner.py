@@ -31,8 +31,10 @@ from .models import (
     JUDGE_RUBRIC_VERSION,
     MEDICAL_RELEASE_CONTRACT_VERSION,
     METRICS_VERSION,
+    RETRIEVAL_DIAGNOSTICS_VERSION,
     EvaluationConfig,
 )
+from .retrieval_diagnostics import write_retrieval_diagnostic_report
 from .plots import create_plots
 from .report_vi import render_report
 from .validators import load_cases, sha256_file, validate_cases
@@ -208,6 +210,7 @@ class FinalEvaluationRunner:
             "dataset_schema_version": DATASET_SCHEMA_VERSION,
             "metrics_version": METRICS_VERSION,
             "medical_release_contract_version": MEDICAL_RELEASE_CONTRACT_VERSION,
+            "retrieval_diagnostics_version": RETRIEVAL_DIAGNOSTICS_VERSION,
             "judge_rubric_version": JUDGE_RUBRIC_VERSION,
             "live_provider": self.config.live_provider,
             "live_model": self.config.live_model,
@@ -286,7 +289,9 @@ class FinalEvaluationRunner:
         atomic_write_json(run_dir / "safety_metrics.json", metrics["safety_and_scope"])
         atomic_write_json(run_dir / "performance_metrics.json", metrics["performance"])
         atomic_write_json(run_dir / "naturalness_metrics.json", metrics["naturalness_user_experience"])
+        atomic_write_json(run_dir / "retrieval_diagnostics.json", metrics["retrieval_diagnostics"])
         atomic_write_json(run_dir / "summary_metrics.json", metrics)
+        write_retrieval_diagnostic_report(run_dir / "RETRIEVAL_DIAGNOSTICS.md", metrics["retrieval_diagnostics"], results)
         atomic_write_json(run_dir / "component_checks.json", checks)
         full_run = len(cases) == 300
         stage_status = {
