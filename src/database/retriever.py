@@ -33,7 +33,7 @@ from src.retrieval.contracts import RerankTrace, RetrievalTrace
 from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
 from src.retrieval.diagnostics import ConceptMatcher, build_retrieval_diagnostic_trace
 from src.retrieval.entity_retriever import EntityRetriever
-from src.retrieval.metadata_boost import boost_chunk_results
+from src.retrieval.metadata_boost import annotate_chunk_results, boost_chunk_results
 from src.retrieval.query_expansion import expand_normalized_query
 from src.retrieval.query_normalization import normalize_query
 from src.retrieval.reranker import (
@@ -234,6 +234,54 @@ def apply_metadata_boost(
     return boosted
 
 
+def annotate_metadata_matches(
+    results: list[dict[str, Any]],
+    query_metadata: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Attach query metadata matches while preserving knowledge RRF ranking.
+
+    This is the V5 R3 path. It deliberately does not calculate or apply an
+    additive metadata score; metadata remains a feature for later stages.
+    """
+
+    annotated: list[dict[str, Any]] = []
+    for result in results:
+        entry = dict(result)
+        rrf_score = float(entry.get("rrf_score", entry.get("score", 0.0)) or 0.0)
+        matched_fields: list[str] = []
+        for field_name in _BOOST_FIELDS:
+            query_values = query_metadata.get(field_name, [])
+            doc_values = entry.get(field_name, [])
+            if not query_values or not isinstance(doc_values, list):
+                continue
+            if set(query_values) & set(doc_values):
+                matched_fields.append(field_name)
+
+        entry["score"] = round(rrf_score, 6)
+        entry["original_score"] = round(rrf_score, 6)
+        entry["matched_metadata_fields"] = matched_fields
+        entry["metadata_annotation_only"] = True
+        annotated.append(entry)
+
+    annotated.sort(
+        key=lambda item: (
+            -float(item.get("rrf_score", item.get("score", 0.0)) or 0.0),
+            _rank_or_max(item.get("dense_rank")),
+            _rank_or_max(item.get("sparse_rank")),
+            str(item.get("id") or item.get("chunk_id") or ""),
+        )
+    )
+    return annotated
+
+
+def _rank_or_max(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 10**9
+    return parsed if parsed > 0 else 10**9
+
+
 # ---------------------------------------------------------------------------
 # Result data class
 # ---------------------------------------------------------------------------
@@ -411,26 +459,36 @@ class HybridRetriever:
             len(fused),
         )
 
-        # ── Step 4.5: Query-Adaptive Metadata Boost (Phase 1.5) ──────
+        # ── Step 4.5: Legacy boost or V5 metadata annotation ────────
         t_boost_start = time.time()
         query_metadata = extract_query_dermatology_metadata(query)
-        boosted = apply_metadata_boost(fused, query_metadata)
-
-        chunk_candidates = boost_chunk_results(
-            boosted,
-            normalized_query=normalized_query,
-            collection_name=self._vector_store._collection,
-        )
+        metadata_mode = "legacy_additive"
+        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+            metadata_mode = "annotation_first"
+            annotated = annotate_metadata_matches(fused, query_metadata)
+            chunk_candidates = annotate_chunk_results(
+                annotated,
+                normalized_query=normalized_query,
+                collection_name=self._vector_store._collection,
+            )
+        else:
+            boosted = apply_metadata_boost(fused, query_metadata)
+            chunk_candidates = boost_chunk_results(
+                boosted,
+                normalized_query=normalized_query,
+                collection_name=self._vector_store._collection,
+            )
         t_boost = time.time() - t_boost_start
 
-        boost_count = sum(
+        metadata_match_count = sum(
             1
             for candidate in chunk_candidates
-            if candidate.debug.get("metadata_boost", 0.0)
+            if candidate.matched_metadata
         )
         logger.info(
-            "Metadata boost: %d/%d results boosted in %.4fs",
-            boost_count,
+            "Metadata %s: %d/%d candidates annotated in %.4fs",
+            metadata_mode,
+            metadata_match_count,
             len(chunk_candidates),
             t_boost,
         )
@@ -677,7 +735,9 @@ class HybridRetriever:
                 "dense_count": len(dense_results),
                 "sparse_count": len(sparse_results),
                 "fused_count": len(fused),
-                "boosted_count": boost_count,
+                "boosted_count": metadata_match_count if metadata_mode == "legacy_additive" else 0,
+                "metadata_annotation_count": metadata_match_count,
+                "metadata_mode": metadata_mode,
                 "entity_count": len(entity_candidates),
                     "merged_count": len(reranker_input_candidates),
                 "reranked_count": len(reranked_candidates),

@@ -86,6 +86,50 @@ def boost_chunk_results(
     ]
 
 
+def annotate_chunk_results(
+    chunks: list[dict[str, Any]],
+    normalized_query: NormalizedQuery,
+    collection_name: str | None = None,
+) -> list[RetrievedCandidate]:
+    """Build V5 chunk candidates without letting metadata change RRF order.
+
+    Metadata matches are preserved for downstream inspection and later reranker
+    features. The RRF score remains the primary score, with deterministic
+    upstream-rank and candidate-ID tie breaks.
+    """
+
+    collection = collection_name or os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
+    candidates: list[RetrievedCandidate] = []
+    for index, chunk in enumerate(chunks):
+        base_score = float(chunk.get("rrf_score", chunk.get("score", 0.0)) or 0.0)
+        matched = match_payload_metadata(chunk, normalized_query)
+        candidate = RetrievedCandidate(
+            candidate_id=_chunk_candidate_id(chunk),
+            source="chunk",
+            collection=collection,
+            text=str(chunk.get("text") or chunk.get("content") or ""),
+            score=round(base_score, 6),
+            fused_score=round(base_score, 6),
+            payload=dict(chunk),
+            matched_metadata=matched,
+            rank=index + 1,
+            debug={
+                "dense_rank": chunk.get("dense_rank"),
+                "sparse_rank": chunk.get("sparse_rank"),
+                "rrf_score": chunk.get("rrf_score", base_score),
+                "base_score": base_score,
+                "metadata_annotation_only": True,
+            },
+        )
+        candidates.append(candidate)
+
+    candidates.sort(key=_annotation_sort_key)
+    return [
+        candidate.model_copy(update={"rank": index + 1})
+        for index, candidate in enumerate(candidates)
+    ]
+
+
 def match_payload_metadata(
     payload: dict[str, Any],
     normalized_query: NormalizedQuery,
@@ -144,8 +188,28 @@ def _chunk_candidate_id(chunk: dict[str, Any]) -> str:
     return f"chunk:{digest}"
 
 
+def _annotation_sort_key(candidate: RetrievedCandidate) -> tuple[float, int, int, str]:
+    """Keep RRF primary ordering with deterministic upstream tie breaks."""
+
+    return (
+        -float(candidate.score or 0.0),
+        _rank_or_max(candidate.debug.get("dense_rank")),
+        _rank_or_max(candidate.debug.get("sparse_rank")),
+        candidate.candidate_id,
+    )
+
+
+def _rank_or_max(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 10**9
+    return parsed if parsed > 0 else 10**9
+
+
 __all__ = [
     "FIELD_WEIGHTS",
+    "annotate_chunk_results",
     "boost_chunk_results",
     "match_payload_metadata",
     "score_candidate_with_metadata",

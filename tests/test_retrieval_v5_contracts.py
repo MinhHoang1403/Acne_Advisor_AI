@@ -14,6 +14,7 @@ from src.retrieval.v5_compat import (
     compare_v4_to_v5_shadow,
     query_context_from_legacy,
     retrieval_pipeline_selection_from_env,
+    retrieval_v5_config_version_from_env,
 )
 from src.retrieval.v5_contracts import (
     CandidateObservationV5,
@@ -197,3 +198,11 @@ def test_pipeline_selection_keeps_v4_default_and_enables_explicit_v5(
     assert requested_v5.warning_code is None
     assert invalid.execution == RetrievalPipelineVersion.V4
     assert invalid.warning_code == "INVALID_RETRIEVAL_PIPELINE_VERSION"
+
+
+def test_v5_config_version_can_be_overridden_without_changing_selector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RETRIEVAL_V5_CONFIG_VERSION", "retrieval_v5_test_contract")
+
+    assert retrieval_v5_config_version_from_env() == "retrieval_v5_test_contract"

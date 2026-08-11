@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 RETRIEVAL_V5_CONTRACT_VERSION = "retrieval_v5_contracts_v1"
+RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_metadata_annotation_v1"
 TRACE_EVENT_LIMIT = 64
 TRACE_CANDIDATE_LIMIT = 256
 
@@ -35,6 +36,7 @@ class RetrievalStageV5(str, Enum):
     ENTITY_RESOLUTION = "ENTITY_RESOLUTION"
     KNOWLEDGE_FUSION = "KNOWLEDGE_FUSION"
     LEGACY_METADATA = "LEGACY_METADATA"
+    METADATA_ANNOTATION = "METADATA_ANNOTATION"
     SOURCE_EVIDENCE_POOL = "SOURCE_EVIDENCE_POOL"
     LEGACY_CANDIDATE_MERGE = "LEGACY_CANDIDATE_MERGE"
     RERANK = "RERANK"
@@ -332,6 +334,7 @@ __all__ = [
     "QueryContextV5",
     "QueryObservationV5",
     "RETRIEVAL_V5_CONTRACT_VERSION",
+    "RETRIEVAL_V5_CONFIG_VERSION",
     "RankedEvidenceV5",
     "RetrievalPipelineVersion",
     "RetrievalStageEventV5",

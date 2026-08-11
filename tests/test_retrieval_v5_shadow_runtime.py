@@ -150,6 +150,8 @@ async def test_explicit_v5_uses_source_evidence_pool_and_entity_graph_seeds(
     assert shadow["graph_seed_names"] == ["adapalene"]
     assert graph_store.entity_lookups == [["adapalene"]]
     trace_events = shadow["trace"]["events"]
+    assert "METADATA_ANNOTATION" in [event["stage"] for event in trace_events]
+    assert "LEGACY_METADATA" not in [event["stage"] for event in trace_events]
     assert all(
         not candidate["legacy_compat_only"]
         for event in trace_events

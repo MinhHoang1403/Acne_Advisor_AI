@@ -25,6 +25,7 @@ from src.retrieval.v5_contracts import (
     RetrievalStageEventV5,
     RetrievalStageV5,
     RetrievalTraceV5,
+    RETRIEVAL_V5_CONFIG_VERSION,
     ScoreNamespaceV5,
     ShadowComparisonV5,
     ShadowStageComparisonV5,
@@ -37,7 +38,7 @@ from src.retrieval.v5_signals import (
 
 
 DEFAULT_RETRIEVAL_PIPELINE_VERSION = RetrievalPipelineVersion.V4
-V5_CONFIG_FINGERPRINT = "retrieval_v5_entity_graph_signals_v1"
+V5_CONFIG_FINGERPRINT = RETRIEVAL_V5_CONFIG_VERSION
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,15 @@ def retrieval_pipeline_selection_from_env() -> RetrievalPipelineSelection:
     )
 
 
+def retrieval_v5_config_version_from_env() -> str:
+    """Resolve the V5 semantic contract version for trace and cache identity."""
+
+    return (
+        os.getenv("RETRIEVAL_V5_CONFIG_VERSION", V5_CONFIG_FINGERPRINT).strip()
+        or V5_CONFIG_FINGERPRINT
+    )
+
+
 def build_v5_shadow_trace(
     *,
     original_query: str,
@@ -109,7 +119,7 @@ def build_v5_shadow_trace(
     trace = RetrievalTraceV5(
         trace_id=_sha256(f"{query_context.query_id}:{query_context.intent}"),
         pipeline_version=selection.requested,
-        config_fingerprint=V5_CONFIG_FINGERPRINT,
+        config_fingerprint=retrieval_v5_config_version_from_env(),
         query_hash=_sha256(query_context.original_query),
         query_observation=QueryObservationV5(
             intent=query_context.intent,
@@ -163,9 +173,14 @@ def build_v5_shadow_trace(
             fused_results,
         )
     )
+    metadata_stage = (
+        RetrievalStageV5.METADATA_ANNOTATION
+        if selection.execution == RetrievalPipelineVersion.V5
+        else RetrievalStageV5.LEGACY_METADATA
+    )
     trace = trace.append_event(
         RetrievalStageEventV5(
-            stage=RetrievalStageV5.LEGACY_METADATA,
+            stage=metadata_stage,
             candidates=tuple(_candidate_observation(candidate) for candidate in chunk_candidates),
             elapsed_ms=timings_ms.get("boost"),
         )
@@ -464,4 +479,5 @@ __all__ = [
     "compare_v4_to_v5_shadow",
     "query_context_from_legacy",
     "retrieval_pipeline_selection_from_env",
+    "retrieval_v5_config_version_from_env",
 ]

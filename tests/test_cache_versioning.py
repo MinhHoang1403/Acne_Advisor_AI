@@ -55,6 +55,24 @@ def test_retrieval_pipeline_manifest_defaults_to_v4():
     assert manifest["retrieval_pipeline_version"] == "v4"
 
 
+def test_retrieval_v5_config_version_partitions_cache_identity():
+    previous = build_pipeline_version_manifest(
+        {
+            "RETRIEVAL_PIPELINE_VERSION": "v5",
+            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_entity_graph_signals_v1",
+        }
+    )
+    current = build_pipeline_version_manifest(
+        {
+            "RETRIEVAL_PIPELINE_VERSION": "v5",
+            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_metadata_annotation_v1",
+        }
+    )
+
+    assert current["retrieval_v5_config_version"] == "retrieval_v5_metadata_annotation_v1"
+    assert compute_pipeline_fingerprint(previous) != compute_pipeline_fingerprint(current)
+
+
 def test_answer_verifier_version_is_in_manifest_and_changes_fingerprint():
     old_manifest = build_pipeline_version_manifest(
         {
