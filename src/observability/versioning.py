@@ -7,6 +7,8 @@ import json
 import os
 from typing import Any, Mapping
 
+from src.retrieval.v5_contracts import RETRIEVAL_V5_CONFIG_VERSION
+
 
 DEFAULT_ANSWER_CACHE_VERSION = "v5"
 DEFAULT_RERANKER_VERSION = "reranker_pipeline_v2"
@@ -62,6 +64,9 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "phase": "phase2e",
         "retrieval_pipeline_version": _effective_retrieval_pipeline_version(
             value("RETRIEVAL_PIPELINE_VERSION", "v4")
+        ),
+        "retrieval_v5_config_version": _effective_retrieval_v5_config_version(
+            value("RETRIEVAL_V5_CONFIG_VERSION", RETRIEVAL_V5_CONFIG_VERSION)
         ),
         "context_packer_version": value("CONTEXT_PACKER_VERSION", "context_packer_v3"),
         "reranker_version": value("RERANKER_VERSION", DEFAULT_RERANKER_VERSION),
@@ -195,6 +200,7 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
     summary_keys = [
         "phase",
         "retrieval_pipeline_version",
+        "retrieval_v5_config_version",
         "context_packer_version",
         "reranker_version",
         "answer_verifier_version",
@@ -264,6 +270,12 @@ def _effective_retrieval_pipeline_version(configured: Any) -> str:
     if text in {"v4", "v5_shadow", "v5"}:
         return text
     return "v4"
+
+
+def _effective_retrieval_v5_config_version(configured: Any) -> str:
+    """Keep the V5 cache namespace versioned when semantic contracts change."""
+
+    return str(configured or "").strip() or RETRIEVAL_V5_CONFIG_VERSION
 
 
 def _effective_answer_formatting_contract_version(configured: Any) -> str:
