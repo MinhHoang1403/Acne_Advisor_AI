@@ -152,7 +152,9 @@ def embed_texts_sync(
         active_client = client or build_google_genai_client(api_key=api_key)
         response = active_client.models.embed_content(
             model=model_name,
-            contents=texts,
+            # google-genai groups a list of consecutive strings into one Content
+            # with multiple Parts. Batch embeddings require one Content per text.
+            contents=[types.Content(parts=[types.Part(text=text)]) for text in texts],
             config=types.EmbedContentConfig(task_type=task_type),
         )
         vectors = extract_embedding_vectors(response, expected_count=len(texts))
