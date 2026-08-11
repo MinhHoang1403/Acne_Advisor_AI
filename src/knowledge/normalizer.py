@@ -17,7 +17,25 @@ from src.knowledge.taxonomy_models import (
 )
 
 
+# This YAML is the only active deterministic taxonomy for runtime normalization,
+# entity cards, and the core Phase 1 graph. ``drug_taxonomy_v2.yaml`` remains a
+# legacy migration catalog and is intentionally not loaded by default.
 DEFAULT_TAXONOMY_PATH = Path(__file__).resolve().parents[2] / "data" / "taxonomy" / "drug_aliases.yaml"
+ACTIVE_TAXONOMY_CONTRACT = "data/taxonomy/drug_aliases.yaml"
+
+CANONICAL_CORPUS_SOURCE_IDS = frozenset(
+    {
+        "acne-vulgaris-management-pdf-66142088866501.pdf",
+        "PIIS0190962223033893.pdf",
+        "qd_4416_cut.pdf",
+        "web_raw_dataset.json",
+    }
+)
+CURATED_TAXONOMY_SOURCE_IDS = frozenset(
+    {
+        "drug_taxonomy_v1:drug_products.dalacin_t",
+    }
+)
 
 SECTION_TO_ENTITY_TYPE: dict[str, EntityType] = {
     "drug_products": "drug_product",
@@ -180,6 +198,21 @@ class DrugEntityNormalizer:
         key = normalize_text_key(mention)
         return self._dedupe_cards(self.alias_index.get(key, []))
 
+    def incompatible_alias_collisions(self) -> dict[str, list[str]]:
+        """Return aliases resolving to more than one runtime entity identity."""
+
+        collisions: dict[str, list[str]] = {}
+        for alias, cards in sorted(self.alias_index.items()):
+            identities = sorted(
+                {
+                    f"{card.entity_type}:{self._canonical_key_for_card(card)}"
+                    for card in cards
+                }
+            )
+            if len(identities) > 1:
+                collisions[alias] = identities
+        return collisions
+
     def expand_query(self, query: str) -> dict[str, Any]:
         direct_cards = self.match_alias(query)
         direct_cards = self._filter_contrast_class_mentions(query, direct_cards)
@@ -304,4 +337,11 @@ class DrugEntityNormalizer:
         return canonical_text_key(card.canonical_name).replace(" ", "_")
 
 
-__all__ = ["DEFAULT_TAXONOMY_PATH", "DrugEntityNormalizer", "normalize_text_key"]
+__all__ = [
+    "ACTIVE_TAXONOMY_CONTRACT",
+    "CANONICAL_CORPUS_SOURCE_IDS",
+    "CURATED_TAXONOMY_SOURCE_IDS",
+    "DEFAULT_TAXONOMY_PATH",
+    "DrugEntityNormalizer",
+    "normalize_text_key",
+]

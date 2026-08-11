@@ -43,7 +43,7 @@ def test_class_contrast_queries_do_not_assign_negative_class():
     bp = normalize_query("Benzoyl peroxide có phải kháng sinh không?")
     assert bp.intent == "class_check"
     assert "benzoyl_peroxide" in bp.active_ingredient
-    assert "benzoyl_peroxide" in bp.drug_class
+    assert "benzoyl_peroxide" not in bp.drug_class
     assert "topical_antibiotic" not in bp.drug_class
 
     adapalene = normalize_query("Adapalene có phải kháng sinh không?")

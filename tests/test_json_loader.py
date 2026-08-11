@@ -77,7 +77,7 @@ def test_json_metadata_enrichment_maps_entities(tmp_path) -> None:
 
     assert "benzoyl_peroxide" in metadata["active_ingredient"]
     assert "adapalene" in metadata["active_ingredient"]
-    assert "benzoyl_peroxide" in metadata["drug_class"]
+    assert "benzoyl_peroxide" not in metadata["drug_class"]
     assert "topical_retinoid" in metadata["drug_class"]
 
 

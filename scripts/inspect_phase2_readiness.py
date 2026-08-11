@@ -56,13 +56,27 @@ REBUILT_NEO4J_LABELS = {
 }
 EXPECTED_NEO4J_RELATIONSHIPS = {
     "BELONGS_TO_CLASS": 11,
+    "CONTRAINDICATED_IN": 0,
     "HAS_ACTIVE_INGREDIENT": 4,
 }
 REBUILT_NEO4J_RELATIONSHIPS = {
     "BELONGS_TO_CLASS": 13,
+    "CONTRAINDICATED_IN": 0,
     "HAS_ACTIVE_INGREDIENT": 5,
 }
-ACCEPTABLE_ENTITY_POINTS = {20, 22}
+EXPANDED_NEO4J_LABELS = {
+    "ActiveIngredient": 15,
+    "Condition": 1,
+    "DrugClass": 8,
+    "DrugProduct": 4,
+    "SafetyContext": 4,
+}
+EXPANDED_NEO4J_RELATIONSHIPS = {
+    "BELONGS_TO_CLASS": 20,
+    "CONTRAINDICATED_IN": 2,
+    "HAS_ACTIVE_INGREDIENT": 5,
+}
+ACCEPTABLE_ENTITY_POINTS = {20, 22, 32}
 
 
 def _check(
@@ -192,7 +206,13 @@ async def inspect_neo4j() -> dict[str, Any]:
             and label_counts == REBUILT_NEO4J_LABELS
             and rel_counts == REBUILT_NEO4J_RELATIONSHIPS
         )
-        passed = baseline_ok or rebuilt_ok
+        expanded_ok = (
+            node_total == 32
+            and rel_total == 27
+            and label_counts == EXPANDED_NEO4J_LABELS
+            and rel_counts == EXPANDED_NEO4J_RELATIONSHIPS
+        )
+        passed = baseline_ok or rebuilt_ok or expanded_ok
         checks.append(
             _check(
                 "neo4j_deterministic_graph",

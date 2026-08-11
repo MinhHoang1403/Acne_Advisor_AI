@@ -21,7 +21,7 @@ def test_enrich_epiduo_metadata() -> None:
     assert "adapalene" in metadata["active_ingredient"]
     assert "benzoyl_peroxide" in metadata["active_ingredient"]
     assert "topical_retinoid" in metadata["drug_class"]
-    assert "benzoyl_peroxide" in metadata["drug_class"]
+    assert "benzoyl_peroxide" not in metadata["drug_class"]
 
 
 def test_enrich_differin_metadata() -> None:

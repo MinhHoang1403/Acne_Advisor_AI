@@ -22,6 +22,10 @@ DEFAULT_TAXONOMY_V2_PATH = Path(__file__).resolve().parents[2] / "data" / "taxon
 ReviewStatus = Literal["draft", "verified", "rejected"]
 SourceType = Literal["pdf", "json", "existing_taxonomy", "manual_review"]
 
+# The active taxonomy deliberately keeps these as ingredients without inventing
+# a self-named DrugClass just to satisfy a graph completeness heuristic.
+ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS = frozenset({"azelaic_acid", "benzoyl_peroxide"})
+
 
 def normalize_taxonomy_name(text: str) -> str:
     """Normalize canonical/display names for deterministic taxonomy IDs."""
@@ -414,7 +418,8 @@ def validate_taxonomy_catalog(catalog: TaxonomyCatalog, *, production_verified_o
                 if class_name not in class_names:
                     product_issues.append(f"{entity.entity_key()}:unknown_class:{class_name}")
         if isinstance(entity, ActiveIngredientEntity):
-            if not entity.drug_classes:
+            canonical_key = normalize_taxonomy_name(entity.canonical_name).replace(" ", "_")
+            if not entity.drug_classes and canonical_key not in ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS:
                 ingredient_issues.append(f"{entity.entity_key()}:missing_class")
             for class_name in entity.drug_classes:
                 if class_name not in class_names:
@@ -520,6 +525,7 @@ __all__ = [
     "DEFAULT_TAXONOMY_V2_PATH",
     "TAXONOMY_SCHEMA_VERSION",
     "ActiveIngredientEntity",
+    "ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS",
     "AllowedAliasCollision",
     "ConditionEntity",
     "DrugClassEntity",

@@ -1,3 +1,4 @@
+# Legacy migration catalog. The active runtime catalog is drug_aliases.yaml.
 taxonomy_version: drug_taxonomy_v2
 entity_schema_version: entity_schema_v2
 taxonomy_schema_version: taxonomy_schema_v2

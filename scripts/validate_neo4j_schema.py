@@ -35,6 +35,7 @@ from src.knowledge.graph_schema import (  # noqa: E402
     CANONICAL_RELATIONSHIP_SCHEMAS,
     LEGACY_GRAPH_PROPERTIES,
 )
+from src.knowledge.taxonomy_models import ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS  # noqa: E402
 
 
 def _check(name: str, passed: bool, details: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -110,10 +111,16 @@ def validate_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         int(snapshot.get("orphan_drug_products", 0) or 0) == 0,
         {"orphan_drug_products": snapshot.get("orphan_drug_products", 0)},
     )
+    classless_actives = list(snapshot.get("active_ingredients_without_class") or [])
+    unexpected_classless = sorted(set(classless_actives) - ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS)
     add(
-        "active_ingredients_have_class",
-        int(snapshot.get("active_ingredients_without_class", 0) or 0) == 0,
-        {"active_ingredients_without_class": snapshot.get("active_ingredients_without_class", 0)},
+        "active_ingredients_have_supported_classification",
+        not unexpected_classless,
+        {
+            "allowed_classless": sorted(ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS),
+            "active_ingredients_without_class": sorted(classless_actives),
+            "unexpected": unexpected_classless,
+        },
     )
 
     invalid_directions = []
@@ -204,9 +211,9 @@ async def collect_neo4j_snapshot() -> dict[str, Any]:
                     session,
                     "MATCH (n:DrugProduct) WHERE NOT (n)-[:HAS_ACTIVE_INGREDIENT]->(:ActiveIngredient) RETURN count(n) AS count",
                 ),
-                "active_ingredients_without_class": await _single_count(
+                "active_ingredients_without_class": await _single_names(
                     session,
-                    "MATCH (n:ActiveIngredient) WHERE NOT (n)-[:BELONGS_TO_CLASS]->(:DrugClass) RETURN count(n) AS count",
+                    "MATCH (n:ActiveIngredient) WHERE NOT (n)-[:BELONGS_TO_CLASS]->(:DrugClass) RETURN n.canonical_name AS canonical_name ORDER BY canonical_name",
                 ),
                 "relationship_directions": await _records(
                     session,
@@ -239,6 +246,13 @@ async def _single_count(session: Any, cypher: str, **params: Any) -> int:
     record = await result.single()
     await result.consume()
     return int(record["count"]) if record else 0
+
+
+async def _single_names(session: Any, cypher: str, **params: Any) -> list[str]:
+    result = await session.run(cypher, **params)
+    names = [str(record["canonical_name"]) async for record in result]
+    await result.consume()
+    return names
 
 
 async def _key_count(session: Any, cypher: str, **params: Any) -> dict[str, int]:
@@ -324,6 +338,7 @@ def offline_snapshot() -> dict[str, Any]:
             "created_by": 1,
             "kb_version": 1,
             "source": 1,
+            "source_ids": 1,
             "taxonomy_version": 1,
         },
         "properties_by_label": {
@@ -332,7 +347,7 @@ def offline_snapshot() -> dict[str, Any]:
         },
         "duplicate_canonical_names": [],
         "orphan_drug_products": 0,
-        "active_ingredients_without_class": 0,
+        "active_ingredients_without_class": sorted(ALLOWED_CLASSLESS_ACTIVE_INGREDIENTS),
         "relationship_directions": [
             {
                 "relationship_type": "HAS_ACTIVE_INGREDIENT",
@@ -344,6 +359,12 @@ def offline_snapshot() -> dict[str, Any]:
                 "relationship_type": "BELONGS_TO_CLASS",
                 "source_labels": ["ActiveIngredient"],
                 "target_labels": ["DrugClass"],
+                "count": 1,
+            },
+            {
+                "relationship_type": "CONTRAINDICATED_IN",
+                "source_labels": ["ActiveIngredient"],
+                "target_labels": ["SafetyContext"],
                 "count": 1,
             },
         ],

@@ -33,7 +33,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 DEFAULT_MANIFEST_PATH = PROJECT_ROOT / "data" / "ingestion_manifest.json"
 EXPECTED_CHUNK_COLLECTION = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge").strip() or "acne_knowledge"
 EXPECTED_ENTITY_COLLECTION = get_entity_collection_name()
-ACCEPTABLE_ENTITY_POINTS = {20, 22}
+ACCEPTABLE_ENTITY_POINTS = {20, 22, 32}
 EXPECTED_MANIFEST_RECORDS = 4
 EXPECTED_NEO4J_LABELS = {
     "ActiveIngredient": 7,
@@ -51,10 +51,24 @@ REBUILT_NEO4J_LABELS = {
 }
 EXPECTED_NEO4J_RELATIONSHIPS = {
     "BELONGS_TO_CLASS": 11,
+    "CONTRAINDICATED_IN": 0,
     "HAS_ACTIVE_INGREDIENT": 4,
 }
 REBUILT_NEO4J_RELATIONSHIPS = {
     "BELONGS_TO_CLASS": 13,
+    "CONTRAINDICATED_IN": 0,
+    "HAS_ACTIVE_INGREDIENT": 5,
+}
+EXPANDED_NEO4J_LABELS = {
+    "ActiveIngredient": 15,
+    "Condition": 1,
+    "DrugClass": 8,
+    "DrugProduct": 4,
+    "SafetyContext": 4,
+}
+EXPANDED_NEO4J_RELATIONSHIPS = {
+    "BELONGS_TO_CLASS": 20,
+    "CONTRAINDICATED_IN": 2,
     "HAS_ACTIVE_INGREDIENT": 5,
 }
 
@@ -236,7 +250,13 @@ async def validate_neo4j(checks: list[dict[str, Any]], errors: list[str]) -> Non
                 and label_counts == REBUILT_NEO4J_LABELS
                 and rel_counts == REBUILT_NEO4J_RELATIONSHIPS
             )
-            passed = baseline_ok or rebuilt_ok
+            expanded_ok = (
+                node_total == 32
+                and rel_total == 27
+                and label_counts == EXPANDED_NEO4J_LABELS
+                and rel_counts == EXPANDED_NEO4J_RELATIONSHIPS
+            )
+            passed = baseline_ok or rebuilt_ok or expanded_ok
             add_check(
                 checks,
                 errors,

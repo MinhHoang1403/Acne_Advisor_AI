@@ -31,12 +31,12 @@ from src.knowledge.entity_index import (  # noqa: E402
     entity_point_id,
     get_entity_collection_name,
 )
-from src.knowledge.taxonomy_models import DEFAULT_TAXONOMY_V2_PATH, load_taxonomy_catalog  # noqa: E402
+from src.knowledge.normalizer import DEFAULT_TAXONOMY_PATH, DrugEntityNormalizer  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plan entity-card index changes without Qdrant writes.")
-    parser.add_argument("--taxonomy-path", default=str(DEFAULT_TAXONOMY_V2_PATH))
+    parser.add_argument("--taxonomy-path", default=str(DEFAULT_TAXONOMY_PATH))
     parser.add_argument("--kb-version", default="acne_kb_v1")
     parser.add_argument(
         "--from-qdrant",
@@ -53,12 +53,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def build_entity_index_update_plan(
     *,
-    taxonomy_path: str | Path = DEFAULT_TAXONOMY_V2_PATH,
+    taxonomy_path: str | Path = DEFAULT_TAXONOMY_PATH,
     kb_version: str = "acne_kb_v1",
     existing_points: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    proposed_catalog = load_taxonomy_catalog(taxonomy_path)
-    proposed_cards = proposed_catalog.to_entity_cards(verified_only=True)
+    proposed_normalizer = DrugEntityNormalizer(taxonomy_path)
+    proposed_cards = build_entity_cards_from_taxonomy(proposed_normalizer)
     proposed_by_identity = {entity_identity_key(card): card for card in proposed_cards}
 
     existing_records = (
@@ -117,15 +117,10 @@ def build_entity_index_update_plan(
             )
 
     delete_candidates = sorted(set(existing_by_identity) - set(proposed_by_identity))
-    draft_skipped = [
-        entity.entity_key()
-        for entity in proposed_catalog.entities
-        if entity.review_status != "verified"
-    ]
     return {
         "mutation_executed": False,
         "apply_blocked": bool(conflicts),
-        "taxonomy_version": proposed_catalog.taxonomy_version,
+        "taxonomy_version": proposed_normalizer.taxonomy_version,
         "current_count": len(existing_records),
         "proposed_verified_count": len(proposed_cards),
         "existing_points_matched": len(reused),
@@ -135,7 +130,7 @@ def build_entity_index_update_plan(
         "new": new,
         "updated": updated,
         "conflicts": conflicts,
-        "draft_skipped": draft_skipped,
+        "draft_skipped": [],
         "delete_candidates": delete_candidates,
         "reused_point_ids": reused,
         "preview_payloads": preview_payloads,
@@ -144,7 +139,7 @@ def build_entity_index_update_plan(
 
 async def build_entity_index_update_plan_from_qdrant(
     *,
-    taxonomy_path: str | Path = DEFAULT_TAXONOMY_V2_PATH,
+    taxonomy_path: str | Path = DEFAULT_TAXONOMY_PATH,
     kb_version: str = "acne_kb_v1",
     collection_name: str | None = None,
 ) -> dict[str, Any]:

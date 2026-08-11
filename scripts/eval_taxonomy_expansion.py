@@ -32,8 +32,6 @@ from src.database.vector_store import qdrant_client_kwargs  # noqa: E402
 from src.knowledge.entity_index import get_entity_collection_name  # noqa: E402
 from src.knowledge.normalizer import DEFAULT_TAXONOMY_PATH, DrugEntityNormalizer  # noqa: E402
 from src.knowledge.taxonomy_models import (  # noqa: E402
-    DEFAULT_TAXONOMY_V2_PATH,
-    load_taxonomy_catalog,
     migrate_v1_taxonomy,
     validate_taxonomy_catalog,
 )
@@ -42,7 +40,11 @@ from src.knowledge.taxonomy_models import (  # noqa: E402
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate taxonomy expansion hardening.")
     parser.add_argument("--mode", choices=["offline", "integration-readonly"], default="offline")
-    parser.add_argument("--taxonomy-path", default=str(DEFAULT_TAXONOMY_V2_PATH))
+    parser.add_argument(
+        "--taxonomy-path",
+        default=str(DEFAULT_TAXONOMY_PATH),
+        help="Runtime taxonomy path. Defaults to the active drug_aliases.yaml catalog.",
+    )
     return parser.parse_args(argv)
 
 
@@ -57,7 +59,11 @@ async def main(argv: list[str] | None = None) -> int:
         if not passed:
             failures.append(name)
 
-    catalog = load_taxonomy_catalog(args.taxonomy_path)
+    runtime_normalizer = DrugEntityNormalizer(args.taxonomy_path)
+    catalog = migrate_v1_taxonomy(
+        runtime_normalizer.taxonomy,
+        source_path=runtime_normalizer.taxonomy_path,
+    )
     validation = validate_taxonomy_catalog(catalog)
     add("taxonomy_validation", validation.passed, validation.model_dump(mode="json"))
     warnings.extend(validation.warnings)
@@ -93,7 +99,7 @@ async def main(argv: list[str] | None = None) -> int:
         qdrant_plan = await build_entity_index_update_plan_from_qdrant(taxonomy_path=args.taxonomy_path)
         add(
             "qdrant_existing_points_reused",
-            qdrant_plan.get("conflicts") == [] and qdrant_plan.get("existing_point_ids_reused") in {20, 22},
+            qdrant_plan.get("conflicts") == [] and qdrant_plan.get("existing_point_ids_reused") in {20, 22, 32},
             _plan_counts(qdrant_plan),
         )
         neo4j_snapshot = await collect_neo4j_snapshot()
@@ -115,7 +121,7 @@ async def main(argv: list[str] | None = None) -> int:
     report = {
         "passed": not failures,
         "mode": args.mode,
-        "taxonomy_version": catalog.taxonomy_version,
+        "taxonomy_version": runtime_normalizer.taxonomy_version,
         "entity_counts": catalog.entity_counts(),
         "candidate_counts": {"verified_additions": len(qdrant_plan.get("new", []))},
         "planned_changes": {
