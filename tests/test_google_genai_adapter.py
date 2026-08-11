@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from google.genai import errors
+from google.genai import errors, types
 
 from src.agent.llm import provider as llm_provider
 from src.integrations import google_genai
@@ -117,8 +117,98 @@ def test_embed_texts_sync_extracts_and_validates_3072_vectors() -> None:
     assert len(vectors) == 2
     assert vectors[0] == vector
     assert capture["model"] == "models/gemini-embedding-2"
-    assert capture["contents"] == ["a", "b"]
+    assert [content.parts[0].text for content in capture["contents"]] == ["a", "b"]
     assert capture["config"].task_type == "retrieval_document"
+
+
+@pytest.mark.parametrize("input_count", [1, 2, 16])
+def test_embed_texts_sync_uses_one_content_per_input_and_preserves_order(input_count: int) -> None:
+    capture: dict = {}
+    texts = [f"embedding input {index}" for index in range(input_count)]
+    response = types.EmbedContentResponse(
+        embeddings=[
+            types.ContentEmbedding(values=[float(index)] + [0.0] * 3071)
+            for index in range(input_count)
+        ]
+    )
+    client = SimpleNamespace(models=_FakeSyncModels(capture, response))
+
+    vectors = google_genai.embed_texts_sync(
+        texts,
+        model_name="models/gemini-embedding-2",
+        task_type="retrieval_document",
+        expected_dimensions=3072,
+        api_key="test-key",
+        client=client,
+    )
+
+    contents = capture["contents"]
+    assert len(contents) == input_count
+    assert all(isinstance(content, types.Content) for content in contents)
+    assert [content.parts[0].text for content in contents] == texts
+    assert [vector[0] for vector in vectors] == [float(index) for index in range(input_count)]
+    assert all(len(vector) == 3072 for vector in vectors)
+
+
+def test_embedding_extractor_supports_observed_sdk_response_shape() -> None:
+    response = types.EmbedContentResponse(
+        embeddings=[
+            types.ContentEmbedding(values=[float(index)] + [0.0] * 3071)
+            for index in range(16)
+        ]
+    )
+
+    vectors = google_genai.extract_embedding_vectors(response, expected_count=16)
+
+    assert len(vectors) == 16
+    assert [vector[0] for vector in vectors] == [float(index) for index in range(16)]
+    google_genai.validate_embedding_vectors(vectors, expected_dimensions=3072)
+
+
+def test_embedding_extractor_rejects_observed_sdk_response_cardinality_mismatch() -> None:
+    response = types.EmbedContentResponse(
+        embeddings=[types.ContentEmbedding(values=[0.0] * 3072)]
+    )
+
+    with pytest.raises(ValueError, match="got 1, expected 16"):
+        google_genai.extract_embedding_vectors(response, expected_count=16)
+
+
+def test_embed_texts_sync_empty_input_skips_provider_call() -> None:
+    capture: dict = {}
+    client = SimpleNamespace(models=_FakeSyncModels(capture, SimpleNamespace()))
+
+    assert google_genai.embed_texts_sync(
+        [],
+        model_name="models/gemini-embedding-2",
+        task_type="retrieval_document",
+        expected_dimensions=3072,
+        api_key="test-key",
+        client=client,
+    ) == []
+    assert capture == {}
+
+
+def test_entity_embedding_path_delegates_to_the_shared_google_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import build_entity_index
+
+    captured: dict[str, object] = {}
+
+    def fake_embed(texts: list[str], **kwargs: object) -> list[list[float]]:
+        captured["texts"] = texts
+        captured["kwargs"] = kwargs
+        return [[0.0] * 3072 for _ in texts]
+
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    monkeypatch.setattr(build_entity_index, "embed_texts_sync", fake_embed)
+
+    vectors = build_entity_index.embed_entity_texts_sync(["card one", "card two"])
+
+    assert len(vectors) == 2
+    assert captured["texts"] == ["card one", "card two"]
+    assert captured["kwargs"]["expected_dimensions"] == 3072
 
 
 @pytest.mark.parametrize(
