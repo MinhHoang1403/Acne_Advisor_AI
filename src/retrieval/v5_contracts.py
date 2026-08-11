@@ -35,6 +35,7 @@ class RetrievalStageV5(str, Enum):
     ENTITY_RESOLUTION = "ENTITY_RESOLUTION"
     KNOWLEDGE_FUSION = "KNOWLEDGE_FUSION"
     LEGACY_METADATA = "LEGACY_METADATA"
+    SOURCE_EVIDENCE_POOL = "SOURCE_EVIDENCE_POOL"
     LEGACY_CANDIDATE_MERGE = "LEGACY_CANDIDATE_MERGE"
     RERANK = "RERANK"
     PACKER = "PACKER"
@@ -175,6 +176,7 @@ class GraphSignalV5(_FrozenModel):
     target_entity_id: str | None = None
     path_confidence: float | None = None
     source_chunk_ids: tuple[str, ...] = ()
+    medical_claim_eligible: bool = False
 
     @field_validator("path_confidence")
     @classmethod
@@ -285,6 +287,9 @@ class RetrievalTraceV5(_FrozenModel):
     config_fingerprint: str
     query_hash: str
     query_observation: QueryObservationV5 = Field(default_factory=QueryObservationV5)
+    entity_signals: tuple[EntitySignalV5, ...] = ()
+    graph_seed_names: tuple[str, ...] = ()
+    graph_signals: tuple[GraphSignalV5, ...] = ()
     events: tuple[RetrievalStageEventV5, ...] = ()
     shadow_comparison: ShadowComparisonV5 | None = None
 

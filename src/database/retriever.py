@@ -47,6 +47,8 @@ from src.retrieval.v5_compat import (
     compare_v4_to_v5_shadow,
     retrieval_pipeline_selection_from_env,
 )
+from src.retrieval.v5_contracts import RetrievalPipelineVersion, RetrievalStageV5
+from src.retrieval.v5_signals import build_entity_signals, entity_graph_seed_names
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.resilience.contracts import runtime_resilience_settings_from_env
 
@@ -332,6 +334,7 @@ class HybridRetriever:
         """
         t_start = time.time()
         warnings: list[str] = []
+        pipeline_selection = retrieval_pipeline_selection_from_env()
 
         # ── Phase 2A: normalize + taxonomy expansion ────────────────
         t_norm_start = time.time()
@@ -439,6 +442,12 @@ class HybridRetriever:
             normalized_query=normalized_query,
             limit=max(top_k * 2, 8),
         )
+        source_evidence_candidates = [
+            candidate for candidate in chunk_candidates if candidate.source == "chunk"
+        ]
+        reranker_input_candidates = merged_candidates
+        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+            reranker_input_candidates = source_evidence_candidates
         t_rerank_start = time.time()
         rerank_top_n = rerank_top_n_from_env(default=max(top_k * 2, 8))
         rerank_timeout_seconds = _rerank_timeout_within_retrieval_budget()
@@ -448,7 +457,7 @@ class HybridRetriever:
                     asyncio.to_thread(
                         rerank_candidates,
                         normalized_query=normalized_query,
-                        candidates=merged_candidates,
+                        candidates=reranker_input_candidates,
                         expansion=expansion,
                         top_n=rerank_top_n,
                         provider=rerank_provider_from_env(),
@@ -460,24 +469,24 @@ class HybridRetriever:
                 warning = "Reranker timed out; using merged candidate order."
                 warnings.append(warning)
                 logger.warning(warning)
-                reranked_candidates = merged_candidates
+                reranked_candidates = reranker_input_candidates
                 rerank_trace = RerankTrace(
                     provider=rerank_provider_from_env(),
                     enabled=False,
-                    input_count=len(merged_candidates),
-                    output_count=len(merged_candidates),
+                    input_count=len(reranker_input_candidates),
+                    output_count=len(reranker_input_candidates),
                     top_n=rerank_top_n,
                     ranked_candidates=[],
                     warnings=[warning],
                     timings_ms={},
                 )
         else:
-            reranked_candidates = merged_candidates
+            reranked_candidates = reranker_input_candidates
             rerank_trace = RerankTrace(
                 provider=rerank_provider_from_env(),
                 enabled=False,
-                input_count=len(merged_candidates),
-                output_count=len(merged_candidates),
+                input_count=len(reranker_input_candidates),
+                output_count=len(reranker_input_candidates),
                 top_n=rerank_top_n,
                 ranked_candidates=[],
                 warnings=["Reranker disabled by RERANK_ENABLED=false."],
@@ -509,6 +518,8 @@ class HybridRetriever:
                 entity_names.update(
                     n for n in graph_nodes if isinstance(n, str) and n.strip()
                 )
+        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+            entity_names.update(entity_graph_seed_names(build_entity_signals(entity_candidates)))
 
         # ── Step 6: Neo4j knowledge graph context ────────────────────
         t_neo4j_start = time.time()
@@ -547,7 +558,7 @@ class HybridRetriever:
             expansion=expansion,
             entity_candidates=entity_candidates[:8],
             chunk_candidates=chunk_candidates[:8],
-            merged_candidates=merged_candidates[:8],
+            merged_candidates=reranker_input_candidates[:8],
             selected_context=selected_candidates,
             packed_context=packed_context,
             rerank_trace=rerank_trace,
@@ -580,7 +591,7 @@ class HybridRetriever:
                     entity_candidates=entity_candidates,
                     fused_results=fused,
                     chunk_candidates=chunk_candidates,
-                    merged_candidates=merged_candidates,
+                    merged_candidates=reranker_input_candidates,
                     reranked_candidates=reranked_candidates,
                     packed_context=packed_context,
                     rerank_trace=rerank_trace,
@@ -594,11 +605,10 @@ class HybridRetriever:
                 warnings.append(warning)
                 logger.warning(warning)
 
-        # R1 keeps V4 as the only execution path.  When explicitly requested,
-        # create a passive V5 trace from finalized V4 outputs and compare IDs,
-        # ranks, and packed context without influencing the response.
+        # V5 remains opt-in. Shadow mode preserves V4 output for equivalence
+        # checks, while explicit V5 uses source-backed chunks as evidence and
+        # retains entity/graph data as dedicated structural side signals.
         v5_shadow_payload = None
-        pipeline_selection = retrieval_pipeline_selection_from_env()
         if pipeline_selection.shadow_enabled:
             try:
                 v5_trace = build_v5_shadow_trace(
@@ -615,24 +625,39 @@ class HybridRetriever:
                     reranked_candidates=reranked_candidates,
                     rerank_trace=rerank_trace,
                     packed_context=packed_context,
+                    graph_facts=graph_facts,
                     timings_ms=trace.timings_ms,
                     selection=pipeline_selection,
                 )
-                comparison = compare_v4_to_v5_shadow(
-                    trace=v5_trace,
-                    dense_results=dense_results,
-                    sparse_results=sparse_results,
-                    fused_results=fused,
-                    merged_candidates=merged_candidates,
-                    reranked_candidates=reranked_candidates,
-                    packed_context=packed_context,
-                )
-                v5_trace = v5_trace.model_copy(update={"shadow_comparison": comparison})
+                comparison = None
+                if pipeline_selection.execution == RetrievalPipelineVersion.V4:
+                    comparison = compare_v4_to_v5_shadow(
+                        trace=v5_trace,
+                        dense_results=dense_results,
+                        sparse_results=sparse_results,
+                        fused_results=fused,
+                        merged_candidates=merged_candidates,
+                        reranked_candidates=reranked_candidates,
+                        packed_context=packed_context,
+                    )
+                    v5_trace = v5_trace.model_copy(update={"shadow_comparison": comparison})
                 v5_shadow_payload = {
                     "requested_pipeline": pipeline_selection.requested.value,
                     "execution_pipeline": pipeline_selection.execution.value,
-                    "shadow_equivalent": comparison.equivalent,
-                    "comparison": comparison.model_dump(mode="json"),
+                    "shadow_equivalent": comparison.equivalent if comparison else None,
+                    "comparison": comparison.model_dump(mode="json") if comparison else None,
+                    "entity_signals": [
+                        signal.model_dump(mode="json")
+                        for signal in v5_trace.entity_signals
+                    ],
+                    "graph_seed_names": list(v5_trace.graph_seed_names),
+                    "graph_signals": [
+                        signal.model_dump(mode="json")
+                        for signal in v5_trace.graph_signals
+                    ],
+                    "source_evidence_candidate_ids": list(
+                        v5_trace.candidate_ids_for(RetrievalStageV5.SOURCE_EVIDENCE_POOL)
+                    ),
                     "trace": v5_trace.model_dump(mode="json"),
                 }
             except Exception as exc:
@@ -654,7 +679,7 @@ class HybridRetriever:
                 "fused_count": len(fused),
                 "boosted_count": boost_count,
                 "entity_count": len(entity_candidates),
-                "merged_count": len(merged_candidates),
+                    "merged_count": len(reranker_input_candidates),
                 "reranked_count": len(reranked_candidates),
                 "top_k": top_k,
                 "entity_names_count": len(entity_names),
@@ -680,7 +705,7 @@ class HybridRetriever:
                     ],
                     "merged_candidates": [
                         candidate_debug_summary(candidate)
-                        for candidate in merged_candidates[:5]
+                        for candidate in reranker_input_candidates[:5]
                     ],
                     "rerank": {
                         "enabled": rerank_trace.enabled,
