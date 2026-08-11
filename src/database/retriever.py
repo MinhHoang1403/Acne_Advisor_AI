@@ -42,6 +42,11 @@ from src.retrieval.reranker import (
     rerank_provider_from_env,
     rerank_top_n_from_env,
 )
+from src.retrieval.v5_compat import (
+    build_v5_shadow_trace,
+    compare_v4_to_v5_shadow,
+    retrieval_pipeline_selection_from_env,
+)
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.resilience.contracts import runtime_resilience_settings_from_env
 
@@ -589,12 +594,51 @@ class HybridRetriever:
                 warnings.append(warning)
                 logger.warning(warning)
 
-        return RetrievalResult(
-            vector_contexts=top_chunks,
-            graph_facts=graph_facts,
-            sources=sources,
-            query=query,
-            metadata={
+        # R1 keeps V4 as the only execution path.  When explicitly requested,
+        # create a passive V5 trace from finalized V4 outputs and compare IDs,
+        # ranks, and packed context without influencing the response.
+        v5_shadow_payload = None
+        pipeline_selection = retrieval_pipeline_selection_from_env()
+        if pipeline_selection.shadow_enabled:
+            try:
+                v5_trace = build_v5_shadow_trace(
+                    original_query=query,
+                    retrieval_query=query,
+                    normalized_query=normalized_query,
+                    expansion=expansion,
+                    dense_results=dense_results,
+                    sparse_results=sparse_results,
+                    fused_results=fused,
+                    entity_candidates=entity_candidates,
+                    chunk_candidates=chunk_candidates,
+                    merged_candidates=merged_candidates,
+                    reranked_candidates=reranked_candidates,
+                    rerank_trace=rerank_trace,
+                    packed_context=packed_context,
+                    timings_ms=trace.timings_ms,
+                    selection=pipeline_selection,
+                )
+                comparison = compare_v4_to_v5_shadow(
+                    trace=v5_trace,
+                    dense_results=dense_results,
+                    sparse_results=sparse_results,
+                    fused_results=fused,
+                    merged_candidates=merged_candidates,
+                    reranked_candidates=reranked_candidates,
+                    packed_context=packed_context,
+                )
+                v5_trace = v5_trace.model_copy(update={"shadow_comparison": comparison})
+                v5_shadow_payload = {
+                    "requested_pipeline": pipeline_selection.requested.value,
+                    "execution_pipeline": pipeline_selection.execution.value,
+                    "shadow_equivalent": comparison.equivalent,
+                    "comparison": comparison.model_dump(mode="json"),
+                    "trace": v5_trace.model_dump(mode="json"),
+                }
+            except Exception as exc:
+                logger.warning("V5 shadow trace unavailable: %s", sanitize_fallback_reason(exc))
+
+        result_metadata = {
                 "total_time_s": round(t_total, 3),
                 "normalize_expand_time_s": round(t_norm, 3),
                 "embed_time_s": round(t_embed, 3),
@@ -671,8 +715,17 @@ class HybridRetriever:
                 "retrieval_trace": trace.model_dump(mode="json"),
                 "rerank_trace": rerank_trace.model_dump(mode="json"),
                 "packed_context": packed_context.model_dump(mode="json"),
-                "retrieval_diagnostics": retrieval_diagnostics,
-            },
+            "retrieval_diagnostics": retrieval_diagnostics,
+        }
+        if v5_shadow_payload is not None:
+            result_metadata["retrieval_v5"] = v5_shadow_payload
+
+        return RetrievalResult(
+            vector_contexts=top_chunks,
+            graph_facts=graph_facts,
+            sources=sources,
+            query=query,
+            metadata=result_metadata,
         )
     # ------------------------------------------------------------------
     # RRF fusion
