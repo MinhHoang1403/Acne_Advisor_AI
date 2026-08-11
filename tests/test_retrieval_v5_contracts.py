@@ -158,6 +158,7 @@ def test_shadow_adapter_preserves_stage_identity_order_and_context_hash() -> Non
             top_n=1,
         ),
         packed_context=packed,
+        graph_facts=[],
         timings_ms={"dense": 1.0, "sparse": 2.0, "pack": 3.0},
         selection=selection,
     )
@@ -183,7 +184,7 @@ def test_shadow_adapter_preserves_stage_identity_order_and_context_hash() -> Non
     assert candidate.model_dump(mode="json")["text"] not in serialized_trace
 
 
-def test_pipeline_selection_keeps_unreleased_v5_on_safe_v4_shadow(
+def test_pipeline_selection_keeps_v4_default_and_enables_explicit_v5(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "v5")
@@ -191,8 +192,8 @@ def test_pipeline_selection_keeps_unreleased_v5_on_safe_v4_shadow(
     monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "invalid")
     invalid = retrieval_pipeline_selection_from_env()
 
-    assert requested_v5.execution == RetrievalPipelineVersion.V4
+    assert requested_v5.execution == RetrievalPipelineVersion.V5
     assert requested_v5.shadow_enabled is True
-    assert requested_v5.warning_code == "V5_NOT_PROMOTED_USING_V4_SHADOW"
+    assert requested_v5.warning_code is None
     assert invalid.execution == RetrievalPipelineVersion.V4
     assert invalid.warning_code == "INVALID_RETRIEVAL_PIPELINE_VERSION"

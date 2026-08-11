@@ -30,6 +30,31 @@ def test_pipeline_fingerprint_is_deterministic_and_changes():
     assert len(fingerprint_a) == 24
 
 
+def test_retrieval_pipeline_version_partitions_cache_identity():
+    v4_manifest = build_pipeline_version_manifest(
+        {
+            "CACHE_ANSWER_VERSION": "v5",
+            "RETRIEVAL_PIPELINE_VERSION": "v4",
+        }
+    )
+    v5_manifest = build_pipeline_version_manifest(
+        {
+            "CACHE_ANSWER_VERSION": "v5",
+            "RETRIEVAL_PIPELINE_VERSION": "v5",
+        }
+    )
+
+    assert v4_manifest["retrieval_pipeline_version"] == "v4"
+    assert v5_manifest["retrieval_pipeline_version"] == "v5"
+    assert compute_pipeline_fingerprint(v4_manifest) != compute_pipeline_fingerprint(v5_manifest)
+
+
+def test_retrieval_pipeline_manifest_defaults_to_v4():
+    manifest = build_pipeline_version_manifest({"RETRIEVAL_PIPELINE_VERSION": ""})
+
+    assert manifest["retrieval_pipeline_version"] == "v4"
+
+
 def test_answer_verifier_version_is_in_manifest_and_changes_fingerprint():
     old_manifest = build_pipeline_version_manifest(
         {

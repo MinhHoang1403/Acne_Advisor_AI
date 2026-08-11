@@ -1,4 +1,4 @@
-"""Passive V4-to-V5 compatibility adapters used by the R1 shadow path."""
+"""Compatibility adapters for staged Retrieval V5 execution and shadow traces."""
 
 from __future__ import annotations
 
@@ -29,15 +29,20 @@ from src.retrieval.v5_contracts import (
     ShadowComparisonV5,
     ShadowStageComparisonV5,
 )
+from src.retrieval.v5_signals import (
+    build_entity_signals,
+    build_graph_signals,
+    entity_graph_seed_names,
+)
 
 
 DEFAULT_RETRIEVAL_PIPELINE_VERSION = RetrievalPipelineVersion.V4
-V5_CONFIG_FINGERPRINT = "retrieval_v5_contracts_v1"
+V5_CONFIG_FINGERPRINT = "retrieval_v5_entity_graph_signals_v1"
 
 
 @dataclass(frozen=True)
 class RetrievalPipelineSelection:
-    """Requested mode and the safe execution mode available at R1."""
+    """Requested mode and the staged execution mode available in V5."""
 
     requested: RetrievalPipelineVersion
     execution: RetrievalPipelineVersion
@@ -46,7 +51,7 @@ class RetrievalPipelineSelection:
 
 
 def retrieval_pipeline_selection_from_env() -> RetrievalPipelineSelection:
-    """Resolve the migration selector without silently promoting unfinished V5."""
+    """Resolve the migration selector without changing the default V4 path."""
 
     raw = os.getenv("RETRIEVAL_PIPELINE_VERSION", DEFAULT_RETRIEVAL_PIPELINE_VERSION.value)
     try:
@@ -62,9 +67,8 @@ def retrieval_pipeline_selection_from_env() -> RetrievalPipelineSelection:
     if requested == RetrievalPipelineVersion.V5:
         return RetrievalPipelineSelection(
             requested=requested,
-            execution=RetrievalPipelineVersion.V4,
+            execution=RetrievalPipelineVersion.V5,
             shadow_enabled=True,
-            warning_code="V5_NOT_PROMOTED_USING_V4_SHADOW",
         )
     return RetrievalPipelineSelection(
         requested=requested,
@@ -88,16 +92,20 @@ def build_v5_shadow_trace(
     reranked_candidates: list[RetrievedCandidate],
     rerank_trace: RerankTrace,
     packed_context: PackedContext,
+    graph_facts: list[dict[str, Any]],
     timings_ms: Mapping[str, float],
     selection: RetrievalPipelineSelection,
 ) -> RetrievalTraceV5:
-    """Create a passive V5 trace from already-finalized legacy stage outputs."""
+    """Create a redacted V5 trace from finalized staged retrieval outputs."""
 
     query_context = query_context_from_legacy(
         original_query=original_query,
         retrieval_query=retrieval_query,
         normalized_query=normalized_query,
     )
+    entity_signals = build_entity_signals(entity_candidates)
+    graph_seed_names = entity_graph_seed_names(entity_signals)
+    graph_signals = build_graph_signals(graph_facts, entity_signals)
     trace = RetrievalTraceV5(
         trace_id=_sha256(f"{query_context.query_id}:{query_context.intent}"),
         pipeline_version=selection.requested,
@@ -110,6 +118,9 @@ def build_v5_shadow_trace(
             safety_flags=query_context.safety_flags,
             expansion_terms=tuple(_dedupe(expansion.expanded_terms)),
         ),
+        entity_signals=entity_signals,
+        graph_seed_names=graph_seed_names,
+        graph_signals=graph_signals,
     )
     trace = trace.append_event(
         RetrievalStageEventV5(
@@ -161,6 +172,16 @@ def build_v5_shadow_trace(
     )
     trace = trace.append_event(
         RetrievalStageEventV5(
+            stage=RetrievalStageV5.SOURCE_EVIDENCE_POOL,
+            candidates=tuple(
+                _candidate_observation(candidate)
+                for candidate in chunk_candidates
+                if candidate.source == "chunk"
+            ),
+        )
+    )
+    trace = trace.append_event(
+        RetrievalStageEventV5(
             stage=RetrievalStageV5.LEGACY_CANDIDATE_MERGE,
             candidates=tuple(
                 _candidate_observation(candidate, legacy_compat_only=True)
@@ -168,6 +189,7 @@ def build_v5_shadow_trace(
             ),
         )
     )
+    legacy_execution = selection.execution == RetrievalPipelineVersion.V4
     rerank_scores = {
         item.candidate.candidate_id: item.rerank_score
         for item in rerank_trace.ranked_candidates
@@ -179,7 +201,7 @@ def build_v5_shadow_trace(
                 _candidate_observation(
                     candidate,
                     reranker_final=rerank_scores.get(candidate.candidate_id),
-                    legacy_compat_only=True,
+                    legacy_compat_only=legacy_execution,
                 )
                 for candidate in reranked_candidates
             ),
@@ -190,7 +212,10 @@ def build_v5_shadow_trace(
     trace = trace.append_event(
         RetrievalStageEventV5(
             stage=RetrievalStageV5.PACKER,
-            candidates=tuple(_context_observation(item) for item in packed_context.items),
+            candidates=tuple(
+                _context_observation(item, legacy_compat_only=legacy_execution)
+                for item in packed_context.items
+            ),
             elapsed_ms=timings_ms.get("pack"),
             context_sha256=_sha256(packed_context.context_text),
         )
@@ -345,7 +370,11 @@ def _candidate_observation(
     )
 
 
-def _context_observation(item: ContextItem) -> CandidateObservationV5:
+def _context_observation(
+    item: ContextItem,
+    *,
+    legacy_compat_only: bool = False,
+) -> CandidateObservationV5:
     return CandidateObservationV5(
         candidate_id=item.item_id,
         source=item.source,
@@ -356,7 +385,7 @@ def _context_observation(item: ContextItem) -> CandidateObservationV5:
         ),
         provenance=_mapping_provenance(item.payload, item.item_id),
         metadata_features=tuple(_metadata_features(item.matched_metadata)),
-        legacy_compat_only=True,
+        legacy_compat_only=legacy_compat_only,
     )
 
 

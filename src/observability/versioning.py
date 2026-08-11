@@ -60,7 +60,9 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
 
     manifest = {
         "phase": "phase2e",
-        "retrieval_pipeline_version": value("RETRIEVAL_PIPELINE_VERSION", "retrieval_pipeline_v2"),
+        "retrieval_pipeline_version": _effective_retrieval_pipeline_version(
+            value("RETRIEVAL_PIPELINE_VERSION", "v4")
+        ),
         "context_packer_version": value("CONTEXT_PACKER_VERSION", "context_packer_v3"),
         "reranker_version": value("RERANKER_VERSION", DEFAULT_RERANKER_VERSION),
         "answer_verifier_version": value("ANSWER_VERIFIER_VERSION", "answer_verifier_v2"),
@@ -253,6 +255,15 @@ def _effective_answer_cache_version(configured: Any) -> str:
     if text.lower() in LEGACY_ANSWER_CACHE_VERSIONS:
         return DEFAULT_ANSWER_CACHE_VERSION
     return text
+
+
+def _effective_retrieval_pipeline_version(configured: Any) -> str:
+    """Normalize cache identity to the staged retrieval execution selector."""
+
+    text = str(configured or "").strip().lower()
+    if text in {"v4", "v5_shadow", "v5"}:
+        return text
+    return "v4"
 
 
 def _effective_answer_formatting_contract_version(configured: Any) -> str:
