@@ -53,6 +53,7 @@ CANONICAL_ENTITY_GRAPH_LABELS = (
 
 CANONICAL_ENTITY_GRAPH_RELATIONSHIPS = (
     "BELONGS_TO_CLASS",
+    "CONTRAINDICATED_IN",
     "HAS_ACTIVE_INGREDIENT",
 )
 
@@ -94,6 +95,7 @@ _CANONICAL_REL_REQUIRED_PROPERTIES = frozenset(
         "created_by",
         "kb_version",
         "source",
+        "source_ids",
         "taxonomy_version",
     }
 )
@@ -118,8 +120,15 @@ CANONICAL_RELATIONSHIP_SCHEMAS: dict[str, RelationshipSchema] = {
     ),
     "BELONGS_TO_CLASS": RelationshipSchema(
         relationship_type="BELONGS_TO_CLASS",
-        source_labels=frozenset({"DrugProduct", "ActiveIngredient"}),
+        source_labels=frozenset({"DrugProduct", "ActiveIngredient", "DrugClass"}),
         target_labels=frozenset({"DrugClass"}),
+        required_properties=_CANONICAL_REL_REQUIRED_PROPERTIES,
+        optional_properties=_CANONICAL_REL_OPTIONAL_PROPERTIES,
+    ),
+    "CONTRAINDICATED_IN": RelationshipSchema(
+        relationship_type="CONTRAINDICATED_IN",
+        source_labels=frozenset({"ActiveIngredient"}),
+        target_labels=frozenset({"SafetyContext"}),
         required_properties=_CANONICAL_REL_REQUIRED_PROPERTIES,
         optional_properties=_CANONICAL_REL_OPTIONAL_PROPERTIES,
     ),
@@ -229,6 +238,10 @@ def build_entity_graph_records(
                 **RELATIONSHIP_PROPERTIES,
                 "kb_version": resolved_kb_version,
                 "taxonomy_version": versions["taxonomy_version"],
+                "source_ids": _relationship_source_ids(
+                    cards_by_key.get(_entity_key(source_label, source_name)),
+                    cards_by_key.get(_entity_key(target_label, target_name)),
+                ),
             },
         }
 
@@ -265,12 +278,12 @@ def build_entity_graph_records(
                     class_name,
                 )
 
-        if card.entity_type == "active_ingredient":
+        if card.entity_type in {"active_ingredient", "drug_class"}:
             for class_name in card.drug_class:
                 target_card = cards_by_key.get(_entity_key("DrugClass", class_name))
                 add_node("DrugClass", class_name, card=target_card)
                 add_relationship(
-                    "ActiveIngredient",
+                    label,
                     card.canonical_name,
                     "BELONGS_TO_CLASS",
                     "DrugClass",
@@ -329,6 +342,19 @@ def _dedupe(values: list[str]) -> list[str]:
         seen.add(key)
         output.append(item)
     return output
+
+
+def _relationship_source_ids(
+    source_card: EntityCard | None,
+    target_card: EntityCard | None,
+) -> list[str]:
+    """Keep deterministic edge provenance traceable to curated endpoints."""
+
+    source_ids = [
+        *(source_card.source_ids if source_card else []),
+        *(target_card.source_ids if target_card else []),
+    ]
+    return _dedupe(source_ids)
 
 
 def _entity_key(label: str, canonical_name: str) -> str:

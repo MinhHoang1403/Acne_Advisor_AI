@@ -33,9 +33,9 @@ EXPECTED_CACHE_VERSION = "v5"
 EXPECTED_FINGERPRINT_BEFORE_STEP10 = "c8507401e35043380fd119e7"
 EXPECTED_COUNTS = {
     "acne_knowledge": 641,
-    "acne_entities_v1": {20, 22},
-    "neo4j_nodes": {21, 23},
-    "neo4j_relationships": {15, 18},
+    "acne_entities_v1": {20, 22, 32},
+    "neo4j_nodes": {21, 23, 32},
+    "neo4j_relationships": {15, 18, 27},
 }
 SECRET_PATTERNS = ("AI" + "za",)
 

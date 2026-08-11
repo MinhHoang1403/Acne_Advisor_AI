@@ -65,7 +65,7 @@ def test_rebuild_plan_adds_tazorac_without_knowledge_or_manifest_mutation() -> N
         manifest_hash="ABC",
     )
 
-    assert plan["qdrant_entity_count_proposed"] == 22
+    assert plan["qdrant_entity_count_proposed"] == 32
     assert "drug_product:tazorac" in plan["entities_added"]
     assert "active_ingredient:tazarotene" in plan["entities_added"]
     assert plan["acne_knowledge_mutation_count"] == 0

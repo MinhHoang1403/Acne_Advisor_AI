@@ -16,7 +16,7 @@
       "intent": "ingredient_question",
       "drug_product": ["Epiduo"],
       "active_ingredient": ["adapalene", "benzoyl_peroxide"],
-      "drug_class": ["topical_retinoid", "benzoyl_peroxide"]
+      "drug_class": ["topical_retinoid"]
     }
   },
   {
@@ -35,7 +35,6 @@
     "expected": {
       "intent": "class_check",
       "active_ingredient": ["benzoyl_peroxide"],
-      "drug_class": ["benzoyl_peroxide"],
       "negative_drug_class": ["topical_antibiotic", "oral_antibiotic"],
       "not_antibiotic": true
     }

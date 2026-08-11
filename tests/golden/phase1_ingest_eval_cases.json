@@ -31,7 +31,7 @@
     "expected": {
       "drug_product": ["Epiduo"],
       "active_ingredient": ["adapalene", "benzoyl_peroxide"],
-      "drug_class": ["topical_retinoid", "benzoyl_peroxide"],
+      "drug_class": ["topical_retinoid"],
       "entity_type_expected": "drug_product",
       "required_graph_edges": [
         {
@@ -108,7 +108,6 @@
     "query": "Benzoyl peroxide có phải kháng sinh không?",
     "expected": {
       "active_ingredient": ["benzoyl_peroxide"],
-      "drug_class": ["benzoyl_peroxide"],
       "metadata": {
         "not_antibiotic": true
       },

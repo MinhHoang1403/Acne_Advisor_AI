@@ -15,26 +15,26 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy  # noqa: E402
 from src.knowledge.graph_schema import build_entity_graph_records  # noqa: E402
-from src.knowledge.taxonomy_models import DEFAULT_TAXONOMY_V2_PATH, load_taxonomy_catalog  # noqa: E402
+from src.knowledge.normalizer import DEFAULT_TAXONOMY_PATH, DrugEntityNormalizer  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Plan taxonomy graph changes without Neo4j writes.")
-    parser.add_argument("--taxonomy-path", default=str(DEFAULT_TAXONOMY_V2_PATH))
+    parser.add_argument("--taxonomy-path", default=str(DEFAULT_TAXONOMY_PATH))
     parser.add_argument("--kb-version", default="acne_kb_v1")
     return parser.parse_args(argv)
 
 
 def build_taxonomy_graph_update_plan(
     *,
-    taxonomy_path: str | Path = DEFAULT_TAXONOMY_V2_PATH,
+    taxonomy_path: str | Path = DEFAULT_TAXONOMY_PATH,
     kb_version: str = "acne_kb_v1",
 ) -> dict[str, Any]:
     current_records = build_entity_graph_records(
         build_entity_cards_from_taxonomy(),
         kb_version=kb_version,
     )
-    proposed_cards = load_taxonomy_catalog(taxonomy_path).to_entity_cards(verified_only=True)
+    proposed_cards = build_entity_cards_from_taxonomy(DrugEntityNormalizer(taxonomy_path))
     proposed_records = build_entity_graph_records(proposed_cards, kb_version=kb_version)
 
     current_nodes = {_node_key(node): node for node in current_records["nodes"]}

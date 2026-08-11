@@ -165,7 +165,7 @@ def test_constraints_have_unique_canonical_name() -> None:
 def test_dry_run_build_entity_graph_no_neo4j_required() -> None:
     summary = build_dry_run_summary()
 
-    assert summary["card_count"] == 22
+    assert summary["card_count"] == 32
     assert summary["node_count"] >= 20
     assert summary["relationship_count"] >= 1
     assert summary["nodes_by_label"]["DrugProduct"] == 4

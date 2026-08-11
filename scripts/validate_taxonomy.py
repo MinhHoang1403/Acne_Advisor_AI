@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the versioned acne drug taxonomy without mutating runtime data."""
+"""Validate the legacy versioned taxonomy catalog without mutating runtime data."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--taxonomy-path",
         default=str(DEFAULT_TAXONOMY_V2_PATH),
-        help="Path to taxonomy v2 YAML. Defaults to data/taxonomy/drug_taxonomy_v2.yaml.",
+        help="Path to the legacy taxonomy v2 migration catalog; it is not the runtime default.",
     )
     parser.add_argument(
         "--json-schema",

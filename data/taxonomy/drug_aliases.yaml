@@ -10,6 +10,8 @@ drug_products:
       - adapalene
     drug_class:
       - topical_retinoid
+    source_ids:
+      - web_raw_dataset.json
 
   epiduo:
     canonical_name: Epiduo
@@ -21,7 +23,8 @@ drug_products:
       - benzoyl_peroxide
     drug_class:
       - topical_retinoid
-      - benzoyl_peroxide
+    source_ids:
+      - web_raw_dataset.json
 
   dalacin_t:
     canonical_name: Dalacin T
@@ -33,6 +36,8 @@ drug_products:
       - clindamycin
     drug_class:
       - topical_antibiotic
+    source_ids:
+      - drug_taxonomy_v1:drug_products.dalacin_t
 
   tazorac:
     canonical_name: Tazorac
@@ -42,6 +47,8 @@ drug_products:
       - tazarotene
     drug_class:
       - topical_retinoid
+    source_ids:
+      - web_raw_dataset.json
 
 active_ingredients:
   adapalene:
@@ -51,6 +58,8 @@ active_ingredients:
       - adapalen
     drug_class:
       - topical_retinoid
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   benzoyl_peroxide:
     canonical_name: benzoyl_peroxide
@@ -60,8 +69,8 @@ active_ingredients:
       - benzoyl_peroxide
       - bpo
       - bp
-    drug_class:
-      - benzoyl_peroxide
+    source_ids:
+      - web_raw_dataset.json
 
   clindamycin:
     canonical_name: clindamycin
@@ -70,21 +79,34 @@ active_ingredients:
       - clindamycin phosphate
     drug_class:
       - topical_antibiotic
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   tretinoin:
     canonical_name: tretinoin
     aliases:
       - tretinoin
+      - retin-a
     drug_class:
       - topical_retinoid
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   tazarotene:
     canonical_name: tazarotene
     aliases:
       - tazarotene
       - tazaroten
+      - arazlo
+      - avage
+      - fabior
     drug_class:
       - topical_retinoid
+    contraindications:
+      - pregnancy
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
 
   isotretinoin:
     canonical_name: isotretinoin
@@ -93,6 +115,11 @@ active_ingredients:
       - oral isotretinoin
     drug_class:
       - oral_retinoid
+    contraindications:
+      - pregnancy
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
 
   doxycycline:
     canonical_name: doxycycline
@@ -100,14 +127,96 @@ active_ingredients:
       - doxycycline
     drug_class:
       - oral_antibiotic
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   azelaic_acid:
     canonical_name: azelaic_acid
     aliases:
       - azelaic acid
       - azelaic_acid
+    source_ids:
+      - PIIS0190962223033893.pdf
+
+  salicylic_acid:
+    canonical_name: salicylic_acid
+    aliases:
+      - salicylic acid
     drug_class:
-      - azelaic_acid
+      - beta_hydroxy_acid
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
+
+  clascoterone:
+    canonical_name: clascoterone
+    aliases:
+      - clascoterone
+    drug_class:
+      - topical_antiandrogen
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - qd_4416_cut.pdf
+      - web_raw_dataset.json
+
+  minocycline:
+    canonical_name: minocycline
+    aliases:
+      - minocycline
+      - minocyclin
+    drug_class:
+      - oral_antibiotic
+      - topical_antibiotic
+    source_ids:
+      - acne-vulgaris-management-pdf-66142088866501.pdf
+      - PIIS0190962223033893.pdf
+      - qd_4416_cut.pdf
+      - web_raw_dataset.json
+
+  sarecycline:
+    canonical_name: sarecycline
+    aliases:
+      - sarecycline
+      - sarecyclin
+    drug_class:
+      - oral_antibiotic
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
+
+  erythromycin:
+    canonical_name: erythromycin
+    aliases:
+      - erythromycin
+    drug_class:
+      - oral_antibiotic
+      - topical_antibiotic
+    source_ids:
+      - acne-vulgaris-management-pdf-66142088866501.pdf
+      - PIIS0190962223033893.pdf
+      - qd_4416_cut.pdf
+      - web_raw_dataset.json
+
+  spironolactone:
+    canonical_name: spironolactone
+    aliases:
+      - spironolactone
+    drug_class:
+      - hormonal_treatment
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
+
+  trifarotene:
+    canonical_name: trifarotene
+    aliases:
+      - trifarotene
+      - aklief
+    drug_class:
+      - topical_retinoid
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
 
 drug_classes:
   topical_retinoid:
@@ -115,13 +224,16 @@ drug_classes:
     aliases:
       - topical retinoid
       - retinoid bôi
-      - retinoid
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   oral_retinoid:
     canonical_name: oral_retinoid
     aliases:
       - oral retinoid
       - retinoid uống
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   topical_antibiotic:
     canonical_name: topical_antibiotic
@@ -129,6 +241,8 @@ drug_classes:
       - topical antibiotic
       - kháng sinh bôi
       - kháng sinh bôi tại chỗ
+    source_ids:
+      - PIIS0190962223033893.pdf
 
   oral_antibiotic:
     canonical_name: oral_antibiotic
@@ -136,13 +250,48 @@ drug_classes:
       - oral antibiotic
       - kháng sinh uống
       - kháng sinh đường uống
+    source_ids:
+      - PIIS0190962223033893.pdf
 
-  benzoyl_peroxide:
-    canonical_name: benzoyl_peroxide
+  beta_hydroxy_acid:
+    canonical_name: beta_hydroxy_acid
     aliases:
-      - benzoyl peroxide
-      - bpo
-      - bp
+      - beta hydroxy acid
+    source_ids:
+      - PIIS0190962223033893.pdf
+
+  topical_antiandrogen:
+    canonical_name: topical_antiandrogen
+    aliases:
+      - topical antiandrogen
+      - kháng androgen tại chỗ
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - qd_4416_cut.pdf
+
+  hormonal_treatment:
+    canonical_name: hormonal_treatment
+    aliases:
+      - hormonal treatment
+      - hormonal therapy
+      - liệu pháp nội tiết
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
+
+  combined_oral_contraceptive:
+    canonical_name: combined_oral_contraceptive
+    aliases:
+      - combined oral contraceptive
+      - combined oral contraceptives
+      - combined oral contraceptive pill
+      - combined oral contraceptive pills
+    drug_class:
+      - hormonal_treatment
+    source_ids:
+      - acne-vulgaris-management-pdf-66142088866501.pdf
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
 
 conditions:
   acne_vulgaris:
@@ -153,6 +302,8 @@ conditions:
       - mụn
       - mụn trứng cá
       - trứng cá
+    source_ids:
+      - PIIS0190962223033893.pdf
 
 safety_contexts:
   pregnancy:
@@ -164,6 +315,9 @@ safety_contexts:
       - thai kỳ
       - mang thai
       - có thai
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
 
   breastfeeding:
     canonical_name: breastfeeding
@@ -171,6 +325,8 @@ safety_contexts:
     aliases:
       - breastfeeding
       - cho con bú
+    source_ids:
+      - web_raw_dataset.json
 
   scarring:
     canonical_name: scarring
@@ -180,6 +336,9 @@ safety_contexts:
       - sẹo mụn
       - acne scar
       - scarring
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json
 
   severe_acne:
     canonical_name: severe_acne
@@ -190,3 +349,6 @@ safety_contexts:
       - mụn nang
       - nodular acne
       - nodulocystic acne
+    source_ids:
+      - PIIS0190962223033893.pdf
+      - web_raw_dataset.json

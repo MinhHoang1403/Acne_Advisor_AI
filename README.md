@@ -547,6 +547,13 @@ Deterministic Neo4j taxonomy/entity graph thuộc core Phase 1; semantic documen
 graph do Ollama trích xuất là enrichment độc lập, không quyết định core validity.
 Chỉ xem plan optional job mà không gọi Ollama bằng `--dry-run`.
 
+Catalog deterministic đang được runtime sử dụng là
+`data/taxonomy/drug_aliases.yaml`; file này cấp EntityCards, normalizer và core
+Neo4j graph. `data/taxonomy/drug_taxonomy_v2.yaml` chỉ là catalog migration/kiểm
+thử tương thích, không được runtime tự động nạp. Mỗi EntityCard active mang
+`source_ids` trỏ tới corpus canonical hoặc một entry taxonomy curated đã được
+ghi rõ.
+
 `ingest_knowledge.py` là knowledge-layer entrypoint cho debug hoặc incremental,
 không tương đương Full Phase 1:
 
