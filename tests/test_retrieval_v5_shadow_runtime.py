@@ -152,6 +152,9 @@ async def test_explicit_v5_uses_source_evidence_pool_and_entity_graph_seeds(
     trace_events = shadow["trace"]["events"]
     assert "METADATA_ANNOTATION" in [event["stage"] for event in trace_events]
     assert "LEGACY_METADATA" not in [event["stage"] for event in trace_events]
+    assert "CANDIDATE_POLICY" in [event["stage"] for event in trace_events]
+    assert "LEGACY_CANDIDATE_MERGE" not in [event["stage"] for event in trace_events]
+    assert result.metadata["candidate_policy"]["mode"] == "budget_only"
     assert all(
         not candidate["legacy_compat_only"]
         for event in trace_events
