@@ -22,6 +22,7 @@ from src.retrieval.v5_contracts import (
     CandidateProvenanceV5,
     QueryContextV5,
     QueryObservationV5,
+    RankedEvidenceV5,
     RetrievalPipelineVersion,
     RetrievalStageEventV5,
     RetrievalStageV5,
@@ -108,6 +109,7 @@ def build_v5_shadow_trace(
     selection: RetrievalPipelineSelection,
     candidate_policy_candidates: list[RetrievedCandidate] | None = None,
     candidate_policy_drops: tuple[CandidateDropV5, ...] = (),
+    ranked_evidence: tuple[RankedEvidenceV5, ...] = (),
 ) -> RetrievalTraceV5:
     """Create a redacted V5 trace from finalized staged retrieval outputs."""
 
@@ -224,17 +226,22 @@ def build_v5_shadow_trace(
         item.candidate.candidate_id: item.rerank_score
         for item in rerank_trace.ranked_candidates
     }
+    rerank_observations = (
+        tuple(_ranked_evidence_observation(item) for item in ranked_evidence)
+        if selection.execution == RetrievalPipelineVersion.V5 and ranked_evidence
+        else tuple(
+            _candidate_observation(
+                candidate,
+                reranker_final=rerank_scores.get(candidate.candidate_id),
+                legacy_compat_only=legacy_execution,
+            )
+            for candidate in reranked_candidates
+        )
+    )
     trace = trace.append_event(
         RetrievalStageEventV5(
             stage=RetrievalStageV5.RERANK,
-            candidates=tuple(
-                _candidate_observation(
-                    candidate,
-                    reranker_final=rerank_scores.get(candidate.candidate_id),
-                    legacy_compat_only=legacy_execution,
-                )
-                for candidate in reranked_candidates
-            ),
+            candidates=rerank_observations,
             warning_codes=("RERANK_FALLBACK",) if rerank_trace.fallback_used else (),
             elapsed_ms=timings_ms.get("rerank"),
         )
@@ -397,6 +404,18 @@ def _candidate_observation(
         provenance=_mapping_provenance(payload, candidate.candidate_id),
         metadata_features=tuple(_metadata_features(candidate.matched_metadata, candidate.debug)),
         legacy_compat_only=legacy_compat_only,
+    )
+
+
+def _ranked_evidence_observation(evidence: RankedEvidenceV5) -> CandidateObservationV5:
+    candidate = evidence.candidate.candidate
+    return CandidateObservationV5(
+        candidate_id=candidate.candidate_id,
+        source="chunk",
+        rank=evidence.output_rank,
+        scores=evidence.scores,
+        provenance=candidate.provenance,
+        metadata_features=candidate.metadata_features,
     )
 
 

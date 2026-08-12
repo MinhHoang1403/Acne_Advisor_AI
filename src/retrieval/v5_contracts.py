@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 RETRIEVAL_V5_CONTRACT_VERSION = "retrieval_v5_contracts_v1"
-RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_candidate_policy_v1"
+RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_reranker_contract_v1"
 TRACE_EVENT_LIMIT = 64
 TRACE_CANDIDATE_LIMIT = 256
 

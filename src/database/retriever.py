@@ -47,12 +47,22 @@ from src.retrieval.reranker import (
     rerank_provider_from_env,
     rerank_top_n_from_env,
 )
+from src.retrieval.reranker_v5 import (
+    policy_order_fallback_v5,
+    ranked_evidence_from_rerank_v5,
+    rerank_policy_evidence_v5,
+)
 from src.retrieval.v5_compat import (
     build_v5_shadow_trace,
     compare_v4_to_v5_shadow,
+    query_context_from_legacy,
     retrieval_pipeline_selection_from_env,
 )
-from src.retrieval.v5_contracts import RetrievalPipelineVersion, RetrievalStageV5
+from src.retrieval.v5_contracts import (
+    RankedEvidenceV5,
+    RetrievalPipelineVersion,
+    RetrievalStageV5,
+)
 from src.retrieval.v5_signals import build_entity_signals, entity_graph_seed_names
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.resilience.contracts import runtime_resilience_settings_from_env
@@ -523,35 +533,70 @@ class HybridRetriever:
         t_rerank_start = time.time()
         rerank_top_n = rerank_top_n_from_env(default=max(top_k * 2, 8))
         rerank_timeout_seconds = _rerank_timeout_within_retrieval_budget()
+        ranked_evidence_v5: tuple[RankedEvidenceV5, ...] = ()
         if rerank_enabled_from_env():
-            try:
-                reranked_candidates, rerank_trace = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        rerank_candidates,
-                        normalized_query=normalized_query,
+            if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+                v5_query_context = query_context_from_legacy(
+                    original_query=query,
+                    retrieval_query=query,
+                    normalized_query=normalized_query,
+                )
+                try:
+                    rerank_result_v5 = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            rerank_policy_evidence_v5,
+                            query_context=v5_query_context,
+                            normalized_query=normalized_query,
+                            candidates=reranker_input_candidates,
+                            expansion=expansion,
+                            top_n=rerank_top_n,
+                            provider=rerank_provider_from_env(),
+                            timeout_seconds=rerank_timeout_seconds,
+                        ),
+                        timeout=rerank_timeout_seconds,
+                    )
+                except asyncio.TimeoutError:
+                    warning = "Reranker timed out; using Candidate Policy order."
+                    logger.warning(warning)
+                    rerank_result_v5 = policy_order_fallback_v5(
+                        query_context=v5_query_context,
                         candidates=reranker_input_candidates,
-                        expansion=expansion,
-                        top_n=rerank_top_n,
                         provider=rerank_provider_from_env(),
-                        timeout_seconds=rerank_timeout_seconds,
-                    ),
-                    timeout=rerank_timeout_seconds,
-                )
-            except asyncio.TimeoutError:
-                warning = "Reranker timed out; using merged candidate order."
-                warnings.append(warning)
-                logger.warning(warning)
-                reranked_candidates = reranker_input_candidates
-                rerank_trace = RerankTrace(
-                    provider=rerank_provider_from_env(),
-                    enabled=False,
-                    input_count=len(reranker_input_candidates),
-                    output_count=len(reranker_input_candidates),
-                    top_n=rerank_top_n,
-                    ranked_candidates=[],
-                    warnings=[warning],
-                    timings_ms={},
-                )
+                        top_n=rerank_top_n,
+                        warning="RERANK_FALLBACK_TIMEOUT",
+                    )
+                reranked_candidates = list(rerank_result_v5.candidates)
+                rerank_trace = rerank_result_v5.trace
+                ranked_evidence_v5 = rerank_result_v5.ranked_evidence
+            else:
+                try:
+                    reranked_candidates, rerank_trace = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            rerank_candidates,
+                            normalized_query=normalized_query,
+                            candidates=reranker_input_candidates,
+                            expansion=expansion,
+                            top_n=rerank_top_n,
+                            provider=rerank_provider_from_env(),
+                            timeout_seconds=rerank_timeout_seconds,
+                        ),
+                        timeout=rerank_timeout_seconds,
+                    )
+                except asyncio.TimeoutError:
+                    warning = "Reranker timed out; using merged candidate order."
+                    warnings.append(warning)
+                    logger.warning(warning)
+                    reranked_candidates = reranker_input_candidates
+                    rerank_trace = RerankTrace(
+                        provider=rerank_provider_from_env(),
+                        enabled=False,
+                        input_count=len(reranker_input_candidates),
+                        output_count=len(reranker_input_candidates),
+                        top_n=rerank_top_n,
+                        ranked_candidates=[],
+                        warnings=[warning],
+                        timings_ms={},
+                    )
         else:
             reranked_candidates = reranker_input_candidates
             rerank_trace = RerankTrace(
@@ -564,6 +609,13 @@ class HybridRetriever:
                 warnings=["Reranker disabled by RERANK_ENABLED=false."],
                 timings_ms={},
             )
+            if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+                ranked_evidence_v5 = ranked_evidence_from_rerank_v5(
+                    policy_candidates=reranker_input_candidates,
+                    reranked_candidates=reranked_candidates,
+                    trace=rerank_trace,
+                    fallback_used=False,
+                )
         t_rerank = time.time() - t_rerank_start
         warnings.extend(rerank_trace.warnings)
 
@@ -711,6 +763,7 @@ class HybridRetriever:
                         if candidate_policy_result is not None
                         else ()
                     ),
+                    ranked_evidence=ranked_evidence_v5,
                 )
                 comparison = None
                 if pipeline_selection.execution == RetrievalPipelineVersion.V4:

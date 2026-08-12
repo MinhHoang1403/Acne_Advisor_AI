@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from src.database import retriever as retriever_module
 from src.database.retriever import HybridRetriever
 from src.retrieval.contracts import RetrievedCandidate
+from src.retrieval.reranker_v5 import policy_order_fallback_v5
 
 
 class _VectorStore:
@@ -161,3 +164,71 @@ async def test_explicit_v5_uses_source_evidence_pool_and_entity_graph_seeds(
         if event["stage"] in {"RERANK", "PACKER"}
         for candidate in event["candidates"]
     )
+
+
+@pytest.mark.asyncio
+async def test_explicit_v5_rerank_trace_keeps_upstream_scores_namespaced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _embed(query: str) -> list[float]:
+        assert query == "Adapalene la gi?"
+        return [0.1, 0.2]
+
+    retriever = object.__new__(HybridRetriever)
+    retriever._vector_store = _VectorStore()
+    retriever._entity_retriever = _EntityRetriever()
+    retriever._graph_store = _GraphStore()
+    monkeypatch.setattr(retriever_module, "embed_query", _embed)
+    monkeypatch.setattr(retriever_module, "rerank_enabled_from_env", lambda: True)
+    monkeypatch.setattr(retriever_module, "rerank_provider_from_env", lambda: "local_rules")
+    monkeypatch.setattr(retriever_module, "rerank_top_n_from_env", lambda **_kwargs: 8)
+    monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "v5")
+
+    result = await retriever.retrieve("Adapalene la gi?", top_k=5)
+
+    trace_events = result.metadata["retrieval_v5"]["trace"]["events"]
+    rerank_event = next(event for event in trace_events if event["stage"] == "RERANK")
+    scores = rerank_event["candidates"][0]["scores"]
+    assert scores["dense_similarity"] == pytest.approx(0.82)
+    assert scores["sparse_bm25_score"] == pytest.approx(1.2)
+    assert scores["rrf"] is not None
+    assert math.isfinite(scores["reranker_final"])
+    assert rerank_event["warning_codes"] == []
+    assert result.metadata["rerank_trace"]["fallback_used"] is False
+
+
+@pytest.mark.asyncio
+async def test_explicit_v5_runtime_trace_marks_policy_order_rerank_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _embed(query: str) -> list[float]:
+        assert query == "Adapalene la gi?"
+        return [0.1, 0.2]
+
+    def _fallback_reranker(**kwargs):
+        return policy_order_fallback_v5(
+            query_context=kwargs["query_context"],
+            candidates=kwargs["candidates"],
+            provider=kwargs["provider"],
+            top_n=kwargs["top_n"],
+            warning="RERANK_FALLBACK_TIMEOUT",
+        )
+
+    retriever = object.__new__(HybridRetriever)
+    retriever._vector_store = _VectorStore()
+    retriever._entity_retriever = _EntityRetriever()
+    retriever._graph_store = _GraphStore()
+    monkeypatch.setattr(retriever_module, "embed_query", _embed)
+    monkeypatch.setattr(retriever_module, "rerank_enabled_from_env", lambda: True)
+    monkeypatch.setattr(retriever_module, "rerank_provider_from_env", lambda: "hybrid")
+    monkeypatch.setattr(retriever_module, "rerank_top_n_from_env", lambda **_kwargs: 8)
+    monkeypatch.setattr(retriever_module, "rerank_policy_evidence_v5", _fallback_reranker)
+    monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "v5")
+
+    result = await retriever.retrieve("Adapalene la gi?", top_k=5)
+
+    trace_events = result.metadata["retrieval_v5"]["trace"]["events"]
+    rerank_event = next(event for event in trace_events if event["stage"] == "RERANK")
+    assert rerank_event["warning_codes"] == ["RERANK_FALLBACK"]
+    assert [candidate["candidate_id"] for candidate in rerank_event["candidates"]] == ["point-a"]
+    assert result.metadata["rerank_trace"]["fallback_used"] is True
