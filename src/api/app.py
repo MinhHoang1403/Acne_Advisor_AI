@@ -30,6 +30,7 @@ from src.agent.main import run_clinical_agent
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
 from src.agent.text_encoding import repair_mojibake
 from src.observability.versioning import get_answer_cache_version
+from src.quality.claim_grounding import compact_claim_grounding
 from src.resilience.exceptions import (
     AgentTimeoutError,
     CircuitOpenError,
@@ -306,6 +307,20 @@ def _compact_p3_metadata(result: dict[str, Any]) -> dict[str, Any] | None:
         "abstention_type": abstention.get("abstention_type"),
         "abstention_reason": abstention.get("reason"),
     }
+
+
+def _compact_p4_metadata(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Return bounded claim-level grounding diagnostics without evidence text."""
+
+    try:
+        return compact_claim_grounding(result.get("claim_grounding"))
+    except Exception:
+        return {
+            "mode": result.get("p4_mode"),
+            "status": "degraded",
+            "verifier_degraded": True,
+            "production_answer_modified": False,
+        }
 
 
 def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> str:
@@ -815,6 +830,7 @@ async def chat_endpoint(request: ChatRequest):
                 "runtime_resilience": result.get("runtime_resilience"),
                 "prompt_budget": result.get("prompt_budget"),
                 "evidence_sufficiency": _compact_p3_metadata(result),
+                "claim_grounding": _compact_p4_metadata(result),
                 "answer_quality": {
                     "passed": answer_quality_report.get("passed") if isinstance(answer_quality_report, dict) else None,
                     "issue_count": len(answer_quality_report.get("issues", [])) if isinstance(answer_quality_report, dict) else 0,
@@ -879,6 +895,7 @@ async def chat_endpoint(request: ChatRequest):
                 "fallback_cache_eligible": result.get("fallback_cache_eligible"),
             },
             "evidence_sufficiency": _compact_p3_metadata(result),
+            "claim_grounding": _compact_p4_metadata(result),
             "cache": {
                 "enabled": bool(result.get("cache_enabled", os.getenv("CACHE_ENABLED", "true").lower() == "true")),
                 "checked": bool(result.get("cache_checked")),

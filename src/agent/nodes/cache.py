@@ -23,6 +23,7 @@ from src.observability.versioning import (
     get_answer_cache_version,
     pipeline_manifest_summary,
 )
+from src.quality.claim_grounding import compact_claim_grounding
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,11 @@ async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
             "cached_answer": cached_answer,
             "cached_sources": cached_data.get("sources", []),
             "cache_metadata": cached_data.get("metadata", {}),
+            "claim_grounding": meta.get("claim_grounding"),
+            "p4_mode": (meta.get("claim_grounding") or {}).get("mode"),
+            "p4_degraded": (meta.get("claim_grounding") or {}).get("verifier_degraded"),
+            "p4_shadow_policy": (meta.get("claim_grounding") or {}).get("shadow_action"),
+            "p4_answer_modified": False,
             "normalized_question": normalized,
             "pipeline_manifest": pipeline_manifest,
             "pipeline_fingerprint": pipeline_fingerprint,
@@ -422,6 +428,7 @@ async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
         "answer_cache_version": answer_cache_version,
         "pipeline_fingerprint": pipeline_fingerprint,
         "pipeline_manifest": pipeline_manifest_summary(pipeline_manifest),
+        "claim_grounding": compact_claim_grounding(state.get("claim_grounding")),
         "raw_question": raw_question,
         "standalone_question": standalone_q or "",
         "cache_key_question": target_question,
