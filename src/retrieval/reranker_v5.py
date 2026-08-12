@@ -178,6 +178,7 @@ def ranked_evidence_from_rerank_v5(
             candidate=KnowledgeCandidateV5(
                 candidate_id=source_candidate.candidate_id,
                 provenance=_provenance(source_candidate),
+                text=source_candidate.text,
                 scores=upstream_scores,
                 metadata_features=_metadata_features(source_candidate),
             ),

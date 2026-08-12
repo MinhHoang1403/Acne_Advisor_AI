@@ -46,6 +46,7 @@ _SECRET_KEY_MARKERS = (
     "bearer",
     "cookie",
 )
+_NON_SECRET_TOKEN_KEYS = {"retrieval_context_max_tokens"}
 
 
 def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -117,6 +118,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "rerank_top_n": _env_int(value("RERANK_TOP_N", "8"), default=8),
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "5"), default=5),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "4200"), default=4200),
+        "retrieval_context_max_tokens": _env_int(value("RETRIEVAL_CONTEXT_MAX_TOKENS", "1050"), default=1050),
         "semantic_rerank_model_identifier": _semantic_model_identifier(
             value("SEMANTIC_RERANK_MODEL_PATH", "")
         ),
@@ -228,6 +230,7 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
         "rerank_top_n",
         "retrieval_context_max_items",
         "retrieval_context_max_chars",
+        "retrieval_context_max_tokens",
         "semantic_rerank_model_identifier",
         "semantic_rerank_max_candidates",
         "answer_verifier_enabled",
@@ -325,7 +328,8 @@ def _strip_secret_keys(data: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in data.items()
-        if not any(marker in key.lower() for marker in _SECRET_KEY_MARKERS)
+        if key in _NON_SECRET_TOKEN_KEYS
+        or not any(marker in key.lower() for marker in _SECRET_KEY_MARKERS)
     }
 
 

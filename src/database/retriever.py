@@ -36,6 +36,10 @@ from src.retrieval.candidate_policy import (
 )
 from src.retrieval.contracts import RerankTrace, RetrievalTrace
 from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
+from src.retrieval.context_packer_v5 import (
+    pack_selected_evidence_v5,
+    packed_evidence_to_legacy_context_v5,
+)
 from src.retrieval.diagnostics import ConceptMatcher, build_retrieval_diagnostic_trace
 from src.retrieval.evidence_selector import select_evidence_v5
 from src.retrieval.entity_retriever import EntityRetriever
@@ -61,6 +65,7 @@ from src.retrieval.v5_compat import (
 )
 from src.retrieval.v5_contracts import (
     EvidenceSelectionResultV5,
+    PackedEvidenceV5,
     RankedEvidenceV5,
     RetrievalPipelineVersion,
     RetrievalStageV5,
@@ -647,12 +652,34 @@ class HybridRetriever:
         t_pack_start = time.time()
         context_max_items = _env_int("RETRIEVAL_CONTEXT_MAX_ITEMS", 5, minimum=3, maximum=10)
         context_max_chars = _env_int("RETRIEVAL_CONTEXT_MAX_CHARS", 4200, minimum=1200, maximum=12000)
-        packed_context = pack_context(
-            normalized_query=normalized_query,
-            merged_candidates=reranked_candidates,
-            max_items=min(max(top_k, 5), context_max_items),
-            max_chars=context_max_chars,
-        )
+        packed_evidence_v5: PackedEvidenceV5 | None = None
+        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+            assert evidence_selection_result_v5 is not None
+            context_max_tokens = _env_int(
+                "RETRIEVAL_CONTEXT_MAX_TOKENS",
+                context_max_chars // 4,
+                minimum=300,
+                maximum=3000,
+            )
+            packed_evidence_v5 = pack_selected_evidence_v5(
+                selected_evidence=evidence_selection_result_v5.selected_evidence,
+                max_items=min(max(top_k, 5), context_max_items),
+                max_characters=context_max_chars,
+                max_tokens=context_max_tokens,
+            )
+            packed_context = packed_evidence_to_legacy_context_v5(
+                normalized_query=normalized_query,
+                selected_evidence=evidence_selection_result_v5.selected_evidence,
+                packed_evidence=packed_evidence_v5,
+                candidates=reranked_candidates,
+            )
+        else:
+            packed_context = pack_context(
+                normalized_query=normalized_query,
+                merged_candidates=reranked_candidates,
+                max_items=min(max(top_k, 5), context_max_items),
+                max_chars=context_max_chars,
+            )
         t_pack = time.time() - t_pack_start
         selected_candidates = _candidates_for_packed_items(reranked_candidates, packed_context)
         top_chunks = prioritize_main_contexts(packed_context_to_legacy_contexts(packed_context), top_k)
@@ -791,6 +818,7 @@ class HybridRetriever:
                     ),
                     ranked_evidence=ranked_evidence_v5,
                     evidence_selection_result=evidence_selection_result_v5,
+                    packed_evidence=packed_evidence_v5,
                 )
                 comparison = None
                 if pipeline_selection.execution == RetrievalPipelineVersion.V4:
@@ -826,6 +854,11 @@ class HybridRetriever:
                         if evidence_selection_result_v5 is not None
                         else None
                     ),
+                    "evidence_packer": (
+                        packed_evidence_v5.model_dump(mode="json")
+                        if packed_evidence_v5 is not None
+                        else None
+                    ),
                     "trace": v5_trace.model_dump(mode="json"),
                 }
             except Exception as exc:
@@ -858,6 +891,11 @@ class HybridRetriever:
                 "evidence_selector": (
                     evidence_selection_result_v5.model_dump(mode="json")
                     if evidence_selection_result_v5 is not None
+                    else None
+                ),
+                "evidence_packer": (
+                    packed_evidence_v5.model_dump(mode="json")
+                    if packed_evidence_v5 is not None
                     else None
                 ),
                 "entity_count": len(entity_candidates),

@@ -21,7 +21,9 @@ from src.retrieval.v5_contracts import (
     CandidateObservationV5,
     CandidateProvenanceV5,
     EvidenceSelectionResultV5,
+    EvidencePackingStatusV5,
     EvidenceSufficiencyV5,
+    PackedEvidenceV5,
     QueryContextV5,
     QueryObservationV5,
     RankedEvidenceV5,
@@ -114,6 +116,7 @@ def build_v5_shadow_trace(
     candidate_policy_drops: tuple[CandidateDropV5, ...] = (),
     ranked_evidence: tuple[RankedEvidenceV5, ...] = (),
     evidence_selection_result: EvidenceSelectionResultV5 | None = None,
+    packed_evidence: PackedEvidenceV5 | None = None,
 ) -> RetrievalTraceV5:
     """Create a redacted V5 trace from finalized staged retrieval outputs."""
 
@@ -277,8 +280,24 @@ def build_v5_shadow_trace(
         RetrievalStageEventV5(
             stage=RetrievalStageV5.PACKER,
             candidates=tuple(
-                _context_observation(item, legacy_compat_only=legacy_execution)
+                _context_observation(
+                    item,
+                    legacy_compat_only=legacy_execution,
+                    extra_metadata_features=(
+                        ("critical",)
+                        if packed_evidence is not None
+                        and item.item_id in packed_evidence.critical_evidence_ids
+                        else ()
+                    ),
+                )
                 for item in packed_context.items
+            ),
+            drops=(packed_evidence.drops if packed_evidence is not None else ()),
+            warning_codes=(
+                ("PACKER_OVERFLOW",)
+                if packed_evidence is not None
+                and packed_evidence.status != EvidencePackingStatusV5.SUFFICIENT
+                else ()
             ),
             elapsed_ms=timings_ms.get("pack"),
             context_sha256=_sha256(packed_context.context_text),
@@ -457,6 +476,7 @@ def _context_observation(
     item: ContextItem,
     *,
     legacy_compat_only: bool = False,
+    extra_metadata_features: tuple[str, ...] = (),
 ) -> CandidateObservationV5:
     return CandidateObservationV5(
         candidate_id=item.item_id,
@@ -467,7 +487,9 @@ def _context_observation(
             legacy_compat_score=_finite_or_none(item.fused_score or item.score),
         ),
         provenance=_mapping_provenance(item.payload, item.item_id),
-        metadata_features=tuple(_metadata_features(item.matched_metadata)),
+        metadata_features=tuple(
+            _dedupe([*_metadata_features(item.matched_metadata), *extra_metadata_features])
+        ),
         legacy_compat_only=legacy_compat_only,
     )
 
