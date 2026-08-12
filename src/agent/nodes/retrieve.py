@@ -548,7 +548,14 @@ async def extract_symptoms_node(state: ClinicalState) -> dict:
 
 async def retrieve_context_node(state: ClinicalState) -> dict:
     """Retrieve context using the HybridRetriever."""
-    query = state.get("standalone_question") or state.get("normalized_question", "")
+    attempt = min(1, max(0, int(state.get("retrieval_attempt") or 0)))
+    retry_plan = state.get("retry_plan") or {}
+    retry_query = retry_plan.get("query_variant") if isinstance(retry_plan, dict) else None
+    query = (
+        retry_query
+        if attempt == 1 and isinstance(retry_query, str) and retry_query.strip()
+        else state.get("standalone_question") or state.get("normalized_question", "")
+    )
     
     if not query or not str(query).strip():
         return {
@@ -559,6 +566,8 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "source_allowlist": [],
             "retrieval_diagnostics": None,
             "retrieval_trace_v5": None,
+            "evidence_selector": None,
+            "evidence_packer": None,
             "retrieval_status": "empty_query",
             "retrieval_error": None,
         }
@@ -586,6 +595,11 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             )
         async with asyncio.timeout(timeout_seconds):
             result = await retriever.retrieve(query, **retrieve_kwargs)
+        retrieval_timings = {
+            str(name): float(value)
+            for name, value in (result.metadata.get("retrieval_trace", {}).get("timings_ms", {}) or {}).items()
+            if isinstance(value, (int, float))
+        }
         payload = {
             "vector_contexts": result.vector_contexts,
             "graph_facts": result.graph_facts,
@@ -602,16 +616,19 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
                 if isinstance(result.metadata.get("retrieval_v5"), dict)
                 else None
             ),
+            "evidence_selector": result.metadata.get("evidence_selector"),
+            "evidence_packer": result.metadata.get("evidence_packer"),
             "packed_context": result.metadata.get("packed_context"),
             "retrieval_diagnostics": result.metadata.get("retrieval_diagnostics"),
             "retrieval_error": None,
             "performance_timings": {
                 **(state.get("performance_timings") or {}),
-                **{
-                    f"retrieval_{name}": float(value)
-                    for name, value in (result.metadata.get("retrieval_trace", {}).get("timings_ms", {}) or {}).items()
-                    if isinstance(value, (int, float))
-                },
+                **(
+                    {f"retrieval_{name}": value for name, value in retrieval_timings.items()}
+                    if attempt == 0
+                    else {}
+                ),
+                **{f"retrieval_attempt_{attempt}_{name}": value for name, value in retrieval_timings.items()},
             },
         }
         payload["retrieval_status"] = "success" if has_usable_evidence(payload) else "no_evidence"
@@ -637,6 +654,8 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "source_allowlist": [],
             "retrieval_trace": None,
             "retrieval_trace_v5": None,
+            "evidence_selector": None,
+            "evidence_packer": None,
             "packed_context": None,
             "retrieval_diagnostics": None,
             "retrieval_status": "recoverable_error",

@@ -32,6 +32,12 @@ from src.agent.nodes.guardrails import domain_guard_node
 from src.agent.nodes.cache import cache_lookup_node, cache_store_node
 from src.agent.nodes.severity import severity_classification_node
 from src.agent.nodes.observability import observability_export_node
+from src.agent.nodes.evidence_sufficiency import (
+    assess_evidence_sufficiency_node,
+    build_evidence_retry_plan_node,
+    evidence_abstention_node,
+    route_after_evidence_sufficiency,
+)
 from src.observability.versioning import (
     build_pipeline_version_manifest,
     compute_pipeline_fingerprint,
@@ -82,6 +88,10 @@ def build_clinical_graph():
     builder.add_node("cache_lookup", cache_lookup_node)
     builder.add_node("extract", extract_symptoms_node)
     builder.add_node("retrieve", retrieve_context_node)
+    builder.add_node("assess_evidence_sufficiency", assess_evidence_sufficiency_node)
+    builder.add_node("build_retry_plan", build_evidence_retry_plan_node)
+    builder.add_node("retry_retrieve", retrieve_context_node)
+    builder.add_node("evidence_abstention", evidence_abstention_node)
     builder.add_node("fallback_decision", fallback_decision_node)
     builder.add_node("safety", safety_check_node)
     builder.add_node("generate", generate_answer_node)
@@ -105,7 +115,14 @@ def build_clinical_graph():
     builder.add_conditional_edges("cache_lookup", route_after_cache)
     
     builder.add_edge("extract", "retrieve")
-    builder.add_edge("retrieve", "fallback_decision")
+    builder.add_edge("retrieve", "assess_evidence_sufficiency")
+    builder.add_conditional_edges(
+        "assess_evidence_sufficiency",
+        route_after_evidence_sufficiency,
+    )
+    builder.add_edge("build_retry_plan", "retry_retrieve")
+    builder.add_edge("retry_retrieve", "assess_evidence_sufficiency")
+    builder.add_edge("evidence_abstention", "safe_fallback")
     builder.add_conditional_edges("fallback_decision", route_after_fallback_decision)
     builder.add_edge("safety", "generate")
     builder.add_edge("generate", "generation_fallback_decision")
@@ -187,8 +204,19 @@ async def run_clinical_agent(
         "retrieval_error": None,
         "retrieval_trace": None,
         "retrieval_trace_v5": None,
+        "evidence_selector": None,
+        "evidence_packer": None,
         "packed_context": None,
         "retrieval_diagnostics": None,
+        "p3_active": None,
+        "evidence_sufficiency_pre_pack": None,
+        "evidence_sufficiency_post_pack": None,
+        "evidence_sufficiency": None,
+        "retrieval_attempt": 0,
+        "retry_plan": None,
+        "retry_history": [],
+        "abstention": None,
+        "p3_trace": None,
         "prompt_evidence_trace": None,
         "prompt_budget": None,
         "pipeline_manifest": pipeline_manifest,
@@ -275,8 +303,19 @@ async def run_clinical_agent(
         "retrieval_error": final_state.get("retrieval_error"),
         "retrieval_trace": final_state.get("retrieval_trace"),
         "retrieval_trace_v5": final_state.get("retrieval_trace_v5"),
+        "evidence_selector": final_state.get("evidence_selector"),
+        "evidence_packer": final_state.get("evidence_packer"),
         "packed_context": final_state.get("packed_context"),
         "retrieval_diagnostics": final_state.get("retrieval_diagnostics"),
+        "p3_active": final_state.get("p3_active"),
+        "evidence_sufficiency_pre_pack": final_state.get("evidence_sufficiency_pre_pack"),
+        "evidence_sufficiency_post_pack": final_state.get("evidence_sufficiency_post_pack"),
+        "evidence_sufficiency": final_state.get("evidence_sufficiency"),
+        "retrieval_attempt": final_state.get("retrieval_attempt", 0),
+        "retry_plan": final_state.get("retry_plan"),
+        "retry_history": final_state.get("retry_history", []),
+        "abstention": final_state.get("abstention"),
+        "p3_trace": final_state.get("p3_trace"),
         "prompt_evidence_trace": final_state.get("prompt_evidence_trace"),
         "prompt_budget": final_state.get("prompt_budget"),
         "pipeline_manifest": final_state.get("pipeline_manifest"),

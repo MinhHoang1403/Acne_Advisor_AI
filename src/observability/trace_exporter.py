@@ -114,6 +114,11 @@ def build_observability_event(
         "cache_reason": result.get("cache_reason", state.get("cache_reason")),
         "pipeline_manifest": pipeline_manifest_summary(pipeline_manifest),
         "runtime_resilience": result.get("runtime_resilience", state.get("runtime_resilience")),
+        "evidence_sufficiency": _compact_p3_summary(
+            result.get("evidence_sufficiency", state.get("evidence_sufficiency")),
+            result.get("abstention", state.get("abstention")),
+            result.get("retry_history", state.get("retry_history")),
+        ),
     }
 
     summary = PipelineTraceSummary(
@@ -149,6 +154,7 @@ def build_observability_event(
         "fallback_reason": result.get("fallback_reason", state.get("fallback_reason")),
         "fallback_cache_eligible": result.get("fallback_cache_eligible", state.get("fallback_cache_eligible")),
         "quality_issues": issues,
+        "p3_trace": result.get("p3_trace", state.get("p3_trace")),
     }
 
     return ObservabilityEvent(
@@ -218,6 +224,26 @@ def _float_dict(value: Any) -> dict[str, float]:
 def _safe_query_summary(query: str) -> str:
     text = query or ""
     return f"[REDACTED_QUERY chars={len(text)}]"
+
+
+def _compact_p3_summary(
+    assessment: Any,
+    abstention: Any,
+    history: Any,
+) -> dict[str, Any] | None:
+    if not isinstance(assessment, dict):
+        return None
+    abstention = abstention if isinstance(abstention, dict) else {}
+    history = history if isinstance(history, list) else []
+    return {
+        "status": assessment.get("status"),
+        "attempts": min(2, max(1, len(history))),
+        "missing_roles": list(assessment.get("missing_roles") or [])[:12],
+        "critical_missing_roles": list(assessment.get("critical_missing_roles") or [])[:12],
+        "retry_eligibility": assessment.get("retry_eligibility"),
+        "abstention_type": abstention.get("abstention_type"),
+        "abstention_reason": abstention.get("reason"),
+    }
 
 
 __all__ = [

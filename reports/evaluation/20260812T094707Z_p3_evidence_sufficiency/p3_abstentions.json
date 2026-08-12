@@ -1,0 +1,161 @@
+[
+  {
+    "case_id": "retry_no_recovery",
+    "category": "RETRY_DOES_NOT_RECOVER",
+    "query": "Cơ chế hiếm này liên quan mụn thế nào?",
+    "initial_status": "INSUFFICIENT",
+    "initial_missing_roles": [
+      "treatment"
+    ],
+    "initial_evidence_ids": [
+      "retry_no_recovery-evidence-a0"
+    ],
+    "retry_eligible": "RETRYABLE",
+    "retry_triggered": true,
+    "retry_strategy": "deterministic_query_representation_refinement",
+    "retry_query": "Cơ chế hiếm này liên quan mụn thế nào? | evidence focus: treatment guidance",
+    "retry_query_differs": true,
+    "retry_status": "INSUFFICIENT",
+    "final_status": "INSUFFICIENT",
+    "final_action": "ABSTAIN",
+    "abstention_type": "INSUFFICIENT_EVIDENCE",
+    "attempts": 2,
+    "attempt_0_ms": 0.041,
+    "retry_planning_ms": 0.018,
+    "attempt_1_ms": 0.0476,
+    "total_ms": 0.1232,
+    "correct": true
+  },
+  {
+    "case_id": "critical_missing_pregnancy",
+    "category": "CRITICAL_EVIDENCE_MISSING",
+    "query": "Tazarotene có dùng khi mang thai không?",
+    "initial_status": "CRITICAL_EVIDENCE_MISSING",
+    "initial_missing_roles": [
+      "safety"
+    ],
+    "initial_evidence_ids": [
+      "critical_missing_pregnancy-evidence-a0"
+    ],
+    "retry_eligible": "RETRYABLE",
+    "retry_triggered": true,
+    "retry_strategy": "deterministic_query_representation_refinement",
+    "retry_query": "Tazarotene có dùng khi mang thai không? | evidence focus: safety contraindication",
+    "retry_query_differs": true,
+    "retry_status": "CRITICAL_EVIDENCE_MISSING",
+    "final_status": "CRITICAL_EVIDENCE_MISSING",
+    "final_action": "ABSTAIN",
+    "abstention_type": "CRITICAL_EVIDENCE_MISSING",
+    "attempts": 2,
+    "attempt_0_ms": 0.0438,
+    "retry_planning_ms": 0.0177,
+    "attempt_1_ms": 0.0409,
+    "total_ms": 0.1111,
+    "correct": true
+  },
+  {
+    "case_id": "out_of_scope",
+    "category": "OUT_OF_SCOPE",
+    "query": "Cách sửa động cơ xe máy?",
+    "initial_status": "INSUFFICIENT",
+    "initial_missing_roles": [
+      "primary",
+      "source_traceability"
+    ],
+    "initial_evidence_ids": [],
+    "retry_eligible": "NON_RETRYABLE",
+    "retry_triggered": false,
+    "retry_strategy": null,
+    "retry_query": null,
+    "retry_query_differs": false,
+    "retry_status": null,
+    "final_status": "INSUFFICIENT",
+    "final_action": "ABSTAIN",
+    "abstention_type": "OUT_OF_SCOPE",
+    "attempts": 1,
+    "attempt_0_ms": 0.0318,
+    "retry_planning_ms": 0.0,
+    "attempt_1_ms": 0.0,
+    "total_ms": 0.0392,
+    "correct": true
+  },
+  {
+    "case_id": "source_provenance_failure",
+    "category": "SOURCE_PROVENANCE_FAILURE",
+    "query": "Nguồn nào nói về adapalene?",
+    "initial_status": "INSUFFICIENT",
+    "initial_missing_roles": [
+      "primary",
+      "source_traceability"
+    ],
+    "initial_evidence_ids": [],
+    "retry_eligible": "NON_RETRYABLE",
+    "retry_triggered": false,
+    "retry_strategy": null,
+    "retry_query": null,
+    "retry_query_differs": false,
+    "retry_status": null,
+    "final_status": "INSUFFICIENT",
+    "final_action": "ABSTAIN",
+    "abstention_type": "SOURCE_PROVENANCE_FAILURE",
+    "attempts": 1,
+    "attempt_0_ms": 0.0295,
+    "retry_planning_ms": 0.0,
+    "attempt_1_ms": 0.0,
+    "total_ms": 0.0365,
+    "correct": true
+  },
+  {
+    "case_id": "retrieval_provider_failure",
+    "category": "PROVIDER_FAILURE",
+    "query": "Benzoyl peroxide là gì?",
+    "initial_status": "INSUFFICIENT",
+    "initial_missing_roles": [
+      "primary",
+      "source_traceability"
+    ],
+    "initial_evidence_ids": [],
+    "retry_eligible": "NON_RETRYABLE",
+    "retry_triggered": false,
+    "retry_strategy": null,
+    "retry_query": null,
+    "retry_query_differs": false,
+    "retry_status": null,
+    "final_status": "INSUFFICIENT",
+    "final_action": "ABSTAIN",
+    "abstention_type": "RETRIEVAL_PROVIDER_FAILURE",
+    "attempts": 1,
+    "attempt_0_ms": 0.0309,
+    "retry_planning_ms": 0.0,
+    "attempt_1_ms": 0.0,
+    "total_ms": 0.0424,
+    "correct": true
+  },
+  {
+    "case_id": "packer_critical_overflow",
+    "category": "PACKER_CRITICAL_OVERFLOW",
+    "query": "Có dùng retinoid khi mang thai không?",
+    "initial_status": "CRITICAL_EVIDENCE_MISSING",
+    "initial_missing_roles": [
+      "primary",
+      "source_traceability",
+      "safety"
+    ],
+    "initial_evidence_ids": [],
+    "retry_eligible": "NON_RETRYABLE",
+    "retry_triggered": false,
+    "retry_strategy": null,
+    "retry_query": null,
+    "retry_query_differs": false,
+    "retry_status": null,
+    "final_status": "CRITICAL_EVIDENCE_MISSING",
+    "final_action": "ABSTAIN",
+    "abstention_type": "CRITICAL_EVIDENCE_MISSING",
+    "attempts": 1,
+    "attempt_0_ms": 0.0369,
+    "retry_planning_ms": 0.0,
+    "attempt_1_ms": 0.0,
+    "total_ms": 0.045,
+    "correct": true
+  }
+]

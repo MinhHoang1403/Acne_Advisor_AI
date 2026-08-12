@@ -286,6 +286,28 @@ def _chat_metadata_identity(
     return provider, result.get("actual_model") or request.llm_model or default_model
 
 
+def _compact_p3_metadata(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Return bounded P3 decision fields suitable for API and DB diagnostics."""
+
+    assessment = result.get("evidence_sufficiency")
+    if not isinstance(assessment, dict):
+        return None
+    abstention = result.get("abstention")
+    abstention = abstention if isinstance(abstention, dict) else {}
+    history = result.get("retry_history")
+    history = history if isinstance(history, list) else []
+    return {
+        "status": assessment.get("status"),
+        "attempts": min(2, max(1, len(history))),
+        "missing_roles": list(assessment.get("missing_roles") or [])[:12],
+        "critical_missing_roles": list(assessment.get("critical_missing_roles") or [])[:12],
+        "retry_eligibility": assessment.get("retry_eligibility"),
+        "retry_reason": assessment.get("retry_reason"),
+        "abstention_type": abstention.get("abstention_type"),
+        "abstention_reason": abstention.get("reason"),
+    }
+
+
 def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> str:
     if result.get("cache_hit"):
         return "cache"
@@ -792,6 +814,7 @@ async def chat_endpoint(request: ChatRequest):
                 "observability_exported": result.get("observability_exported"),
                 "runtime_resilience": result.get("runtime_resilience"),
                 "prompt_budget": result.get("prompt_budget"),
+                "evidence_sufficiency": _compact_p3_metadata(result),
                 "answer_quality": {
                     "passed": answer_quality_report.get("passed") if isinstance(answer_quality_report, dict) else None,
                     "issue_count": len(answer_quality_report.get("issues", [])) if isinstance(answer_quality_report, dict) else 0,
@@ -855,6 +878,7 @@ async def chat_endpoint(request: ChatRequest):
                 "fallback_reason": result.get("fallback_reason"),
                 "fallback_cache_eligible": result.get("fallback_cache_eligible"),
             },
+            "evidence_sufficiency": _compact_p3_metadata(result),
             "cache": {
                 "enabled": bool(result.get("cache_enabled", os.getenv("CACHE_ENABLED", "true").lower() == "true")),
                 "checked": bool(result.get("cache_checked")),
