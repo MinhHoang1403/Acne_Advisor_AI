@@ -29,6 +29,11 @@ from typing import Any
 from src.database.graph_store import Neo4jGraphStore
 from src.database.vector_store import QdrantVectorStore, embed_query
 from src.retrieval.candidate_merge import candidate_debug_summary, merge_candidates
+from src.retrieval.candidate_policy import (
+    CandidatePolicyResult,
+    apply_candidate_policy,
+    candidate_policy_budget,
+)
 from src.retrieval.contracts import RerankTrace, RetrievalTrace
 from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
 from src.retrieval.diagnostics import ConceptMatcher, build_retrieval_diagnostic_trace
@@ -504,8 +509,17 @@ class HybridRetriever:
             candidate for candidate in chunk_candidates if candidate.source == "chunk"
         ]
         reranker_input_candidates = merged_candidates
+        candidate_policy_result: CandidatePolicyResult | None = None
+        t_candidate_policy = 0.0
         if pipeline_selection.execution == RetrievalPipelineVersion.V5:
-            reranker_input_candidates = source_evidence_candidates
+            t_policy_start = time.time()
+            candidate_policy_result = apply_candidate_policy(
+                source_evidence_candidates,
+                normalized_query,
+                budget=candidate_policy_budget(top_k),
+            )
+            reranker_input_candidates = list(candidate_policy_result.candidates)
+            t_candidate_policy = time.time() - t_policy_start
         t_rerank_start = time.time()
         rerank_top_n = rerank_top_n_from_env(default=max(top_k * 2, 8))
         rerank_timeout_seconds = _rerank_timeout_within_retrieval_budget()
@@ -628,6 +642,7 @@ class HybridRetriever:
                 "sparse": round(t_sparse * 1000, 3),
                 "boost": round(t_boost * 1000, 3),
                 "entity": round(t_entity * 1000, 3),
+                "candidate_policy": round(t_candidate_policy * 1000, 3),
                 "rerank": round(t_rerank * 1000, 3),
                 "pack": round(t_pack * 1000, 3),
                 "neo4j": round(t_neo4j * 1000, 3),
@@ -686,6 +701,16 @@ class HybridRetriever:
                     graph_facts=graph_facts,
                     timings_ms=trace.timings_ms,
                     selection=pipeline_selection,
+                    candidate_policy_candidates=(
+                        list(candidate_policy_result.candidates)
+                        if candidate_policy_result is not None
+                        else None
+                    ),
+                    candidate_policy_drops=(
+                        candidate_policy_result.drops
+                        if candidate_policy_result is not None
+                        else ()
+                    ),
                 )
                 comparison = None
                 if pipeline_selection.execution == RetrievalPipelineVersion.V4:
@@ -729,6 +754,7 @@ class HybridRetriever:
                 "sparse_time_s": round(t_sparse, 3),
                 "boost_time_s": round(t_boost, 3),
                 "entity_time_s": round(t_entity, 3),
+                "candidate_policy_time_s": round(t_candidate_policy, 3),
                 "rerank_time_s": round(t_rerank, 3),
                 "context_pack_time_s": round(t_pack, 3),
                 "neo4j_time_s": round(t_neo4j, 3),
@@ -738,6 +764,11 @@ class HybridRetriever:
                 "boosted_count": metadata_match_count if metadata_mode == "legacy_additive" else 0,
                 "metadata_annotation_count": metadata_match_count,
                 "metadata_mode": metadata_mode,
+                "candidate_policy": (
+                    candidate_policy_result.debug_summary()
+                    if candidate_policy_result is not None
+                    else {"mode": "legacy_candidate_merge"}
+                ),
                 "entity_count": len(entity_candidates),
                     "merged_count": len(reranker_input_candidates),
                 "reranked_count": len(reranked_candidates),

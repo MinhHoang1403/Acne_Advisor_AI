@@ -17,6 +17,7 @@ from src.retrieval.contracts import (
     RetrievedCandidate,
 )
 from src.retrieval.v5_contracts import (
+    CandidateDropV5,
     CandidateObservationV5,
     CandidateProvenanceV5,
     QueryContextV5,
@@ -105,6 +106,8 @@ def build_v5_shadow_trace(
     graph_facts: list[dict[str, Any]],
     timings_ms: Mapping[str, float],
     selection: RetrievalPipelineSelection,
+    candidate_policy_candidates: list[RetrievedCandidate] | None = None,
+    candidate_policy_drops: tuple[CandidateDropV5, ...] = (),
 ) -> RetrievalTraceV5:
     """Create a redacted V5 trace from finalized staged retrieval outputs."""
 
@@ -195,15 +198,27 @@ def build_v5_shadow_trace(
             ),
         )
     )
-    trace = trace.append_event(
-        RetrievalStageEventV5(
-            stage=RetrievalStageV5.LEGACY_CANDIDATE_MERGE,
-            candidates=tuple(
-                _candidate_observation(candidate, legacy_compat_only=True)
-                for candidate in merged_candidates
-            ),
+    if selection.execution == RetrievalPipelineVersion.V5:
+        trace = trace.append_event(
+            RetrievalStageEventV5(
+                stage=RetrievalStageV5.CANDIDATE_POLICY,
+                candidates=tuple(
+                    _candidate_observation(candidate)
+                    for candidate in candidate_policy_candidates or []
+                ),
+                drops=candidate_policy_drops,
+            )
         )
-    )
+    else:
+        trace = trace.append_event(
+            RetrievalStageEventV5(
+                stage=RetrievalStageV5.LEGACY_CANDIDATE_MERGE,
+                candidates=tuple(
+                    _candidate_observation(candidate, legacy_compat_only=True)
+                    for candidate in merged_candidates
+                ),
+            )
+        )
     legacy_execution = selection.execution == RetrievalPipelineVersion.V4
     rerank_scores = {
         item.candidate.candidate_id: item.rerank_score
