@@ -66,6 +66,8 @@ Trạng thái tổng quát:
 - Severity-aware answer guard cho routine, caution, urgent và emergency cases.
 - Safe fallback flow khi query rỗng, thiếu evidence, retrieval lỗi recoverable
   hoặc model trả output không hợp lệ.
+- P3 kiểm tra evidence sufficiency với tối đa một retry; P4 ánh xạ từng claim
+  vào packed source evidence và chạy entailment diagnostics ở `shadow` mode.
 - Frontend ChatGPT-inspired UI, render Markdown, bảng, bullet, source display
   metadata và trạng thái backend connectivity.
 - Bộ test/eval offline để kiểm tra retrieval, answer quality, fallback,
@@ -121,6 +123,8 @@ sequenceDiagram
     participant Q as Qdrant
     participant N as Neo4j
     participant L as LLM Provider
+    participant P3 as P3 Sufficiency
+    participant P4 as P4 Claim Grounding
     participant V as Verifier/Formatter
     participant DB as PostgreSQL
 
@@ -132,8 +136,11 @@ sequenceDiagram
     G->>R: Rewrite/context-aware retrieval nếu cần
     R->>Q: Dense + sparse search, entity retrieval
     R->>N: Graph enrichment
+    R->>P3: Kiểm tra role/provenance coverage
+    P3-->>R: Tối đa một bounded retry nếu thiếu evidence
     R-->>L: Packed context
-    L-->>V: Draft answer
+    L-->>P4: Draft answer
+    P4-->>V: Shadow verdicts; giữ nguyên draft production
     V-->>V: Quality check, safety wording, Markdown finalizer
     V->>C: Store answer nếu đủ điều kiện
     V->>DB: Persist chat history
@@ -147,9 +154,10 @@ Các bước chính:
 2. Agent phân loại domain/safety, severity và cache eligibility.
 3. Nếu cache hit hợp lệ, hệ thống trả answer đã versioned mà không gọi LLM.
 4. Nếu cache miss, retrieval lấy evidence từ Qdrant và Neo4j.
-5. Context được pack theo intent/entity trước khi gọi provider.
-6. Answer đi qua verifier, formatter, source presentation và cache store.
-7. Chat history được lưu vào PostgreSQL; lỗi DB persistence không được phép làm
+5. P3 kiểm tra sufficiency sau selection/packing và không vượt quá hai retrieval attempts.
+6. P4 `shadow` ánh xạ claim vào chunk đã có trong generation context; EntitySignal và GraphSignal không phải medical evidence.
+7. Answer đi qua verifier, formatter, source presentation và cache store; P4 shadow không đổi nội dung trả về.
+8. Chat history được lưu vào PostgreSQL; lỗi DB persistence không được phép làm
    mất an toàn y khoa của answer.
 
 ## Cấu Trúc Repository
@@ -266,6 +274,7 @@ Các nhóm biến quan trọng trong `.env.example`:
 | Redis/cache | `REDIS_URL`, `CACHE_*`, `CACHE_ANSWER_VERSION` | Default answer cache version là `v5` |
 | Ingestion | `CHUNK_SIZE`, `GRAPH_*`, `EMBEDDING_*` | Chỉ cần khi chạy ingestion |
 | Retrieval | `RETRIEVAL_PIPELINE_VERSION`, `RETRIEVAL_CONTEXT_*` | V5 là mặc định; đặt `v4` để rollback tường minh |
+| Grounding | `P3_EVIDENCE_SUFFICIENCY_*`, `P4_MODE`, `P4_*` | P4 mặc định `shadow`; đặt `disabled` để rollback ngay |
 | Reranker | `RERANK_*`, `SEMANTIC_RERANK_*` | Model path là đường dẫn local cần đổi theo máy |
 | Safety/resilience | `ANSWER_*`, `SEVERITY_GUARD_VERSION`, `SAFE_FALLBACK_FLOW_VERSION`, timeout/retry | Không cần đổi cho setup thường |
 | Observability | `OBSERVABILITY_*`, `PHASE2_DEBUG_METADATA` | Mặc định tắt để không lộ metadata debug |
