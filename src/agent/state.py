@@ -43,8 +43,19 @@ class ClinicalState(TypedDict):
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
     retrieval_trace_v5: dict[str, Any] | None
+    evidence_selector: dict[str, Any] | None
+    evidence_packer: dict[str, Any] | None
     packed_context: dict[str, Any] | None
     retrieval_diagnostics: dict[str, Any] | None
+    p3_active: bool | None
+    evidence_sufficiency_pre_pack: dict[str, Any] | None
+    evidence_sufficiency_post_pack: dict[str, Any] | None
+    evidence_sufficiency: dict[str, Any] | None
+    retrieval_attempt: int
+    retry_plan: dict[str, Any] | None
+    retry_history: list[dict[str, Any]]
+    abstention: dict[str, Any] | None
+    p3_trace: dict[str, Any] | None
     prompt_evidence_trace: dict[str, Any] | None
     prompt_budget: dict[str, Any] | None
     pipeline_manifest: dict[str, Any] | None

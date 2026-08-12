@@ -8,6 +8,10 @@ import os
 from typing import Any, Mapping
 
 from src.retrieval.v5_contracts import RETRIEVAL_V5_CONFIG_VERSION
+from src.retrieval.evidence_sufficiency import (
+    P3_EVIDENCE_SUFFICIENCY_VERSION,
+    P3_MAX_RETRIEVAL_ATTEMPTS,
+)
 
 
 DEFAULT_ANSWER_CACHE_VERSION = "v5"
@@ -68,6 +72,25 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         ),
         "retrieval_v5_config_version": _effective_retrieval_v5_config_version(
             value("RETRIEVAL_V5_CONFIG_VERSION", RETRIEVAL_V5_CONFIG_VERSION)
+        ),
+        "p3_evidence_sufficiency_enabled": _env_bool(
+            value("P3_EVIDENCE_SUFFICIENCY_ENABLED", "true"),
+            default=True,
+        ),
+        "p3_evidence_sufficiency_version": value(
+            "P3_EVIDENCE_SUFFICIENCY_VERSION",
+            P3_EVIDENCE_SUFFICIENCY_VERSION,
+        )
+        or P3_EVIDENCE_SUFFICIENCY_VERSION,
+        "p3_max_retrieval_attempts": min(
+            P3_MAX_RETRIEVAL_ATTEMPTS,
+            max(
+                1,
+                _env_int(
+                    value("P3_MAX_RETRIEVAL_ATTEMPTS", str(P3_MAX_RETRIEVAL_ATTEMPTS)),
+                    default=P3_MAX_RETRIEVAL_ATTEMPTS,
+                ),
+            ),
         ),
         "context_packer_version": value("CONTEXT_PACKER_VERSION", "context_packer_v3"),
         "reranker_version": value("RERANKER_VERSION", DEFAULT_RERANKER_VERSION),
@@ -203,6 +226,9 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
         "phase",
         "retrieval_pipeline_version",
         "retrieval_v5_config_version",
+        "p3_evidence_sufficiency_enabled",
+        "p3_evidence_sufficiency_version",
+        "p3_max_retrieval_attempts",
         "context_packer_version",
         "reranker_version",
         "answer_verifier_version",
