@@ -20,6 +20,8 @@ from src.retrieval.v5_contracts import (
     CandidateDropV5,
     CandidateObservationV5,
     CandidateProvenanceV5,
+    EvidenceSelectionResultV5,
+    EvidenceSufficiencyV5,
     QueryContextV5,
     QueryObservationV5,
     RankedEvidenceV5,
@@ -29,6 +31,7 @@ from src.retrieval.v5_contracts import (
     RetrievalTraceV5,
     RETRIEVAL_V5_CONFIG_VERSION,
     ScoreNamespaceV5,
+    SelectedEvidenceV5,
     ShadowComparisonV5,
     ShadowStageComparisonV5,
 )
@@ -110,6 +113,7 @@ def build_v5_shadow_trace(
     candidate_policy_candidates: list[RetrievedCandidate] | None = None,
     candidate_policy_drops: tuple[CandidateDropV5, ...] = (),
     ranked_evidence: tuple[RankedEvidenceV5, ...] = (),
+    evidence_selection_result: EvidenceSelectionResultV5 | None = None,
 ) -> RetrievalTraceV5:
     """Create a redacted V5 trace from finalized staged retrieval outputs."""
 
@@ -246,6 +250,29 @@ def build_v5_shadow_trace(
             elapsed_ms=timings_ms.get("rerank"),
         )
     )
+    if selection.execution == RetrievalPipelineVersion.V5:
+        selected_evidence = (
+            evidence_selection_result.selected_evidence
+            if evidence_selection_result is not None
+            else ()
+        )
+        trace = trace.append_event(
+            RetrievalStageEventV5(
+                stage=RetrievalStageV5.EVIDENCE_SELECTOR,
+                candidates=tuple(
+                    _selected_evidence_observation(item)
+                    for item in selected_evidence
+                ),
+                warning_codes=(
+                    ("EVIDENCE_INSUFFICIENT",)
+                    if evidence_selection_result is not None
+                    and evidence_selection_result.status
+                    != EvidenceSufficiencyV5.SUFFICIENT
+                    else ()
+                ),
+                elapsed_ms=timings_ms.get("evidence_selector"),
+            )
+        )
     trace = trace.append_event(
         RetrievalStageEventV5(
             stage=RetrievalStageV5.PACKER,
@@ -416,6 +443,13 @@ def _ranked_evidence_observation(evidence: RankedEvidenceV5) -> CandidateObserva
         scores=evidence.scores,
         provenance=candidate.provenance,
         metadata_features=candidate.metadata_features,
+    )
+
+
+def _selected_evidence_observation(selected_evidence: SelectedEvidenceV5) -> CandidateObservationV5:
+    observation = _ranked_evidence_observation(selected_evidence.evidence)
+    return observation.model_copy(
+        update={"metadata_features": (*observation.metadata_features, *selected_evidence.roles)}
     )
 
 

@@ -157,7 +157,14 @@ async def test_explicit_v5_uses_source_evidence_pool_and_entity_graph_seeds(
     assert "LEGACY_METADATA" not in [event["stage"] for event in trace_events]
     assert "CANDIDATE_POLICY" in [event["stage"] for event in trace_events]
     assert "LEGACY_CANDIDATE_MERGE" not in [event["stage"] for event in trace_events]
+    assert "EVIDENCE_SELECTOR" in [event["stage"] for event in trace_events]
     assert result.metadata["candidate_policy"]["mode"] == "budget_only"
+    assert result.metadata["evidence_selector"]["status"] == "SUFFICIENT"
+    assert [event["stage"] for event in trace_events].index("EVIDENCE_SELECTOR") == (
+        [event["stage"] for event in trace_events].index("RERANK") + 1
+    )
+    selector_event = next(event for event in trace_events if event["stage"] == "EVIDENCE_SELECTOR")
+    assert [candidate["candidate_id"] for candidate in selector_event["candidates"]] == ["point-a"]
     assert all(
         not candidate["legacy_compat_only"]
         for event in trace_events

@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 RETRIEVAL_V5_CONTRACT_VERSION = "retrieval_v5_contracts_v1"
-RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_reranker_contract_v1"
+RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_evidence_selector_v1"
 TRACE_EVENT_LIMIT = 64
 TRACE_CANDIDATE_LIMIT = 256
 
@@ -41,6 +41,7 @@ class RetrievalStageV5(str, Enum):
     CANDIDATE_POLICY = "CANDIDATE_POLICY"
     LEGACY_CANDIDATE_MERGE = "LEGACY_CANDIDATE_MERGE"
     RERANK = "RERANK"
+    EVIDENCE_SELECTOR = "EVIDENCE_SELECTOR"
     PACKER = "PACKER"
     GRAPH = "GRAPH"
 
@@ -207,6 +208,21 @@ class RankedEvidenceV5(_FrozenModel):
     fallback_used: bool = False
 
 
+class EvidenceSufficiencyV5(str, Enum):
+    """Bounded selector sufficiency outcome for later retry-compatible flows."""
+
+    SUFFICIENT = "SUFFICIENT"
+    INSUFFICIENT = "INSUFFICIENT"
+    CRITICAL_EVIDENCE_MISSING = "CRITICAL_EVIDENCE_MISSING"
+
+
+class EvidenceSelectionRequirementsV5(_FrozenModel):
+    """Coverage requirements, intentionally separate from packer budget."""
+
+    required_roles: tuple[str, ...] = ("primary", "source_traceability")
+    critical_safety_flags: tuple[str, ...] = ()
+
+
 class SelectedEvidenceV5(_FrozenModel):
     """Coverage-oriented evidence selection output for R6."""
 
@@ -214,6 +230,16 @@ class SelectedEvidenceV5(_FrozenModel):
     roles: tuple[str, ...]
     selection_reason: str
     critical: bool = False
+
+
+class EvidenceSelectionResultV5(_FrozenModel):
+    """Selector decision without prompt rendering or token accounting."""
+
+    selected_evidence: tuple[SelectedEvidenceV5, ...] = ()
+    status: EvidenceSufficiencyV5
+    missing_roles: tuple[str, ...] = ()
+    entity_signal_count: int = 0
+    graph_signal_count: int = 0
 
 
 class PackedEvidenceV5(_FrozenModel):
@@ -327,6 +353,9 @@ __all__ = [
     "CandidateObservationV5",
     "CandidateProvenanceV5",
     "DropReasonV5",
+    "EvidenceSelectionRequirementsV5",
+    "EvidenceSelectionResultV5",
+    "EvidenceSufficiencyV5",
     "EntitySignalV5",
     "FusedKnowledgeCandidateV5",
     "GraphSignalV5",

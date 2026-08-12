@@ -37,6 +37,7 @@ from src.retrieval.candidate_policy import (
 from src.retrieval.contracts import RerankTrace, RetrievalTrace
 from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
 from src.retrieval.diagnostics import ConceptMatcher, build_retrieval_diagnostic_trace
+from src.retrieval.evidence_selector import select_evidence_v5
 from src.retrieval.entity_retriever import EntityRetriever
 from src.retrieval.metadata_boost import annotate_chunk_results, boost_chunk_results
 from src.retrieval.query_expansion import expand_normalized_query
@@ -59,11 +60,15 @@ from src.retrieval.v5_compat import (
     retrieval_pipeline_selection_from_env,
 )
 from src.retrieval.v5_contracts import (
+    EvidenceSelectionResultV5,
     RankedEvidenceV5,
     RetrievalPipelineVersion,
     RetrievalStageV5,
 )
-from src.retrieval.v5_signals import build_entity_signals, entity_graph_seed_names
+from src.retrieval.v5_signals import (
+    build_entity_signals,
+    entity_graph_seed_names,
+)
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.resilience.contracts import runtime_resilience_settings_from_env
 
@@ -530,17 +535,22 @@ class HybridRetriever:
             )
             reranker_input_candidates = list(candidate_policy_result.candidates)
             t_candidate_policy = time.time() - t_policy_start
+        v5_query_context = (
+            query_context_from_legacy(
+                original_query=query,
+                retrieval_query=query,
+                normalized_query=normalized_query,
+            )
+            if pipeline_selection.execution == RetrievalPipelineVersion.V5
+            else None
+        )
         t_rerank_start = time.time()
         rerank_top_n = rerank_top_n_from_env(default=max(top_k * 2, 8))
         rerank_timeout_seconds = _rerank_timeout_within_retrieval_budget()
         ranked_evidence_v5: tuple[RankedEvidenceV5, ...] = ()
         if rerank_enabled_from_env():
             if pipeline_selection.execution == RetrievalPipelineVersion.V5:
-                v5_query_context = query_context_from_legacy(
-                    original_query=query,
-                    retrieval_query=query,
-                    normalized_query=normalized_query,
-                )
+                assert v5_query_context is not None
                 try:
                     rerank_result_v5 = await asyncio.wait_for(
                         asyncio.to_thread(
@@ -619,6 +629,21 @@ class HybridRetriever:
         t_rerank = time.time() - t_rerank_start
         warnings.extend(rerank_trace.warnings)
 
+        # R6 only classifies the R5-ranked source evidence. It deliberately
+        # runs before the legacy packer so selection and context budgeting
+        # remain separate stages while V4 packing behavior stays unchanged.
+        evidence_selection_result_v5: EvidenceSelectionResultV5 | None = None
+        t_evidence_selector = 0.0
+        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+            assert v5_query_context is not None
+            t_selector_start = time.time()
+            evidence_selection_result_v5 = select_evidence_v5(
+                query_context=v5_query_context,
+                ranked_evidence=ranked_evidence_v5,
+                entity_signals=build_entity_signals(entity_candidates),
+            )
+            t_evidence_selector = time.time() - t_selector_start
+
         t_pack_start = time.time()
         context_max_items = _env_int("RETRIEVAL_CONTEXT_MAX_ITEMS", 5, minimum=3, maximum=10)
         context_max_chars = _env_int("RETRIEVAL_CONTEXT_MAX_CHARS", 4200, minimum=1200, maximum=12000)
@@ -696,6 +721,7 @@ class HybridRetriever:
                 "entity": round(t_entity * 1000, 3),
                 "candidate_policy": round(t_candidate_policy * 1000, 3),
                 "rerank": round(t_rerank * 1000, 3),
+                "evidence_selector": round(t_evidence_selector * 1000, 3),
                 "pack": round(t_pack * 1000, 3),
                 "neo4j": round(t_neo4j * 1000, 3),
                 "total": round(t_total * 1000, 3),
@@ -764,6 +790,7 @@ class HybridRetriever:
                         else ()
                     ),
                     ranked_evidence=ranked_evidence_v5,
+                    evidence_selection_result=evidence_selection_result_v5,
                 )
                 comparison = None
                 if pipeline_selection.execution == RetrievalPipelineVersion.V4:
@@ -794,6 +821,11 @@ class HybridRetriever:
                     "source_evidence_candidate_ids": list(
                         v5_trace.candidate_ids_for(RetrievalStageV5.SOURCE_EVIDENCE_POOL)
                     ),
+                    "evidence_selector": (
+                        evidence_selection_result_v5.model_dump(mode="json")
+                        if evidence_selection_result_v5 is not None
+                        else None
+                    ),
                     "trace": v5_trace.model_dump(mode="json"),
                 }
             except Exception as exc:
@@ -809,6 +841,7 @@ class HybridRetriever:
                 "entity_time_s": round(t_entity, 3),
                 "candidate_policy_time_s": round(t_candidate_policy, 3),
                 "rerank_time_s": round(t_rerank, 3),
+                "evidence_selector_time_s": round(t_evidence_selector, 3),
                 "context_pack_time_s": round(t_pack, 3),
                 "neo4j_time_s": round(t_neo4j, 3),
                 "dense_count": len(dense_results),
@@ -821,6 +854,11 @@ class HybridRetriever:
                     candidate_policy_result.debug_summary()
                     if candidate_policy_result is not None
                     else {"mode": "legacy_candidate_merge"}
+                ),
+                "evidence_selector": (
+                    evidence_selection_result_v5.model_dump(mode="json")
+                    if evidence_selection_result_v5 is not None
+                    else None
                 ),
                 "entity_count": len(entity_candidates),
                     "merged_count": len(reranker_input_candidates),
