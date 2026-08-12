@@ -217,6 +217,10 @@ def _select_answer_contexts(contexts: list[dict[str, Any]], limit: int = 5, quer
     """Select prompt contexts, preferring clinical chunks over abbreviations/references."""
     if not contexts:
         return []
+    if all(str(ctx.get("context_pack_reason") or "").startswith("v5_packer:") for ctx in contexts):
+        # V5 Packer output is already selected, budgeted, and ordered. Preserve
+        # that contract instead of applying a hidden post-Packer rerank.
+        return [dict(ctx) for ctx in contexts[:limit]]
     ranked = sorted(
         (dict(ctx) for ctx in contexts),
         key=lambda ctx: _context_quality_score(ctx, query=query),
@@ -343,7 +347,10 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         return {}
         
     try:
-        from src.agent.prompts.medical_answer import build_medical_prompt
+        from src.agent.prompts.medical_answer import (
+            build_medical_prompt,
+            observe_medical_prompt_budget,
+        )
 
         answer_contexts = _select_answer_contexts(contexts, limit=5, query=question)
         prompt_graph_facts = filter_graph_facts_for_prompt(
@@ -383,6 +390,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             ignored_out_of_domain_part=ignored_out_of_domain_part,
             available_sources=source_allowlist,
         )
+        prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         
         llm_provider = state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")
@@ -432,6 +440,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "graph_relation_found": bool(prompt_graph_facts),
             "retrieval_diagnostics": retrieval_diagnostics,
             "prompt_evidence_trace": prompt_evidence_trace,
+            "prompt_budget": prompt_budget.model_dump(mode="json"),
             "runtime_resilience": {
                 **(state.get("runtime_resilience") or {}),
                 "llm": response_data.get("resilience"),

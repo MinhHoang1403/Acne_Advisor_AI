@@ -180,3 +180,26 @@ def build_medical_prompt(
     )
     
     return prompt
+
+
+def observe_medical_prompt_budget(prompt: str):
+    """Return size-only accounting for the exact rendered provider prompt."""
+
+    from src.retrieval.token_budget import observe_prompt_components
+
+    evidence_marker = "\n--- TÀI LIỆU Y KHOA (VECTOR CONTEXTS) ---\n"
+    graph_marker = "\n--- KIẾN THỨC LIÊN HỆ (GRAPH FACTS ĐÃ LỌC, CHỈ DÙNG BỔ SUNG) ---\n"
+    response_marker = "\n--- YÊU CẦU TRẢ LỜI ---\n"
+    evidence_start = prompt.find(evidence_marker)
+    graph_start = prompt.find(graph_marker)
+    response_start = prompt.find(response_marker)
+    if not (0 <= evidence_start < graph_start < response_start):
+        return observe_prompt_components((("non_evidence", prompt),))
+    return observe_prompt_components(
+        (
+            ("non_evidence", prompt[:evidence_start]),
+            ("evidence", prompt[evidence_start:graph_start]),
+            ("graph", prompt[graph_start:response_start]),
+            ("non_evidence", prompt[response_start:]),
+        )
+    )

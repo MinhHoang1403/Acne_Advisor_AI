@@ -558,6 +558,7 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "sources": [],
             "source_allowlist": [],
             "retrieval_diagnostics": None,
+            "retrieval_trace_v5": None,
             "retrieval_status": "empty_query",
             "retrieval_error": None,
         }
@@ -596,6 +597,11 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "sources": result.sources,
             "source_allowlist": build_source_allowlist(result.sources, result.vector_contexts),
             "retrieval_trace": result.metadata.get("retrieval_trace"),
+            "retrieval_trace_v5": (
+                (result.metadata.get("retrieval_v5") or {}).get("trace")
+                if isinstance(result.metadata.get("retrieval_v5"), dict)
+                else None
+            ),
             "packed_context": result.metadata.get("packed_context"),
             "retrieval_diagnostics": result.metadata.get("retrieval_diagnostics"),
             "retrieval_error": None,
@@ -630,6 +636,7 @@ async def retrieve_context_node(state: ClinicalState) -> dict:
             "sources": [],
             "source_allowlist": [],
             "retrieval_trace": None,
+            "retrieval_trace_v5": None,
             "packed_context": None,
             "retrieval_diagnostics": None,
             "retrieval_status": "recoverable_error",

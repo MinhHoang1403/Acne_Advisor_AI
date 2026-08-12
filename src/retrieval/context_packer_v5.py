@@ -20,9 +20,13 @@ from src.retrieval.v5_contracts import (
     PackedEvidenceV5,
     SelectedEvidenceV5,
 )
+from src.retrieval.token_budget import (
+    APPROXIMATE_TOKEN_CHARACTERS,
+    APPROXIMATE_TOKEN_COUNT_MODE,
+    estimate_tokens_approximately,
+)
 
 
-_APPROXIMATE_TOKEN_CHARACTERS = 4
 _MIN_CLIPPED_BLOCK_CHARACTERS = 96
 _CLIP_SUFFIX = "\n...[truncated]"
 
@@ -159,8 +163,10 @@ def pack_selected_evidence_v5(
         character_count=len(context_text),
         max_characters=max_characters,
         token_count=_estimate_tokens(context_text),
+        token_count_mode=APPROXIMATE_TOKEN_COUNT_MODE,
         max_tokens=effective_max_tokens,
         max_items=max_items,
+        used_items=len(selected_ids),
         source_paths=_source_paths(records, ordered_indexes),
         critical_evidence_ids=critical_ids,
         critical_evidence_preserved=critical_evidence_preserved,
@@ -306,7 +312,7 @@ def _fits(text: str, *, max_characters: int, max_tokens: int) -> bool:
 
 
 def _estimate_tokens(text: str) -> int:
-    return (len(text) + _APPROXIMATE_TOKEN_CHARACTERS - 1) // _APPROXIMATE_TOKEN_CHARACTERS
+    return estimate_tokens_approximately(text)
 
 
 def _clip_to_remaining_budget(
@@ -320,7 +326,7 @@ def _clip_to_remaining_budget(
     separator_size = 2 if existing else 0
     character_room = max_characters - len(existing) - separator_size
     token_room = max_tokens - _estimate_tokens(existing)
-    allowed = min(character_room, token_room * _APPROXIMATE_TOKEN_CHARACTERS)
+    allowed = min(character_room, token_room * APPROXIMATE_TOKEN_CHARACTERS)
     if allowed < _MIN_CLIPPED_BLOCK_CHARACTERS:
         return ""
     clipped = block[: allowed - len(_CLIP_SUFFIX)].rstrip() + _CLIP_SUFFIX

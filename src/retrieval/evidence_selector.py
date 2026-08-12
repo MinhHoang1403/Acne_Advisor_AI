@@ -19,6 +19,11 @@ from src.retrieval.v5_contracts import (
 _SAFETY_FEATURES = {"safety_context", "safety_contexts", "contraindications"}
 _TREATMENT_INTENTS = {"treatment", "treatment_recommendation", "general_acne_question"}
 _CONTRADICTION_FEATURES = {"contraindication", "contraindications", "not_antibiotic"}
+_GRAPH_RELATION_ROLES = {
+    "BELONGS_TO_CLASS": "drug_class",
+    "HAS_ACTIVE_INGREDIENT": "ingredient",
+    "CONTRAINDICATED_IN": "safety",
+}
 
 
 def select_evidence_v5(
@@ -39,7 +44,7 @@ def select_evidence_v5(
     ranked = tuple(ranked_evidence)
     entity_signals = tuple(entity_signals)
     graph_signals = tuple(graph_signals)
-    requirements = requirements or _requirements_from_query(query_context)
+    requirements = requirements or _requirements_from_query(query_context, graph_signals)
     selected = tuple(
         _selected_evidence(
             evidence=evidence,
@@ -69,18 +74,33 @@ def select_evidence_v5(
         selected_evidence=selected,
         status=status,
         missing_roles=missing_roles,
+        satisfied_roles=tuple(sorted(covered_roles)),
+        requirements=requirements,
         entity_signal_count=len(entity_signals),
         graph_signal_count=len(graph_signals),
     )
 
 
-def _requirements_from_query(query_context: QueryContextV5) -> EvidenceSelectionRequirementsV5:
+def _requirements_from_query(
+    query_context: QueryContextV5,
+    graph_signals: tuple[GraphSignalV5, ...],
+) -> EvidenceSelectionRequirementsV5:
     required_roles = ["primary", "source_traceability"]
     if query_context.safety_flags:
         required_roles.append("safety")
+    graph_required_roles = tuple(
+        dict.fromkeys(
+            role
+            for signal in graph_signals
+            for role in (_graph_requirement_role(signal),)
+            if role
+        )
+    )
+    required_roles.extend(role for role in graph_required_roles if role not in required_roles)
     return EvidenceSelectionRequirementsV5(
         required_roles=tuple(required_roles),
         critical_safety_flags=query_context.safety_flags,
+        graph_required_roles=graph_required_roles,
     )
 
 
@@ -104,6 +124,10 @@ def _selected_evidence(
         roles.append("treatment")
     if metadata_features & _CONTRADICTION_FEATURES:
         roles.append("contradiction")
+    if "drug_class" in metadata_features:
+        roles.append("drug_class")
+    if metadata_features & {"active_ingredient", "active_ingredients", "ingredient"}:
+        roles.append("ingredient")
     critical = bool(requirements.critical_safety_flags) and safety_evidence
     if critical:
         roles.append("critical")
@@ -118,6 +142,11 @@ def _selected_evidence(
 def _has_source_provenance(evidence: RankedEvidenceV5) -> bool:
     provenance = evidence.candidate.candidate.provenance
     return bool(provenance.chunk_id and (provenance.source_path or provenance.document_id))
+
+
+def _graph_requirement_role(signal: GraphSignalV5) -> str | None:
+    relation = signal.relation_path[0].upper() if signal.relation_path else ""
+    return _GRAPH_RELATION_ROLES.get(relation)
 
 
 __all__ = ["select_evidence_v5"]

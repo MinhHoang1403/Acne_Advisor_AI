@@ -69,11 +69,19 @@ class _EntitySignalRetriever:
 
 
 class _GraphStore:
-    async def get_entity_context(self, entity_names: list[str]) -> list[dict[str, object]]:
+    async def get_entity_context(
+        self,
+        entity_names: list[str],
+        **_kwargs: object,
+    ) -> list[dict[str, object]]:
         assert entity_names
         return []
 
-    async def search_by_keywords(self, keywords: list[str]) -> list[dict[str, object]]:
+    async def search_by_keywords(
+        self,
+        keywords: list[str],
+        **_kwargs: object,
+    ) -> list[dict[str, object]]:
         assert keywords
         return []
 
@@ -82,9 +90,33 @@ class _RecordingGraphStore(_GraphStore):
     def __init__(self) -> None:
         self.entity_lookups: list[list[str]] = []
 
-    async def get_entity_context(self, entity_names: list[str]) -> list[dict[str, object]]:
+    async def get_entity_context(
+        self,
+        entity_names: list[str],
+        **_kwargs: object,
+    ) -> list[dict[str, object]]:
         self.entity_lookups.append(entity_names)
-        return []
+        return [
+            {
+                "entity": "adapalene",
+                "relationship": "RELATED_TO",
+                "related_entity": "topical_retinoid",
+                "evidence": "taxonomy",
+            }
+        ]
+
+
+class _UnavailableGraphStore(_GraphStore):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def search_by_keywords(
+        self,
+        keywords: list[str],
+        **_kwargs: object,
+    ) -> list[dict[str, object]]:
+        self.calls += 1
+        raise ConnectionError("graph unavailable")
 
 
 @pytest.mark.asyncio
@@ -152,12 +184,19 @@ async def test_explicit_v5_uses_source_evidence_pool_and_entity_graph_seeds(
     assert [signal["canonical_name"] for signal in shadow["entity_signals"]] == ["adapalene"]
     assert shadow["graph_seed_names"] == ["adapalene"]
     assert graph_store.entity_lookups == [["adapalene"]]
+    assert len(shadow["graph_signals"]) == 1
     trace_events = shadow["trace"]["events"]
     assert "METADATA_ANNOTATION" in [event["stage"] for event in trace_events]
     assert "LEGACY_METADATA" not in [event["stage"] for event in trace_events]
     assert "CANDIDATE_POLICY" in [event["stage"] for event in trace_events]
     assert "LEGACY_CANDIDATE_MERGE" not in [event["stage"] for event in trace_events]
     assert "EVIDENCE_SELECTOR" in [event["stage"] for event in trace_events]
+    assert [event["stage"] for event in trace_events].index("GRAPH") < (
+        [event["stage"] for event in trace_events].index("EVIDENCE_SELECTOR")
+    )
+    assert [event["stage"] for event in trace_events].index("GRAPH") < (
+        [event["stage"] for event in trace_events].index("CANDIDATE_POLICY")
+    )
     assert result.metadata["candidate_policy"]["mode"] == "budget_only"
     assert result.metadata["evidence_selector"]["status"] == "SUFFICIENT"
     assert result.metadata["evidence_packer"]["status"] == "SUFFICIENT"
@@ -166,9 +205,18 @@ async def test_explicit_v5_uses_source_evidence_pool_and_entity_graph_seeds(
     )
     selector_event = next(event for event in trace_events if event["stage"] == "EVIDENCE_SELECTOR")
     assert [candidate["candidate_id"] for candidate in selector_event["candidates"]] == ["point-a"]
+    assert selector_event["summary"]["status_code"] == "SUFFICIENT"
+    assert selector_event["transitions"][0]["status"] == "SELECTED"
+    assert result.metadata["evidence_selector"]["graph_signal_count"] == 1
+    graph_event = next(event for event in trace_events if event["stage"] == "GRAPH")
+    assert graph_event["summary"]["graph_lookup_attempted"] is True
+    assert graph_event["summary"]["graph_signal_count"] == 1
+    assert graph_event["graph_signals"][0]["medical_claim_eligible"] is False
     packer_event = next(event for event in trace_events if event["stage"] == "PACKER")
     assert [candidate["candidate_id"] for candidate in packer_event["candidates"]] == ["point-a"]
     assert packer_event["drops"] == []
+    assert packer_event["summary"]["token_count_mode"] == "approximate_chars_div_4"
+    assert packer_event["summary"]["used_items"] == 1
     assert all(
         not candidate["legacy_compat_only"]
         for event in trace_events
@@ -205,6 +253,7 @@ async def test_explicit_v5_rerank_trace_keeps_upstream_scores_namespaced(
     assert scores["rrf"] is not None
     assert math.isfinite(scores["reranker_final"])
     assert rerank_event["warning_codes"] == []
+    assert rerank_event["transitions"][0]["status"] == "RETAINED"
     assert result.metadata["rerank_trace"]["fallback_used"] is False
 
 
@@ -242,4 +291,36 @@ async def test_explicit_v5_runtime_trace_marks_policy_order_rerank_fallback(
     rerank_event = next(event for event in trace_events if event["stage"] == "RERANK")
     assert rerank_event["warning_codes"] == ["RERANK_FALLBACK"]
     assert [candidate["candidate_id"] for candidate in rerank_event["candidates"]] == ["point-a"]
+    assert rerank_event["transitions"][0]["status"] == "FALLBACK_RESTORED"
     assert result.metadata["rerank_trace"]["fallback_used"] is True
+
+
+@pytest.mark.asyncio
+async def test_explicit_v5_graph_failure_is_traced_and_source_evidence_survives(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _embed(_query: str) -> list[float]:
+        return [0.1, 0.2]
+
+    graph_store = _UnavailableGraphStore()
+    retriever = object.__new__(HybridRetriever)
+    retriever._vector_store = _VectorStore()
+    retriever._entity_retriever = _EntityRetriever()
+    retriever._graph_store = graph_store
+    monkeypatch.setattr(retriever_module, "embed_query", _embed)
+    monkeypatch.setattr(retriever_module, "rerank_enabled_from_env", lambda: False)
+    monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "v5")
+
+    result = await retriever.retrieve("Adapalene la gi?", top_k=5)
+
+    assert graph_store.calls == 1
+    assert result.vector_contexts[0]["chunk_id"] == "chunk-a"
+    assert result.graph_facts == []
+    graph_event = next(
+        event
+        for event in result.metadata["retrieval_v5"]["trace"]["events"]
+        if event["stage"] == "GRAPH"
+    )
+    assert graph_event["summary"]["status_code"] == "DEGRADED"
+    assert graph_event["warning_codes"] == ["GRAPH_LOOKUP_UNAVAILABLE"]
+    assert result.metadata["evidence_selector"]["status"] == "SUFFICIENT"

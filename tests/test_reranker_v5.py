@@ -7,7 +7,7 @@ import pytest
 from src.retrieval.contracts import RerankScoreBreakdown, RerankTrace, RerankedCandidate, RetrievedCandidate
 from src.retrieval.query_normalization import normalize_query
 from src.retrieval.reranker_v5 import policy_order_fallback_v5, rerank_policy_evidence_v5
-from src.retrieval.v5_compat import query_context_from_legacy
+from src.retrieval.v5_compat import build_reranker_transitions_v5, query_context_from_legacy
 
 
 def _candidate(candidate_id: str, score: float, **payload: object) -> RetrievedCandidate:
@@ -217,3 +217,45 @@ def test_v5_timeout_fallback_has_explicit_trace_code_and_preserves_all_policy_ev
         "first",
         "pregnancy",
     ]
+
+
+def test_reranker_transitions_explicitly_record_top_n_removals_and_fallback_restore() -> None:
+    normalized, context = _query_context()
+    policy = [_candidate("first", 0.4), _candidate("second", 0.3), _candidate("third", 0.2)]
+    output = [policy[1]]
+    trace = _trace_for(output, input_count=3, top_n=1)
+    ranked = rerank_policy_evidence_v5(
+        query_context=context,
+        normalized_query=normalized,
+        candidates=policy,
+        expansion=None,
+        top_n=1,
+        provider="local_rules",
+        runner=_runner(output, trace),
+    )
+    transitions = build_reranker_transitions_v5(
+        policy_candidates=policy,
+        ranked_evidence=ranked.ranked_evidence,
+        reranked_candidates=ranked.candidates,
+        fallback_used=False,
+    )
+    fallback_result = policy_order_fallback_v5(
+        query_context=context,
+        candidates=policy,
+        provider="hybrid",
+        top_n=1,
+        warning="RERANK_FALLBACK_TIMEOUT",
+    )
+    fallback = build_reranker_transitions_v5(
+        policy_candidates=policy,
+        ranked_evidence=fallback_result.ranked_evidence,
+        reranked_candidates=fallback_result.candidates,
+        fallback_used=True,
+    )
+
+    assert transitions[1].status.value == "RETAINED"
+    assert transitions[1].output_rank == 1
+    assert transitions[0].reason.value == "RERANK_TOP_N_REMOVED"
+    assert transitions[2].reason.value == "RERANK_TOP_N_REMOVED"
+    assert all(item.status.value == "FALLBACK_RESTORED" for item in fallback)
+    assert [item.output_rank for item in fallback] == [1, 2, 3]

@@ -4,6 +4,10 @@ from src.retrieval.context_packer_v5 import (
     pack_selected_evidence_v5,
     packed_evidence_to_legacy_context_v5,
 )
+from src.retrieval.token_budget import (
+    APPROXIMATE_TOKEN_COUNT_MODE,
+    estimate_tokens_approximately,
+)
 from src.retrieval.contracts import RetrievedCandidate
 from src.retrieval.query_normalization import normalize_query
 from src.retrieval.v5_contracts import (
@@ -212,3 +216,96 @@ def test_historical_r7_sentinels_remain_serialized_when_budget_allows() -> None:
     assert packed.status == EvidencePackingStatusV5.SUFFICIENT
     for sentinel in sentinels:
         assert sentinel in packed.context_text
+
+
+def _selected_with_rendered_length(target: int, *, critical: bool = False) -> SelectedEvidenceV5:
+    probe = _selected("boundary", "x", critical=critical)
+    rendered = pack_selected_evidence_v5(
+        selected_evidence=[probe],
+        max_items=1,
+        max_characters=10000,
+        max_tokens=2500,
+    ).rendered_blocks[0]
+    overhead = len(rendered) - 1
+    return _selected("boundary", "x" * (target - overhead), critical=critical)
+
+
+def test_exact_item_boundary_five_vs_six() -> None:
+    evidence = [_selected(f"item-{index}", "short evidence") for index in range(6)]
+    packed = pack_selected_evidence_v5(
+        selected_evidence=evidence,
+        max_items=5,
+        max_characters=4200,
+        max_tokens=1050,
+    )
+
+    assert packed.used_items == 5
+    assert packed.selected_evidence_ids == tuple(f"item-{index}" for index in range(5))
+    assert packed.omitted_evidence_ids == ("item-5",)
+    assert packed.token_count_mode == APPROXIMATE_TOKEN_COUNT_MODE
+
+
+def test_exact_character_and_estimated_token_boundaries() -> None:
+    assert estimate_tokens_approximately("x" * 4200) == 1050
+    assert estimate_tokens_approximately("x" * 4201) == 1051
+
+    exact = pack_selected_evidence_v5(
+        selected_evidence=[_selected_with_rendered_length(4200)],
+        max_items=1,
+        max_characters=4200,
+        max_tokens=1050,
+    )
+    over_character = pack_selected_evidence_v5(
+        selected_evidence=[_selected_with_rendered_length(4201)],
+        max_items=1,
+        max_characters=4200,
+        max_tokens=2000,
+    )
+    over_estimated_token = pack_selected_evidence_v5(
+        selected_evidence=[_selected_with_rendered_length(4201)],
+        max_items=1,
+        max_characters=5000,
+        max_tokens=1050,
+    )
+
+    assert exact.character_count == 4200
+    assert exact.token_count == 1050
+    assert exact.status == EvidencePackingStatusV5.SUFFICIENT
+    assert over_character.character_count == 4200
+    assert over_character.clipped_evidence_ids == ("boundary",)
+    assert over_estimated_token.character_count == 4200
+    assert over_estimated_token.token_count == 1050
+    assert over_estimated_token.clipped_evidence_ids == ("boundary",)
+
+
+def test_empty_text_and_combined_critical_overflow_are_explicit() -> None:
+    empty = _selected("empty", "   ")
+    first = _selected("critical-a", "a" * 80, critical=True, roles=("safety", "critical"))
+    second = _selected("critical-b", "b" * 80, critical=True, roles=("safety", "critical"))
+    empty_result = pack_selected_evidence_v5(
+        selected_evidence=[empty], max_items=1, max_characters=4200, max_tokens=1050
+    )
+    critical_result = pack_selected_evidence_v5(
+        selected_evidence=[first, second], max_items=2, max_characters=180, max_tokens=45
+    )
+
+    assert empty_result.drops[0].reason == DropReasonV5.PACKER_EMPTY_TEXT
+    assert critical_result.status == EvidencePackingStatusV5.CRITICAL_EVIDENCE_OVERFLOW
+    assert critical_result.critical_evidence_preserved is False
+    assert critical_result.omitted_evidence_ids
+
+
+def test_approximate_estimator_handles_vietnamese_english_and_mixed_medical_text() -> None:
+    for candidate_id, text in (
+        ("vi", "Mụn viêm đỏ cần đánh giá." * 20),
+        ("en", "Inflamed acne needs assessment." * 20),
+        ("mixed", "Adapalene và benzoyl peroxide trị mụn." * 20),
+    ):
+        packed = pack_selected_evidence_v5(
+            selected_evidence=[_selected(candidate_id, text)],
+            max_items=1,
+            max_characters=4200,
+            max_tokens=1050,
+        )
+        assert packed.token_count == (packed.character_count + 3) // 4
+        assert packed.token_count_mode == "approximate_chars_div_4"
