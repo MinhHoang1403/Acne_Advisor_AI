@@ -1,0 +1,326 @@
+{
+  "schema_version": "p4_claim_grounding_fixture_v1",
+  "frozen": true,
+  "cases": [
+    {
+      "id": "supported_tazorac_alias",
+      "category": "ALIAS_ENTITY",
+      "query": "Tazorac thuộc nhóm thuốc nào?",
+      "claim": "Tazorac chứa tazarotene, một retinoid bôi điều trị mụn.",
+      "evidence": [{"evidence_id": "e-s01", "source_id": "drug-label.pdf", "text": "Tazorac chứa tazarotene, một retinoid bôi điều trị mụn."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_adapalene_class",
+      "category": "DEFINITION",
+      "query": "Adapalene là thuốc gì?",
+      "claim": "Adapalene là một retinoid bôi dùng để điều trị mụn.",
+      "evidence": [{"evidence_id": "e-s02", "source_id": "acne-guide.pdf", "text": "Adapalene là một retinoid bôi dùng để điều trị mụn."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_bp_not_antibiotic",
+      "category": "ANTIBIOTIC_STEWARDSHIP",
+      "query": "Benzoyl peroxide có phải kháng sinh không?",
+      "claim": "Benzoyl peroxide không phải là kháng sinh.",
+      "evidence": [{"evidence_id": "e-s03", "source_id": "bp-monograph.pdf", "text": "Benzoyl peroxide không phải là kháng sinh."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_clindamycin_antibiotic",
+      "category": "ANTIBIOTIC_STEWARDSHIP",
+      "query": "Clindamycin thuộc nhóm nào?",
+      "claim": "Clindamycin là kháng sinh bôi tại chỗ dùng trong điều trị mụn.",
+      "evidence": [{"evidence_id": "e-s04", "source_id": "antibiotic-guide.pdf", "text": "Clindamycin là kháng sinh bôi tại chỗ dùng trong điều trị mụn."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_blackhead_clogging",
+      "category": "MECHANISM",
+      "query": "Mụn đầu đen hình thành thế nào?",
+      "claim": "Mụn đầu đen hình thành khi lỗ chân lông bị bít tắc bởi bã nhờn và tế bào chết.",
+      "evidence": [{"evidence_id": "e-s05", "source_id": "comedone-guide.pdf", "text": "Mụn đầu đen hình thành khi lỗ chân lông bị bít tắc bởi bã nhờn và tế bào chết."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_blackhead_oxidation",
+      "category": "MECHANISM",
+      "query": "Vì sao mụn đầu đen có màu đen?",
+      "claim": "Màu đen của mụn đầu đen liên quan đến quá trình oxy hóa khi nhân mụn tiếp xúc với không khí.",
+      "evidence": [{"evidence_id": "e-s06", "source_id": "comedone-guide.pdf", "text": "Màu đen của mụn đầu đen liên quan đến quá trình oxy hóa khi nhân mụn tiếp xúc với không khí."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_bp_antimicrobial",
+      "category": "MECHANISM",
+      "query": "Benzoyl peroxide tác động thế nào?",
+      "claim": "Benzoyl peroxide có tác dụng kháng khuẩn với C. acnes và hỗ trợ giảm bít tắc.",
+      "evidence": [{"evidence_id": "e-s07", "source_id": "bp-monograph.pdf", "text": "Benzoyl peroxide có tác dụng kháng khuẩn với C. acnes và hỗ trợ giảm bít tắc."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_topical_irritation",
+      "category": "SAFETY",
+      "query": "Thuốc bôi trị mụn có thể gây gì?",
+      "claim": "Retinoid bôi có thể gây khô, đỏ và bong tróc da.",
+      "evidence": [{"evidence_id": "e-s08", "source_id": "retinoid-guide.pdf", "text": "Retinoid bôi có thể gây khô, đỏ và bong tróc da."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_epiduo_composition",
+      "category": "TREATMENT_COMPARISON",
+      "query": "Epiduo gồm hoạt chất nào?",
+      "claim": "Epiduo chứa adapalene và benzoyl peroxide.",
+      "evidence": [{"evidence_id": "e-s09", "source_id": "epiduo-label.pdf", "text": "Epiduo chứa adapalene và benzoyl peroxide."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_mixed_language",
+      "category": "MIXED_LANGUAGE",
+      "query": "Topical retinoid có tác dụng gì?",
+      "claim": "Topical retinoids help reduce comedonal acne and follicular plugging.",
+      "evidence": [{"evidence_id": "e-s10", "source_id": "clinical-review.pdf", "text": "Topical retinoids help reduce comedonal acne and follicular plugging."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_pregnancy_contraindication",
+      "category": "PREGNANCY_CONTRAINDICATION",
+      "query": "Tazarotene có dùng khi mang thai không?",
+      "claim": "Tazarotene không được dùng trong thai kỳ.",
+      "evidence": [{"evidence_id": "e-s11", "source_id": "tazarotene-label.pdf", "text": "Tazarotene không được dùng trong thai kỳ."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "supported_emergency_action",
+      "category": "EMERGENCY",
+      "query": "Khó thở và sưng lưỡi sau thuốc thì làm gì?",
+      "claim": "Khó thở kèm sưng lưỡi sau dùng thuốc cần được cấp cứu ngay.",
+      "evidence": [{"evidence_id": "e-s12", "source_id": "emergency-guide.pdf", "text": "Khó thở kèm sưng lưỡi sau dùng thuốc cần được cấp cứu ngay."}],
+      "expected_verdict": "SUPPORTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "DIRECT_SUPPORT"
+    },
+    {
+      "id": "partial_retinoid_overclaim",
+      "category": "PARTIAL_SUPPORT",
+      "query": "Retinoid có trị mụn đầu đen không?",
+      "claim": "Retinoid bôi luôn luôn chữa khỏi hoàn toàn mụn đầu đen trong một tuần.",
+      "evidence": [{"evidence_id": "e-p01", "source_id": "retinoid-guide.pdf", "text": "Retinoid bôi có thể cải thiện mụn đầu đen."}],
+      "expected_verdict": "PARTIALLY_SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "SUPPORTS_WEAKER_CLAIM"
+    },
+    {
+      "id": "partial_bp_speed_overclaim",
+      "category": "PARTIAL_SUPPORT",
+      "query": "Benzoyl peroxide tác động ra sao?",
+      "claim": "Benzoyl peroxide luôn luôn loại bỏ hoàn toàn C. acnes trong một tuần.",
+      "evidence": [{"evidence_id": "e-p02", "source_id": "bp-monograph.pdf", "text": "Benzoyl peroxide có tác dụng kháng khuẩn với C. acnes."}],
+      "expected_verdict": "PARTIALLY_SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "SUPPORTS_WEAKER_CLAIM"
+    },
+    {
+      "id": "partial_adapalene_overclaim",
+      "category": "PARTIAL_SUPPORT",
+      "query": "Adapalene có giảm nhân mụn không?",
+      "claim": "Adapalene luôn luôn làm sạch hoàn toàn mọi nhân mụn trong một tuần.",
+      "evidence": [{"evidence_id": "e-p03", "source_id": "adapalene-guide.pdf", "text": "Adapalene giúp giảm bít tắc và nhân mụn."}],
+      "expected_verdict": "PARTIALLY_SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "SUPPORTS_WEAKER_CLAIM"
+    },
+    {
+      "id": "partial_tazarotene_guarantee",
+      "category": "PARTIAL_SUPPORT",
+      "query": "Tazarotene điều trị mụn thế nào?",
+      "claim": "Tazarotene chắc chắn chữa khỏi hoàn toàn mụn trong một tuần.",
+      "evidence": [{"evidence_id": "e-p04", "source_id": "tazarotene-guide.pdf", "text": "Tazarotene là retinoid bôi được dùng để điều trị mụn."}],
+      "expected_verdict": "PARTIALLY_SUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "SUPPORTS_WEAKER_CLAIM"
+    },
+    {
+      "id": "partial_antibiotic_overclaim",
+      "category": "ANTIBIOTIC_STEWARDSHIP",
+      "query": "Kháng sinh bôi trị mụn có hiệu quả không?",
+      "claim": "Clindamycin luôn luôn chữa khỏi hoàn toàn mọi mụn viêm trong một tuần.",
+      "evidence": [{"evidence_id": "e-p05", "source_id": "antibiotic-guide.pdf", "text": "Clindamycin là kháng sinh bôi có thể hỗ trợ điều trị mụn viêm."}],
+      "expected_verdict": "PARTIALLY_SUPPORTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "SUPPORTS_WEAKER_CLAIM"
+    },
+    {
+      "id": "unsupported_adapalene_bleaching",
+      "category": "UNSUPPORTED_PLAUSIBLE",
+      "query": "Adapalene có làm bạc màu vải không?",
+      "claim": "Adapalene làm bạc màu tóc, quần áo và khăn trải giường sau mỗi lần bôi.",
+      "evidence": [{"evidence_id": "e-u01", "source_id": "adapalene-guide.pdf", "text": "Adapalene là retinoid bôi có thể gây khô và kích ứng da."}],
+      "expected_verdict": "UNSUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "MISSING_KEY_RELATION"
+    },
+    {
+      "id": "unsupported_bp_oral",
+      "category": "UNSUPPORTED_PLAUSIBLE",
+      "query": "Benzoyl peroxide là thuốc uống phải không?",
+      "claim": "Benzoyl peroxide là thuốc uống toàn thân được hấp thu để điều trị mọi dạng mụn nặng.",
+      "evidence": [{"evidence_id": "e-u02", "source_id": "bp-monograph.pdf", "text": "Benzoyl peroxide là hoạt chất bôi có tác dụng kháng khuẩn."}],
+      "expected_verdict": "UNSUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "MISSING_KEY_RELATION"
+    },
+    {
+      "id": "unsupported_clindamycin_mechanism",
+      "category": "UNSUPPORTED_PLAUSIBLE",
+      "query": "Clindamycin có tiêu sừng không?",
+      "claim": "Clindamycin trực tiếp hòa tan nút sừng và mở mọi lỗ chân lông bị bít tắc.",
+      "evidence": [{"evidence_id": "e-u03", "source_id": "antibiotic-guide.pdf", "text": "Clindamycin là kháng sinh bôi dùng trong điều trị mụn."}],
+      "expected_verdict": "UNSUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "MISSING_KEY_RELATION"
+    },
+    {
+      "id": "unsupported_tazarotene_sunscreen",
+      "category": "UNSUPPORTED_PLAUSIBLE",
+      "query": "Tazarotene có thay kem chống nắng không?",
+      "claim": "Tazarotene thay thế hoàn toàn kem chống nắng và bảo vệ da khỏi mọi tia cực tím.",
+      "evidence": [{"evidence_id": "e-u04", "source_id": "tazarotene-guide.pdf", "text": "Tazarotene là retinoid bôi dùng để điều trị mụn."}],
+      "expected_verdict": "UNSUPPORTED",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "MISSING_KEY_RELATION"
+    },
+    {
+      "id": "unsupported_antibiotic_monotherapy_safety",
+      "category": "ANTIBIOTIC_STEWARDSHIP",
+      "query": "Kháng sinh clindamycin dùng đơn độc có an toàn không?",
+      "claim": "Clindamycin an toàn tuyệt đối khi dùng đơn độc kéo dài cho mọi người bị mụn.",
+      "evidence": [{"evidence_id": "e-u05", "source_id": "antibiotic-guide.pdf", "text": "Clindamycin là kháng sinh bôi dùng trong điều trị mụn."}],
+      "expected_verdict": "UNSUPPORTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "MISSING_KEY_RELATION"
+    },
+    {
+      "id": "contradicted_bp_antibiotic",
+      "category": "EXPLICIT_CONTRADICTION",
+      "query": "Benzoyl peroxide có phải kháng sinh không?",
+      "claim": "Benzoyl peroxide là kháng sinh.",
+      "evidence": [{"evidence_id": "e-c01", "source_id": "bp-monograph.pdf", "text": "Benzoyl peroxide không phải là kháng sinh."}],
+      "expected_verdict": "CONTRADICTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "CONTRADICTORY_STATEMENT"
+    },
+    {
+      "id": "contradicted_adapalene_antibiotic",
+      "category": "EXPLICIT_CONTRADICTION",
+      "query": "Adapalene có phải kháng sinh không?",
+      "claim": "Adapalene là kháng sinh.",
+      "evidence": [{"evidence_id": "e-c02", "source_id": "adapalene-guide.pdf", "text": "Adapalene không phải kháng sinh; đây là một retinoid bôi."}],
+      "expected_verdict": "CONTRADICTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "CONTRADICTORY_STATEMENT"
+    },
+    {
+      "id": "contradicted_clindamycin_retinoid",
+      "category": "EXPLICIT_CONTRADICTION",
+      "query": "Clindamycin có phải retinoid không?",
+      "claim": "Clindamycin là retinoid.",
+      "evidence": [{"evidence_id": "e-c03", "source_id": "antibiotic-guide.pdf", "text": "Clindamycin không phải retinoid; đây là kháng sinh bôi."}],
+      "expected_verdict": "CONTRADICTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "CONTRADICTORY_STATEMENT"
+    },
+    {
+      "id": "contradicted_pregnancy",
+      "category": "PREGNANCY_CONTRAINDICATION",
+      "query": "Tazarotene có dùng khi mang thai không?",
+      "claim": "Tazarotene an toàn khi mang thai.",
+      "evidence": [{"evidence_id": "e-c04", "source_id": "tazarotene-label.pdf", "text": "Tazarotene không được dùng trong thai kỳ."}],
+      "expected_verdict": "CONTRADICTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "CONTRADICTORY_STATEMENT"
+    },
+    {
+      "id": "contradicted_emergency",
+      "category": "EMERGENCY",
+      "query": "Khó thở sau thuốc có cần cấp cứu không?",
+      "claim": "Khó thở và sưng lưỡi sau dùng thuốc không cần cấp cứu.",
+      "evidence": [{"evidence_id": "e-c05", "source_id": "emergency-guide.pdf", "text": "Khó thở và sưng lưỡi sau dùng thuốc cần được cấp cứu ngay."}],
+      "expected_verdict": "CONTRADICTED",
+      "criticality": "CRITICAL",
+      "rationale_category": "CONTRADICTORY_STATEMENT"
+    },
+    {
+      "id": "no_evidence_adapalene_scar",
+      "category": "NO_EVIDENCE",
+      "query": "Adapalene có xóa sẹo lõm không?",
+      "claim": "Adapalene xóa hoàn toàn mọi sẹo lõm do mụn.",
+      "evidence": [],
+      "expected_verdict": "NO_EVIDENCE",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "NO_RELEVANT_EVIDENCE"
+    },
+    {
+      "id": "no_evidence_invalid_provenance",
+      "category": "PROVENANCE",
+      "query": "Benzoyl peroxide có giảm thâm không?",
+      "claim": "Benzoyl peroxide xóa hoàn toàn mọi vết thâm sau mụn.",
+      "evidence": [{"evidence_id": "e-n02", "source_id": null, "text": "Benzoyl peroxide xóa hoàn toàn mọi vết thâm sau mụn."}],
+      "expected_verdict": "NO_EVIDENCE",
+      "criticality": "NON_CRITICAL",
+      "rationale_category": "INVALID_PROVENANCE"
+    },
+    {
+      "id": "no_evidence_pregnancy",
+      "category": "PREGNANCY_CONTRAINDICATION",
+      "query": "Tazarotene có an toàn khi mang thai không?",
+      "claim": "Tazarotene an toàn khi mang thai.",
+      "evidence": [{"evidence_id": "e-n03", "source_id": "bp-monograph.pdf", "text": "Benzoyl peroxide có tác dụng kháng khuẩn trên da mụn."}],
+      "expected_verdict": "NO_EVIDENCE",
+      "criticality": "CRITICAL",
+      "rationale_category": "NO_RELEVANT_EVIDENCE"
+    },
+    {
+      "id": "no_evidence_antibiotic",
+      "category": "ANTIBIOTIC_STEWARDSHIP",
+      "query": "Clindamycin dùng đơn độc lâu dài có an toàn không?",
+      "claim": "Clindamycin dùng đơn độc lâu dài không làm tăng nguy cơ kháng kháng sinh.",
+      "evidence": [{"evidence_id": "e-n04", "source_id": "comedone-guide.pdf", "text": "Mụn đầu đen hình thành khi lỗ chân lông bị bít tắc."}],
+      "expected_verdict": "NO_EVIDENCE",
+      "criticality": "CRITICAL",
+      "rationale_category": "NO_RELEVANT_EVIDENCE"
+    },
+    {
+      "id": "no_evidence_source_claim",
+      "category": "SOURCE_ATTRIBUTION",
+      "query": "Nguồn nào nói isotretinoin an toàn tuyệt đối?",
+      "claim": "Tài liệu hiện có xác nhận isotretinoin an toàn tuyệt đối cho mọi người bị mụn.",
+      "evidence": [],
+      "expected_verdict": "NO_EVIDENCE",
+      "criticality": "CRITICAL",
+      "rationale_category": "NO_RELEVANT_EVIDENCE"
+    }
+  ]
+}

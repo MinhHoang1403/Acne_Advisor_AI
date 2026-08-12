@@ -556,7 +556,7 @@ def test_graph_routes_and_compile_safe_fallback_flow():
     assert graph_module.route_after_fallback_decision({"fallback_applied": True}) == "safe_fallback"
     assert graph_module.route_after_fallback_decision({"fallback_applied": False}) == "safety"
     assert graph_module.route_after_generation_fallback_decision({"fallback_applied": True}) == "safe_fallback"
-    assert graph_module.route_after_generation_fallback_decision({"fallback_applied": False}) == "finalize"
+    assert graph_module.route_after_generation_fallback_decision({"fallback_applied": False}) == "claim_grounding"
     assert graph_module.build_clinical_graph() is not None
 
 
