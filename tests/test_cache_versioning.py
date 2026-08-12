@@ -65,11 +65,11 @@ def test_retrieval_v5_config_version_partitions_cache_identity():
     current = build_pipeline_version_manifest(
         {
             "RETRIEVAL_PIPELINE_VERSION": "v5",
-            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_candidate_policy_v1",
+            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_reranker_contract_v1",
         }
     )
 
-    assert current["retrieval_v5_config_version"] == "retrieval_v5_candidate_policy_v1"
+    assert current["retrieval_v5_config_version"] == "retrieval_v5_reranker_contract_v1"
     assert compute_pipeline_fingerprint(previous) != compute_pipeline_fingerprint(current)
 
 
