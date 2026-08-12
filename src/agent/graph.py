@@ -38,6 +38,7 @@ from src.agent.nodes.evidence_sufficiency import (
     evidence_abstention_node,
     route_after_evidence_sufficiency,
 )
+from src.agent.nodes.claim_grounding import claim_grounding_node
 from src.observability.versioning import (
     build_pipeline_version_manifest,
     compute_pipeline_fingerprint,
@@ -72,7 +73,7 @@ def route_after_generation_fallback_decision(state: ClinicalState):
     """Route post-generation validation to fallback or finalization."""
     if state.get("fallback_applied"):
         return "safe_fallback"
-    return "finalize"
+    return "claim_grounding"
 
 def build_clinical_graph():
     """Builds and compiles the StateGraph for the clinical agent."""
@@ -96,6 +97,7 @@ def build_clinical_graph():
     builder.add_node("safety", safety_check_node)
     builder.add_node("generate", generate_answer_node)
     builder.add_node("generation_fallback_decision", generation_fallback_decision_node)
+    builder.add_node("claim_grounding", claim_grounding_node)
     builder.add_node("safe_fallback", safe_fallback_node)
     builder.add_node("cache_store", cache_store_node)
     builder.add_node("finalize", finalize_response_node)
@@ -130,6 +132,7 @@ def build_clinical_graph():
         "generation_fallback_decision",
         route_after_generation_fallback_decision,
     )
+    builder.add_edge("claim_grounding", "finalize")
     builder.add_edge("safe_fallback", "finalize")
     builder.add_edge("finalize", "answer_quality")
     builder.add_edge("answer_quality", "cache_store")
@@ -217,6 +220,13 @@ async def run_clinical_agent(
         "retry_history": [],
         "abstention": None,
         "p3_trace": None,
+        "p4_mode": pipeline_manifest.get("p4_mode"),
+        "claim_grounding": None,
+        "p4_trace": [],
+        "p4_degraded": None,
+        "p4_shadow_policy": None,
+        "shadow_verified_answer": None,
+        "p4_answer_modified": None,
         "prompt_evidence_trace": None,
         "prompt_budget": None,
         "pipeline_manifest": pipeline_manifest,
@@ -316,6 +326,13 @@ async def run_clinical_agent(
         "retry_history": final_state.get("retry_history", []),
         "abstention": final_state.get("abstention"),
         "p3_trace": final_state.get("p3_trace"),
+        "p4_mode": final_state.get("p4_mode"),
+        "claim_grounding": final_state.get("claim_grounding"),
+        "p4_trace": final_state.get("p4_trace", []),
+        "p4_degraded": final_state.get("p4_degraded"),
+        "p4_shadow_policy": final_state.get("p4_shadow_policy"),
+        "shadow_verified_answer": final_state.get("shadow_verified_answer"),
+        "p4_answer_modified": final_state.get("p4_answer_modified"),
         "prompt_evidence_trace": final_state.get("prompt_evidence_trace"),
         "prompt_budget": final_state.get("prompt_budget"),
         "pipeline_manifest": final_state.get("pipeline_manifest"),

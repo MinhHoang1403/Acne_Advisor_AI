@@ -12,6 +12,16 @@ from src.retrieval.evidence_sufficiency import (
     P3_EVIDENCE_SUFFICIENCY_VERSION,
     P3_MAX_RETRIEVAL_ATTEMPTS,
 )
+from src.quality.claim_grounding import (
+    P4_CLAIM_GROUNDING_VERSION,
+    P4_CRITICAL_POLICY_VERSION,
+    P4_ENTAILMENT_VERSION,
+    P4_EVIDENCE_MAPPING_VERSION,
+    P4_MAX_CLAIMS,
+    P4_MAX_EVIDENCE_PER_CLAIM,
+    p4_effective_mode,
+    p4_mode_from_env,
+)
 
 
 DEFAULT_ANSWER_CACHE_VERSION = "v5"
@@ -65,6 +75,21 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
 
     answer_cache_version = _effective_answer_cache_version(value("CACHE_ANSWER_VERSION", None))
 
+    requested_p4_mode = p4_mode_from_env(value("P4_MODE", "shadow"))
+    p4_critical_enforcement_ready = _env_bool(
+        value("P4_CRITICAL_ENFORCEMENT_READY", "false"),
+        default=False,
+    )
+    p4_all_claim_enforcement_ready = _env_bool(
+        value("P4_ALL_CLAIM_ENFORCEMENT_READY", "false"),
+        default=False,
+    )
+    effective_p4_mode = p4_effective_mode(
+        requested_p4_mode,
+        critical_enforcement_ready=p4_critical_enforcement_ready,
+        all_claim_enforcement_ready=p4_all_claim_enforcement_ready,
+    )
+
     manifest = {
         "phase": "phase2e",
         "retrieval_pipeline_version": _effective_retrieval_pipeline_version(
@@ -89,6 +114,41 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
                 _env_int(
                     value("P3_MAX_RETRIEVAL_ATTEMPTS", str(P3_MAX_RETRIEVAL_ATTEMPTS)),
                     default=P3_MAX_RETRIEVAL_ATTEMPTS,
+                ),
+            ),
+        ),
+        "p4_requested_mode": requested_p4_mode.value,
+        "p4_mode": effective_p4_mode.value,
+        "p4_critical_enforcement_ready": p4_critical_enforcement_ready,
+        "p4_all_claim_enforcement_ready": p4_all_claim_enforcement_ready,
+        "p4_claim_grounding_version": value(
+            "P4_CLAIM_GROUNDING_VERSION",
+            P4_CLAIM_GROUNDING_VERSION,
+        )
+        or P4_CLAIM_GROUNDING_VERSION,
+        "p4_evidence_mapping_version": value(
+            "P4_EVIDENCE_MAPPING_VERSION",
+            P4_EVIDENCE_MAPPING_VERSION,
+        )
+        or P4_EVIDENCE_MAPPING_VERSION,
+        "p4_entailment_version": value("P4_ENTAILMENT_VERSION", P4_ENTAILMENT_VERSION)
+        or P4_ENTAILMENT_VERSION,
+        "p4_critical_policy_version": value(
+            "P4_CRITICAL_POLICY_VERSION",
+            P4_CRITICAL_POLICY_VERSION,
+        )
+        or P4_CRITICAL_POLICY_VERSION,
+        "p4_max_claims": min(
+            32,
+            max(1, _env_int(value("P4_MAX_CLAIMS", str(P4_MAX_CLAIMS)), default=P4_MAX_CLAIMS)),
+        ),
+        "p4_max_evidence_per_claim": min(
+            5,
+            max(
+                1,
+                _env_int(
+                    value("P4_MAX_EVIDENCE_PER_CLAIM", str(P4_MAX_EVIDENCE_PER_CLAIM)),
+                    default=P4_MAX_EVIDENCE_PER_CLAIM,
                 ),
             ),
         ),
@@ -229,6 +289,16 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
         "p3_evidence_sufficiency_enabled",
         "p3_evidence_sufficiency_version",
         "p3_max_retrieval_attempts",
+        "p4_mode",
+        "p4_requested_mode",
+        "p4_critical_enforcement_ready",
+        "p4_all_claim_enforcement_ready",
+        "p4_claim_grounding_version",
+        "p4_evidence_mapping_version",
+        "p4_entailment_version",
+        "p4_critical_policy_version",
+        "p4_max_claims",
+        "p4_max_evidence_per_claim",
         "context_packer_version",
         "reranker_version",
         "answer_verifier_version",

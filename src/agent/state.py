@@ -56,6 +56,13 @@ class ClinicalState(TypedDict):
     retry_history: list[dict[str, Any]]
     abstention: dict[str, Any] | None
     p3_trace: dict[str, Any] | None
+    p4_mode: str | None
+    claim_grounding: dict[str, Any] | None
+    p4_trace: list[dict[str, Any]]
+    p4_degraded: bool | None
+    p4_shadow_policy: str | None
+    shadow_verified_answer: str | None
+    p4_answer_modified: bool | None
     prompt_evidence_trace: dict[str, Any] | None
     prompt_budget: dict[str, Any] | None
     pipeline_manifest: dict[str, Any] | None

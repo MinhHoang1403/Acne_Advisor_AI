@@ -18,6 +18,7 @@ from src.observability.versioning import (
     pipeline_manifest_summary,
 )
 from src.quality.safe_fallback import sanitize_fallback_reason
+from src.quality.claim_grounding import compact_claim_grounding
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,9 @@ def build_observability_event(
             result.get("abstention", state.get("abstention")),
             result.get("retry_history", state.get("retry_history")),
         ),
+        "claim_grounding": _compact_p4_summary(
+            result.get("claim_grounding", state.get("claim_grounding"))
+        ),
     }
 
     summary = PipelineTraceSummary(
@@ -155,6 +159,10 @@ def build_observability_event(
         "fallback_cache_eligible": result.get("fallback_cache_eligible", state.get("fallback_cache_eligible")),
         "quality_issues": issues,
         "p3_trace": result.get("p3_trace", state.get("p3_trace")),
+        "p4_trace": result.get("p4_trace", state.get("p4_trace")),
+        "claim_grounding": _compact_p4_summary(
+            result.get("claim_grounding", state.get("claim_grounding"))
+        ),
     }
 
     return ObservabilityEvent(
@@ -244,6 +252,17 @@ def _compact_p3_summary(
         "abstention_type": abstention.get("abstention_type"),
         "abstention_reason": abstention.get("reason"),
     }
+
+
+def _compact_p4_summary(value: Any) -> dict[str, Any] | None:
+    try:
+        return compact_claim_grounding(value)
+    except Exception:
+        return {
+            "status": "degraded",
+            "verifier_degraded": True,
+            "production_answer_modified": False,
+        }
 
 
 __all__ = [
