@@ -791,6 +791,7 @@ async def chat_endpoint(request: ChatRequest):
                 "pipeline_phase": pipeline_manifest.get("phase") if isinstance(pipeline_manifest, dict) else None,
                 "observability_exported": result.get("observability_exported"),
                 "runtime_resilience": result.get("runtime_resilience"),
+                "prompt_budget": result.get("prompt_budget"),
                 "answer_quality": {
                     "passed": answer_quality_report.get("passed") if isinstance(answer_quality_report, dict) else None,
                     "issue_count": len(answer_quality_report.get("issues", [])) if isinstance(answer_quality_report, dict) else 0,

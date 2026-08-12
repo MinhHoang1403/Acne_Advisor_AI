@@ -72,6 +72,7 @@ from src.retrieval.v5_contracts import (
 )
 from src.retrieval.v5_signals import (
     build_entity_signals,
+    build_graph_signals,
     entity_graph_seed_names,
 )
 from src.quality.safe_fallback import sanitize_fallback_reason
@@ -347,12 +348,24 @@ async def _get_graph_facts_with_fallback(
     graph_store: Neo4jGraphStore,
     entity_names: set[str],
     query: str,
+    *,
+    raise_on_error: bool = False,
 ) -> list[dict[str, Any]]:
     """Resolve graph facts, using keywords when optional semantic hints are empty."""
 
     if entity_names:
+        if raise_on_error:
+            return await graph_store.get_entity_context(
+                list(entity_names),
+                raise_on_error=True,
+            )
         return await graph_store.get_entity_context(list(entity_names))
     logger.info("No graph_nodes in payloads, falling back to keyword search.")
+    if raise_on_error:
+        return await graph_store.search_by_keywords(
+            query.lower().split(),
+            raise_on_error=True,
+        )
     return await graph_store.search_by_keywords(query.lower().split())
 
 
@@ -528,6 +541,51 @@ class HybridRetriever:
         source_evidence_candidates = [
             candidate for candidate in chunk_candidates if candidate.source == "chunk"
         ]
+        entity_signals_v5 = (
+            build_entity_signals(entity_candidates)
+            if pipeline_selection.execution == RetrievalPipelineVersion.V5
+            else ()
+        )
+        graph_facts: list[dict[str, Any]] = []
+        graph_signals_v5 = ()
+        graph_trace_warnings: list[str] = []
+        entity_names: set[str] = set()
+        t_neo4j = 0.0
+        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
+            entity_names.update(entity_graph_seed_names(entity_signals_v5))
+
+            t_neo4j_start = time.time()
+            neo4j_timeout_seconds = float(os.getenv("NEO4J_TIMEOUT_SECONDS", "10"))
+            try:
+                async with asyncio.timeout(neo4j_timeout_seconds):
+                    graph_facts = await _get_graph_facts_with_fallback(
+                        self._graph_store,
+                        entity_names,
+                        query,
+                        raise_on_error=True,
+                    )
+            except asyncio.CancelledError:
+                raise
+            except TimeoutError:
+                warning = f"Neo4j context skipped after {neo4j_timeout_seconds:.1f}s timeout."
+                warnings.append(warning)
+                graph_trace_warnings.append("GRAPH_LOOKUP_TIMEOUT")
+                logger.warning(warning)
+            except Exception as exc:
+                warning = f"Neo4j context unavailable: {sanitize_fallback_reason(exc)}"
+                warnings.append(warning)
+                graph_trace_warnings.append("GRAPH_LOOKUP_UNAVAILABLE")
+                logger.warning(warning)
+            t_neo4j = time.time() - t_neo4j_start
+            graph_signals_v5 = build_graph_signals(graph_facts, entity_signals_v5)
+            if not graph_facts and not graph_trace_warnings:
+                graph_trace_warnings.append("GRAPH_NO_RESULTS")
+            logger.info(
+                "Early V5 Neo4j context: %d entity names -> %d facts in %.2fs",
+                len(entity_names),
+                len(graph_facts),
+                t_neo4j,
+            )
         reranker_input_candidates = merged_candidates
         candidate_policy_result: CandidatePolicyResult | None = None
         t_candidate_policy = 0.0
@@ -645,7 +703,8 @@ class HybridRetriever:
             evidence_selection_result_v5 = select_evidence_v5(
                 query_context=v5_query_context,
                 ranked_evidence=ranked_evidence_v5,
-                entity_signals=build_entity_signals(entity_candidates),
+                entity_signals=entity_signals_v5,
+                graph_signals=graph_signals_v5,
             )
             t_evidence_selector = time.time() - t_selector_start
 
@@ -684,39 +743,37 @@ class HybridRetriever:
         selected_candidates = _candidates_for_packed_items(reranked_candidates, packed_context)
         top_chunks = prioritize_main_contexts(packed_context_to_legacy_contexts(packed_context), top_k)
 
-        # ── Step 5: Extract graph_nodes from Qdrant payloads ────────
-        entity_names: set[str] = set()
-        for chunk in top_chunks:
-            if chunk.get("retrieval_source") == "entity" and chunk.get("canonical_name"):
-                entity_names.add(str(chunk["canonical_name"]))
-            graph_nodes = chunk.get("graph_nodes", [])
-            if isinstance(graph_nodes, list):
-                entity_names.update(
-                    n for n in graph_nodes if isinstance(n, str) and n.strip()
-                )
-        if pipeline_selection.execution == RetrievalPipelineVersion.V5:
-            entity_names.update(entity_graph_seed_names(build_entity_signals(entity_candidates)))
+        # V5 already performed its single bounded graph lookup before the
+        # Selector. V4 keeps the released post-Packer lookup for rollback.
+        if pipeline_selection.execution != RetrievalPipelineVersion.V5:
+            entity_names = set()
+            for chunk in top_chunks:
+                if chunk.get("retrieval_source") == "entity" and chunk.get("canonical_name"):
+                    entity_names.add(str(chunk["canonical_name"]))
+                graph_nodes = chunk.get("graph_nodes", [])
+                if isinstance(graph_nodes, list):
+                    entity_names.update(
+                        node for node in graph_nodes if isinstance(node, str) and node.strip()
+                    )
 
-        # ── Step 6: Neo4j knowledge graph context ────────────────────
-        t_neo4j_start = time.time()
+            t_neo4j_start = time.time()
+            neo4j_timeout_seconds = float(os.getenv("NEO4J_TIMEOUT_SECONDS", "10"))
+            try:
+                async with asyncio.timeout(neo4j_timeout_seconds):
+                    graph_facts = await _get_graph_facts_with_fallback(
+                        self._graph_store,
+                        entity_names,
+                        query,
+                    )
+            except asyncio.CancelledError:
+                raise
+            except TimeoutError:
+                warning = f"Neo4j context skipped after {neo4j_timeout_seconds:.1f}s timeout."
+                warnings.append(warning)
+                logger.warning(warning)
+                graph_facts = []
+            t_neo4j = time.time() - t_neo4j_start
 
-        neo4j_timeout_seconds = float(os.getenv("NEO4J_TIMEOUT_SECONDS", "10"))
-        try:
-            async with asyncio.timeout(neo4j_timeout_seconds):
-                graph_facts = await _get_graph_facts_with_fallback(
-                    self._graph_store,
-                    entity_names,
-                    query,
-                )
-        except asyncio.CancelledError:
-            raise
-        except TimeoutError:
-            warning = f"Neo4j context skipped after {neo4j_timeout_seconds:.1f}s timeout."
-            warnings.append(warning)
-            logger.warning(warning)
-            graph_facts = []
-
-        t_neo4j = time.time() - t_neo4j_start
         logger.info(
             "Neo4j context: %d entity names → %d facts in %.2fs",
             len(entity_names),
@@ -783,9 +840,9 @@ class HybridRetriever:
                 warnings.append(warning)
                 logger.warning(warning)
 
-        # V5 remains opt-in. Shadow mode preserves V4 output for equivalence
-        # checks, while explicit V5 uses source-backed chunks as evidence and
-        # retains entity/graph data as dedicated structural side signals.
+        # V5 is the released default. Shadow mode preserves V4 output for
+        # equivalence checks, while explicit V5 uses source-backed chunks as
+        # evidence and retains entity/graph data as structural side signals.
         v5_shadow_payload = None
         if pipeline_selection.shadow_enabled:
             try:
@@ -819,6 +876,9 @@ class HybridRetriever:
                     ranked_evidence=ranked_evidence_v5,
                     evidence_selection_result=evidence_selection_result_v5,
                     packed_evidence=packed_evidence_v5,
+                    graph_signals=graph_signals_v5,
+                    graph_lookup_attempted=True,
+                    graph_warning_codes=tuple(graph_trace_warnings),
                 )
                 comparison = None
                 if pipeline_selection.execution == RetrievalPipelineVersion.V4:

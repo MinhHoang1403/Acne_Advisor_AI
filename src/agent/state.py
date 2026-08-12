@@ -42,9 +42,11 @@ class ClinicalState(TypedDict):
     retrieval_status: str | None
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
+    retrieval_trace_v5: dict[str, Any] | None
     packed_context: dict[str, Any] | None
     retrieval_diagnostics: dict[str, Any] | None
     prompt_evidence_trace: dict[str, Any] | None
+    prompt_budget: dict[str, Any] | None
     pipeline_manifest: dict[str, Any] | None
     pipeline_fingerprint: str | None
     observability_exported: bool | None

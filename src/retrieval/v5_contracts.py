@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 RETRIEVAL_V5_CONTRACT_VERSION = "retrieval_v5_contracts_v1"
-RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_context_packer_v2"
+RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_conformance_closure_v1"
 TRACE_EVENT_LIMIT = 64
 TRACE_CANDIDATE_LIMIT = 256
 
@@ -66,6 +66,26 @@ class DropReasonV5(str, Enum):
     ENTITY_ONLY_SIGNAL = "ENTITY_ONLY_SIGNAL"
     GRAPH_ONLY_SIGNAL = "GRAPH_ONLY_SIGNAL"
     EVIDENCE_INSUFFICIENT = "EVIDENCE_INSUFFICIENT"
+
+
+class CandidateTransitionStatusV5(str, Enum):
+    """Candidate-local lifecycle states recorded without changing execution."""
+
+    RETAINED = "RETAINED"
+    REMOVED = "REMOVED"
+    FALLBACK_RESTORED = "FALLBACK_RESTORED"
+    SELECTED = "SELECTED"
+    NOT_SELECTED = "NOT_SELECTED"
+
+
+class CandidateTransitionReasonV5(str, Enum):
+    """Stable structural reasons; these never claim semantic model intent."""
+
+    RERANK_RETAINED = "RERANK_RETAINED"
+    RERANK_TOP_N_REMOVED = "RERANK_TOP_N_REMOVED"
+    RERANK_FALLBACK = "RERANK_FALLBACK"
+    SELECTOR_SELECTED = "SELECTOR_SELECTED"
+    SELECTOR_NOT_SELECTED = "SELECTOR_NOT_SELECTED"
 
 
 class _FrozenModel(BaseModel):
@@ -223,6 +243,7 @@ class EvidenceSelectionRequirementsV5(_FrozenModel):
 
     required_roles: tuple[str, ...] = ("primary", "source_traceability")
     critical_safety_flags: tuple[str, ...] = ()
+    graph_required_roles: tuple[str, ...] = ()
 
 
 class SelectedEvidenceV5(_FrozenModel):
@@ -240,6 +261,10 @@ class EvidenceSelectionResultV5(_FrozenModel):
     selected_evidence: tuple[SelectedEvidenceV5, ...] = ()
     status: EvidenceSufficiencyV5
     missing_roles: tuple[str, ...] = ()
+    satisfied_roles: tuple[str, ...] = ()
+    requirements: EvidenceSelectionRequirementsV5 = Field(
+        default_factory=EvidenceSelectionRequirementsV5
+    )
     entity_signal_count: int = 0
     graph_signal_count: int = 0
 
@@ -272,12 +297,59 @@ class PackedEvidenceV5(_FrozenModel):
     character_count: int = 0
     max_characters: int = 0
     token_count: int = 0
+    token_count_mode: str = "approximate_chars_div_4"
     max_tokens: int = 0
     max_items: int = 0
+    used_items: int = 0
     source_paths: tuple[str, ...] = ()
     critical_evidence_ids: tuple[str, ...] = ()
     critical_evidence_preserved: bool = True
     status: EvidencePackingStatusV5 = EvidencePackingStatusV5.SUFFICIENT
+
+
+class CandidateTransitionV5(_FrozenModel):
+    """One redacted candidate transition with explicit before/after identity."""
+
+    candidate_id: str
+    source: str
+    provenance: CandidateProvenanceV5 = Field(default_factory=CandidateProvenanceV5)
+    input_rank: int | None = None
+    output_rank: int | None = None
+    scores: ScoreNamespaceV5 = Field(default_factory=ScoreNamespaceV5)
+    status: CandidateTransitionStatusV5
+    reason: CandidateTransitionReasonV5
+
+
+class GraphSignalObservationV5(_FrozenModel):
+    """Bounded graph signal summary safe for a retrieval-stage event."""
+
+    signal_id: str
+    source_entity_id: str
+    relation_path: tuple[str, ...] = ()
+    target_entity_id: str | None = None
+    medical_claim_eligible: bool = False
+
+
+class RetrievalStageSummaryV5(_FrozenModel):
+    """Optional event-local state needed to interpret candidate transitions."""
+
+    input_count: int | None = None
+    output_count: int | None = None
+    status_code: str | None = None
+    required_roles: tuple[str, ...] = ()
+    satisfied_roles: tuple[str, ...] = ()
+    missing_roles: tuple[str, ...] = ()
+    graph_lookup_attempted: bool | None = None
+    graph_seed_count: int | None = None
+    graph_result_count: int | None = None
+    graph_signal_count: int | None = None
+    used_items: int | None = None
+    max_items: int | None = None
+    used_characters: int | None = None
+    max_characters: int | None = None
+    estimated_tokens: int | None = None
+    max_tokens: int | None = None
+    token_count_mode: str | None = None
 
 
 class RetrievalStageEventV5(_FrozenModel):
@@ -286,6 +358,9 @@ class RetrievalStageEventV5(_FrozenModel):
     stage: RetrievalStageV5
     candidates: tuple[CandidateObservationV5, ...] = ()
     drops: tuple[CandidateDropV5, ...] = ()
+    transitions: tuple[CandidateTransitionV5, ...] = ()
+    graph_signals: tuple[GraphSignalObservationV5, ...] = ()
+    summary: RetrievalStageSummaryV5 | None = None
     warning_codes: tuple[str, ...] = ()
     elapsed_ms: float | None = None
     context_sha256: str | None = None
@@ -298,6 +373,13 @@ class RetrievalStageEventV5(_FrozenModel):
     ) -> tuple[CandidateObservationV5, ...]:
         if len(value) > TRACE_CANDIDATE_LIMIT:
             raise ValueError(f"trace candidates exceed limit {TRACE_CANDIDATE_LIMIT}")
+        return value
+
+    @field_validator("transitions", "graph_signals")
+    @classmethod
+    def _transition_count_is_bounded(cls, value: tuple[object, ...]) -> tuple[object, ...]:
+        if len(value) > TRACE_CANDIDATE_LIMIT:
+            raise ValueError(f"trace transitions exceed limit {TRACE_CANDIDATE_LIMIT}")
         return value
 
     @field_validator("elapsed_ms")
@@ -371,6 +453,9 @@ __all__ = [
     "CandidateDropV5",
     "CandidateObservationV5",
     "CandidateProvenanceV5",
+    "CandidateTransitionReasonV5",
+    "CandidateTransitionStatusV5",
+    "CandidateTransitionV5",
     "DropReasonV5",
     "EvidencePackingStatusV5",
     "EvidenceSelectionRequirementsV5",
@@ -379,6 +464,7 @@ __all__ = [
     "EntitySignalV5",
     "FusedKnowledgeCandidateV5",
     "GraphSignalV5",
+    "GraphSignalObservationV5",
     "KnowledgeCandidateV5",
     "PackedEvidenceV5",
     "QueryContextV5",
@@ -388,6 +474,7 @@ __all__ = [
     "RankedEvidenceV5",
     "RetrievalPipelineVersion",
     "RetrievalStageEventV5",
+    "RetrievalStageSummaryV5",
     "RetrievalStageV5",
     "RetrievalTraceV5",
     "ScoreNamespaceV5",

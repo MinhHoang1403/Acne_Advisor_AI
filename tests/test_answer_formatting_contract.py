@@ -14,7 +14,7 @@ from src.agent.answer_formatting import (
 )
 from src.agent.nodes import reason as reason_node
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.prompts.medical_answer import build_medical_prompt
+from src.agent.prompts.medical_answer import build_medical_prompt, observe_medical_prompt_budget
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
 from src.quality.safe_fallback import build_safe_fallback_answer
 
@@ -477,7 +477,7 @@ async def test_provider_generation_uses_same_formatting_contract(monkeypatch, pr
 
     monkeypatch.setattr(reason_node, "generate_llm_response", fake_generate_llm_response)
 
-    await reason_node.generate_answer_node(
+    result = await reason_node.generate_answer_node(
         {
             "user_question": "Mụn đầu đen và mụn đầu trắng khác nhau như thế nào?",
             "vector_contexts": [
@@ -502,6 +502,60 @@ async def test_provider_generation_uses_same_formatting_contract(monkeypatch, pr
 
     assert ANSWER_FORMATTING_CONTRACT in captured["prompt"]
     assert "bảng Markdown GFM" in captured["prompt"]
+    assert result["prompt_budget"]["accounting_mode"] == "observation_only"
+    assert result["prompt_budget"]["estimated_total_tokens"] > 0
+
+
+def test_full_prompt_budget_observation_accounts_for_graph_and_all_rendered_text() -> None:
+    prompt = build_medical_prompt(
+        question="Tazorac có dùng khi mang thai không?",
+        symptoms=[],
+        safety_flags=["pregnancy"],
+        contexts=[{"text": "Source-backed pregnancy evidence.", "source_file": "source.pdf"}],
+        graph_facts=[
+            {
+                "entity": "tazarotene",
+                "entity_type": "ActiveIngredient",
+                "relationship": "CONTRAINDICATED_IN",
+                "related_entity": "pregnancy",
+                "related_type": "SafetyContext",
+                "evidence": "taxonomy",
+            }
+        ],
+        conversation_history=[{"role": "user", "content": "Tôi đang mang thai."}],
+    )
+
+    observation = observe_medical_prompt_budget(prompt)
+
+    assert observation.total_characters == len(prompt)
+    assert observation.estimated_total_tokens == (len(prompt) + 3) // 4
+    assert observation.evidence_characters > 0
+    assert observation.graph_characters > 0
+    assert observation.non_evidence_characters > 0
+    assert observation.token_count_mode == "approximate_chars_div_4"
+    assert observation.accounting_mode == "observation_only"
+    assert observation.enforced_max_tokens is None
+
+
+def test_v5_packed_context_order_is_not_reranked_after_budgeting() -> None:
+    contexts = [
+        {
+            "text": "First packed block",
+            "score": 0.1,
+            "context_pack_reason": "v5_packer: selected",
+            "context_role": "primary_evidence",
+        },
+        {
+            "text": "Second packed block",
+            "score": 0.9,
+            "context_pack_reason": "v5_packer: selected",
+            "context_role": "supporting_evidence",
+        },
+    ]
+
+    selected = reason_node._select_answer_contexts(contexts, query="adapalene")
+
+    assert [item["text"] for item in selected] == ["First packed block", "Second packed block"]
 
 
 @pytest.mark.asyncio

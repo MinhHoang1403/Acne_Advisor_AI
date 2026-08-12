@@ -79,6 +79,8 @@ class Neo4jGraphStore:
         self,
         entity_names: list[str],
         limit: int = 50,
+        *,
+        raise_on_error: bool = False,
     ) -> list[dict[str, Any]]:
         """Get 1-hop relationships for given entity names.
 
@@ -134,6 +136,8 @@ class Neo4jGraphStore:
 
         except Exception as exc:
             logger.error("Neo4j get_entity_context failed: %s", sanitize_fallback_reason(exc))
+            if raise_on_error:
+                raise
 
         logger.debug(
             "Neo4j: queried %d entity names → %d facts",
@@ -147,6 +151,8 @@ class Neo4jGraphStore:
         self,
         keywords: list[str],
         limit: int = 30,
+        *,
+        raise_on_error: bool = False,
     ) -> list[dict[str, Any]]:
         """Fallback: search entities whose name contains any keyword.
 
@@ -183,6 +189,8 @@ class Neo4jGraphStore:
 
         except Exception as exc:
             logger.error("Neo4j keyword search failed: %s", sanitize_fallback_reason(exc))
+            if raise_on_error:
+                raise
 
         logger.debug(
             "Neo4j: keyword search with %d sanitized keywords → %d facts",

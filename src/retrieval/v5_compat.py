@@ -20,15 +20,22 @@ from src.retrieval.v5_contracts import (
     CandidateDropV5,
     CandidateObservationV5,
     CandidateProvenanceV5,
+    CandidateTransitionReasonV5,
+    CandidateTransitionStatusV5,
+    CandidateTransitionV5,
+    DropReasonV5,
     EvidenceSelectionResultV5,
     EvidencePackingStatusV5,
     EvidenceSufficiencyV5,
+    GraphSignalObservationV5,
+    GraphSignalV5,
     PackedEvidenceV5,
     QueryContextV5,
     QueryObservationV5,
     RankedEvidenceV5,
     RetrievalPipelineVersion,
     RetrievalStageEventV5,
+    RetrievalStageSummaryV5,
     RetrievalStageV5,
     RetrievalTraceV5,
     RETRIEVAL_V5_CONFIG_VERSION,
@@ -117,6 +124,9 @@ def build_v5_shadow_trace(
     ranked_evidence: tuple[RankedEvidenceV5, ...] = (),
     evidence_selection_result: EvidenceSelectionResultV5 | None = None,
     packed_evidence: PackedEvidenceV5 | None = None,
+    graph_signals: tuple[GraphSignalV5, ...] | None = None,
+    graph_lookup_attempted: bool = True,
+    graph_warning_codes: tuple[str, ...] = (),
 ) -> RetrievalTraceV5:
     """Create a redacted V5 trace from finalized staged retrieval outputs."""
 
@@ -127,7 +137,11 @@ def build_v5_shadow_trace(
     )
     entity_signals = build_entity_signals(entity_candidates)
     graph_seed_names = entity_graph_seed_names(entity_signals)
-    graph_signals = build_graph_signals(graph_facts, entity_signals)
+    graph_signals = (
+        graph_signals
+        if graph_signals is not None
+        else build_graph_signals(graph_facts, entity_signals)
+    )
     trace = RetrievalTraceV5(
         trace_id=_sha256(f"{query_context.query_id}:{query_context.intent}"),
         pipeline_version=selection.requested,
@@ -209,6 +223,17 @@ def build_v5_shadow_trace(
     )
     if selection.execution == RetrievalPipelineVersion.V5:
         trace = trace.append_event(
+            _graph_event(
+                graph_signals=graph_signals,
+                graph_seed_names=graph_seed_names,
+                graph_fact_count=len(graph_facts),
+                lookup_attempted=graph_lookup_attempted,
+                warning_codes=graph_warning_codes,
+                elapsed_ms=timings_ms.get("neo4j"),
+            )
+        )
+    if selection.execution == RetrievalPipelineVersion.V5:
+        trace = trace.append_event(
             RetrievalStageEventV5(
                 stage=RetrievalStageV5.CANDIDATE_POLICY,
                 candidates=tuple(
@@ -245,12 +270,37 @@ def build_v5_shadow_trace(
             for candidate in reranked_candidates
         )
     )
+    rerank_transitions = build_reranker_transitions_v5(
+        policy_candidates=(
+            candidate_policy_candidates
+            if selection.execution == RetrievalPipelineVersion.V5
+            and candidate_policy_candidates is not None
+            else merged_candidates
+        ),
+        ranked_evidence=ranked_evidence,
+        reranked_candidates=reranked_candidates,
+        fallback_used=rerank_trace.fallback_used,
+    )
     trace = trace.append_event(
         RetrievalStageEventV5(
             stage=RetrievalStageV5.RERANK,
             candidates=rerank_observations,
+            drops=tuple(
+                CandidateDropV5(
+                    candidate_id=transition.candidate_id,
+                    reason=DropReasonV5.RERANK_REMOVED,
+                )
+                for transition in rerank_transitions
+                if transition.status == CandidateTransitionStatusV5.REMOVED
+            ),
+            transitions=rerank_transitions,
             warning_codes=("RERANK_FALLBACK",) if rerank_trace.fallback_used else (),
             elapsed_ms=timings_ms.get("rerank"),
+            summary=RetrievalStageSummaryV5(
+                input_count=rerank_trace.input_count,
+                output_count=rerank_trace.output_count,
+                status_code=("FALLBACK" if rerank_trace.fallback_used else "COMPLETED"),
+            ),
         )
     )
     if selection.execution == RetrievalPipelineVersion.V5:
@@ -259,6 +309,10 @@ def build_v5_shadow_trace(
             if evidence_selection_result is not None
             else ()
         )
+        selector_transitions = build_selector_transitions_v5(
+            ranked_evidence=ranked_evidence,
+            result=evidence_selection_result,
+        )
         trace = trace.append_event(
             RetrievalStageEventV5(
                 stage=RetrievalStageV5.EVIDENCE_SELECTOR,
@@ -266,6 +320,15 @@ def build_v5_shadow_trace(
                     _selected_evidence_observation(item)
                     for item in selected_evidence
                 ),
+                drops=tuple(
+                    CandidateDropV5(
+                        candidate_id=transition.candidate_id,
+                        reason=DropReasonV5.EVIDENCE_SELECTOR_REMOVED,
+                    )
+                    for transition in selector_transitions
+                    if transition.status == CandidateTransitionStatusV5.NOT_SELECTED
+                ),
+                transitions=selector_transitions,
                 warning_codes=(
                     ("EVIDENCE_INSUFFICIENT",)
                     if evidence_selection_result is not None
@@ -274,6 +337,18 @@ def build_v5_shadow_trace(
                     else ()
                 ),
                 elapsed_ms=timings_ms.get("evidence_selector"),
+                summary=(
+                    RetrievalStageSummaryV5(
+                        input_count=len(ranked_evidence),
+                        output_count=len(selected_evidence),
+                        status_code=evidence_selection_result.status.value,
+                        required_roles=evidence_selection_result.requirements.required_roles,
+                        satisfied_roles=evidence_selection_result.satisfied_roles,
+                        missing_roles=evidence_selection_result.missing_roles,
+                    )
+                    if evidence_selection_result is not None
+                    else None
+                ),
             )
         )
     trace = trace.append_event(
@@ -301,14 +376,39 @@ def build_v5_shadow_trace(
             ),
             elapsed_ms=timings_ms.get("pack"),
             context_sha256=_sha256(packed_context.context_text),
+            summary=(
+                RetrievalStageSummaryV5(
+                    input_count=(
+                        len(evidence_selection_result.selected_evidence)
+                        if evidence_selection_result is not None
+                        else len(packed_context.items)
+                    ),
+                    output_count=len(packed_context.items),
+                    status_code=packed_evidence.status.value,
+                    used_items=packed_evidence.used_items,
+                    max_items=packed_evidence.max_items,
+                    used_characters=packed_evidence.character_count,
+                    max_characters=packed_evidence.max_characters,
+                    estimated_tokens=packed_evidence.token_count,
+                    max_tokens=packed_evidence.max_tokens,
+                    token_count_mode=packed_evidence.token_count_mode,
+                )
+                if packed_evidence is not None
+                else None
+            ),
         )
     )
-    trace = trace.append_event(
-        RetrievalStageEventV5(
-            stage=RetrievalStageV5.GRAPH,
-            elapsed_ms=timings_ms.get("neo4j"),
+    if selection.execution != RetrievalPipelineVersion.V5:
+        trace = trace.append_event(
+            _graph_event(
+                graph_signals=graph_signals,
+                graph_seed_names=graph_seed_names,
+                graph_fact_count=len(graph_facts),
+                lookup_attempted=graph_lookup_attempted,
+                warning_codes=graph_warning_codes,
+                elapsed_ms=timings_ms.get("neo4j"),
+            )
         )
-    )
     return trace
 
 
@@ -472,6 +572,118 @@ def _selected_evidence_observation(selected_evidence: SelectedEvidenceV5) -> Can
     )
 
 
+def _graph_event(
+    *,
+    graph_signals: tuple[GraphSignalV5, ...],
+    graph_seed_names: tuple[str, ...],
+    graph_fact_count: int,
+    lookup_attempted: bool,
+    warning_codes: tuple[str, ...],
+    elapsed_ms: float | None,
+) -> RetrievalStageEventV5:
+    degraded = any(code in {"GRAPH_LOOKUP_TIMEOUT", "GRAPH_LOOKUP_UNAVAILABLE"} for code in warning_codes)
+    status_code = "DEGRADED" if degraded else "AVAILABLE" if graph_signals else "EMPTY"
+    return RetrievalStageEventV5(
+        stage=RetrievalStageV5.GRAPH,
+        graph_signals=tuple(
+            GraphSignalObservationV5(
+                signal_id=signal.signal_id,
+                source_entity_id=signal.source_entity_id,
+                relation_path=signal.relation_path,
+                target_entity_id=signal.target_entity_id,
+                medical_claim_eligible=signal.medical_claim_eligible,
+            )
+            for signal in graph_signals
+        ),
+        warning_codes=warning_codes,
+        elapsed_ms=elapsed_ms,
+        summary=RetrievalStageSummaryV5(
+            status_code=status_code,
+            graph_lookup_attempted=lookup_attempted,
+            graph_seed_count=len(graph_seed_names),
+            graph_result_count=graph_fact_count,
+            graph_signal_count=len(graph_signals),
+        ),
+    )
+
+
+def build_reranker_transitions_v5(
+    *,
+    policy_candidates: Iterable[RetrievedCandidate],
+    ranked_evidence: tuple[RankedEvidenceV5, ...],
+    reranked_candidates: Iterable[RetrievedCandidate],
+    fallback_used: bool,
+) -> tuple[CandidateTransitionV5, ...]:
+    policy = tuple(policy_candidates)
+    ranked_by_id = {
+        item.candidate.candidate.candidate_id: item
+        for item in ranked_evidence
+    }
+    output_rank_by_id = {
+        candidate.candidate_id: rank
+        for rank, candidate in enumerate(reranked_candidates, start=1)
+    }
+    transitions: list[CandidateTransitionV5] = []
+    for input_rank, candidate in enumerate(policy, start=1):
+        evidence = ranked_by_id.get(candidate.candidate_id)
+        output_rank = output_rank_by_id.get(candidate.candidate_id)
+        if fallback_used:
+            status = CandidateTransitionStatusV5.FALLBACK_RESTORED
+            reason = CandidateTransitionReasonV5.RERANK_FALLBACK
+        elif output_rank is None:
+            status = CandidateTransitionStatusV5.REMOVED
+            reason = CandidateTransitionReasonV5.RERANK_TOP_N_REMOVED
+        else:
+            status = CandidateTransitionStatusV5.RETAINED
+            reason = CandidateTransitionReasonV5.RERANK_RETAINED
+        observation = _candidate_observation(candidate)
+        transitions.append(
+            CandidateTransitionV5(
+                candidate_id=candidate.candidate_id,
+                source=candidate.source,
+                provenance=observation.provenance,
+                input_rank=(evidence.input_rank if evidence is not None else input_rank),
+                output_rank=output_rank,
+                scores=(evidence.scores if evidence is not None else observation.scores),
+                status=status,
+                reason=reason,
+            )
+        )
+    return tuple(transitions)
+
+
+def build_selector_transitions_v5(
+    *,
+    ranked_evidence: tuple[RankedEvidenceV5, ...],
+    result: EvidenceSelectionResultV5 | None,
+) -> tuple[CandidateTransitionV5, ...]:
+    selected_ids = {
+        item.evidence.candidate.candidate.candidate_id
+        for item in (result.selected_evidence if result is not None else ())
+    }
+    return tuple(
+        CandidateTransitionV5(
+            candidate_id=evidence.candidate.candidate.candidate_id,
+            source="chunk",
+            provenance=evidence.candidate.candidate.provenance,
+            input_rank=evidence.output_rank,
+            output_rank=(evidence.output_rank if evidence.candidate.candidate.candidate_id in selected_ids else None),
+            scores=evidence.scores,
+            status=(
+                CandidateTransitionStatusV5.SELECTED
+                if evidence.candidate.candidate.candidate_id in selected_ids
+                else CandidateTransitionStatusV5.NOT_SELECTED
+            ),
+            reason=(
+                CandidateTransitionReasonV5.SELECTOR_SELECTED
+                if evidence.candidate.candidate.candidate_id in selected_ids
+                else CandidateTransitionReasonV5.SELECTOR_NOT_SELECTED
+            ),
+        )
+        for evidence in ranked_evidence
+    )
+
+
 def _context_observation(
     item: ContextItem,
     *,
@@ -566,6 +778,8 @@ __all__ = [
     "RetrievalPipelineSelection",
     "V5_CONFIG_FINGERPRINT",
     "build_v5_shadow_trace",
+    "build_reranker_transitions_v5",
+    "build_selector_transitions_v5",
     "compare_v4_to_v5_shadow",
     "query_context_from_legacy",
     "retrieval_pipeline_selection_from_env",
