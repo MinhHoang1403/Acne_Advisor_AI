@@ -265,6 +265,7 @@ Các nhóm biến quan trọng trong `.env.example`:
 | Qdrant | `QDRANT_URL`, `QDRANT_API_KEY`, collection names | `QDRANT_API_KEY` chỉ set khi Qdrant có auth |
 | Redis/cache | `REDIS_URL`, `CACHE_*`, `CACHE_ANSWER_VERSION` | Default answer cache version là `v5` |
 | Ingestion | `CHUNK_SIZE`, `GRAPH_*`, `EMBEDDING_*` | Chỉ cần khi chạy ingestion |
+| Retrieval | `RETRIEVAL_PIPELINE_VERSION`, `RETRIEVAL_CONTEXT_*` | V5 là mặc định; đặt `v4` để rollback tường minh |
 | Reranker | `RERANK_*`, `SEMANTIC_RERANK_*` | Model path là đường dẫn local cần đổi theo máy |
 | Safety/resilience | `ANSWER_*`, `SEVERITY_GUARD_VERSION`, `SAFE_FALLBACK_FLOW_VERSION`, timeout/retry | Không cần đổi cho setup thường |
 | Observability | `OBSERVABILITY_*`, `PHASE2_DEBUG_METADATA` | Mặc định tắt để không lộ metadata debug |

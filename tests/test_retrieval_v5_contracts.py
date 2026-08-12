@@ -185,18 +185,27 @@ def test_shadow_adapter_preserves_stage_identity_order_and_context_hash() -> Non
     assert candidate.model_dump(mode="json")["text"] not in serialized_trace
 
 
-def test_pipeline_selection_keeps_v4_default_and_enables_explicit_v5(
+def test_pipeline_selection_defaults_to_v5_and_keeps_explicit_v4_rollback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("RETRIEVAL_PIPELINE_VERSION", raising=False)
+    default = retrieval_pipeline_selection_from_env()
     monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "v5")
     requested_v5 = retrieval_pipeline_selection_from_env()
+    monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "v4")
+    requested_v4 = retrieval_pipeline_selection_from_env()
     monkeypatch.setenv("RETRIEVAL_PIPELINE_VERSION", "invalid")
     invalid = retrieval_pipeline_selection_from_env()
 
+    assert default.execution == RetrievalPipelineVersion.V5
+    assert default.shadow_enabled is True
     assert requested_v5.execution == RetrievalPipelineVersion.V5
     assert requested_v5.shadow_enabled is True
     assert requested_v5.warning_code is None
-    assert invalid.execution == RetrievalPipelineVersion.V4
+    assert requested_v4.execution == RetrievalPipelineVersion.V4
+    assert requested_v4.shadow_enabled is False
+    assert invalid.execution == RetrievalPipelineVersion.V5
+    assert invalid.shadow_enabled is True
     assert invalid.warning_code == "INVALID_RETRIEVAL_PIPELINE_VERSION"
 
 
