@@ -65,12 +65,21 @@ def test_retrieval_v5_config_version_partitions_cache_identity():
     current = build_pipeline_version_manifest(
         {
             "RETRIEVAL_PIPELINE_VERSION": "v5",
-            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_evidence_selector_v1",
+            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_context_packer_v2",
         }
     )
 
-    assert current["retrieval_v5_config_version"] == "retrieval_v5_evidence_selector_v1"
+    assert current["retrieval_v5_config_version"] == "retrieval_v5_context_packer_v2"
     assert compute_pipeline_fingerprint(previous) != compute_pipeline_fingerprint(current)
+
+
+def test_retrieval_context_token_budget_partitions_cache_identity():
+    baseline = build_pipeline_version_manifest({"RETRIEVAL_CONTEXT_MAX_TOKENS": "1050"})
+    changed = build_pipeline_version_manifest({"RETRIEVAL_CONTEXT_MAX_TOKENS": "1051"})
+
+    assert baseline["retrieval_context_max_tokens"] == 1050
+    assert changed["retrieval_context_max_tokens"] == 1051
+    assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
 def test_answer_verifier_version_is_in_manifest_and_changes_fingerprint():

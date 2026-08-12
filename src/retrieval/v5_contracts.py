@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 RETRIEVAL_V5_CONTRACT_VERSION = "retrieval_v5_contracts_v1"
-RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_evidence_selector_v1"
+RETRIEVAL_V5_CONFIG_VERSION = "retrieval_v5_context_packer_v2"
 TRACE_EVENT_LIMIT = 64
 TRACE_CANDIDATE_LIMIT = 256
 
@@ -62,6 +62,7 @@ class DropReasonV5(str, Enum):
     PACKER_BUDGET_REMOVED = "PACKER_BUDGET_REMOVED"
     PACKER_DUPLICATE_REMOVED = "PACKER_DUPLICATE_REMOVED"
     PACKER_CLIPPED = "PACKER_CLIPPED"
+    PACKER_EMPTY_TEXT = "PACKER_EMPTY_TEXT"
     ENTITY_ONLY_SIGNAL = "ENTITY_ONLY_SIGNAL"
     GRAPH_ONLY_SIGNAL = "GRAPH_ONLY_SIGNAL"
     EVIDENCE_INSUFFICIENT = "EVIDENCE_INSUFFICIENT"
@@ -148,6 +149,7 @@ class KnowledgeCandidateV5(_FrozenModel):
 
     candidate_id: str
     provenance: CandidateProvenanceV5
+    text: str = ""
     scores: ScoreNamespaceV5
     metadata_features: tuple[str, ...] = ()
 
@@ -242,23 +244,40 @@ class EvidenceSelectionResultV5(_FrozenModel):
     graph_signal_count: int = 0
 
 
-class PackedEvidenceV5(_FrozenModel):
-    """Budgeted prompt serialization output for R7."""
-
-    selected_evidence_ids: tuple[str, ...]
-    clipped_evidence_ids: tuple[str, ...] = ()
-    omitted_evidence_ids: tuple[str, ...] = ()
-    character_count: int = 0
-    max_characters: int = 0
-    source_paths: tuple[str, ...] = ()
-    critical_evidence_preserved: bool = True
-
-
 class CandidateDropV5(_FrozenModel):
     """One explicit candidate removal observation."""
 
     candidate_id: str
     reason: DropReasonV5
+
+
+class EvidencePackingStatusV5(str, Enum):
+    """Bounded packer outcome without an implicit retrieval retry."""
+
+    SUFFICIENT = "SUFFICIENT"
+    INSUFFICIENT = "INSUFFICIENT"
+    OVERFLOW = "OVERFLOW"
+    CRITICAL_EVIDENCE_OVERFLOW = "CRITICAL_EVIDENCE_OVERFLOW"
+
+
+class PackedEvidenceV5(_FrozenModel):
+    """Budgeted R7 serialization with complete source/drop traceability."""
+
+    selected_evidence_ids: tuple[str, ...] = ()
+    rendered_blocks: tuple[str, ...] = ()
+    context_text: str = ""
+    clipped_evidence_ids: tuple[str, ...] = ()
+    omitted_evidence_ids: tuple[str, ...] = ()
+    drops: tuple[CandidateDropV5, ...] = ()
+    character_count: int = 0
+    max_characters: int = 0
+    token_count: int = 0
+    max_tokens: int = 0
+    max_items: int = 0
+    source_paths: tuple[str, ...] = ()
+    critical_evidence_ids: tuple[str, ...] = ()
+    critical_evidence_preserved: bool = True
+    status: EvidencePackingStatusV5 = EvidencePackingStatusV5.SUFFICIENT
 
 
 class RetrievalStageEventV5(_FrozenModel):
@@ -353,6 +372,7 @@ __all__ = [
     "CandidateObservationV5",
     "CandidateProvenanceV5",
     "DropReasonV5",
+    "EvidencePackingStatusV5",
     "EvidenceSelectionRequirementsV5",
     "EvidenceSelectionResultV5",
     "EvidenceSufficiencyV5",
