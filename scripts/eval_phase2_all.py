@@ -17,6 +17,7 @@ CHECKS = [
     ["scripts/inspect_phase2_readiness.py"],
     ["scripts/eval_phase1_readiness.py", "--verbose"],
     ["scripts/eval_phase2_retrieval.py"],
+    ["scripts/eval_retrieval_v5_release.py"],
     ["scripts/eval_phase2_context_packing.py"],
     ["scripts/eval_phase2_reranking.py"],
     ["scripts/eval_semantic_reranker.py", "--mode", "offline"],

@@ -44,7 +44,7 @@ from src.retrieval.v5_signals import (
 )
 
 
-DEFAULT_RETRIEVAL_PIPELINE_VERSION = RetrievalPipelineVersion.V4
+DEFAULT_RETRIEVAL_PIPELINE_VERSION = RetrievalPipelineVersion.V5
 V5_CONFIG_FINGERPRINT = RETRIEVAL_V5_CONFIG_VERSION
 
 
@@ -59,7 +59,7 @@ class RetrievalPipelineSelection:
 
 
 def retrieval_pipeline_selection_from_env() -> RetrievalPipelineSelection:
-    """Resolve the migration selector without changing the default V4 path."""
+    """Resolve the release selector while retaining explicit V4 rollback."""
 
     raw = os.getenv("RETRIEVAL_PIPELINE_VERSION", DEFAULT_RETRIEVAL_PIPELINE_VERSION.value)
     try:
@@ -67,8 +67,8 @@ def retrieval_pipeline_selection_from_env() -> RetrievalPipelineSelection:
     except ValueError:
         return RetrievalPipelineSelection(
             requested=DEFAULT_RETRIEVAL_PIPELINE_VERSION,
-            execution=RetrievalPipelineVersion.V4,
-            shadow_enabled=False,
+            execution=DEFAULT_RETRIEVAL_PIPELINE_VERSION,
+            shadow_enabled=DEFAULT_RETRIEVAL_PIPELINE_VERSION == RetrievalPipelineVersion.V5,
             warning_code="INVALID_RETRIEVAL_PIPELINE_VERSION",
         )
 

@@ -64,7 +64,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
     manifest = {
         "phase": "phase2e",
         "retrieval_pipeline_version": _effective_retrieval_pipeline_version(
-            value("RETRIEVAL_PIPELINE_VERSION", "v4")
+            value("RETRIEVAL_PIPELINE_VERSION", "v5")
         ),
         "retrieval_v5_config_version": _effective_retrieval_v5_config_version(
             value("RETRIEVAL_V5_CONFIG_VERSION", RETRIEVAL_V5_CONFIG_VERSION)
@@ -272,7 +272,7 @@ def _effective_retrieval_pipeline_version(configured: Any) -> str:
     text = str(configured or "").strip().lower()
     if text in {"v4", "v5_shadow", "v5"}:
         return text
-    return "v4"
+    return "v5"
 
 
 def _effective_retrieval_v5_config_version(configured: Any) -> str:

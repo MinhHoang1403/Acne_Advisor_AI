@@ -49,10 +49,10 @@ def test_retrieval_pipeline_version_partitions_cache_identity():
     assert compute_pipeline_fingerprint(v4_manifest) != compute_pipeline_fingerprint(v5_manifest)
 
 
-def test_retrieval_pipeline_manifest_defaults_to_v4():
+def test_retrieval_pipeline_manifest_defaults_to_v5():
     manifest = build_pipeline_version_manifest({"RETRIEVAL_PIPELINE_VERSION": ""})
 
-    assert manifest["retrieval_pipeline_version"] == "v4"
+    assert manifest["retrieval_pipeline_version"] == "v5"
 
 
 def test_retrieval_v5_config_version_partitions_cache_identity():
