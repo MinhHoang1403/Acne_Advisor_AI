@@ -22,7 +22,7 @@ Export SVG bản full:
 |---|---|
 | [phase1a-parse-cache.mmd](diagrams/phase1a-parse-cache.mmd) | Discover PDF/DOCX, LlamaParse, Markdown cache, chunking |
 | [phase1b-graph-neo4j.mmd](diagrams/phase1b-graph-neo4j.mmd) | Graph cache, Ollama graph extraction, Neo4j upsert |
-| [phase1c-qdrant-upsert.mmd](diagrams/phase1c-qdrant-upsert.mmd) | Gemini embedding, sparse BM25, Qdrant schema/upsert |
+| [phase1c-qdrant-upsert.mmd](diagrams/phase1c-qdrant-upsert.mmd) | Gemini embedding, custom sparse TF, Qdrant schema/upsert |
 | [phase2a-guardrail.mmd](diagrams/phase2a-guardrail.mmd) | `/chat`, validation, history loading, guardrails |
 | [phase2b-retrieval.mmd](diagrams/phase2b-retrieval.mmd) | Redis cache, Qdrant dense/sparse retrieval, Neo4j enrichment |
 | [phase2c-answer-history.mmd](diagrams/phase2c-answer-history.mmd) | LLM generation/fallback, formatter, cache store, chat persistence |
@@ -130,7 +130,7 @@ sequenceDiagram
                 CLI->>CLI: Lọc noisy chunks
                 CLI->>Gemini: Embed batch với task retrieval_document
                 Gemini-->>CLI: Dense vectors
-                CLI->>CLI: Compute hashed sparse BM25 vectors
+                CLI->>CLI: Compute hashed normalized log-TF sparse vectors
                 CLI->>Qdrant: Upsert points gồm dense, bm25, payload, graph_nodes
                 Qdrant-->>CLI: Batch upsert thành công
             end
@@ -199,7 +199,7 @@ sequenceDiagram
             LangGraph->>Retriever: Retrieve context
             Retriever->>Qdrant: Gemini query embedding + dense search using dense
             Qdrant-->>Retriever: Dense candidates
-            Retriever->>Qdrant: Sparse BM25 search using bm25
+            Retriever->>Qdrant: Custom sparse TF search using legacy key bm25
             Qdrant-->>Retriever: Sparse candidates
             Retriever->>Retriever: RRF fusion, metadata boost, ưu tiên non-References
             Retriever->>Neo4j: Query graph facts từ graph_nodes hoặc keyword fallback

@@ -1,13 +1,15 @@
 # Project Structure
 
 This document defines the maintained repository paths for Acne Advisor AI.
+Start with `docs/ARCHITECTURE.md`; use `docs/DATA_PIPELINE.md` and
+`docs/AGENT_WORKFLOW.md` for the two primary runtime paths.
 
 ## Application
 
 - `src/api/app.py`: FastAPI application entrypoint. Run with `uvicorn src.api.app:app --reload --port 8000`.
 - `src/agent/`: LangGraph clinical-answer pipeline, prompts, guardrails, fallback and response presentation.
 - `src/database/`: Qdrant, Neo4j and PostgreSQL access layers.
-- `src/retrieval/`: query normalization, entity retrieval, context packing and reranking.
+- `src/retrieval/`: query normalization, sparse/dense fusion, entity retrieval, context packing and reranking.
 - `src/knowledge/`: taxonomy models, entity cards and deterministic graph indexing.
 - `src/frontend/`: the only maintained web client. Run its Vite commands from this directory.
 
