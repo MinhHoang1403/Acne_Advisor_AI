@@ -84,7 +84,8 @@ async def validate_collections(args: argparse.Namespace) -> tuple[dict[str, Any]
     client = AsyncQdrantClient(**qdrant_client_kwargs())
     try:
         collections = await client.get_collections()
-        existing = {collection.name for collection in collections.collections}
+        aliases = await client.get_aliases()
+        existing = qdrant_addressable_names(collections, aliases)
 
         warnings: list[str] = []
         errors: list[str] = []
@@ -251,6 +252,22 @@ def _get_named_config(config: Any, name: str) -> Any:
     if hasattr(config, "get"):
         return config.get(name)
     return None
+
+
+def qdrant_addressable_names(collections: Any, aliases: Any) -> set[str]:
+    """Return physical collection names plus logical aliases accepted by Qdrant."""
+
+    names = {
+        str(item.name)
+        for item in getattr(collections, "collections", [])
+        if getattr(item, "name", None)
+    }
+    names.update(
+        str(item.alias_name)
+        for item in getattr(aliases, "aliases", [])
+        if getattr(item, "alias_name", None)
+    )
+    return names
 
 
 async def main() -> int:

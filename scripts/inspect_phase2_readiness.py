@@ -27,7 +27,10 @@ try:
 except ImportError:
     pass
 
-from scripts.validate_kb_collections import inspect_qdrant_schema  # noqa: E402
+from scripts.validate_kb_collections import (  # noqa: E402
+    inspect_qdrant_schema,
+    qdrant_addressable_names,
+)
 from src.database.vector_store import qdrant_client_kwargs  # noqa: E402
 from src.knowledge.entity_index import (  # noqa: E402
     get_chunk_collection_name,
@@ -106,8 +109,9 @@ async def inspect_qdrant() -> dict[str, Any]:
 
     try:
         collections = await client.get_collections()
-        existing = {collection.name for collection in collections.collections}
-        checks.append(_check("qdrant_reachable", True, {"collections": sorted(existing)}))
+        aliases = await client.get_aliases()
+        existing = qdrant_addressable_names(collections, aliases)
+        checks.append(_check("qdrant_reachable", True, {"collections_and_aliases": sorted(existing)}))
 
         for role, collection_name, expected_points in (
             ("chunk", chunk_collection, None),

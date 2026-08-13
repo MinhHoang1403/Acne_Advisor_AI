@@ -111,6 +111,7 @@ data/processed/
 data/embeddings/
 data/cache/
 !data/phase1_method_sources.json
+!data/phase1_build_manifest.json
 !data/sources/
 data/sources/*
 !data/sources/manifest.yaml
