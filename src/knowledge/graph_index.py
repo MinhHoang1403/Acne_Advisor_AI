@@ -129,11 +129,31 @@ async def replace_entity_graph(
     *,
     build_id: str,
 ) -> dict[str, Any]:
-    """Atomically materialize one build and remove only stale canonical graph nodes."""
+    """Materialize one build and remove stale canonical relationships and nodes."""
 
     await apply_entity_graph_schema(driver)
     materialized = await upsert_entity_graph(driver, records)
     async with driver.session() as session:
+        relationship_count_result = await session.run(
+            "MATCH ()-[r]->() "
+            "WHERE type(r) IN $relationship_types "
+            "AND coalesce(r.kb_version, '') <> $build_id "
+            "RETURN count(r) AS removed",
+            relationship_types=list(ENTITY_GRAPH_RELATIONSHIPS),
+            build_id=build_id,
+        )
+        stale_relationships_removed = _record_count(
+            await _result_single(relationship_count_result), "removed"
+        )
+        relationship_delete_result = await session.run(
+            "MATCH ()-[r]->() "
+            "WHERE type(r) IN $relationship_types "
+            "AND coalesce(r.kb_version, '') <> $build_id "
+            "DELETE r",
+            relationship_types=list(ENTITY_GRAPH_RELATIONSHIPS),
+            build_id=build_id,
+        )
+        await relationship_delete_result.consume()
         count_result = await session.run(
             "MATCH (n) "
             "WHERE any(label IN labels(n) WHERE label IN $labels) "
@@ -155,7 +175,12 @@ async def replace_entity_graph(
     validation = await validate_entity_graph_records(driver, records)
     if not validation["passed"]:
         raise RuntimeError(f"Canonical graph reconciliation failed: {validation['errors']}")
-    return {**materialized, "stale_nodes_removed": removed, "validation": validation}
+    return {
+        **materialized,
+        "stale_relationships_removed": stale_relationships_removed,
+        "stale_nodes_removed": removed,
+        "validation": validation,
+    }
 
 
 async def validate_entity_graph(driver: Any) -> dict[str, Any]:

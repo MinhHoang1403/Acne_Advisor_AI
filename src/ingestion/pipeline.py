@@ -19,6 +19,7 @@ from src.ingestion.index import (
     entity_physical_collection,
     resolve_embeddings,
     seed_embedding_cache_from_collection,
+    switch_alias,
 )
 from src.ingestion.manifest import build_manifest, load_build_manifest, save_build_manifest
 from src.ingestion.parser import load_or_parse_source
@@ -32,6 +33,7 @@ from src.ingestion.validation import (
 )
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy, entity_card_to_text
 from src.knowledge.graph_schema import build_entity_graph_records
+from src.knowledge.graph_index import get_neo4j_driver, replace_entity_graph
 
 
 DEFAULT_SOURCE_DIR = Path("sample_data")
@@ -41,6 +43,8 @@ DEFAULT_PARSED_CACHE = Path("data/cache/phase1/parsed")
 DEFAULT_EMBEDDING_CACHE = Path("data/cache/phase1/embeddings")
 DEFAULT_BUILD_MANIFEST = Path("data/phase1_build_manifest.json")
 LEGACY_INGESTION_MANIFEST = Path("data/ingestion_manifest.json")
+KNOWLEDGE_LOGICAL_COLLECTION = "acne_knowledge"
+ENTITY_LOGICAL_COLLECTION = "acne_entities"
 
 
 async def prepare_phase1(
@@ -216,6 +220,93 @@ async def validate_phase1(
     return combine_validation_layers(*layers)
 
 
+async def activate_phase1(
+    *,
+    manifest_path: Path = DEFAULT_BUILD_MANIFEST,
+    rollback_root: Path,
+) -> dict[str, Any]:
+    """Activate a validated candidate after proving local rollback artifacts exist."""
+
+    _verify_rollback_artifacts(rollback_root)
+    validation = await validate_phase1(manifest_path=manifest_path, live=True)
+    if not validation["passed"]:
+        raise RuntimeError(f"Candidate cutover validation failed: {validation['errors']}")
+
+    manifest = load_build_manifest(manifest_path)
+    prepared = await prepare_phase1()
+    if manifest["build_id"] != prepared["identity"].build_id:
+        raise RuntimeError("Candidate manifest does not match the frozen input build identity")
+
+    driver = get_neo4j_driver()
+    try:
+        graph_result = await replace_entity_graph(
+            driver,
+            prepared["graph_records"],
+            build_id=manifest["build_id"],
+        )
+    finally:
+        await driver.close()
+
+    client = AsyncQdrantClient(**qdrant_client_kwargs())
+    try:
+        collections = {item.name for item in (await client.get_collections()).collections}
+        knowledge_physical = manifest["collections"]["knowledge_physical"]
+        entity_physical = manifest["collections"]["entity_physical"]
+        missing = sorted({knowledge_physical, entity_physical} - collections)
+        if missing:
+            raise RuntimeError(f"Candidate collection missing before cutover: {missing}")
+
+        # The historical knowledge store used the logical name as a physical
+        # collection. Its verified native snapshot is the rollback boundary.
+        if KNOWLEDGE_LOGICAL_COLLECTION in collections:
+            await client.delete_collection(KNOWLEDGE_LOGICAL_COLLECTION)
+        if ENTITY_LOGICAL_COLLECTION in collections:
+            await client.delete_collection(ENTITY_LOGICAL_COLLECTION)
+
+        await switch_alias(
+            client,
+            alias_name=KNOWLEDGE_LOGICAL_COLLECTION,
+            target_collection=knowledge_physical,
+        )
+        await switch_alias(
+            client,
+            alias_name=ENTITY_LOGICAL_COLLECTION,
+            target_collection=entity_physical,
+        )
+        knowledge_alias_validation = await validate_qdrant_collection(
+            client,
+            collection_name=KNOWLEDGE_LOGICAL_COLLECTION,
+            expected_points=manifest["counts"]["knowledge_chunks"],
+        )
+        entity_alias_validation = await validate_qdrant_collection(
+            client,
+            collection_name=ENTITY_LOGICAL_COLLECTION,
+            expected_points=manifest["counts"]["entities"],
+            smoke_query="adapalene",
+        )
+    finally:
+        await client.close()
+
+    cutover_validation = combine_validation_layers(
+        validation,
+        knowledge_alias_validation,
+        entity_alias_validation,
+        graph_result["validation"],
+    )
+    if not cutover_validation["passed"]:
+        raise RuntimeError(f"Post-cutover validation failed: {cutover_validation['errors']}")
+    manifest["status"] = "activated"
+    manifest["activation"] = {
+        "rollback_root": rollback_root.as_posix(),
+        "knowledge_alias": KNOWLEDGE_LOGICAL_COLLECTION,
+        "entity_alias": ENTITY_LOGICAL_COLLECTION,
+        "graph": graph_result,
+        "validation": cutover_validation,
+    }
+    save_build_manifest(manifest_path, manifest)
+    return manifest
+
+
 async def phase1_status(manifest_path: Path = DEFAULT_BUILD_MANIFEST) -> dict[str, Any]:
     prepared = await prepare_phase1()
     manifest = load_build_manifest(manifest_path) if manifest_path.is_file() else None
@@ -241,10 +332,25 @@ def _legacy_point_ids(path: Path) -> list[str]:
     return identifiers
 
 
+def _verify_rollback_artifacts(root: Path) -> None:
+    qdrant_snapshots = list((root / "qdrant").glob("*.snapshot"))
+    neo4j_store = root / "neo4j" / "data" / "databases"
+    if len(qdrant_snapshots) < 2 or any(path.stat().st_size <= 0 for path in qdrant_snapshots):
+        raise RuntimeError(f"Rollback requires two readable Qdrant snapshots under {root}")
+    if not neo4j_store.is_dir() or not any(path.is_file() for path in neo4j_store.rglob("*")):
+        raise RuntimeError(f"Rollback requires a non-empty Neo4j cold backup under {root}")
+
+
 def _git_commit() -> str:
     return subprocess.check_output(
         ["git", "rev-parse", "HEAD"], text=True, encoding="utf-8"
     ).strip()
 
 
-__all__ = ["build_phase1", "phase1_status", "prepare_phase1", "validate_phase1"]
+__all__ = [
+    "activate_phase1",
+    "build_phase1",
+    "phase1_status",
+    "prepare_phase1",
+    "validate_phase1",
+]

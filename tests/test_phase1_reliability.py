@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 import scripts.ingest_knowledge as ingestion
 from scripts.run_full_phase1 import build_full_phase1_plan, run_full_phase1
-from src.knowledge.graph_index import upsert_entity_graph, validate_entity_graph_records
+import src.knowledge.graph_index as graph_index
+from src.knowledge.graph_index import (
+    replace_entity_graph,
+    upsert_entity_graph,
+    validate_entity_graph_records,
+)
 from src.knowledge.phase1_validation import (
     CollectionReconciliation,
     Phase1ValidationReport,
@@ -413,6 +418,59 @@ def test_entity_graph_upsert_counts_only_materialized_records() -> None:
         "nodes": 2,
         "relationships": 1,
     }
+
+
+def test_replace_entity_graph_removes_stale_relationships_before_nodes(monkeypatch) -> None:
+    queries: list[str] = []
+
+    class Result:
+        async def single(self):
+            return {"removed": 1}
+
+        async def consume(self):
+            return None
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def run(self, query: str, **_kwargs):
+            queries.append(query)
+            return Result()
+
+    class Driver:
+        def session(self):
+            return Session()
+
+    async def no_schema(_driver):
+        return None
+
+    async def materialize(_driver, _records):
+        return {"nodes": 1, "relationships": 1}
+
+    async def valid(_driver, _records):
+        return {"passed": True, "errors": []}
+
+    monkeypatch.setattr(graph_index, "apply_entity_graph_schema", no_schema)
+    monkeypatch.setattr(graph_index, "upsert_entity_graph", materialize)
+    monkeypatch.setattr(graph_index, "validate_entity_graph_records", valid)
+
+    result = asyncio.run(
+        replace_entity_graph(
+            Driver(),
+            {"nodes": [], "relationships": []},
+            build_id="build-a",
+        )
+    )
+
+    relationship_delete = next(i for i, query in enumerate(queries) if "DELETE r" in query)
+    node_delete = next(i for i, query in enumerate(queries) if "DETACH DELETE n" in query)
+    assert relationship_delete < node_delete
+    assert result["stale_relationships_removed"] == 1
+    assert result["stale_nodes_removed"] == 1
 
 
 def test_strict_graph_record_validation_detects_stale_aggregate_count() -> None:
