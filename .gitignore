@@ -110,6 +110,10 @@ data/raw/
 data/processed/
 data/embeddings/
 data/cache/
+!data/phase1_method_sources.json
+!data/sources/
+data/sources/*
+!data/sources/manifest.yaml
 !data/taxonomy/
 data/taxonomy/*
 !data/taxonomy/drug_aliases.yaml
