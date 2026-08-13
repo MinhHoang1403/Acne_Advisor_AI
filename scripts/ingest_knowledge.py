@@ -70,14 +70,12 @@ import asyncio
 import hashlib
 import json
 import logging
-import math
 import os
 import re
 import sys
 import uuid
 import urllib.error
 import urllib.request
-from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
@@ -105,8 +103,16 @@ from src.ingestion.cleanup import (
     build_qdrant_cleanup_plan,
     cleanup_previous_qdrant_points,
 )
+from src.ingestion.chunking import naive_split
 from src.ingestion.domain_metadata import enrich_domain_metadata, extract_dermatology_metadata
+from src.ingestion.filtering import is_noisy_chunk, is_short_medical_safety_statement
 from src.ingestion.json_loader import load_web_json_documents_with_stats
+from src.ingestion.sparse_legacy import (
+    SPARSE_VECTOR_SCHEMA_VERSION,
+    compute_sparse_vectors,
+    token_to_sparse_index,
+    tokenize_for_sparse,
+)
 from src.integrations.google_genai import embed_texts_sync
 from src.knowledge.versioning import expected_kb_payload_metadata
 
@@ -156,7 +162,6 @@ GRAPH_CACHE_DIR: Path = CACHE_DIR / "graph"
 DEFAULT_MANIFEST_PATH: Path = DATA_DIR / "ingestion_manifest.json"
 INGESTION_MANIFEST_VERSION: int = 1
 INGESTION_CONFIG_SCHEMA_VERSION = "phase1_ingestion_config_v1"
-SPARSE_VECTOR_SCHEMA_VERSION = "hashed_bm25_v1"
 SEMANTIC_ENRICHMENT_VERSION = "semantic_graph_enrichment_v1"
 
 CHUNK_SIZE: int = int(os.getenv("CHUNK_SIZE", "2000"))
@@ -1870,18 +1875,6 @@ async def stage1_extract_sources(
 # STAGE 2 – Markdown chunking
 # =============================================================================
 
-def naive_split(text: str, size: int, overlap: int) -> list[str]:
-    parts: list[str] = []
-    start = 0
-    step = max(1, size - overlap)
-
-    while start < len(text):
-        parts.append(text[start:start + size])
-        start += step
-
-    return parts
-
-
 def _enrich_chunk_metadata(
     base_metadata: dict[str, Any],
     text: str,
@@ -1917,108 +1910,6 @@ def _enrich_chunk_metadata(
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 1.5 Step 6.5 – Noisy chunk detection
 # ─────────────────────────────────────────────────────────────────────────────
-
-# Regex patterns for noise detection
-_DOTS_RE = re.compile(r"\.{3,}")
-_PAGE_NUM_RE = re.compile(r"^\s*\d{1,4}\s*$")
-_COPYRIGHT_RE = re.compile(
-    r"(?:©|notice of rights|all rights reserved|subject to)",
-    re.IGNORECASE,
-)
-
-# Medical keywords that rescue short chunks from being marked noisy
-_MEDICAL_RESCUE_RE = re.compile(
-    r"(?:"
-    r"benzoyl\s*peroxide|retinoid|tretinoin|isotretinoin|adapalene|tazarotene"
-    r"|salicylic\s*acid|azelaic\s*acid|clindamycin|erythromycin|doxycycline"
-    r"|minocycline|spironolactone|comedogenic|comedone|papule|pustule"
-    r"|nodule|cyst|formulation|dosage|mg|topical|oral|cream|gel|lotion"
-    r"|mụn|da|viêm|trị|thuốc|kem|bôi|uống"
-    r")",
-    re.IGNORECASE,
-)
-
-# Short clinical warnings must carry both an action and a safety context. This
-# preserves meaningful evidence without turning every short navigation label
-# into an indexed chunk.
-_SHORT_SAFETY_ACTION_RE = re.compile(
-    r"(?:do\s+not\s+use|avoid(?:\s+use|\s+using)?|contraindicat(?:ed|ion)?|"
-    r"stop\s+(?:use|using)|seek\s+(?:medical\s+)?(?:care|help)|"
-    r"không\s+(?:dùng|sử\s+dụng)|tránh\s+(?:dùng|sử\s+dụng)|"
-    r"chống\s+chỉ\s+định|ngừng\s+(?:dùng|sử\s+dụng)|đi\s+khám)",
-    re.IGNORECASE,
-)
-_SHORT_SAFETY_CONTEXT_RE = re.compile(
-    r"(?:pregnan(?:cy|t)?|breastfeed(?:ing)?|lactat(?:ion|ing)?|"
-    r"allerg(?:y|ic)|swelling|angioedema|anaphyla|severe\s+(?:reaction|irritation)|"
-    r"adverse\s+(?:reaction|effect)|antibiotic|mang\s+thai|thai\s+kỳ|"
-    r"cho\s+con\s+bú|dị\s+ứng|sưng|phản\s+ứng\s+nặng|kháng\s+sinh)",
-    re.IGNORECASE,
-)
-
-
-def is_short_medical_safety_statement(text: str, header: str | None = None) -> bool:
-    """Recognise general short safety evidence without matching fixed examples."""
-
-    combined = "\n".join(part for part in ((header or "").strip(), text.strip()) if part)
-    return bool(
-        _SHORT_SAFETY_ACTION_RE.search(combined)
-        and _SHORT_SAFETY_CONTEXT_RE.search(combined)
-    )
-
-
-def is_noisy_chunk(
-    text: str,
-    header: str | None = None,
-) -> tuple[bool, str]:
-    """Heuristic detection of noisy / low-quality chunks.
-
-    Returns ``(is_noisy, reason)``.
-    A chunk is considered noisy if it is mostly PDF artifacts
-    (TOC dot-leaders, page numbers, copyright notices) rather than
-    meaningful medical content.
-
-    Short chunks that contain medical keywords are **not** marked noisy.
-    """
-    stripped = text.strip()
-    text_len = len(stripped)
-    hdr = (header or "").strip()
-
-    # ── Rule 1: mostly dots (TOC dot-leaders) ────────────────────────
-    dots_chars = sum(len(m.group()) for m in _DOTS_RE.finditer(stripped))
-    if text_len > 0 and dots_chars / text_len > 0.40:
-        return True, f"mostly_dots ({dots_chars}/{text_len} chars are dots)"
-
-    # ── Rule 2: Contents header with dot-leaders ─────────────────────
-    if hdr.lower() in {"contents", "table of contents", "mục lục"}:
-        if dots_chars > 10:
-            return True, f"toc_header '{hdr}' with dot-leaders"
-
-    # ── Rule 3: copyright / legal boilerplate ────────────────────────
-    if _COPYRIGHT_RE.search(stripped) and text_len < 300:
-        return True, f"copyright_notice (len={text_len})"
-
-    # ── Rule 4: mostly page numbers ──────────────────────────────────
-    lines = stripped.split("\n")
-    non_empty_lines = [l for l in lines if l.strip()]
-    if non_empty_lines:
-        page_num_lines = sum(1 for l in non_empty_lines if _PAGE_NUM_RE.match(l))
-        if page_num_lines / len(non_empty_lines) > 0.5:
-            return True, f"page_numbers ({page_num_lines}/{len(non_empty_lines)} lines)"
-
-    # ── Rule 5: very short text ──────────────────────────────────────
-    if text_len < 80:
-        # Rescue if text or header contains medical keywords
-        if (
-            _MEDICAL_RESCUE_RE.search(stripped)
-            or _MEDICAL_RESCUE_RE.search(hdr)
-            or is_short_medical_safety_statement(stripped, hdr)
-        ):
-            return False, ""
-        return True, f"too_short (len={text_len})"
-
-    return False, ""
-
 
 def chunk_markdown_text(
     markdown_text: str,
@@ -3029,67 +2920,10 @@ async def embed_dense_batch_with_retry(
     ) from last_error
 
 
-def tokenize_for_sparse(text: str) -> list[str]:
-    return re.findall(
-        r"[a-zA-ZÀ-ỹ0-9][a-zA-ZÀ-ỹ0-9_\-/.%]*",
-        text.lower(),
-    )
-
-
-def token_to_sparse_index(token: str) -> int:
-    digest = hashlib.md5(token.encode("utf-8")).hexdigest()
-    return int(digest[:8], 16) & 0x7FFFFFFF
-
-
 def compute_hashed_sparse_vectors(texts: list[str]) -> list[dict[str, list]]:
-    """Create deterministic sparse vectors for Qdrant.
+    """Compatibility wrapper for the current custom sparse representation."""
 
-    This replaces the old rank_bm25 implementation that caused:
-    IndexError: index 16 is out of bounds for axis 0 with size 16
-
-    Reason:
-    rank_bm25.get_scores(query_tokens) returns scores per document,
-    not scores per token. The previous code indexed it as if it were
-    token scores.
-
-    This implementation:
-    - tokenizes text
-    - hashes tokens to stable sparse indices
-    - uses log-scaled term frequency
-    - is stable across batches and safe for Qdrant sparse vectors
-    """
-    sparse_vectors: list[dict[str, list]] = []
-
-    for text in texts:
-        tokens = tokenize_for_sparse(text)
-
-        if not tokens:
-            sparse_vectors.append({"indices": [], "values": []})
-            continue
-
-        counts = Counter(tokens)
-        max_tf = max(counts.values()) if counts else 1
-
-        index_to_value: dict[int, float] = {}
-
-        for token, count in counts.items():
-            idx = token_to_sparse_index(token)
-
-            tf = 1.0 + math.log(float(count))
-            value = tf / (1.0 + math.log(float(max_tf)))
-
-            index_to_value[idx] = index_to_value.get(idx, 0.0) + float(value)
-
-        sorted_items = sorted(index_to_value.items())
-
-        sparse_vectors.append(
-            {
-                "indices": [idx for idx, _ in sorted_items],
-                "values": [val for _, val in sorted_items],
-            }
-        )
-
-    return sparse_vectors
+    return compute_sparse_vectors(texts)
 
 
 async def stage4b_upsert_qdrant(

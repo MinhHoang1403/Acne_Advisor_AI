@@ -10,7 +10,10 @@ Responsibilities
 2. Create patient_records table in PostgreSQL with JSONB profile.
 3. Enable PostgreSQL extensions.
 4. Create SQLAlchemy model tables if src.database.models exists.
-5. Create Qdrant collection with named dense vector + sparse BM25 vector.
+5. Create Qdrant collection with dense and custom sparse TF vectors.
+
+The sparse datastore key remains ``bm25`` for compatibility. The current
+formula is not canonical BM25.
 """
 
 from __future__ import annotations

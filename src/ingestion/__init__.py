@@ -14,6 +14,13 @@ dermatology_taxonomy
 domain_metadata
     Rule-based metadata extractor that annotates text chunks with
     structured dermatology metadata.
+
+chunking and filtering
+    Pure current splitting and noisy-chunk heuristic primitives.
+
+sparse_legacy
+    Compatibility custom hashed normalized log-TF representation. This is
+    not canonical BM25; migration is reserved for S4A.
 """
 
 from src.ingestion.dermatology_taxonomy import (

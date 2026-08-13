@@ -1,14 +1,14 @@
 """
 src/database/retriever.py – Hybrid Retriever
 =============================================
-Combines Qdrant semantic search (dense + sparse BM25) with Neo4j
+Combines Qdrant semantic search (dense + custom sparse TF) with Neo4j
 knowledge graph context for comprehensive retrieval.
 
 Pipeline
 --------
   User Query
     ├─→ [1] Qdrant Dense Search   (semantic similarity)
-    ├─→ [2] Qdrant Sparse BM25    (lexical keyword match)
+    ├─→ [2] Qdrant sparse TF      (lexical keyword match)
     ├─→ [3] RRF Fusion            (merge & re-rank)
     ├─→ [3.5] Metadata Boost      (Phase 1.5 query-adaptive boost)
     └─→ [4] Neo4j KG Enrichment   (graph_nodes → relationships)
@@ -375,7 +375,7 @@ async def _get_graph_facts_with_fallback(
 # ---------------------------------------------------------------------------
 
 class HybridRetriever:
-    """Hybrid retrieval combining dense semantic search, sparse BM25 lexical
+    """Hybrid retrieval combining dense semantic search, custom sparse TF
     search, RRF fusion, and Neo4j knowledge graph enrichment.
 
     Usage
@@ -415,7 +415,7 @@ class HybridRetriever:
         dense_weight : float
             Weight for dense search in RRF fusion.
         sparse_weight : float
-            Weight for sparse BM25 search in RRF fusion.
+            Weight for the custom sparse TF channel in RRF fusion.
         rrf_k : int
             RRF constant (default 60, higher = more conservative fusion).
         """
