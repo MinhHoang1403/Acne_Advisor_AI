@@ -1,6 +1,5 @@
 from scripts.evaluate_s2_controlled_ablation import (
     _complexity_inventory,
-    _git_snapshot,
     _write_machine_outputs,
     _write_markdown_outputs,
 )
@@ -98,7 +97,13 @@ def test_s2_writer_emits_every_required_artifact(tmp_path):
         "reembedding": "not_run",
     }
     complexity = _complexity_inventory()
-    git = _git_snapshot()
+    git = {
+        "branch": "feat/s2-controlled-ablation",
+        "head": "test-head",
+        "main": "test-main",
+        "origin_main": "test-origin-main",
+        "status": "",
+    }
 
     _write_machine_outputs(tmp_path, result, runtime, complexity, git)
     _write_markdown_outputs(tmp_path, result, runtime, complexity, git)
