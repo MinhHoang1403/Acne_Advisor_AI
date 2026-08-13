@@ -87,14 +87,13 @@ def test_v1_emergency_regressions_route_to_immediate_emergency_action(query: str
     assert first_sentence_has_immediate_emergency_action(result.answer) is True
 
 
-def test_all_v3_canonical_emergency_cases_route_to_immediate_emergency_action():
-    dataset_path = Path("evaluation/data/acne_system_eval_v3.jsonl")
-    emergency_cases = [
-        json.loads(line)
-        for line in dataset_path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and json.loads(line).get("category") == "urgent_emergency"
-    ]
+def test_all_retained_emergency_regressions_route_to_immediate_emergency_action():
+    fixture_path = Path("tests/fixtures/safety_emergency_regression.json")
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    emergency_cases = fixture["cases"]
 
+    assert fixture["schema_version"] == "safety_emergency_regression_v1"
+    assert "not clinical gold" in fixture["description"]
     assert len(emergency_cases) == 20
     for case in emergency_cases:
         result = apply_severity_aware_answer_guard(

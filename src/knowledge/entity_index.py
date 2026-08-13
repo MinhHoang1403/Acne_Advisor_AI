@@ -179,7 +179,7 @@ def build_entity_point(
     *,
     point_id: str | None = None,
 ) -> Any:
-    """Build a Qdrant ``PointStruct`` with dense and hashed sparse BM25 vectors."""
+    """Build a point with dense and compatibility hashed sparse TF vectors."""
 
     from qdrant_client.models import PointStruct, SparseVector  # type: ignore[import]
 

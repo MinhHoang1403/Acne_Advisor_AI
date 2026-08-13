@@ -12,7 +12,7 @@ Trạng thái tổng quát:
 
 - Backend runtime: FastAPI + LangGraph agent.
 - Frontend: React/Vite giao diện chat tối giản.
-- Vector retrieval: Qdrant hybrid dense + sparse BM25.
+- Vector retrieval: Qdrant hybrid dense + custom hashed sparse TF.
 - Knowledge graph: Neo4j deterministic entity graph.
 - Cache: Redis semantic answer cache, versioned bằng `CACHE_ANSWER_VERSION=v5`
   và pipeline fingerprint.
@@ -54,8 +54,8 @@ Trạng thái tổng quát:
 - Trả lời trực tiếp các câu hỏi yes/no, câu hỏi so sánh và câu hỏi về entity
   cụ thể như adapalene, benzoyl peroxide, clindamycin, isotretinoin hoặc
   tazarotene.
-- Hybrid retrieval từ Qdrant với named dense vector `dense` và sparse vector
-  `bm25`.
+- Hybrid retrieval từ Qdrant với named dense vector `dense` và custom hashed
+  sparse TF lưu dưới compatibility key `bm25` (không phải BM25 chuẩn).
 - Entity-centric retrieval từ collection entity riêng.
 - Neo4j graph enrichment để bổ sung facts quan hệ giữa hoạt chất, nhóm thuốc,
   sản phẩm, cơ chế và safety context.
@@ -162,6 +162,11 @@ Các bước chính:
 
 ## Cấu Trúc Repository
 
+Tài liệu điều hướng: [architecture](docs/ARCHITECTURE.md),
+[data pipeline](docs/DATA_PIPELINE.md), [agent workflow](docs/AGENT_WORKFLOW.md),
+[methods and formulas](docs/METHODS_AND_FORMULAS.md), [safety](docs/SAFETY.md),
+[operations](docs/OPERATIONS.md) và [references](docs/REFERENCES.md).
+
 ```text
 src/
   agent/          LangGraph workflow, nodes, prompts, LLM provider wrappers
@@ -169,7 +174,7 @@ src/
   cache/          Redis và semantic cache helpers
   database/       PostgreSQL, Qdrant, Neo4j access layers
   frontend/       React/Vite UI
-  ingestion/      JSON loader, metadata enrichment, cleanup helpers
+  ingestion/      Chunking/filtering primitives, metadata, cleanup, sparse compatibility
   integrations/   Google GenAI integration
   knowledge/      Taxonomy, entity cards, entity graph/index builders
   observability/  Pipeline fingerprint, trace export, metadata sanitizer
@@ -177,7 +182,7 @@ src/
   resilience/     Timeout, retry, circuit breaker settings
   retrieval/      Query normalization, expansion, rerank, context packing
 
-scripts/          Init, ingestion, validation, eval, diagnostics
+scripts/          Supported init, ingestion, validation and regression entrypoints
 tests/            Python test suite
 data/             Local runtime data, taxonomy, cache, manifests
 .github/          GitHub Actions workflows
