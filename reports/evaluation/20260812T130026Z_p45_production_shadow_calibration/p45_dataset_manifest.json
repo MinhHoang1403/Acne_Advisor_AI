@@ -1,0 +1,67 @@
+{
+  "schema_version": "p45_dataset_manifest_v1",
+  "dataset_version": "p45_production_shadow_v1",
+  "timestamp": "2026-08-12T13:17:08.257847+00:00",
+  "frozen": true,
+  "question_count": 75,
+  "generated_output_count": 75,
+  "generation_failure_count": 0,
+  "claim_count": 522,
+  "critical_claim_count": 126,
+  "languages": {
+    "VI": 48,
+    "MIXED": 15,
+    "EN": 12
+  },
+  "categories": {
+    "BASIC_ACNE_KNOWLEDGE": 4,
+    "COMEDONAL_ACNE": 4,
+    "INFLAMMATORY_ACNE": 2,
+    "SKINCARE_ROUTINE": 2,
+    "SEBUM_OILY_SKIN": 3,
+    "BODY_ACNE": 3,
+    "TRIGGERS_ASSOCIATIONS": 5,
+    "SKINCARE_PRODUCT_USE": 5,
+    "BENZOYL_PEROXIDE": 4,
+    "SALICYLIC_ACID": 2,
+    "RETINOIDS": 2,
+    "BRAND_GENERIC_ALIAS": 2,
+    "SIDE_EFFECTS": 3,
+    "PREGNANCY_LACTATION": 4,
+    "TREATMENT_COMPARISON": 4,
+    "ANTIBIOTICS": 5,
+    "ACTIVE_INGREDIENTS": 5,
+    "CONTRAINDICATIONS": 2,
+    "EMERGENCY_SEVERE": 6,
+    "SOURCE_PROVENANCE": 2,
+    "UNCLEAR_AMBIGUOUS": 3,
+    "OUT_OF_SCOPE": 2,
+    "TREATMENT_FOLLOWUP": 1
+  },
+  "sha256": {
+    "p45_questions.json": "6e3e10395358ee7c487d6375cf403e49242587f62e0c4d4dcbc8b4e7176e9e69",
+    "p45_generated_answers.json": "4ccab7232dbf727df64b266d7b89673f3302cab19d8bbd5de91ba85c9af15fc4",
+    "p45_claims.json": "084a1c4a2f477ab0e2ece4ed3ff232ad3ba3a87a9ee4ce2ecb214a014698131e",
+    "p45_review_blind.jsonl": "82cc6985d502c0a195aa83e5c12ef95ab02da3fb4fd4d2ebc77c5f043e31e178",
+    "p45_review_with_predictions.jsonl": "4ca1aebae85ba5310f2e858972853e7fc461952bbb582cc48a674cf8b83cf462",
+    "p45_human_labels.jsonl": "82cc6985d502c0a195aa83e5c12ef95ab02da3fb4fd4d2ebc77c5f043e31e178",
+    "p45_adjudicated_labels.jsonl": "4ca1aebae85ba5310f2e858972853e7fc461952bbb582cc48a674cf8b83cf462"
+  },
+  "generation_config_fingerprint": "af95aafe84645cf9a7987b91",
+  "generation_provider_models": [
+    "gemini:gemini-3.1-flash-lite",
+    "gemini:gemini-3.5-flash",
+    "system:None",
+    "system:guardrail-rule"
+  ],
+  "p4_config": {
+    "mode": "shadow",
+    "claim_grounding_version": "claim_level_grounding_v1",
+    "evidence_mapping_version": "claim_evidence_mapping_v1",
+    "entailment_version": "deterministic_entailment_v1",
+    "critical_policy_version": "critical_claim_policy_v1"
+  },
+  "review_type": "HUMAN EVIDENCE-SUPPORT REVIEW",
+  "reviewer_count": 0,
+  "adjudication_status": "PENDING_HUMAN_REVIEW"
+}
