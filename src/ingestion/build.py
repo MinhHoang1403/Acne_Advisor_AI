@@ -51,7 +51,10 @@ class CompiledKnowledge:
 
 def compute_build_identity(source_manifest_path: Path, taxonomy_path: Path) -> BuildIdentity:
     source_hash = source_manifest_hash(source_manifest_path)
-    taxonomy_hash = hashlib.sha256(taxonomy_path.read_bytes()).hexdigest()
+    taxonomy_bytes = (
+        taxonomy_path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    )
+    taxonomy_hash = hashlib.sha256(taxonomy_bytes).hexdigest()
     contract = {
         "build": BUILD_CONTRACT_ID,
         "parser": PARSER_CONTRACT_ID,
