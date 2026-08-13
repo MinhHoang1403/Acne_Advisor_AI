@@ -33,8 +33,8 @@ This document defines the maintained repository paths for Acne Advisor AI.
 
 - `tests/`: maintained Python regression suite.
 - `scripts/check_release_readiness.py`, `scripts/check_reproducible_environment.py`, `scripts/inspect_phase2_readiness.py` and `scripts/pre_ui_runtime_check.py`: supported readiness checks.
+- `scripts/README.md`: maintained command classification and canonical entrypoints.
 - `docs/END_TO_END_RELEASE_READINESS.md`: release validation sequence.
-- `scripts/diagnostics/`: manual diagnostic tools. They are not canonical evaluation paths and must not replace Evaluation V3 evidence.
 
 ## Excluded Local Paths
 
