@@ -252,7 +252,6 @@ def inspect_runtime_code() -> dict[str, Any]:
     reproducible_checker_path = PROJECT_ROOT / "scripts" / "check_reproducible_environment.py"
     release_checker_path = PROJECT_ROOT / "scripts" / "check_release_readiness.py"
     answer_quality_eval_path = PROJECT_ROOT / "scripts" / "eval_phase2_answer_quality.py"
-    severity_guard_eval_path = PROJECT_ROOT / "scripts" / "eval_severity_aware_guard.py"
     safe_fallback_eval_path = PROJECT_ROOT / "scripts" / "eval_safe_fallback_flow.py"
     runtime_smoke_path = PROJECT_ROOT / "scripts" / "smoke_phase2_runtime.py"
     cache_versioning_path = PROJECT_ROOT / "src" / "observability" / "versioning.py"
@@ -263,7 +262,6 @@ def inspect_runtime_code() -> dict[str, Any]:
     taxonomy_validator_path = PROJECT_ROOT / "scripts" / "validate_taxonomy.py"
     taxonomy_qdrant_planner_path = PROJECT_ROOT / "scripts" / "plan_entity_index_update.py"
     taxonomy_graph_planner_path = PROJECT_ROOT / "scripts" / "plan_taxonomy_graph_update.py"
-    debug_report_path = PROJECT_ROOT / "scripts" / "generate_phase2_debug_report.py"
     all_eval_path = PROJECT_ROOT / "scripts" / "eval_phase2_all.py"
     cache_inspect_path = PROJECT_ROOT / "scripts" / "inspect_cache_versions.py"
     answer_verifier_source = answer_verifier_path.read_text(encoding="utf-8") if answer_verifier_path.exists() else ""
@@ -339,7 +337,6 @@ def inspect_runtime_code() -> dict[str, Any]:
             "severity_aware_answer_guard_available": "def classify_medical_severity" in severity_guard_source
             and "def apply_severity_aware_answer_guard" in severity_guard_source
             and "severity_aware_answer_guard_v1" in cache_versioning_source,
-            "severity_guard_eval_available": severity_guard_eval_path.exists(),
             "safe_fallback_flow_available": "def decide_retrieval_fallback" in safe_fallback_source
             and "def build_safe_fallback_answer" in safe_fallback_source
             and "fallback_decision" in agent_graph_source
@@ -369,7 +366,6 @@ def inspect_runtime_code() -> dict[str, Any]:
             "observability_available": "sanitize_for_observability" in observability_exporter_source
             and "export_observability_event" in observability_exporter_source,
             "cache_inspection_available": cache_inspect_path.exists(),
-            "debug_report_available": debug_report_path.exists(),
             "phase2_all_eval_available": all_eval_path.exists(),
         },
         "rerank_provider_default": _display_rerank_provider(),
