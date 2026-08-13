@@ -24,7 +24,6 @@ except ImportError:
 
 from src.database.vector_store import qdrant_client_kwargs  # noqa: E402
 from src.knowledge.entity_index import (  # noqa: E402
-    CHUNK_COLLECTION_FUTURE_DEFAULT,
     get_chunk_collection_name,
     get_entity_collection_name,
 )
@@ -60,8 +59,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--chunk-collection",
         default=get_default_chunk_collection_name(),
         help=(
-            "Chunk collection name. Defaults to QDRANT_COLLECTION_NAME when "
-            f"CHUNK_QDRANT_COLLECTION_NAME is unset or legacy {CHUNK_COLLECTION_FUTURE_DEFAULT!r}."
+            "Chunk collection name. Defaults to CHUNK_QDRANT_COLLECTION_NAME "
+            "or the canonical QDRANT_COLLECTION_NAME alias."
         ),
     )
     parser.add_argument(

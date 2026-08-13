@@ -75,5 +75,5 @@ def test_domain_metadata_no_crash_on_empty() -> None:
     assert metadata["condition"] == []
     assert metadata["safety_context"] == []
     assert metadata["query_intent_hint"] == []
-    assert metadata["taxonomy_version"] == "drug_taxonomy_v1"
-    assert metadata["entity_schema_version"] == "entity_schema_v1"
+    assert metadata["taxonomy_version"] == "acne_taxonomy_2026_08"
+    assert metadata["entity_schema_version"] == "source_backed_entity_card"

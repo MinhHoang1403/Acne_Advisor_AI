@@ -164,8 +164,8 @@ class EntityCard(BaseModel):
     contraindications: list[str] = Field(default_factory=list)
     safety_contexts: list[str] = Field(default_factory=list)
     source_ids: list[str] = Field(default_factory=list)
-    taxonomy_version: str = "drug_taxonomy_v1"
-    entity_schema_version: str = "entity_schema_v1"
+    taxonomy_version: str = "acne_taxonomy_2026_08"
+    entity_schema_version: str = "source_backed_entity_card"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("canonical_name", mode="before")
@@ -188,7 +188,7 @@ class EntityCard(BaseModel):
     def to_payload(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
 
-    def stable_id(self, kb_version: str = "acne_kb_v1") -> str:
+    def stable_id(self, kb_version: str = "frozen_phase1_build") -> str:
         raw = "|".join(
             [
                 kb_version,

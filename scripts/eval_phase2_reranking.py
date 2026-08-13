@@ -50,7 +50,7 @@ def run_phase2_reranking_eval(path: Path = DEFAULT_GOLDEN_PATH) -> dict[str, Any
             normalized_query=normalized,
             expansion=expansion,
             payloads=entity_payloads,
-            collection_name="acne_entities_v1",
+            collection_name="acne_entities",
             limit=8,
         )
         entity_candidates.extend(_distractor_entities(entity_payloads, case_id))
@@ -226,7 +226,7 @@ def _distractor_entities(payloads: list[dict[str, Any]], case_id: str) -> list[R
             RetrievedCandidate(
                 candidate_id=str(copied["entity_id"]),
                 source="entity",
-                collection="acne_entities_v1",
+                collection="acne_entities",
                 text=str(copied.get("text") or copied.get("canonical_name") or ""),
                 score=0.95,
                 fused_score=1.1,

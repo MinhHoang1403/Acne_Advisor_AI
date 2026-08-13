@@ -32,10 +32,10 @@ EXPECTED_VERSION = "end_to_end_release_readiness_v1"
 EXPECTED_CACHE_VERSION = "v5"
 EXPECTED_FINGERPRINT_BEFORE_STEP10 = "c8507401e35043380fd119e7"
 EXPECTED_COUNTS = {
-    "acne_knowledge": 641,
-    "acne_entities_v1": {20, 22, 32},
-    "neo4j_nodes": {21, 23, 32},
-    "neo4j_relationships": {15, 18, 27},
+    "acne_knowledge": 512,
+    "acne_entities": 32,
+    "neo4j_nodes": 32,
+    "neo4j_relationships": 27,
 }
 SECRET_PATTERNS = ("AI" + "za",)
 
@@ -348,7 +348,7 @@ def run_json_script(args: list[str], *, timeout: float = 120.0) -> dict[str, Any
 def extract_data_counts(summary: dict[str, Any]) -> dict[str, Any]:
     counts = {
         "acne_knowledge": None,
-        "acne_entities_v1": None,
+        "acne_entities": None,
         "neo4j_nodes": None,
         "neo4j_relationships": None,
     }
@@ -358,7 +358,7 @@ def extract_data_counts(summary: dict[str, Any]) -> dict[str, Any]:
         if name == "qdrant_chunk_schema_and_points":
             counts["acne_knowledge"] = details.get("points_count")
         elif name == "qdrant_entity_schema_and_points":
-            counts["acne_entities_v1"] = details.get("points_count")
+            counts["acne_entities"] = details.get("points_count")
         elif name == "neo4j_deterministic_graph":
             counts["neo4j_nodes"] = details.get("nodes")
             counts["neo4j_relationships"] = details.get("relationships")

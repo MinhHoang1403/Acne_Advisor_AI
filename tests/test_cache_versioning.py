@@ -284,10 +284,10 @@ def test_manifest_summary_includes_severity_and_runtime_fields():
     assert summary["entity_foundation_version"] == manifest["entity_foundation_version"]
 
 
-def test_manifest_promotes_legacy_chunk_collection_to_base_collection():
+def test_manifest_preserves_explicit_chunk_collection_and_uses_canonical_entity_default():
     manifest = build_pipeline_version_manifest(
         {
-            "CHUNK_QDRANT_COLLECTION_NAME": "acne_chunks_v1",
+            "CHUNK_QDRANT_COLLECTION_NAME": "alternate_chunk_fixture",
             "QDRANT_COLLECTION_NAME": "acne_knowledge",
             "ENTITY_QDRANT_COLLECTION_NAME": "",
             "CACHE_ANSWER_VERSION": "",
@@ -295,8 +295,8 @@ def test_manifest_promotes_legacy_chunk_collection_to_base_collection():
         }
     )
 
-    assert manifest["qdrant_collection_name"] == "acne_knowledge"
-    assert manifest["entity_collection_name"] == "acne_entities_v1"
+    assert manifest["qdrant_collection_name"] == "alternate_chunk_fixture"
+    assert manifest["entity_collection_name"] == "acne_entities"
     assert manifest["answer_cache_version"] == "v5"
     assert manifest["rerank_enabled"] is True
 

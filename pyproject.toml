@@ -13,7 +13,7 @@ authors = [{ name = "Your Name", email = "you@example.com" }]
 
 [project.scripts]
 init-schema = "scripts.init_schema:cli"
-ingest-knowledge = "scripts.ingest_knowledge:cli"
+phase1 = "scripts.phase1:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

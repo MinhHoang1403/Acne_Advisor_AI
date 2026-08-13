@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    actor Operator
+    participant CLI as scripts/phase1.py
+    participant Sources as Canonical source manifest
+    participant Build as src/ingestion
+    participant Gemini as Gemini Embedding 2
+    participant Qdrant
+    participant Neo4j
+
+    Operator->>CLI: phase1.py build
+    CLI->>Sources: Verify portable IDs and SHA-256 hashes
+    Sources-->>Build: Four canonical source records
+    Build->>Build: Reuse content-addressed parsed artifacts
+    Build->>Build: NFC normalize, structure-first chunk, proof-only filter
+    Build->>Build: Attach complete provenance and deterministic IDs
+    Build->>Gemini: Embed cache misses only (3072 dimensions)
+    Gemini-->>Build: Dense vectors
+    Build->>Qdrant: Candidate chunks with dense and native BM25
+    Build->>Qdrant: Candidate source-backed EntityCards
+    Build->>Build: Compile deterministic taxonomy graph
+    Build->>CLI: Candidate manifest and layered validation
+    CLI-->>Operator: Candidate build ID and validation result
+
+    opt Explicit guarded activation
+        Operator->>CLI: phase1.py build --activate --rollback-root
+        CLI->>CLI: Verify Qdrant snapshots and Neo4j cold backup
+        CLI->>Qdrant: Switch aliases to validated physical build
+        CLI->>Neo4j: Reconcile deterministic source-backed graph
+        CLI->>CLI: Run post-cutover validation
+        CLI-->>Operator: Activated build manifest
+    end

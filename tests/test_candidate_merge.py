@@ -8,7 +8,7 @@ def test_merge_prioritizes_entity_for_drug_identity():
     entity = RetrievedCandidate(
         candidate_id="entity:dalacin",
         source="entity",
-        collection="acne_entities_v1",
+        collection="acne_entities",
         text="Dalacin T entity card",
         score=0.7,
         payload={"entity_id": "drug_product:dalacin", "canonical_name": "Dalacin T"},
@@ -62,7 +62,7 @@ def test_merge_preserves_chunk_evidence_for_drug_intent_when_entities_fill_limit
         RetrievedCandidate(
             candidate_id=f"entity:{index}",
             source="entity",
-            collection="acne_entities_v1",
+            collection="acne_entities",
             text=f"Entity {index}",
             score=1.0 - index * 0.01,
             payload={"entity_id": f"entity:{index}", "canonical_name": f"Entity {index}"},

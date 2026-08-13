@@ -77,7 +77,7 @@ class DrugEntityNormalizer:
     def __init__(self, taxonomy_path: str | Path | None = None) -> None:
         self.taxonomy_path = Path(taxonomy_path) if taxonomy_path else DEFAULT_TAXONOMY_PATH
         self.taxonomy = self._load_taxonomy(self.taxonomy_path)
-        self.taxonomy_version = str(self.taxonomy.get("version") or "drug_taxonomy_v1")
+        self.taxonomy_version = str(self.taxonomy.get("version") or "acne_taxonomy_2026_08")
         self.cards_by_type: dict[EntityType, dict[str, EntityCard]] = {
             "drug_product": {},
             "active_ingredient": {},
@@ -158,6 +158,7 @@ class DrugEntityNormalizer:
             "canonical_name": entry.get("canonical_name") or canonical_key,
             "aliases": entry.get("aliases") or [],
             "taxonomy_version": self.taxonomy_version,
+            "entity_schema_version": "source_backed_entity_card",
             "metadata": {"taxonomy_key": canonical_key},
         }
         for field in [

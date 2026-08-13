@@ -10,11 +10,11 @@ DEFAULT_EMBEDDING_PROVIDER = "google"
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSIONS = 3072
 
-DEFAULT_KB_VERSION = "acne_kb_v1"
-DEFAULT_TAXONOMY_VERSION = "drug_taxonomy_v1"
-DEFAULT_ENTITY_SCHEMA_VERSION = "entity_schema_v1"
-DEFAULT_CHUNK_SCHEMA_VERSION = "chunk_schema_v2"
-DEFAULT_INGESTION_PIPELINE_VERSION = "ingestion_pipeline_v2"
+DEFAULT_KB_VERSION = "frozen_phase1_build"
+DEFAULT_TAXONOMY_VERSION = "acne_taxonomy_2026_08"
+DEFAULT_ENTITY_SCHEMA_VERSION = "source_backed_entity_card"
+DEFAULT_CHUNK_SCHEMA_VERSION = "structure_first_chars_2400_no_overlap"
+DEFAULT_INGESTION_PIPELINE_VERSION = "frozen_phase1_build"
 
 
 def _env_str(name: str, default: str) -> str:

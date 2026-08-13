@@ -196,7 +196,7 @@ def test_embed_texts_sync_empty_input_skips_provider_call() -> None:
 def test_entity_embedding_path_delegates_to_the_shared_google_adapter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from scripts import build_entity_index
+    from src.ingestion import embedding
 
     captured: dict[str, object] = {}
 
@@ -205,14 +205,14 @@ def test_entity_embedding_path_delegates_to_the_shared_google_adapter(
         captured["kwargs"] = kwargs
         return [[0.0] * 3072 for _ in texts]
 
-    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
-    monkeypatch.setattr(build_entity_index, "embed_texts_sync", fake_embed)
+    monkeypatch.setattr(embedding, "embed_texts_sync", fake_embed)
 
-    vectors = build_entity_index.embed_entity_texts_sync(["card one", "card two"])
+    vectors = embedding.embed_documents(["card one", "card two"], api_key="test-key")
 
     assert len(vectors) == 2
     assert captured["texts"] == ["card one", "card two"]
     assert captured["kwargs"]["expected_dimensions"] == 3072
+    assert captured["kwargs"]["task_type"] is None
 
 
 @pytest.mark.parametrize(

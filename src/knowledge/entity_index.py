@@ -1,4 +1,4 @@
-"""Qdrant entity-card index helpers for the ``acne_entities_v1`` collection."""
+"""Qdrant entity-card index helpers for the canonical ``acne_entities`` alias."""
 
 from __future__ import annotations
 
@@ -22,9 +22,8 @@ from src.knowledge.versioning import (
 )
 
 
-ENTITY_COLLECTION_DEFAULT = "acne_entities_v1"
+ENTITY_COLLECTION_DEFAULT = "acne_entities"
 CHUNK_COLLECTION_DEFAULT = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
-CHUNK_COLLECTION_FUTURE_DEFAULT = "acne_chunks_v1"
 
 EmbeddingProvider = Callable[[list[str]], list[list[float]] | Awaitable[list[list[float]]]]
 
@@ -37,9 +36,7 @@ def get_chunk_collection_name() -> str:
     qdrant_collection = os.getenv("QDRANT_COLLECTION_NAME", CHUNK_COLLECTION_DEFAULT).strip()
     qdrant_collection = qdrant_collection or CHUNK_COLLECTION_DEFAULT
     configured = os.getenv("CHUNK_QDRANT_COLLECTION_NAME", "").strip()
-    if not configured or configured == CHUNK_COLLECTION_FUTURE_DEFAULT:
-        return qdrant_collection
-    return configured
+    return configured or qdrant_collection
 
 
 def entity_identity_key(card_or_payload: EntityCard | dict[str, Any]) -> str:
@@ -64,7 +61,7 @@ def entity_identity_key(card_or_payload: EntityCard | dict[str, Any]) -> str:
     return f"{entity_type}:{normalized}"
 
 
-def entity_point_id(card: EntityCard, kb_version: str = "acne_kb_v1") -> str:
+def entity_point_id(card: EntityCard, kb_version: str = "frozen_phase1_build") -> str:
     """Return a deterministic Qdrant-compatible UUID for a new entity identity.
 
     ``kb_version`` is accepted for backward-compatible callers but does not
@@ -77,7 +74,7 @@ def entity_point_id(card: EntityCard, kb_version: str = "acne_kb_v1") -> str:
 
 def build_entity_point_payload(
     card: EntityCard,
-    kb_version: str = "acne_kb_v1",
+    kb_version: str = "frozen_phase1_build",
     *,
     point_id: str | None = None,
 ) -> dict[str, Any]:
@@ -123,7 +120,7 @@ async def ensure_entity_collection(
 
     protected_collections = {
         "acne_knowledge",
-        CHUNK_COLLECTION_FUTURE_DEFAULT,
+        CHUNK_COLLECTION_DEFAULT,
         QDRANT_COLLECTION_NAME,
         get_chunk_collection_name(),
     }
@@ -175,7 +172,7 @@ async def ensure_entity_collection(
 def build_entity_point(
     card: EntityCard,
     dense_vector: list[float],
-    kb_version: str = "acne_kb_v1",
+    kb_version: str = "frozen_phase1_build",
     *,
     point_id: str | None = None,
 ) -> Any:
@@ -203,7 +200,7 @@ async def upsert_entity_cards(
     embedding_provider: EmbeddingProvider | None = None,
     client: Any | None = None,
     collection_name: str | None = None,
-    kb_version: str = "acne_kb_v1",
+    kb_version: str = "frozen_phase1_build",
     batch_size: int = 64,
 ) -> int:
     """Upsert entity cards into Qdrant using precomputed embeddings or a provider."""

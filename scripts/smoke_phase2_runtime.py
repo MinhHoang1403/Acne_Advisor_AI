@@ -89,7 +89,7 @@ def run_offline_smoke() -> dict[str, Any]:
                 normalized_query=normalized,
                 expansion=expansion,
                 payloads=entity_payloads,
-                collection_name="acne_entities_v1",
+                collection_name="acne_entities",
                 limit=8,
             )
             chunk_candidates = boost_chunk_results(

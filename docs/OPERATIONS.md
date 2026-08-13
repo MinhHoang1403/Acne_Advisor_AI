@@ -1,8 +1,26 @@
 # Operations
 
-## Supported Commands
+## Phase 1
 
-See `scripts/README.md` for the maintained command inventory. Common commands:
+```powershell
+.\venv\Scripts\python.exe scripts\phase1.py build --source sample_data
+.\venv\Scripts\python.exe scripts\phase1.py validate --offline
+.\venv\Scripts\python.exe scripts\phase1.py validate
+.\venv\Scripts\python.exe scripts\phase1.py status
+```
+
+Activation is intentionally guarded and requires verified native Qdrant
+snapshots plus a Neo4j cold backup:
+
+```powershell
+.\venv\Scripts\python.exe scripts\phase1.py build --activate --rollback-root data\backups\<snapshot>
+```
+
+Do not run Phase 1 merely to start the UI. `scripts/init_schema.py` owns SQL
+schema initialization and does not create, recreate or delete the frozen
+Qdrant knowledge store.
+
+## Runtime Checks
 
 ```powershell
 .\venv\Scripts\python.exe scripts\inspect_phase2_readiness.py
@@ -11,22 +29,5 @@ See `scripts/README.md` for the maintained command inventory. Common commands:
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
-Full Phase 1 is an explicit operator action:
-
-```powershell
-.\venv\Scripts\python.exe scripts\run_full_phase1.py --source sample_data
-```
-
-Do not run ingestion merely to start the UI. Do not use destructive Docker,
-Qdrant, Neo4j, PostgreSQL or Redis cleanup as a readiness step.
-
-## Local-Only State
-
-`.env`, `venv/`, runtime databases under `data/`, caches, build output and
-generated reports remain ignored. Secrets must never enter reports or Git.
-
-## Current Data Contract
-
-The S3B starting baseline is Qdrant knowledge 639, entities 32, Neo4j 32 nodes / 27
-relationships, dense dimension 3072, and semantic enrichment `not_run`. Verify
-with `scripts/inspect_phase2_readiness.py`; do not mutate stores during checks.
+`.env`, provider secrets, caches, databases, snapshots and generated reports
+remain local-only. Never print secrets or use destructive global Docker cleanup.

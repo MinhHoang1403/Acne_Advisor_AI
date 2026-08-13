@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.ingestion.chunking import CHUNK_MAX_CHARS, structural_chunks
+from src.ingestion.chunking import CHUNK_MAX_CHARS, naive_split, structural_chunks
 from src.ingestion.filtering import deduplicate_chunks, is_noisy_chunk
 from src.ingestion.normalization import normalize_parsed_text
 
@@ -41,3 +41,7 @@ def test_normalization_is_conservative_and_deterministic() -> None:
 
 def test_exact_deduplication_keeps_first_occurrence() -> None:
     assert deduplicate_chunks(["a", "b", "a"]) == (["a", "b"], [2])
+
+
+def test_fixed_width_split_primitive_remains_deterministic() -> None:
+    assert naive_split("abcdefghij", size=4, overlap=1) == ["abcd", "defg", "ghij", "j"]

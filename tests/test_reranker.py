@@ -19,7 +19,7 @@ def _entity(candidate_id: str, canonical_name: str, entity_type: str = "active_i
     return RetrievedCandidate(
         candidate_id=candidate_id,
         source="entity",
-        collection="acne_entities_v1",
+        collection="acne_entities",
         text=str(data["text"]),
         score=0.8,
         fused_score=0.8,
