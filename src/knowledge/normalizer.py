@@ -17,25 +17,20 @@ from src.knowledge.taxonomy_models import (
 )
 
 
-# This YAML is the only active deterministic taxonomy for runtime normalization,
-# entity cards, and the core Phase 1 graph. ``drug_taxonomy_v2.yaml`` remains a
-# legacy migration catalog and is intentionally not loaded by default.
+# This YAML is the only active source-backed taxonomy for runtime normalization,
+# EntityCards, and the deterministic Phase 1 graph.
 DEFAULT_TAXONOMY_PATH = Path(__file__).resolve().parents[2] / "data" / "taxonomy" / "drug_aliases.yaml"
 ACTIVE_TAXONOMY_CONTRACT = "data/taxonomy/drug_aliases.yaml"
 
 CANONICAL_CORPUS_SOURCE_IDS = frozenset(
     {
-        "acne-vulgaris-management-pdf-66142088866501.pdf",
-        "PIIS0190962223033893.pdf",
-        "qd_4416_cut.pdf",
-        "web_raw_dataset.json",
+        "nice_ng198_2026_08",
+        "aad_acne_guideline_2024",
+        "vn_moh_dermatology_4416_2023_acne",
+        "aad_public_acne_2026_07",
     }
 )
-CURATED_TAXONOMY_SOURCE_IDS = frozenset(
-    {
-        "drug_taxonomy_v1:drug_products.dalacin_t",
-    }
-)
+CURATED_TAXONOMY_SOURCE_IDS = frozenset({"pfizer_dalacin_t_label_current"})
 
 SECTION_TO_ENTITY_TYPE: dict[str, EntityType] = {
     "drug_products": "drug_product",
@@ -82,7 +77,7 @@ class DrugEntityNormalizer:
     def __init__(self, taxonomy_path: str | Path | None = None) -> None:
         self.taxonomy_path = Path(taxonomy_path) if taxonomy_path else DEFAULT_TAXONOMY_PATH
         self.taxonomy = self._load_taxonomy(self.taxonomy_path)
-        self.taxonomy_version = str(self.taxonomy.get("version") or "drug_taxonomy_v1")
+        self.taxonomy_version = str(self.taxonomy.get("version") or "acne_taxonomy_2026_08")
         self.cards_by_type: dict[EntityType, dict[str, EntityCard]] = {
             "drug_product": {},
             "active_ingredient": {},
@@ -163,6 +158,7 @@ class DrugEntityNormalizer:
             "canonical_name": entry.get("canonical_name") or canonical_key,
             "aliases": entry.get("aliases") or [],
             "taxonomy_version": self.taxonomy_version,
+            "entity_schema_version": "source_backed_entity_card",
             "metadata": {"taxonomy_key": canonical_key},
         }
         for field in [

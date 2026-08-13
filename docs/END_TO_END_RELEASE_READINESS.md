@@ -70,8 +70,8 @@ Live mode uses at most a small Gemini generation smoke and a small Ollama genera
 Expected Phase 1 data:
 
 ```text
-Qdrant acne_knowledge = 639
-Qdrant acne_entities_v1 = 32
+Qdrant acne_knowledge = 512
+Qdrant acne_entities = 32
 Neo4j nodes = 32
 Neo4j relationships = 27
 ```

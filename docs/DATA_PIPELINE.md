@@ -1,34 +1,37 @@
-# Data Pipeline
+# Frozen Phase 1 Data Pipeline
 
-## Canonical Build
+The canonical path is implemented under `src/ingestion/` and exposed only by
+`scripts/phase1.py` (`build`, `validate`, `status`).
 
-The supported full build entrypoint is `scripts/run_full_phase1.py`. The
-lower-level `scripts/ingest_knowledge.py` remains the incremental ingestion CLI.
-Both operate on the canonical `sample_data/` source directory by default.
+```text
+data/sources/manifest.yaml
+  -> content-addressed parse
+  -> conservative normalization
+  -> structure-first chunks (2400 Unicode chars, no overlap)
+  -> proof-only artifact filtering and exact deduplication
+  -> portable provenance
+  -> Gemini Embedding 2 dense vectors + Qdrant-native BM25 documents
+  -> immutable Qdrant knowledge/entity candidates
+  -> deterministic source-backed Neo4j graph
+  -> layered validation and content-derived build manifest
+  -> rollback-guarded alias cutover
+```
 
-Current responsibilities:
-
-| Stage | Location |
+| Responsibility | Code |
 |---|---|
-| Source discovery and orchestration | `scripts/ingest_knowledge.py` |
-| JSON source loading | `src/ingestion/json_loader.py` |
-| Markdown cleanup | `src/ingestion/cleanup.py` |
-| Fixed-width fallback splitting | `src/ingestion/chunking.py` |
-| Noisy-chunk heuristics | `src/ingestion/filtering.py` |
-| Domain metadata | `src/ingestion/domain_metadata.py` |
-| Dense embedding integration | `src/integrations/google_genai.py` |
-| Compatibility sparse vectors | `src/ingestion/sparse_legacy.py` |
-| Taxonomy/entity/graph build | `src/knowledge/` |
+| Source identity and verification | `src/ingestion/source_manifest.py` |
+| Parsed artifact cache | `src/ingestion/parser.py` |
+| Normalization | `src/ingestion/normalization.py` |
+| Chunking | `src/ingestion/chunking.py` |
+| Filtering | `src/ingestion/filtering.py` |
+| Provenance identities | `src/ingestion/provenance.py` |
+| Dense embedding/cache | `src/ingestion/embedding.py` |
+| Native BM25 contract | `src/ingestion/bm25.py` |
+| Candidate indexing/cutover | `src/ingestion/index.py`, `pipeline.py` |
+| Taxonomy, EntityCards, graph | `src/knowledge/` |
+| Layered validation/manifest | `src/ingestion/validation.py`, `manifest.py` |
 
-The ingestion manifest records source hashes and completion state so unchanged
-documents can be skipped. Core Phase 1 and optional semantic graph enrichment
-are separate operations; the current production baseline records semantic
-enrichment as `not_run`.
-
-## Method Status
-
-- Chunk size, overlap and noisy-chunk rules are existing engineering choices,
-  not literature-validated parameters (`S4A_REVIEW_REQUIRED`).
-- Sparse output is `CUSTOM_SPARSE_NOT_BM25`; the datastore key `bm25` is retained
-  solely for compatibility.
-- S3B changes module ownership only. It does not rebuild or migrate data.
+Unchanged source parsing and embedding are reused by strict content/contract
+identity. Structural output is deterministic; provider vectors are cached and
+validated but floating-point provider output is not claimed to be bitwise
+reproducible. LLM semantic graph extraction is removed from the canonical path.

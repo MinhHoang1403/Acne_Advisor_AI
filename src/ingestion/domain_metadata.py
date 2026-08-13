@@ -28,7 +28,6 @@ from src.ingestion.dermatology_taxonomy import (
     SKIN_TYPE_KEYWORDS,
 )
 from src.knowledge import DrugEntityNormalizer
-from src.knowledge.versioning import get_knowledge_versions
 
 
 logger = logging.getLogger(__name__)
@@ -169,10 +168,9 @@ def _dedupe(values: list[Any]) -> list[str]:
 
 
 def _empty_taxonomy_metadata() -> dict[str, Any]:
-    versions = get_knowledge_versions()
     metadata = {field_name: [] for field_name in NEW_DOMAIN_METADATA_LIST_FIELDS}
-    metadata["taxonomy_version"] = versions["taxonomy_version"]
-    metadata["entity_schema_version"] = versions["entity_schema_version"]
+    metadata["taxonomy_version"] = _get_drug_entity_normalizer().taxonomy_version
+    metadata["entity_schema_version"] = "source_backed_entity_card"
     return metadata
 
 

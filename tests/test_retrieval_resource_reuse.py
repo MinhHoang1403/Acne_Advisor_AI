@@ -75,9 +75,9 @@ async def test_shared_entity_payload_cache_avoids_a_second_scroll() -> None:
     original_client = EntityRetriever._shared_client
     original_cache = EntityRetriever._payload_cache
     EntityRetriever._shared_client = _Closable()
-    EntityRetriever._payload_cache = {"acne_entities_v1": [{"canonical_name": "adapalene"}]}
+    EntityRetriever._payload_cache = {"acne_entities": [{"canonical_name": "adapalene"}]}
     try:
-        retriever = EntityRetriever("acne_entities_v1")
+        retriever = EntityRetriever("acne_entities")
         payloads = await retriever._scroll_entity_payloads()
 
         assert payloads == [{"canonical_name": "adapalene"}]

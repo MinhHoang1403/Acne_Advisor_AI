@@ -9,7 +9,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MIN_RAW_TEXT_CHARS = 50
+DEFAULT_MIN_RAW_TEXT_CHARS = 1
 WRAPPER_RECORD_KEYS = ("records", "data", "items", "documents", "pages")
 
 
@@ -50,13 +50,12 @@ def load_web_json_documents_with_stats(
             continue
 
         raw_text = str(record.get("raw_text") or "").strip()
-        if len(raw_text) < min_raw_text_chars:
+        if not raw_text:
             skipped += 1
             logger.warning(
-                "[JSON LOADER] Skipping empty/short record %d in %s: %d chars",
+                "[JSON LOADER] Skipping empty record %d in %s",
                 record_index,
                 json_path.name,
-                len(raw_text),
             )
             continue
 
@@ -102,10 +101,7 @@ def _extract_records(data: Any, path: Path) -> list[Any]:
 
 
 def _source_path_key(path: Path) -> str:
-    try:
-        return str(path.resolve())
-    except OSError:
-        return str(path)
+    return path.name
 
 
 __all__ = [

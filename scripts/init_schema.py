@@ -10,10 +10,7 @@ Responsibilities
 2. Create patient_records table in PostgreSQL with JSONB profile.
 3. Enable PostgreSQL extensions.
 4. Create SQLAlchemy model tables if src.database.models exists.
-5. Create Qdrant collection with dense and custom sparse TF vectors.
-
-The sparse datastore key remains ``bm25`` for compatibility. The current
-formula is not canonical BM25.
+5. Leave the frozen Phase 1 Qdrant foundation to ``scripts/phase1.py``.
 """
 
 from __future__ import annotations
@@ -57,10 +54,7 @@ SYNC_DATABASE_URL = os.getenv(
 )
 
 VECTOR_DB_PROVIDER = os.getenv("VECTOR_DB_PROVIDER", "qdrant").lower()
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
-EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "3072"))
-FORCE_RECREATE_QDRANT_COLLECTION = os.getenv("FORCE_RECREATE_QDRANT_COLLECTION", "false").lower() in {"1", "true", "yes", "y"}
 
 
 def _mask_password(url: str) -> str:
@@ -159,106 +153,12 @@ async def _setup_postgres() -> None:
 
 
 async def _setup_qdrant() -> None:
-    logger.info("Setting up Qdrant collection...")
-    logger.info("URL: %s", QDRANT_URL)
-    logger.info("Collection: %s", QDRANT_COLLECTION_NAME)
-    logger.info("Dense dimensions: %d", EMBEDDING_DIMENSIONS)
+    """Refuse to create or recreate the frozen Phase 1 collection here."""
 
-    try:
-        from qdrant_client import AsyncQdrantClient
-        from qdrant_client.models import Distance, SparseVectorParams, VectorParams
-        from src.database.vector_store import qdrant_client_kwargs
-    except ImportError as exc:
-        raise SystemExit("Missing dependency. Run: pip install qdrant-client") from exc
-
-    client = AsyncQdrantClient(**qdrant_client_kwargs())
-
-    def get_named_config(config, name: str):
-        if config is None:
-            return None
-        if isinstance(config, dict):
-            return config.get(name)
-        if hasattr(config, "get"):
-            return config.get(name)
-        return None
-
-    try:
-        collections = await client.get_collections()
-        existing = {c.name for c in collections.collections}
-
-        if QDRANT_COLLECTION_NAME in existing and FORCE_RECREATE_QDRANT_COLLECTION:
-            logger.warning(
-                "FORCE_RECREATE_QDRANT_COLLECTION=true → deleting existing Qdrant collection '%s'.",
-                QDRANT_COLLECTION_NAME,
-            )
-            await client.delete_collection(collection_name=QDRANT_COLLECTION_NAME)
-            existing.remove(QDRANT_COLLECTION_NAME)
-
-        if QDRANT_COLLECTION_NAME not in existing:
-            await client.create_collection(
-                collection_name=QDRANT_COLLECTION_NAME,
-                vectors_config={
-                    "dense": VectorParams(
-                        size=EMBEDDING_DIMENSIONS,
-                        distance=Distance.COSINE,
-                    )
-                },
-                sparse_vectors_config={
-                    "bm25": SparseVectorParams()
-                },
-            )
-            logger.info(
-                "✓ Qdrant collection '%s' created with dense + bm25.",
-                QDRANT_COLLECTION_NAME,
-            )
-        else:
-            info = await client.get_collection(collection_name=QDRANT_COLLECTION_NAME)
-            params = info.config.params
-            if isinstance(params, dict):
-                vectors_config = params.get("vectors")
-                sparse_vectors_config = params.get("sparse_vectors")
-            else:
-                vectors_config = getattr(params, "vectors", None)
-                sparse_vectors_config = getattr(params, "sparse_vectors", None)
-
-            dense_config = get_named_config(vectors_config, "dense")
-            bm25_config = get_named_config(sparse_vectors_config, "bm25")
-            schema_errors: list[str] = []
-
-            if dense_config is None:
-                schema_errors.append("missing named dense vector 'dense'")
-            else:
-                dense_size = (
-                    dense_config.get("size")
-                    if isinstance(dense_config, dict)
-                    else getattr(dense_config, "size", None)
-                )
-                if dense_size != EMBEDDING_DIMENSIONS:
-                    schema_errors.append(
-                        f"named vector 'dense' has size {dense_size}, "
-                        f"expected {EMBEDDING_DIMENSIONS}"
-                    )
-
-            if bm25_config is None:
-                schema_errors.append("missing sparse vector 'bm25'")
-
-            if schema_errors:
-                raise RuntimeError(
-                    "Qdrant collection schema mismatch for "
-                    f"'{QDRANT_COLLECTION_NAME}': "
-                    + "; ".join(schema_errors)
-                    + ". Set FORCE_RECREATE_QDRANT_COLLECTION=true only if you "
-                    "intend to delete/recreate the collection, or migrate it manually."
-                )
-
-            logger.info(
-                "✓ Qdrant collection '%s' already exists. Schema validated.",
-                QDRANT_COLLECTION_NAME,
-            )
-            logger.info("  Existing Qdrant config: %s", params)
-
-    finally:
-        await client.close()
+    logger.info(
+        "Qdrant ownership belongs to scripts/phase1.py; init_schema does not mutate %s.",
+        QDRANT_COLLECTION_NAME,
+    )
 
 
 async def main() -> int:

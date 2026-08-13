@@ -1,4 +1,4 @@
-"""Qdrant entity-card index helpers for the ``acne_entities_v1`` collection."""
+"""Qdrant entity-card index helpers for the canonical ``acne_entities`` alias."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from typing import Any
 
 from src.database.vector_store import (
     QDRANT_COLLECTION_NAME,
-    compute_sparse_vector,
     qdrant_client_kwargs,
 )
+from src.ingestion.bm25 import BM25_VECTOR_NAME, bm25_document, bm25_sparse_vector_config
 from src.knowledge.entity_cards import entity_card_to_text
 from src.knowledge.schemas import EntityCard
 from src.knowledge.taxonomy_models import normalize_taxonomy_alias
@@ -22,9 +22,8 @@ from src.knowledge.versioning import (
 )
 
 
-ENTITY_COLLECTION_DEFAULT = "acne_entities_v1"
+ENTITY_COLLECTION_DEFAULT = "acne_entities"
 CHUNK_COLLECTION_DEFAULT = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
-CHUNK_COLLECTION_FUTURE_DEFAULT = "acne_chunks_v1"
 
 EmbeddingProvider = Callable[[list[str]], list[list[float]] | Awaitable[list[list[float]]]]
 
@@ -37,9 +36,7 @@ def get_chunk_collection_name() -> str:
     qdrant_collection = os.getenv("QDRANT_COLLECTION_NAME", CHUNK_COLLECTION_DEFAULT).strip()
     qdrant_collection = qdrant_collection or CHUNK_COLLECTION_DEFAULT
     configured = os.getenv("CHUNK_QDRANT_COLLECTION_NAME", "").strip()
-    if not configured or configured == CHUNK_COLLECTION_FUTURE_DEFAULT:
-        return qdrant_collection
-    return configured
+    return configured or qdrant_collection
 
 
 def entity_identity_key(card_or_payload: EntityCard | dict[str, Any]) -> str:
@@ -64,7 +61,7 @@ def entity_identity_key(card_or_payload: EntityCard | dict[str, Any]) -> str:
     return f"{entity_type}:{normalized}"
 
 
-def entity_point_id(card: EntityCard, kb_version: str = "acne_kb_v1") -> str:
+def entity_point_id(card: EntityCard, kb_version: str = "frozen_phase1_build") -> str:
     """Return a deterministic Qdrant-compatible UUID for a new entity identity.
 
     ``kb_version`` is accepted for backward-compatible callers but does not
@@ -77,7 +74,7 @@ def entity_point_id(card: EntityCard, kb_version: str = "acne_kb_v1") -> str:
 
 def build_entity_point_payload(
     card: EntityCard,
-    kb_version: str = "acne_kb_v1",
+    kb_version: str = "frozen_phase1_build",
     *,
     point_id: str | None = None,
 ) -> dict[str, Any]:
@@ -123,7 +120,7 @@ async def ensure_entity_collection(
 
     protected_collections = {
         "acne_knowledge",
-        CHUNK_COLLECTION_FUTURE_DEFAULT,
+        CHUNK_COLLECTION_DEFAULT,
         QDRANT_COLLECTION_NAME,
         get_chunk_collection_name(),
     }
@@ -139,7 +136,7 @@ async def ensure_entity_collection(
         client = AsyncQdrantClient(**qdrant_client_kwargs())
 
     try:
-        from qdrant_client.models import Distance, SparseVectorParams, VectorParams  # type: ignore[import]
+        from qdrant_client.models import Distance, VectorParams  # type: ignore[import]
 
         collections = await client.get_collections()
         existing_names = {collection.name for collection in collections.collections}
@@ -157,7 +154,7 @@ async def ensure_entity_collection(
                         distance=Distance.COSINE,
                     )
                 },
-                sparse_vectors_config={"bm25": SparseVectorParams()},
+                sparse_vectors_config={BM25_VECTOR_NAME: bm25_sparse_vector_config()},
             )
             return
 
@@ -175,19 +172,19 @@ async def ensure_entity_collection(
 def build_entity_point(
     card: EntityCard,
     dense_vector: list[float],
-    kb_version: str = "acne_kb_v1",
+    kb_version: str = "frozen_phase1_build",
     *,
     point_id: str | None = None,
 ) -> Any:
-    """Build a point with dense and compatibility hashed sparse TF vectors."""
+    """Build a point with dense and Qdrant-native BM25 inference inputs."""
 
-    from qdrant_client.models import PointStruct, SparseVector  # type: ignore[import]
+    from qdrant_client.models import PointStruct  # type: ignore[import]
 
     payload = build_entity_point_payload(card, kb_version=kb_version, point_id=point_id)
-    sparse = compute_sparse_vector(payload["text"])
-    vector: dict[str, Any] = {"dense": dense_vector}
-    if sparse["indices"]:
-        vector["bm25"] = SparseVector(indices=sparse["indices"], values=sparse["values"])
+    vector: dict[str, Any] = {
+        "dense": dense_vector,
+        BM25_VECTOR_NAME: bm25_document(payload["text"]),
+    }
 
     return PointStruct(
         id=payload["point_id"],
@@ -203,7 +200,7 @@ async def upsert_entity_cards(
     embedding_provider: EmbeddingProvider | None = None,
     client: Any | None = None,
     collection_name: str | None = None,
-    kb_version: str = "acne_kb_v1",
+    kb_version: str = "frozen_phase1_build",
     batch_size: int = 64,
 ) -> int:
     """Upsert entity cards into Qdrant using precomputed embeddings or a provider."""

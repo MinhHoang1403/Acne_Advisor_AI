@@ -53,7 +53,7 @@ class _EntitySignalRetriever:
             RetrievedCandidate(
                 candidate_id="active_ingredient:adapalene",
                 source="entity",
-                collection="acne_entities_v1",
+                collection="acne_entities",
                 text="adapalene structural entity",
                 score=1.0,
                 payload={

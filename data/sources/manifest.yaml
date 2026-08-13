@@ -1,0 +1,60 @@
+schema: phase1_source_manifest
+schema_version: 1
+verified_through: '2026-08-14'
+identity_contract: source_id_is_curated_stable_id_document_id_is_sha256_of_source_id_and_content_hash
+sources:
+  - source_id: nice_ng198_2026_08
+    title: 'Acne vulgaris: management (NG198)'
+    authority: National Institute for Health and Care Excellence
+    source_type: clinical_guideline
+    version_date: '2026-08-03'
+    retrieved_at: '2026-08-13'
+    original_url: https://www.nice.org.uk/guidance/ng198/resources/acnevulgaris-management-pdf-66142088866501
+    local_filename: nice_ng198_2026-08-03.md
+    media_type: text/markdown
+    sha256: 8a5b8e104c1394a48bf20aaca5724c33c526a0be7466682b57204c8092a94869
+    licensing: NICE notice of rights; local processing only
+    current_as_of_cutoff: true
+    supersedes_source_hash: f90f02cd1e7b01833ffb9d6feb284a878b1e2624729147a2e2e648a7e5eed1ef
+    inclusion_reason: current authoritative guideline including 2026 safety updates
+    acquisition_note: official PDF URL rendered to Markdown through a text transport after direct access returned HTTP 403
+  - source_id: aad_acne_guideline_2024
+    title: Guidelines of care for the management of acne vulgaris
+    authority: American Academy of Dermatology / JAAD
+    source_type: clinical_guideline
+    version_date: '2024'
+    retrieved_at: '2026-05-22'
+    original_url: https://www.jaad.org/article/S0190-9622(23)03389-3/fulltext
+    local_filename: PIIS0190962223033893.pdf
+    media_type: application/pdf
+    sha256: a95361c921e916e9112f4f22c43975506ab8639df9b0e03e059c41a517205423
+    licensing: publisher copyright; local processing only
+    current_as_of_cutoff: true
+    inclusion_reason: current US professional clinical guideline
+  - source_id: vn_moh_dermatology_4416_2023_acne
+    title: Huong dan chan doan va dieu tri cac benh da lieu - acne excerpt
+    authority: Bo Y te Viet Nam
+    source_type: government_clinical_guidance_excerpt
+    version_date: '2023-12-06'
+    retrieved_at: '2026-05-27'
+    original_url: https://moh.gov.vn/
+    local_filename: qd_4416_cut.pdf
+    media_type: application/pdf
+    sha256: 2957dfdfc603040b08d414043066b153127064416011fc17fa630e0f5a199f4b
+    licensing: government guidance; local excerpt processing
+    current_as_of_cutoff: true
+    inclusion_reason: authoritative Vietnamese terminology and clinical context
+    limitation: local file contains pages 433-442 only; direct attachment URL unavailable
+  - source_id: aad_public_acne_2026_07
+    title: AAD public acne education snapshot
+    authority: American Academy of Dermatology
+    source_type: professional_organization_patient_education
+    version_date: '2026-07-03'
+    retrieved_at: '2026-07-03'
+    original_url: https://www.aad.org/public/diseases/acne
+    local_filename: web_raw_dataset.json
+    media_type: application/json
+    sha256: 540def711016b8608832b0ddac1a9004076e3e7e6c87ee783f205fe656e5a235
+    licensing: AAD copyright; factual excerpts retained for local research
+    current_as_of_cutoff: true
+    inclusion_reason: supplemental patient-facing evidence and terminology

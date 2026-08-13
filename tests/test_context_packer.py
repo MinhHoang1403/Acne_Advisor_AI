@@ -21,7 +21,7 @@ def _entity(
     return RetrievedCandidate(
         candidate_id=candidate_id,
         source="entity",
-        collection="acne_entities_v1",
+        collection="acne_entities",
         text=str(base_payload["text"]),
         score=1.0,
         fused_score=1.2,

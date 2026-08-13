@@ -1,0 +1,1127 @@
+{
+  "activation": {
+    "entity_alias": "acne_entities",
+    "graph": {
+      "nodes": 32,
+      "relationships": 27,
+      "stale_nodes_removed": 0,
+      "stale_relationships_removed": 0,
+      "validation": {
+        "actual_nodes_by_label": {
+          "ActiveIngredient": 15,
+          "Condition": 1,
+          "DrugClass": 8,
+          "DrugProduct": 4,
+          "SafetyContext": 4,
+          "SideEffect": 0
+        },
+        "actual_relationships_by_type": {
+          "BELONGS_TO_CLASS": 20,
+          "CONTRAINDICATED_IN": 2,
+          "HAS_ACTIVE_INGREDIENT": 5,
+          "HAS_SIDE_EFFECT": 0,
+          "USED_FOR": 0
+        },
+        "errors": [],
+        "expected_nodes": 32,
+        "expected_relationships": 27,
+        "node_checks": [
+          {
+            "canonical_name": "Differin",
+            "count": 1,
+            "label": "DrugProduct",
+            "passed": true
+          },
+          {
+            "canonical_name": "Epiduo",
+            "count": 1,
+            "label": "DrugProduct",
+            "passed": true
+          },
+          {
+            "canonical_name": "Dalacin T",
+            "count": 1,
+            "label": "DrugProduct",
+            "passed": true
+          },
+          {
+            "canonical_name": "Tazorac",
+            "count": 1,
+            "label": "DrugProduct",
+            "passed": true
+          },
+          {
+            "canonical_name": "adapalene",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "benzoyl_peroxide",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "clindamycin",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "tretinoin",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "tazarotene",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "isotretinoin",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "doxycycline",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "azelaic_acid",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "salicylic_acid",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "clascoterone",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "minocycline",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "sarecycline",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "erythromycin",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "spironolactone",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "trifarotene",
+            "count": 1,
+            "label": "ActiveIngredient",
+            "passed": true
+          },
+          {
+            "canonical_name": "topical_retinoid",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "oral_retinoid",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "topical_antibiotic",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "oral_antibiotic",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "beta_hydroxy_acid",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "topical_antiandrogen",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "hormonal_treatment",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "combined_oral_contraceptive",
+            "count": 1,
+            "label": "DrugClass",
+            "passed": true
+          },
+          {
+            "canonical_name": "acne_vulgaris",
+            "count": 1,
+            "label": "Condition",
+            "passed": true
+          },
+          {
+            "canonical_name": "pregnancy",
+            "count": 1,
+            "label": "SafetyContext",
+            "passed": true
+          },
+          {
+            "canonical_name": "breastfeeding",
+            "count": 1,
+            "label": "SafetyContext",
+            "passed": true
+          },
+          {
+            "canonical_name": "scarring",
+            "count": 1,
+            "label": "SafetyContext",
+            "passed": true
+          },
+          {
+            "canonical_name": "severe_acne",
+            "count": 1,
+            "label": "SafetyContext",
+            "passed": true
+          }
+        ],
+        "nodes_by_label": {
+          "ActiveIngredient": 15,
+          "Condition": 1,
+          "DrugClass": 8,
+          "DrugProduct": 4,
+          "SafetyContext": 4,
+          "SideEffect": 0
+        },
+        "passed": true,
+        "relationship_checks": [
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "HAS_ACTIVE_INGREDIENT",
+            "source": "DrugProduct:Differin",
+            "target": "ActiveIngredient:adapalene"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "DrugProduct:Differin",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "HAS_ACTIVE_INGREDIENT",
+            "source": "DrugProduct:Epiduo",
+            "target": "ActiveIngredient:adapalene"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "HAS_ACTIVE_INGREDIENT",
+            "source": "DrugProduct:Epiduo",
+            "target": "ActiveIngredient:benzoyl_peroxide"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "DrugProduct:Epiduo",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "HAS_ACTIVE_INGREDIENT",
+            "source": "DrugProduct:Dalacin T",
+            "target": "ActiveIngredient:clindamycin"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "DrugProduct:Dalacin T",
+            "target": "DrugClass:topical_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "HAS_ACTIVE_INGREDIENT",
+            "source": "DrugProduct:Tazorac",
+            "target": "ActiveIngredient:tazarotene"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "DrugProduct:Tazorac",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:adapalene",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:clindamycin",
+            "target": "DrugClass:topical_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:tretinoin",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:tazarotene",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "CONTRAINDICATED_IN",
+            "source": "ActiveIngredient:tazarotene",
+            "target": "SafetyContext:pregnancy"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:isotretinoin",
+            "target": "DrugClass:oral_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "CONTRAINDICATED_IN",
+            "source": "ActiveIngredient:isotretinoin",
+            "target": "SafetyContext:pregnancy"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:doxycycline",
+            "target": "DrugClass:oral_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:salicylic_acid",
+            "target": "DrugClass:beta_hydroxy_acid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:clascoterone",
+            "target": "DrugClass:topical_antiandrogen"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:minocycline",
+            "target": "DrugClass:oral_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:minocycline",
+            "target": "DrugClass:topical_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:sarecycline",
+            "target": "DrugClass:oral_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:erythromycin",
+            "target": "DrugClass:oral_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:erythromycin",
+            "target": "DrugClass:topical_antibiotic"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:spironolactone",
+            "target": "DrugClass:hormonal_treatment"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "ActiveIngredient:trifarotene",
+            "target": "DrugClass:topical_retinoid"
+          },
+          {
+            "count": 1,
+            "passed": true,
+            "relationship": "BELONGS_TO_CLASS",
+            "source": "DrugClass:combined_oral_contraceptive",
+            "target": "DrugClass:hormonal_treatment"
+          }
+        ],
+        "relationships_by_type": {
+          "BELONGS_TO_CLASS": 20,
+          "CONTRAINDICATED_IN": 2,
+          "HAS_ACTIVE_INGREDIENT": 5,
+          "HAS_SIDE_EFFECT": 0,
+          "USED_FOR": 0
+        }
+      }
+    },
+    "knowledge_alias": "acne_knowledge",
+    "rollback_root": "data/backups/20260813T211931Z_s4a_pre_mutation",
+    "validation": {
+      "errors": [],
+      "layers": [
+        {
+          "errors": [],
+          "layers": [
+            {
+              "counts_by_source": {
+                "aad_acne_guideline_2024": 151,
+                "aad_public_acne_2026_07": 209,
+                "nice_ng198_2026_08": 106,
+                "vn_moh_dermatology_4416_2023_acne": 46
+              },
+              "errors": [],
+              "layer": "compiled_knowledge",
+              "passed": true,
+              "provenance_completeness": 1.0,
+              "warnings": []
+            },
+            {
+              "count": 32,
+              "errors": [],
+              "layer": "entity_cards",
+              "passed": true
+            },
+            {
+              "errors": [],
+              "layer": "graph_records",
+              "nodes": 32,
+              "passed": true,
+              "relationships": 27
+            },
+            {
+              "errors": [],
+              "layer": "manifest",
+              "passed": true
+            },
+            {
+              "bm25_smoke_ids": [
+                "7941aafd-ba7e-5c76-bdbc-b80582084961",
+                "0811a89d-e1a3-598a-abd9-4ccb52b8933e",
+                "0db005da-2cd8-5d04-9413-1843f19377fd"
+              ],
+              "errors": [],
+              "layer": "qdrant",
+              "passed": true,
+              "points": 512
+            },
+            {
+              "bm25_smoke_ids": [
+                "e44f71b7-2b8f-529a-bf2a-4c1e8b747a77",
+                "5e9cab6b-3de4-539a-a693-3103bb40f63f",
+                "c7fa15d3-0a5a-5c77-9176-ffe251114253"
+              ],
+              "errors": [],
+              "layer": "qdrant",
+              "passed": true,
+              "points": 32
+            }
+          ],
+          "passed": true
+        },
+        {
+          "bm25_smoke_ids": [
+            "7941aafd-ba7e-5c76-bdbc-b80582084961",
+            "0811a89d-e1a3-598a-abd9-4ccb52b8933e",
+            "0db005da-2cd8-5d04-9413-1843f19377fd"
+          ],
+          "errors": [],
+          "layer": "qdrant",
+          "passed": true,
+          "points": 512
+        },
+        {
+          "bm25_smoke_ids": [
+            "e44f71b7-2b8f-529a-bf2a-4c1e8b747a77",
+            "5e9cab6b-3de4-539a-a693-3103bb40f63f",
+            "c7fa15d3-0a5a-5c77-9176-ffe251114253"
+          ],
+          "errors": [],
+          "layer": "qdrant",
+          "passed": true,
+          "points": 32
+        },
+        {
+          "actual_nodes_by_label": {
+            "ActiveIngredient": 15,
+            "Condition": 1,
+            "DrugClass": 8,
+            "DrugProduct": 4,
+            "SafetyContext": 4,
+            "SideEffect": 0
+          },
+          "actual_relationships_by_type": {
+            "BELONGS_TO_CLASS": 20,
+            "CONTRAINDICATED_IN": 2,
+            "HAS_ACTIVE_INGREDIENT": 5,
+            "HAS_SIDE_EFFECT": 0,
+            "USED_FOR": 0
+          },
+          "errors": [],
+          "expected_nodes": 32,
+          "expected_relationships": 27,
+          "node_checks": [
+            {
+              "canonical_name": "Differin",
+              "count": 1,
+              "label": "DrugProduct",
+              "passed": true
+            },
+            {
+              "canonical_name": "Epiduo",
+              "count": 1,
+              "label": "DrugProduct",
+              "passed": true
+            },
+            {
+              "canonical_name": "Dalacin T",
+              "count": 1,
+              "label": "DrugProduct",
+              "passed": true
+            },
+            {
+              "canonical_name": "Tazorac",
+              "count": 1,
+              "label": "DrugProduct",
+              "passed": true
+            },
+            {
+              "canonical_name": "adapalene",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "benzoyl_peroxide",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "clindamycin",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "tretinoin",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "tazarotene",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "isotretinoin",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "doxycycline",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "azelaic_acid",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "salicylic_acid",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "clascoterone",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "minocycline",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "sarecycline",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "erythromycin",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "spironolactone",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "trifarotene",
+              "count": 1,
+              "label": "ActiveIngredient",
+              "passed": true
+            },
+            {
+              "canonical_name": "topical_retinoid",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "oral_retinoid",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "topical_antibiotic",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "oral_antibiotic",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "beta_hydroxy_acid",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "topical_antiandrogen",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "hormonal_treatment",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "combined_oral_contraceptive",
+              "count": 1,
+              "label": "DrugClass",
+              "passed": true
+            },
+            {
+              "canonical_name": "acne_vulgaris",
+              "count": 1,
+              "label": "Condition",
+              "passed": true
+            },
+            {
+              "canonical_name": "pregnancy",
+              "count": 1,
+              "label": "SafetyContext",
+              "passed": true
+            },
+            {
+              "canonical_name": "breastfeeding",
+              "count": 1,
+              "label": "SafetyContext",
+              "passed": true
+            },
+            {
+              "canonical_name": "scarring",
+              "count": 1,
+              "label": "SafetyContext",
+              "passed": true
+            },
+            {
+              "canonical_name": "severe_acne",
+              "count": 1,
+              "label": "SafetyContext",
+              "passed": true
+            }
+          ],
+          "nodes_by_label": {
+            "ActiveIngredient": 15,
+            "Condition": 1,
+            "DrugClass": 8,
+            "DrugProduct": 4,
+            "SafetyContext": 4,
+            "SideEffect": 0
+          },
+          "passed": true,
+          "relationship_checks": [
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "HAS_ACTIVE_INGREDIENT",
+              "source": "DrugProduct:Differin",
+              "target": "ActiveIngredient:adapalene"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "DrugProduct:Differin",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "HAS_ACTIVE_INGREDIENT",
+              "source": "DrugProduct:Epiduo",
+              "target": "ActiveIngredient:adapalene"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "HAS_ACTIVE_INGREDIENT",
+              "source": "DrugProduct:Epiduo",
+              "target": "ActiveIngredient:benzoyl_peroxide"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "DrugProduct:Epiduo",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "HAS_ACTIVE_INGREDIENT",
+              "source": "DrugProduct:Dalacin T",
+              "target": "ActiveIngredient:clindamycin"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "DrugProduct:Dalacin T",
+              "target": "DrugClass:topical_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "HAS_ACTIVE_INGREDIENT",
+              "source": "DrugProduct:Tazorac",
+              "target": "ActiveIngredient:tazarotene"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "DrugProduct:Tazorac",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:adapalene",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:clindamycin",
+              "target": "DrugClass:topical_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:tretinoin",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:tazarotene",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "CONTRAINDICATED_IN",
+              "source": "ActiveIngredient:tazarotene",
+              "target": "SafetyContext:pregnancy"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:isotretinoin",
+              "target": "DrugClass:oral_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "CONTRAINDICATED_IN",
+              "source": "ActiveIngredient:isotretinoin",
+              "target": "SafetyContext:pregnancy"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:doxycycline",
+              "target": "DrugClass:oral_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:salicylic_acid",
+              "target": "DrugClass:beta_hydroxy_acid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:clascoterone",
+              "target": "DrugClass:topical_antiandrogen"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:minocycline",
+              "target": "DrugClass:oral_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:minocycline",
+              "target": "DrugClass:topical_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:sarecycline",
+              "target": "DrugClass:oral_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:erythromycin",
+              "target": "DrugClass:oral_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:erythromycin",
+              "target": "DrugClass:topical_antibiotic"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:spironolactone",
+              "target": "DrugClass:hormonal_treatment"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "ActiveIngredient:trifarotene",
+              "target": "DrugClass:topical_retinoid"
+            },
+            {
+              "count": 1,
+              "passed": true,
+              "relationship": "BELONGS_TO_CLASS",
+              "source": "DrugClass:combined_oral_contraceptive",
+              "target": "DrugClass:hormonal_treatment"
+            }
+          ],
+          "relationships_by_type": {
+            "BELONGS_TO_CLASS": 20,
+            "CONTRAINDICATED_IN": 2,
+            "HAS_ACTIVE_INGREDIENT": 5,
+            "HAS_SIDE_EFFECT": 0,
+            "USED_FOR": 0
+          }
+        }
+      ],
+      "passed": true
+    }
+  },
+  "build_id": "ec0a6de32d58ac181af6",
+  "cache": {
+    "entity_embeddings": {
+      "cache_hits": 32,
+      "cache_misses": 0,
+      "provider_calls": 0,
+      "retry_count": 0
+    },
+    "knowledge_embeddings": {
+      "cache_hits": 512,
+      "cache_misses": 0,
+      "provider_calls": 0,
+      "retry_count": 0
+    },
+    "legacy_dense_reuse": {
+      "loaded": 638,
+      "unreadable": 1
+    },
+    "parsed_hits": 4,
+    "parsed_total": 4
+  },
+  "collections": {
+    "entity_logical": "acne_entities",
+    "entity_physical": "acne_entities__ec0a6de32d58ac181af6",
+    "knowledge_logical": "acne_knowledge",
+    "knowledge_physical": "acne_knowledge__ec0a6de32d58ac181af6"
+  },
+  "contract_hash": "bc0f578f5e951945b52de2a128f1db0270dc2e589c29fc3eedb5c2a071ccd19e",
+  "contracts": {
+    "bm25": {
+      "configuration": {
+        "ascii_folding": false,
+        "avg_len": 256.0,
+        "b": 0.75,
+        "k": 1.2,
+        "language": "none",
+        "lowercase": true,
+        "max_token_len": null,
+        "min_token_len": null,
+        "stemmer": null,
+        "stopwords": null,
+        "tokenizer": "word"
+      },
+      "field": "bm25",
+      "id": "qdrant_native_bm25_word_language_none",
+      "implementation": "qdrant_native",
+      "modifier": "idf"
+    },
+    "chunk": "structure_first_chars_2400_no_overlap",
+    "embedding": {
+      "dimensions": 3072,
+      "distance": "cosine",
+      "id": "google_gemini_embedding_2_3072_cosine",
+      "model": "models/gemini-embedding-2",
+      "provider": "google",
+      "task_type": null
+    },
+    "entity_card": "narrow_source_backed_entity_cards",
+    "filter": "proof_only_artifact_filter",
+    "graph": "deterministic_source_backed_taxonomy_graph",
+    "normalization": "unicode_nfc_lf_exact_artifacts",
+    "parser": {
+      "configuration": {
+        "json": {
+          "implementation": "python_json_direct",
+          "record_field": "raw_text"
+        },
+        "markdown": {
+          "implementation": "python_utf8_direct"
+        },
+        "pdf": {
+          "implementation": "llama-parse",
+          "instruction": "Preserve headings, tables, lists, clinical terminology and page order.",
+          "result_type": "markdown",
+          "version": "0.6.94"
+        }
+      },
+      "id": "llamaparse_0_6_94_markdown_or_direct_utf8"
+    },
+    "provenance": "portable_content_bound_provenance",
+    "semantic_enrichment": "removed"
+  },
+  "counts": {
+    "entities": 32,
+    "graph_nodes": 32,
+    "graph_relationships": 27,
+    "knowledge_chunks": 512,
+    "sources": 4
+  },
+  "created_at": "2026-08-13T22:46:43.388350+00:00",
+  "git_commit": "5321438eec09192a3ca2a15f595c1faf7f6df1ef",
+  "phase1_frozen": true,
+  "schema": "phase1_build_manifest",
+  "source_manifest_hash": "6f036185801d3651a68294007c7f3e05b89f1020165ab3773cd79b690d740091",
+  "sources": [
+    {
+      "chunk_count": 106,
+      "content_hash": "8a5b8e104c1394a48bf20aaca5724c33c526a0be7466682b57204c8092a94869",
+      "filtered_artifact_count": 1,
+      "normalized_output_hash": "1bfbb085d2af681ef0776576f9bdf01a21dc964396ada76e591dd8e64ae9d627",
+      "parsed_output_hash": "d14068654ce0815fd4416f044122934ddefeec3c1d861d6e88b1cf8ce323ac7f",
+      "source_id": "nice_ng198_2026_08"
+    },
+    {
+      "chunk_count": 151,
+      "content_hash": "a95361c921e916e9112f4f22c43975506ab8639df9b0e03e059c41a517205423",
+      "filtered_artifact_count": 0,
+      "normalized_output_hash": "228adb144283484128f7babb7dd49f01a51a378ddc22fe0d637ff0c57ccc23af",
+      "parsed_output_hash": "98837511e8a98aafecdac268a6ce190130364b595919e45055ba0a2a20f4e418",
+      "source_id": "aad_acne_guideline_2024"
+    },
+    {
+      "chunk_count": 46,
+      "content_hash": "2957dfdfc603040b08d414043066b153127064416011fc17fa630e0f5a199f4b",
+      "filtered_artifact_count": 0,
+      "normalized_output_hash": "93575bfcd03dd1bf834f5f98818cbfac958c06b0fcf1da26ebcd26540f157b45",
+      "parsed_output_hash": "02467d996a63e049e9c3287306f026610872f5f410828f7ebbca9675b9c11eb8",
+      "source_id": "vn_moh_dermatology_4416_2023_acne"
+    },
+    {
+      "chunk_count": 209,
+      "content_hash": "540def711016b8608832b0ddac1a9004076e3e7e6c87ee783f205fe656e5a235",
+      "filtered_artifact_count": 4,
+      "normalized_output_hash": "bb59d99a4bd8f7de7dc2ce94951f9b1eff10c90972322530c5cecf86cc7cfd42",
+      "parsed_output_hash": "54b5753f216ee47cbbea3d1b989b27980600c847968a4011c0d591c888c9edeb",
+      "source_id": "aad_public_acne_2026_07"
+    }
+  ],
+  "status": "activated",
+  "structural_hash": "5a3a1c2a9f27d337aac2dff6787e15e41c30c13ea32bf5631208c0176a1614a9",
+  "taxonomy_hash": "0fce290b2dbea500b9f2aaa59452b4af0cfb8ba606783d9b6de48ffc7471d763",
+  "validation": {
+    "errors": [],
+    "layers": [
+      {
+        "counts_by_source": {
+          "aad_acne_guideline_2024": 151,
+          "aad_public_acne_2026_07": 209,
+          "nice_ng198_2026_08": 106,
+          "vn_moh_dermatology_4416_2023_acne": 46
+        },
+        "errors": [],
+        "layer": "compiled_knowledge",
+        "passed": true,
+        "provenance_completeness": 1.0,
+        "warnings": []
+      },
+      {
+        "count": 32,
+        "errors": [],
+        "layer": "entity_cards",
+        "passed": true
+      },
+      {
+        "errors": [],
+        "layer": "graph_records",
+        "nodes": 32,
+        "passed": true,
+        "relationships": 27
+      },
+      {
+        "bm25_smoke_ids": [
+          "7941aafd-ba7e-5c76-bdbc-b80582084961",
+          "0811a89d-e1a3-598a-abd9-4ccb52b8933e",
+          "0db005da-2cd8-5d04-9413-1843f19377fd"
+        ],
+        "errors": [],
+        "layer": "qdrant",
+        "passed": true,
+        "points": 512
+      },
+      {
+        "bm25_smoke_ids": [
+          "e44f71b7-2b8f-529a-bf2a-4c1e8b747a77",
+          "5e9cab6b-3de4-539a-a693-3103bb40f63f",
+          "c7fa15d3-0a5a-5c77-9176-ffe251114253"
+        ],
+        "errors": [],
+        "layer": "qdrant",
+        "passed": true,
+        "points": 32
+      }
+    ],
+    "passed": true
+  }
+}

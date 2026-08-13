@@ -136,7 +136,7 @@ async def run_pre_ui_runtime_check() -> dict[str, Any]:
             "env_runtime_core",
             env_summary.get("QDRANT_COLLECTION_NAME") == "acne_knowledge"
             and env_summary.get("CHUNK_QDRANT_COLLECTION_NAME") == "acne_knowledge"
-            and env_summary.get("ENTITY_QDRANT_COLLECTION_NAME") == "acne_entities_v1"
+            and env_summary.get("ENTITY_QDRANT_COLLECTION_NAME") == "acne_entities"
             and env_summary.get("NEO4J_URI") == "bolt://127.0.0.1:7687"
             and _is_supported_rerank_provider(os.getenv("RERANK_PROVIDER", "local_rules"))
             and env_summary.get("AGENT_TOTAL_TIMEOUT_SECONDS") == "210"

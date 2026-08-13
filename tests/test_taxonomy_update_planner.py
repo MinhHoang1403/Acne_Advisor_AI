@@ -9,7 +9,7 @@ def test_entity_index_planner_defaults_to_the_active_runtime_catalog() -> None:
     plan = build_entity_index_update_plan()
 
     assert plan["mutation_executed"] is False
-    assert plan["taxonomy_version"] == "drug_taxonomy_v1"
+    assert plan["taxonomy_version"] == "acne_taxonomy_2026_08"
     assert plan["new"] == []
     assert plan["updated"] == []
     assert plan["delete_candidates"] == []
@@ -41,7 +41,7 @@ def test_existing_point_id_is_reused_from_matching_snapshot() -> None:
 
     epiduo = next(item for item in plan["reused_point_ids"] if item["identity"] == entity_identity_key(card))
     assert epiduo["point_id"] == "existing-epiduo-point"
-    assert entity_identity_key(card) in plan["unchanged"]
+    assert entity_identity_key(card) in plan["updated"]
 
 
 def test_new_entity_receives_deterministic_stable_id() -> None:

@@ -51,7 +51,7 @@ def run_phase2_context_packing_eval(path: Path = DEFAULT_GOLDEN_PATH) -> dict[st
             normalized_query=normalized,
             expansion=expansion,
             payloads=entity_payloads,
-            collection_name="acne_entities_v1",
+            collection_name="acne_entities",
             limit=8,
         )
         chunk_candidates = boost_chunk_results(

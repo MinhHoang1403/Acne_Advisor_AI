@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from scripts.build_entity_graph import build_dry_run_summary
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy
 from src.knowledge.graph_index import sanitize_neo4j_properties
 from src.knowledge.graph_schema import (
     build_entity_graph_records,
     get_entity_graph_constraints,
+    summarize_graph_records,
 )
 
 
@@ -163,14 +163,14 @@ def test_constraints_have_unique_canonical_name() -> None:
 
 
 def test_dry_run_build_entity_graph_no_neo4j_required() -> None:
-    summary = build_dry_run_summary()
+    records = _records()
+    counts = summarize_graph_records(records)
 
-    assert summary["card_count"] == 32
-    assert summary["node_count"] >= 20
-    assert summary["relationship_count"] >= 1
-    assert summary["nodes_by_label"]["DrugProduct"] == 4
-    assert "HAS_ACTIVE_INGREDIENT" in summary["relationships_by_type"]
-    preview_names = {node["canonical_name"] for node in summary["preview"]["nodes"]}
+    assert len(records["nodes"]) == 32
+    assert len(records["relationships"]) == 27
+    assert counts["nodes_by_label"]["DrugProduct"] == 4
+    assert "HAS_ACTIVE_INGREDIENT" in counts["relationships_by_type"]
+    preview_names = {node["canonical_name"] for node in records["nodes"]}
     assert {"Dalacin T", "Epiduo", "Differin", "benzoyl_peroxide"}.issubset(preview_names)
 
 

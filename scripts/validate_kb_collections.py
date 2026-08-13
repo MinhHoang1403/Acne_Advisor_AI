@@ -24,7 +24,6 @@ except ImportError:
 
 from src.database.vector_store import qdrant_client_kwargs  # noqa: E402
 from src.knowledge.entity_index import (  # noqa: E402
-    CHUNK_COLLECTION_FUTURE_DEFAULT,
     get_chunk_collection_name,
     get_entity_collection_name,
 )
@@ -60,8 +59,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--chunk-collection",
         default=get_default_chunk_collection_name(),
         help=(
-            "Chunk collection name. Defaults to QDRANT_COLLECTION_NAME when "
-            f"CHUNK_QDRANT_COLLECTION_NAME is unset or legacy {CHUNK_COLLECTION_FUTURE_DEFAULT!r}."
+            "Chunk collection name. Defaults to CHUNK_QDRANT_COLLECTION_NAME "
+            "or the canonical QDRANT_COLLECTION_NAME alias."
         ),
     )
     parser.add_argument(
@@ -85,7 +84,8 @@ async def validate_collections(args: argparse.Namespace) -> tuple[dict[str, Any]
     client = AsyncQdrantClient(**qdrant_client_kwargs())
     try:
         collections = await client.get_collections()
-        existing = {collection.name for collection in collections.collections}
+        aliases = await client.get_aliases()
+        existing = qdrant_addressable_names(collections, aliases)
 
         warnings: list[str] = []
         errors: list[str] = []
@@ -252,6 +252,22 @@ def _get_named_config(config: Any, name: str) -> Any:
     if hasattr(config, "get"):
         return config.get(name)
     return None
+
+
+def qdrant_addressable_names(collections: Any, aliases: Any) -> set[str]:
+    """Return physical collection names plus logical aliases accepted by Qdrant."""
+
+    names = {
+        str(item.name)
+        for item in getattr(collections, "collections", [])
+        if getattr(item, "name", None)
+    }
+    names.update(
+        str(item.alias_name)
+        for item in getattr(aliases, "aliases", [])
+        if getattr(item, "alias_name", None)
+    )
+    return names
 
 
 async def main() -> int:

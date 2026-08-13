@@ -183,7 +183,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         ),
         "ollama_model": value("OLLAMA_MODEL", "qwen3:8b") or "qwen3:8b",
         "neo4j_schema_version": value("NEO4J_SCHEMA_VERSION", "neo4j_schema_v1"),
-        "taxonomy_version": value("TAXONOMY_VERSION", "drug_taxonomy_v1"),
+        "taxonomy_version": value("TAXONOMY_VERSION", "acne_taxonomy_2026_08"),
         "entity_foundation_version": value(
             "ENTITY_FOUNDATION_VERSION",
             DEFAULT_ENTITY_FOUNDATION_VERSION,
@@ -194,7 +194,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "embedding_dimensions": _env_int(value("EMBEDDING_DIMENSIONS", "3072"), default=3072),
         "qdrant_collection_name": _runtime_chunk_collection_name(settings),
         "entity_collection_name": _runtime_entity_collection_name(settings),
-        "kb_version": value("KB_VERSION", "acne_kb_v1"),
+        "kb_version": value("KB_VERSION", "frozen_phase1_build"),
         "prompt_version": value("PROMPT_VERSION", "medical_prompt_v2"),
         "rerank_enabled": _env_bool(value("RERANK_ENABLED", "true"), default=True),
         "rerank_provider": value("RERANK_PROVIDER", "local_rules") or "local_rules",
@@ -433,7 +433,7 @@ def _runtime_chunk_collection_name(settings: Mapping[str, Any]) -> str:
     if "CHUNK_QDRANT_COLLECTION_NAME" in settings or "QDRANT_COLLECTION_NAME" in settings:
         configured = str(settings.get("CHUNK_QDRANT_COLLECTION_NAME") or "").strip()
         base = str(settings.get("QDRANT_COLLECTION_NAME") or os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")).strip()
-        if not configured or configured == "acne_chunks_v1":
+        if not configured:
             return base or "acne_knowledge"
         return configured
     try:
@@ -443,20 +443,20 @@ def _runtime_chunk_collection_name(settings: Mapping[str, Any]) -> str:
     except Exception:
         configured = os.getenv("CHUNK_QDRANT_COLLECTION_NAME", "").strip()
         base = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge").strip() or "acne_knowledge"
-        if not configured or configured == "acne_chunks_v1":
+        if not configured:
             return base
         return configured
 
 
 def _runtime_entity_collection_name(settings: Mapping[str, Any]) -> str:
     if "ENTITY_QDRANT_COLLECTION_NAME" in settings:
-        return str(settings["ENTITY_QDRANT_COLLECTION_NAME"] or "acne_entities_v1")
+        return str(settings["ENTITY_QDRANT_COLLECTION_NAME"] or "acne_entities")
     try:
         from src.knowledge.entity_index import get_entity_collection_name
 
         return get_entity_collection_name()
     except Exception:
-        return os.getenv("ENTITY_QDRANT_COLLECTION_NAME", "acne_entities_v1")
+        return os.getenv("ENTITY_QDRANT_COLLECTION_NAME", "acne_entities")
 
 
 __all__ = [

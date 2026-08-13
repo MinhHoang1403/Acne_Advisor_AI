@@ -12,7 +12,7 @@ Trạng thái tổng quát:
 
 - Backend runtime: FastAPI + LangGraph agent.
 - Frontend: React/Vite giao diện chat tối giản.
-- Vector retrieval: Qdrant hybrid dense + custom hashed sparse TF.
+- Vector retrieval: Qdrant hybrid dense + native BM25.
 - Knowledge graph: Neo4j deterministic entity graph.
 - Cache: Redis semantic answer cache, versioned bằng `CACHE_ANSWER_VERSION=v5`
   và pipeline fingerprint.
@@ -54,8 +54,8 @@ Trạng thái tổng quát:
 - Trả lời trực tiếp các câu hỏi yes/no, câu hỏi so sánh và câu hỏi về entity
   cụ thể như adapalene, benzoyl peroxide, clindamycin, isotretinoin hoặc
   tazarotene.
-- Hybrid retrieval từ Qdrant với named dense vector `dense` và custom hashed
-  sparse TF lưu dưới compatibility key `bm25` (không phải BM25 chuẩn).
+- Hybrid retrieval từ Qdrant với named dense vector `dense` và native BM25
+  lưu dưới named sparse vector `bm25`.
 - Entity-centric retrieval từ collection entity riêng.
 - Neo4j graph enrichment để bổ sung facts quan hệ giữa hoạt chất, nhóm thuốc,
   sản phẩm, cơ chế và safety context.
@@ -277,7 +277,7 @@ Các nhóm biến quan trọng trong `.env.example`:
 | Neo4j | `NEO4J_AUTH`, `NEO4J_URI`, `NEO4J_DATABASE` | Local khuyến nghị `bolt://127.0.0.1:7687` |
 | Qdrant | `QDRANT_URL`, `QDRANT_API_KEY`, collection names | `QDRANT_API_KEY` chỉ set khi Qdrant có auth |
 | Redis/cache | `REDIS_URL`, `CACHE_*`, `CACHE_ANSWER_VERSION` | Default answer cache version là `v5` |
-| Ingestion | `CHUNK_SIZE`, `GRAPH_*`, `EMBEDDING_*` | Chỉ cần khi chạy ingestion |
+| Phase 1 | `LLAMA_CLOUD_API_KEY`, `EMBEDDING_BATCH_DELAY` | Chỉ cần khi build frozen foundation; chunk/filter contracts nằm trong `src/ingestion/` |
 | Retrieval | `RETRIEVAL_PIPELINE_VERSION`, `RETRIEVAL_CONTEXT_*` | V5 là mặc định; đặt `v4` để rollback tường minh |
 | Grounding | `P3_EVIDENCE_SUFFICIENCY_*`, `P4_MODE`, `P4_*` | P4 mặc định `shadow`; đặt `disabled` để rollback ngay |
 | Reranker | `RERANK_*`, `SEMANTIC_RERANK_*` | Model path là đường dẫn local cần đổi theo máy |
@@ -326,9 +326,9 @@ Với môi trường local mới, sau khi Docker services đã chạy:
 .\venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
 
-`init_schema.py` không xóa Qdrant collection trong flow bình thường. Chỉ khi bạn
-set rõ `FORCE_RECREATE_QDRANT_COLLECTION=true`, script mới được phép recreate
-collection. Không bật biến này trong setup thường ngày.
+`init_schema.py` không tạo, xóa hoặc recreate Qdrant collection. Quyền sở hữu
+nền tảng Qdrant thuộc duy nhất `scripts/phase1.py`; activation bắt buộc có
+candidate đã validate và rollback artifacts.
 
 ## Chạy Backend
 
@@ -530,87 +530,40 @@ ba tích hợp, nên tạo endpoint public riêng như `/v1/chat`.
 
 ## Ingestion Và Knowledge Base
 
-Không cần chạy ingestion chỉ để mở UI nếu local data foundation đã sẵn sàng.
-Ingestion có thể gọi external services và có thể phát sinh chi phí. Với một
-database trống, lệnh authoritative cho **Full Phase 1** là:
+Không cần build Phase 1 chỉ để mở UI nếu local data foundation đã sẵn sàng.
+Build có thể gọi LlamaParse và Gemini Embedding nên có thể phát sinh chi phí.
+Toàn bộ Phase 1 chỉ có một operator interface:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\run_full_phase1.py --source sample_data
+.\venv\Scripts\python.exe scripts\phase1.py build --source sample_data
 ```
 
-Workflow này chạy theo thứ tự: preflight, source validation, knowledge
-ingestion, đối soát Qdrant knowledge, entity index, đối soát entity Qdrant,
-deterministic Neo4j graph, graph validation, rồi mới hoàn tất manifest. Dịch vụ
-Qdrant, Neo4j và các API key parser/embedding cần thiết phải sẵn sàng. **Ollama
-không phải dependency của core Phase 1.** Lệnh vẫn xây deterministic Neo4j
-taxonomy/entity graph và chỉ trả exit code `0` khi mọi core validation pass. Có
-thể kiểm tra plan không ghi dữ liệu bằng:
+Lệnh tạo immutable Qdrant candidates. Parsed artifacts và embeddings được cache
+theo content/contract identity; source không đổi không bị parse hoặc embed lại.
+Kiểm tra cấu trúc không gọi provider và kiểm tra candidate hiện có:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\run_full_phase1.py --source sample_data --dry-run
+.\venv\Scripts\python.exe scripts\phase1.py validate --offline
+.\venv\Scripts\python.exe scripts\phase1.py validate
+.\venv\Scripts\python.exe scripts\phase1.py status
 ```
 
-Document-derived semantic graph enrichment là workflow **tùy chọn**, chạy sau
-khi core Phase 1 đã validated. Job này đọc chunks đã index, không parse lại PDF
-hoặc tạo embedding lại, nhưng yêu cầu Ollama và có thể mất nhiều thời gian:
+Cutover yêu cầu backup Qdrant và Neo4j đã được kiểm chứng:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\run_semantic_enrichment.py --source sample_data
+.\venv\Scripts\python.exe scripts\phase1.py build --activate --rollback-root data\backups\<snapshot>
 ```
 
-Deterministic Neo4j taxonomy/entity graph thuộc core Phase 1; semantic document
-graph do Ollama trích xuất là enrichment độc lập, không quyết định core validity.
-Chỉ xem plan optional job mà không gọi Ollama bằng `--dry-run`.
+Canonical build gồm parser, normalization, structural chunks 2400 ký tự không
+overlap, proof-only filtering, provenance 100%, Gemini Embedding 2 (3072/cosine),
+Qdrant-native BM25, EntityCards và deterministic source-backed Neo4j graph.
+LLM semantic graph enrichment đã bị loại khỏi Phase 1 canonical; Ollama không
+phải dependency của Phase 1.
 
-Catalog deterministic đang được runtime sử dụng là
-`data/taxonomy/drug_aliases.yaml`; file này cấp EntityCards, normalizer và core
-Neo4j graph. `data/taxonomy/drug_taxonomy_v2.yaml` chỉ là catalog migration/kiểm
-thử tương thích, không được runtime tự động nạp. Mỗi EntityCard active mang
-`source_ids` trỏ tới corpus canonical hoặc một entry taxonomy curated đã được
-ghi rõ.
-
-`ingest_knowledge.py` là knowledge-layer entrypoint cho debug hoặc incremental,
-không tương đương Full Phase 1:
-
-```powershell
-.\venv\Scripts\python.exe scripts\ingest_knowledge.py --source sample_data
-```
-
-Incremental ingestion:
-
-```powershell
-.\venv\Scripts\python.exe scripts\ingest_knowledge.py --source sample_data --incremental
-```
-
-Manifest mặc định:
-
-```text
-data/ingestion_manifest.json
-```
-
-Logic manifest:
-
-- Core source `completed` với `core_phase1_status=completed_validated` được
-  skip khi content hash và core fingerprint không đổi, kể cả khi semantic
-  enrichment là `not_run`.
-- `partial`, `failed`, file mới, file đổi hash hoặc core fingerprint đổi vẫn
-  retry. Semantic model/prompt/cache version dùng fingerprint riêng và không
-  ép core Phase 1 rebuild.
-- Khi Full Phase 1 đang chạy, knowledge source ở trạng thái
-  `knowledge_indexed_pending_phase1_validation`; chỉ orchestrator mới chuyển
-  chúng sang `completed` sau khi entity và deterministic graph reconciliation
-  pass. Manifest ghi `semantic_enrichment=not_run/completed/completed_with_warnings/failed`
-  độc lập với core completion.
-
-Entity index và graph rebuild là thao tác mutating, chỉ chạy khi có kế hoạch:
-
-```powershell
-.\venv\Scripts\python.exe scripts\build_entity_index.py --dry-run
-.\venv\Scripts\python.exe scripts\build_entity_graph.py --dry-run
-```
-
-Chỉ dùng `--no-dry-run`, `--upsert`, `--validate` khi bạn thật sự muốn ghi vào
-Qdrant/Neo4j.
+Source manifest canonical nằm tại `data/sources/manifest.yaml`, taxonomy tại
+`data/taxonomy/drug_aliases.yaml`, và build manifest tại
+`data/phase1_build_manifest.json`. Chi tiết phương pháp xem
+`docs/DATA_PIPELINE.md` và `docs/METHODS_AND_FORMULAS.md`.
 
 ## Cache Và Versioning
 

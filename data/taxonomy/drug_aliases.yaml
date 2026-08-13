@@ -1,4 +1,4 @@
-version: drug_taxonomy_v1
+version: acne_taxonomy_2026_08
 
 drug_products:
   differin:
@@ -11,7 +11,7 @@ drug_products:
     drug_class:
       - topical_retinoid
     source_ids:
-      - web_raw_dataset.json
+      - aad_public_acne_2026_07
 
   epiduo:
     canonical_name: Epiduo
@@ -24,7 +24,7 @@ drug_products:
     drug_class:
       - topical_retinoid
     source_ids:
-      - web_raw_dataset.json
+      - aad_public_acne_2026_07
 
   dalacin_t:
     canonical_name: Dalacin T
@@ -37,7 +37,7 @@ drug_products:
     drug_class:
       - topical_antibiotic
     source_ids:
-      - drug_taxonomy_v1:drug_products.dalacin_t
+      - pfizer_dalacin_t_label_current
 
   tazorac:
     canonical_name: Tazorac
@@ -48,7 +48,7 @@ drug_products:
     drug_class:
       - topical_retinoid
     source_ids:
-      - web_raw_dataset.json
+      - aad_public_acne_2026_07
 
 active_ingredients:
   adapalene:
@@ -59,7 +59,7 @@ active_ingredients:
     drug_class:
       - topical_retinoid
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   benzoyl_peroxide:
     canonical_name: benzoyl_peroxide
@@ -70,7 +70,7 @@ active_ingredients:
       - bpo
       - bp
     source_ids:
-      - web_raw_dataset.json
+      - aad_public_acne_2026_07
 
   clindamycin:
     canonical_name: clindamycin
@@ -80,7 +80,7 @@ active_ingredients:
     drug_class:
       - topical_antibiotic
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   tretinoin:
     canonical_name: tretinoin
@@ -90,7 +90,7 @@ active_ingredients:
     drug_class:
       - topical_retinoid
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   tazarotene:
     canonical_name: tazarotene
@@ -105,8 +105,8 @@ active_ingredients:
     contraindications:
       - pregnancy
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   isotretinoin:
     canonical_name: isotretinoin
@@ -118,8 +118,8 @@ active_ingredients:
     contraindications:
       - pregnancy
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   doxycycline:
     canonical_name: doxycycline
@@ -128,7 +128,7 @@ active_ingredients:
     drug_class:
       - oral_antibiotic
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   azelaic_acid:
     canonical_name: azelaic_acid
@@ -136,7 +136,7 @@ active_ingredients:
       - azelaic acid
       - azelaic_acid
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   salicylic_acid:
     canonical_name: salicylic_acid
@@ -145,8 +145,8 @@ active_ingredients:
     drug_class:
       - beta_hydroxy_acid
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   clascoterone:
     canonical_name: clascoterone
@@ -155,9 +155,9 @@ active_ingredients:
     drug_class:
       - topical_antiandrogen
     source_ids:
-      - PIIS0190962223033893.pdf
-      - qd_4416_cut.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - vn_moh_dermatology_4416_2023_acne
+      - aad_public_acne_2026_07
 
   minocycline:
     canonical_name: minocycline
@@ -168,10 +168,10 @@ active_ingredients:
       - oral_antibiotic
       - topical_antibiotic
     source_ids:
-      - acne-vulgaris-management-pdf-66142088866501.pdf
-      - PIIS0190962223033893.pdf
-      - qd_4416_cut.pdf
-      - web_raw_dataset.json
+      - nice_ng198_2026_08
+      - aad_acne_guideline_2024
+      - vn_moh_dermatology_4416_2023_acne
+      - aad_public_acne_2026_07
 
   sarecycline:
     canonical_name: sarecycline
@@ -181,8 +181,8 @@ active_ingredients:
     drug_class:
       - oral_antibiotic
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   erythromycin:
     canonical_name: erythromycin
@@ -192,10 +192,10 @@ active_ingredients:
       - oral_antibiotic
       - topical_antibiotic
     source_ids:
-      - acne-vulgaris-management-pdf-66142088866501.pdf
-      - PIIS0190962223033893.pdf
-      - qd_4416_cut.pdf
-      - web_raw_dataset.json
+      - nice_ng198_2026_08
+      - aad_acne_guideline_2024
+      - vn_moh_dermatology_4416_2023_acne
+      - aad_public_acne_2026_07
 
   spironolactone:
     canonical_name: spironolactone
@@ -204,8 +204,8 @@ active_ingredients:
     drug_class:
       - hormonal_treatment
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   trifarotene:
     canonical_name: trifarotene
@@ -215,8 +215,8 @@ active_ingredients:
     drug_class:
       - topical_retinoid
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
 drug_classes:
   topical_retinoid:
@@ -225,7 +225,7 @@ drug_classes:
       - topical retinoid
       - retinoid bôi
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   oral_retinoid:
     canonical_name: oral_retinoid
@@ -233,7 +233,7 @@ drug_classes:
       - oral retinoid
       - retinoid uống
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   topical_antibiotic:
     canonical_name: topical_antibiotic
@@ -242,7 +242,7 @@ drug_classes:
       - kháng sinh bôi
       - kháng sinh bôi tại chỗ
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   oral_antibiotic:
     canonical_name: oral_antibiotic
@@ -251,14 +251,14 @@ drug_classes:
       - kháng sinh uống
       - kháng sinh đường uống
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   beta_hydroxy_acid:
     canonical_name: beta_hydroxy_acid
     aliases:
       - beta hydroxy acid
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
   topical_antiandrogen:
     canonical_name: topical_antiandrogen
@@ -266,8 +266,8 @@ drug_classes:
       - topical antiandrogen
       - kháng androgen tại chỗ
     source_ids:
-      - PIIS0190962223033893.pdf
-      - qd_4416_cut.pdf
+      - aad_acne_guideline_2024
+      - vn_moh_dermatology_4416_2023_acne
 
   hormonal_treatment:
     canonical_name: hormonal_treatment
@@ -276,8 +276,8 @@ drug_classes:
       - hormonal therapy
       - liệu pháp nội tiết
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   combined_oral_contraceptive:
     canonical_name: combined_oral_contraceptive
@@ -289,9 +289,9 @@ drug_classes:
     drug_class:
       - hormonal_treatment
     source_ids:
-      - acne-vulgaris-management-pdf-66142088866501.pdf
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - nice_ng198_2026_08
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
 conditions:
   acne_vulgaris:
@@ -303,7 +303,7 @@ conditions:
       - mụn trứng cá
       - trứng cá
     source_ids:
-      - PIIS0190962223033893.pdf
+      - aad_acne_guideline_2024
 
 safety_contexts:
   pregnancy:
@@ -316,8 +316,8 @@ safety_contexts:
       - mang thai
       - có thai
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   breastfeeding:
     canonical_name: breastfeeding
@@ -326,7 +326,7 @@ safety_contexts:
       - breastfeeding
       - cho con bú
     source_ids:
-      - web_raw_dataset.json
+      - aad_public_acne_2026_07
 
   scarring:
     canonical_name: scarring
@@ -337,8 +337,8 @@ safety_contexts:
       - acne scar
       - scarring
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07
 
   severe_acne:
     canonical_name: severe_acne
@@ -350,5 +350,5 @@ safety_contexts:
       - nodular acne
       - nodulocystic acne
     source_ids:
-      - PIIS0190962223033893.pdf
-      - web_raw_dataset.json
+      - aad_acne_guideline_2024
+      - aad_public_acne_2026_07

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from scripts.build_entity_index import build_dry_run_summary
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy, entity_card_to_text
-from src.knowledge.entity_index import build_entity_point_payload
+from src.knowledge.entity_index import build_entity_point_payload, entity_identity_key
 
 
 def _find_card(entity_type: str, canonical_name: str):
@@ -97,10 +96,9 @@ def test_entity_payload_has_required_fields() -> None:
 
 def test_dry_run_summary_does_not_require_qdrant() -> None:
     cards = build_entity_cards_from_taxonomy()
+    payloads = [build_entity_point_payload(card) for card in cards]
 
-    summary = build_dry_run_summary(cards)
-
-    assert summary["collection"] == "acne_entities_v1"
-    assert summary["card_count"] >= 3
-    preview_names = {payload["canonical_name"] for payload in summary["preview_payloads"]}
+    assert len(cards) == 32
+    assert len({entity_identity_key(card) for card in cards}) == 32
+    preview_names = {payload["canonical_name"] for payload in payloads}
     assert {"Dalacin T", "Epiduo", "Differin", "Tazorac", "benzoyl_peroxide", "tazarotene"}.issubset(preview_names)

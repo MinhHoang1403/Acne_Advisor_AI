@@ -145,7 +145,7 @@ def make_cache_key(
     """
     answer_version = get_answer_cache_version()
     prompt_version = os.getenv("PROMPT_VERSION", CACHE_PROMPT_VERSION)
-    kb_version = os.getenv("KB_VERSION", "acne_kb_v1")
+    kb_version = os.getenv("KB_VERSION", "frozen_phase1_build")
     pipeline_fingerprint = pipeline_fingerprint or compute_pipeline_fingerprint(
         build_pipeline_version_manifest()
     )

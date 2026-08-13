@@ -139,8 +139,9 @@ def embed_texts_sync(
     texts: list[str],
     *,
     model_name: str,
-    task_type: str,
+    task_type: str | None,
     expected_dimensions: int,
+    output_dimensions: int | None = None,
     api_key: str | None = None,
     client: Any | None = None,
 ) -> list[list[float]]:
@@ -150,12 +151,17 @@ def embed_texts_sync(
         return []
     try:
         active_client = client or build_google_genai_client(api_key=api_key)
+        config_kwargs: dict[str, Any] = {}
+        if output_dimensions is not None:
+            config_kwargs["output_dimensionality"] = output_dimensions
+        if task_type is not None and not model_name.endswith("gemini-embedding-2"):
+            config_kwargs["task_type"] = task_type
         response = active_client.models.embed_content(
             model=model_name,
             # google-genai groups a list of consecutive strings into one Content
             # with multiple Parts. Batch embeddings require one Content per text.
             contents=[types.Content(parts=[types.Part(text=text)]) for text in texts],
-            config=types.EmbedContentConfig(task_type=task_type),
+            config=types.EmbedContentConfig(**config_kwargs),
         )
         vectors = extract_embedding_vectors(response, expected_count=len(texts))
         validate_embedding_vectors(vectors, expected_dimensions=expected_dimensions)

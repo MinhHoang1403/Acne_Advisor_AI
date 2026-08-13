@@ -1,4 +1,4 @@
-"""Exact/payload entity retrieval for the ``acne_entities_v1`` Qdrant collection."""
+"""Exact/payload entity retrieval for the canonical ``acne_entities`` alias."""
 
 from __future__ import annotations
 

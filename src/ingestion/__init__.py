@@ -1,7 +1,7 @@
 """Phase 1 ingestion primitives and dermatology metadata helpers.
 
 Public metadata names are loaded lazily so importing a low-level primitive
-such as ``sparse_legacy`` does not initialize knowledge or database adapters.
+does not initialize knowledge or database adapters.
 """
 
 from __future__ import annotations
