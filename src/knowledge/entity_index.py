@@ -10,9 +10,9 @@ from typing import Any
 
 from src.database.vector_store import (
     QDRANT_COLLECTION_NAME,
-    compute_sparse_vector,
     qdrant_client_kwargs,
 )
+from src.ingestion.bm25 import BM25_VECTOR_NAME, bm25_document, bm25_sparse_vector_config
 from src.knowledge.entity_cards import entity_card_to_text
 from src.knowledge.schemas import EntityCard
 from src.knowledge.taxonomy_models import normalize_taxonomy_alias
@@ -139,7 +139,7 @@ async def ensure_entity_collection(
         client = AsyncQdrantClient(**qdrant_client_kwargs())
 
     try:
-        from qdrant_client.models import Distance, SparseVectorParams, VectorParams  # type: ignore[import]
+        from qdrant_client.models import Distance, VectorParams  # type: ignore[import]
 
         collections = await client.get_collections()
         existing_names = {collection.name for collection in collections.collections}
@@ -157,7 +157,7 @@ async def ensure_entity_collection(
                         distance=Distance.COSINE,
                     )
                 },
-                sparse_vectors_config={"bm25": SparseVectorParams()},
+                sparse_vectors_config={BM25_VECTOR_NAME: bm25_sparse_vector_config()},
             )
             return
 
@@ -179,15 +179,15 @@ def build_entity_point(
     *,
     point_id: str | None = None,
 ) -> Any:
-    """Build a point with dense and compatibility hashed sparse TF vectors."""
+    """Build a point with dense and Qdrant-native BM25 inference inputs."""
 
-    from qdrant_client.models import PointStruct, SparseVector  # type: ignore[import]
+    from qdrant_client.models import PointStruct  # type: ignore[import]
 
     payload = build_entity_point_payload(card, kb_version=kb_version, point_id=point_id)
-    sparse = compute_sparse_vector(payload["text"])
-    vector: dict[str, Any] = {"dense": dense_vector}
-    if sparse["indices"]:
-        vector["bm25"] = SparseVector(indices=sparse["indices"], values=sparse["values"])
+    vector: dict[str, Any] = {
+        "dense": dense_vector,
+        BM25_VECTOR_NAME: bm25_document(payload["text"]),
+    }
 
     return PointStruct(
         id=payload["point_id"],

@@ -7,8 +7,8 @@ The active backend is selected via the VECTOR_DB_PROVIDER env var.
 Pha 2 updates
 -------------
 - Fixed named vector support: Qdrant collection uses "dense" + "bm25"
-- Added embed_query() for Gemini query embedding (task_type=retrieval_query)
-- Added search_sparse() for the current custom hashed sparse TF channel
+- Added embed_query() under the Gemini Embedding 2 no-task-type contract
+- Added search_sparse() for Qdrant-native true BM25
 - Added close() method for cleanup
 """
 
@@ -27,11 +27,7 @@ from src.resilience.exceptions import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
-from src.ingestion.sparse_legacy import (
-    compute_sparse_vector,
-    token_to_sparse_index,
-    tokenize_for_sparse,
-)
+from src.ingestion.bm25 import BM25_VECTOR_NAME, bm25_document
 
 try:
     from dotenv import load_dotenv
@@ -70,7 +66,8 @@ def qdrant_client_kwargs() -> dict[str, Any]:
 def _embed_sync(text: str) -> list[float]:
     """Synchronous Gemini embedding call for a single query string.
 
-    Uses task_type="retrieval_query" (vs. "retrieval_document" at ingestion).
+    Gemini Embedding 2 does not accept a task type. Documents and queries share
+    the same frozen model/configuration contract.
     """
     from src.integrations.google_genai import embed_texts_sync
 
@@ -83,8 +80,9 @@ def _embed_sync(text: str) -> list[float]:
     vectors = embed_texts_sync(
         [text],
         model_name=EMBEDDING_MODEL,
-        task_type="retrieval_query",
+        task_type=None,
         expected_dimensions=EMBEDDING_DIMENSIONS,
+        output_dimensions=EMBEDDING_DIMENSIONS,
         api_key=key,
     )
     return vectors[0]
@@ -184,7 +182,7 @@ class QdrantVectorStore(VectorStore):
 
     The Pha 1 collection uses:
     - Named dense vector: ``"dense"`` (3072-dim, COSINE)
-    - Named sparse vector: ``"bm25"`` (legacy storage name for hashed sparse TF)
+    - Named sparse vector: ``"bm25"`` (Qdrant-native BM25 with collection IDF)
     """
 
     _shared_client: Any | None = None
@@ -199,8 +197,8 @@ class QdrantVectorStore(VectorStore):
         self._collection = QDRANT_COLLECTION_NAME
 
     async def upsert(self, id: str, vector: list[float], payload: dict) -> None:
-        """Upsert dense and compatibility sparse vectors when text exists."""
-        from qdrant_client.models import PointStruct, SparseVector  # type: ignore[import]
+        """Upsert dense and native BM25 inference inputs when text exists."""
+        from qdrant_client.models import PointStruct  # type: ignore[import]
 
         text = str(
             payload.get("text")
@@ -209,15 +207,11 @@ class QdrantVectorStore(VectorStore):
             or ""
         )
         vectors: dict[str, Any] = {"dense": vector}
-        sparse = compute_sparse_vector(text)
-        if sparse["indices"]:
-            vectors["bm25"] = SparseVector(
-                indices=sparse["indices"],
-                values=sparse["values"],
-            )
+        if text.strip():
+            vectors[BM25_VECTOR_NAME] = bm25_document(text)
         else:
             logger.warning(
-                "Upserting Qdrant point %s without bm25 sparse vector because payload text is empty.",
+                "Upserting Qdrant point %s without BM25 input because payload text is empty.",
                 id,
             )
 
@@ -259,26 +253,16 @@ class QdrantVectorStore(VectorStore):
     async def search_sparse(
         self, text: str, top_k: int = 5,
     ) -> list[dict[str, Any]]:
-        """Search the custom sparse TF channel stored under ``"bm25"``.
+        """Search the Qdrant-native true BM25 channel."""
 
-        ``bm25`` is a legacy datastore key, not a claim that this formula is
-        canonical BM25. The query computation is identical to Phase 1.
-        """
-        from qdrant_client import models  # type: ignore[import]
-
-        sparse = compute_sparse_vector(text)
-
-        if not sparse["indices"]:
-            logger.warning("Empty sparse vector for query, returning empty results.")
+        if not text.strip():
+            logger.warning("Empty BM25 query, returning empty results.")
             return []
 
         response = await self._client.query_points(
             collection_name=self._collection,
-            query=models.SparseVector(
-                indices=sparse["indices"],
-                values=sparse["values"],
-            ),
-            using="bm25",
+            query=bm25_document(text),
+            using=BM25_VECTOR_NAME,
             limit=top_k,
         )
         return [{"id": r.id, "score": r.score, **(r.payload or {})} for r in response.points]

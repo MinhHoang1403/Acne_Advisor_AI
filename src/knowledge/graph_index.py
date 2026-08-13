@@ -123,15 +123,45 @@ async def upsert_entity_graph(driver: Any, records: dict[str, list[dict[str, Any
     return {"nodes": node_count, "relationships": relationship_count}
 
 
+async def replace_entity_graph(
+    driver: Any,
+    records: dict[str, list[dict[str, Any]]],
+    *,
+    build_id: str,
+) -> dict[str, Any]:
+    """Atomically materialize one build and remove only stale canonical graph nodes."""
+
+    await apply_entity_graph_schema(driver)
+    materialized = await upsert_entity_graph(driver, records)
+    async with driver.session() as session:
+        count_result = await session.run(
+            "MATCH (n) "
+            "WHERE any(label IN labels(n) WHERE label IN $labels) "
+            "AND coalesce(n.kb_version, '') <> $build_id "
+            "RETURN count(n) AS removed",
+            labels=list(ENTITY_GRAPH_LABELS),
+            build_id=build_id,
+        )
+        removed = _record_count(await _result_single(count_result), "removed")
+        delete_result = await session.run(
+            "MATCH (n) "
+            "WHERE any(label IN labels(n) WHERE label IN $labels) "
+            "AND coalesce(n.kb_version, '') <> $build_id "
+            "DETACH DELETE n",
+            labels=list(ENTITY_GRAPH_LABELS),
+            build_id=build_id,
+        )
+        await delete_result.consume()
+    validation = await validate_entity_graph_records(driver, records)
+    if not validation["passed"]:
+        raise RuntimeError(f"Canonical graph reconciliation failed: {validation['errors']}")
+    return {**materialized, "stale_nodes_removed": removed, "validation": validation}
+
+
 async def validate_entity_graph(driver: Any) -> dict[str, Any]:
     """Validate minimal deterministic relationships in Neo4j."""
 
     required_checks = {
-        "dalacin_has_clindamycin": (
-            "MATCH (:DrugProduct {canonical_name:'Dalacin T'})"
-            "-[:HAS_ACTIVE_INGREDIENT]->"
-            "(:ActiveIngredient {canonical_name:'clindamycin'}) RETURN count(*) AS count"
-        ),
         "clindamycin_topical_antibiotic": (
             "MATCH (:ActiveIngredient {canonical_name:'clindamycin'})"
             "-[:BELONGS_TO_CLASS]->"
@@ -384,6 +414,7 @@ __all__ = [
     "apply_entity_graph_schema",
     "get_neo4j_driver",
     "sanitize_neo4j_properties",
+    "replace_entity_graph",
     "upsert_entity_graph",
     "validate_entity_graph",
     "validate_entity_graph_records",

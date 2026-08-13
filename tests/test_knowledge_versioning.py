@@ -98,7 +98,7 @@ def test_entity_payload_has_embedding_and_version_metadata(monkeypatch) -> None:
     assert payload["embedding_model"] == "models/gemini-embedding-2"
     assert payload["embedding_dimensions"] == 3072
     assert payload["kb_version"] == "acne_kb_v1"
-    assert payload["taxonomy_version"] == "drug_taxonomy_v1"
+    assert payload["taxonomy_version"] == "acne_taxonomy_2026_08"
     assert payload["entity_schema_version"] == "entity_schema_v1"
 
 

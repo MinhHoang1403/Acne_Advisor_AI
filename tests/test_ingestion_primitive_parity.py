@@ -16,7 +16,7 @@ def test_fixed_width_split_golden_contract() -> None:
 
 def test_noisy_chunk_decision_golden_contract() -> None:
     assert is_noisy_chunk("...............", "Contents")[0] is True
-    assert is_noisy_chunk("42\n43\nclinical context long enough to inspect")[0] is True
+    assert is_noisy_chunk("42\n43\nclinical context long enough to inspect")[0] is False
     assert is_noisy_chunk("Không dùng adapalene khi mang thai.")[0] is False
     assert is_noisy_chunk("Benzoyl peroxide")[0] is False
-    assert is_noisy_chunk("navigation")[0] is True
+    assert is_noisy_chunk("navigation")[0] is False

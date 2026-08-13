@@ -108,8 +108,9 @@ def test_embed_texts_sync_extracts_and_validates_3072_vectors() -> None:
     vectors = google_genai.embed_texts_sync(
         ["a", "b"],
         model_name="models/gemini-embedding-2",
-        task_type="retrieval_document",
+        task_type=None,
         expected_dimensions=3072,
+        output_dimensions=3072,
         api_key="test-key",
         client=client,
     )
@@ -118,7 +119,8 @@ def test_embed_texts_sync_extracts_and_validates_3072_vectors() -> None:
     assert vectors[0] == vector
     assert capture["model"] == "models/gemini-embedding-2"
     assert [content.parts[0].text for content in capture["contents"]] == ["a", "b"]
-    assert capture["config"].task_type == "retrieval_document"
+    assert capture["config"].task_type is None
+    assert capture["config"].output_dimensionality == 3072
 
 
 @pytest.mark.parametrize("input_count", [1, 2, 16])
@@ -136,8 +138,9 @@ def test_embed_texts_sync_uses_one_content_per_input_and_preserves_order(input_c
     vectors = google_genai.embed_texts_sync(
         texts,
         model_name="models/gemini-embedding-2",
-        task_type="retrieval_document",
+        task_type=None,
         expected_dimensions=3072,
+        output_dimensions=3072,
         api_key="test-key",
         client=client,
     )
@@ -181,8 +184,9 @@ def test_embed_texts_sync_empty_input_skips_provider_call() -> None:
     assert google_genai.embed_texts_sync(
         [],
         model_name="models/gemini-embedding-2",
-        task_type="retrieval_document",
+        task_type=None,
         expected_dimensions=3072,
+        output_dimensions=3072,
         api_key="test-key",
         client=client,
     ) == []

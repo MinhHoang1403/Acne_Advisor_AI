@@ -17,25 +17,20 @@ from src.knowledge.taxonomy_models import (
 )
 
 
-# This YAML is the only active deterministic taxonomy for runtime normalization,
-# entity cards, and the core Phase 1 graph. ``drug_taxonomy_v2.yaml`` remains a
-# legacy migration catalog and is intentionally not loaded by default.
+# This YAML is the only active source-backed taxonomy for runtime normalization,
+# EntityCards, and the deterministic Phase 1 graph.
 DEFAULT_TAXONOMY_PATH = Path(__file__).resolve().parents[2] / "data" / "taxonomy" / "drug_aliases.yaml"
 ACTIVE_TAXONOMY_CONTRACT = "data/taxonomy/drug_aliases.yaml"
 
 CANONICAL_CORPUS_SOURCE_IDS = frozenset(
     {
-        "acne-vulgaris-management-pdf-66142088866501.pdf",
-        "PIIS0190962223033893.pdf",
-        "qd_4416_cut.pdf",
-        "web_raw_dataset.json",
+        "nice_ng198_2026_08",
+        "aad_acne_guideline_2024",
+        "vn_moh_dermatology_4416_2023_acne",
+        "aad_public_acne_2026_07",
     }
 )
-CURATED_TAXONOMY_SOURCE_IDS = frozenset(
-    {
-        "drug_taxonomy_v1:drug_products.dalacin_t",
-    }
-)
+CURATED_TAXONOMY_SOURCE_IDS = frozenset({"pfizer_dalacin_t_label_current"})
 
 SECTION_TO_ENTITY_TYPE: dict[str, EntityType] = {
     "drug_products": "drug_product",

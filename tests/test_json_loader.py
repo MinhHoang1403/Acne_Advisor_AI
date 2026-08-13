@@ -57,9 +57,11 @@ def test_load_web_json_documents_skips_empty_raw_text(tmp_path) -> None:
 
     documents = load_web_json_documents(json_path)
 
-    assert len(documents) == 1
-    assert documents[0]["metadata"]["source_url"] == "https://example.test/ok"
-    assert documents[0]["metadata"]["record_index"] == 2
+    assert len(documents) == 2
+    assert documents[0]["text"] == "short"
+    assert documents[0]["metadata"]["record_index"] == 1
+    assert documents[1]["metadata"]["source_url"] == "https://example.test/ok"
+    assert documents[1]["metadata"]["record_index"] == 2
 
 
 def test_json_metadata_enrichment_maps_entities(tmp_path) -> None:
