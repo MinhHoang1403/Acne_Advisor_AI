@@ -57,6 +57,7 @@ from src.retrieval.reranker_v5 import (
     ranked_evidence_from_rerank_v5,
     rerank_policy_evidence_v5,
 )
+from src.retrieval.rrf import reciprocal_rank_fusion
 from src.retrieval.v5_compat import (
     build_v5_shadow_trace,
     compare_v4_to_v5_shadow,
@@ -1051,48 +1052,13 @@ class HybridRetriever:
 
         Uses Qdrant point ID as the document key for deduplication.
         """
-        doc_scores: dict[str, float] = {}
-        doc_data: dict[str, dict] = {}
-
-        # Score dense results
-        for rank, doc in enumerate(dense_results, start=1):
-            doc_id = str(doc.get("id", ""))
-            if not doc_id:
-                continue
-            rrf_score = dense_weight / (k + rank)
-            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + rrf_score
-            if doc_id not in doc_data:
-                doc_data[doc_id] = doc.copy()
-            doc_data[doc_id]["dense_rank"] = rank
-            doc_data[doc_id]["dense_score"] = doc.get("score", 0.0)
-
-        # Score sparse results
-        for rank, doc in enumerate(sparse_results, start=1):
-            doc_id = str(doc.get("id", ""))
-            if not doc_id:
-                continue
-            rrf_score = sparse_weight / (k + rank)
-            doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + rrf_score
-            if doc_id not in doc_data:
-                doc_data[doc_id] = doc.copy()
-            doc_data[doc_id]["sparse_rank"] = rank
-            doc_data[doc_id]["sparse_score"] = doc.get("score", 0.0)
-
-        # Sort by fused RRF score descending
-        ranked_ids = sorted(
-            doc_scores,
-            key=lambda did: doc_scores[did],
-            reverse=True,
+        return reciprocal_rank_fusion(
+            dense_results,
+            sparse_results,
+            dense_weight=dense_weight,
+            sparse_weight=sparse_weight,
+            k=k,
         )
-
-        result: list[dict] = []
-        for doc_id in ranked_ids:
-            doc = doc_data[doc_id]
-            doc["rrf_score"] = round(doc_scores[doc_id], 6)
-            doc["score"] = doc["rrf_score"]  # Override score with RRF
-            result.append(doc)
-
-        return result
 
     # ------------------------------------------------------------------
     # Cleanup
