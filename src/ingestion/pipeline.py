@@ -113,12 +113,12 @@ async def build_phase1(
             )
 
         api_key = os.getenv("GOOGLE_API_KEY", "").strip()
-        knowledge_vectors, knowledge_embedding_stats = resolve_embeddings(
+        knowledge_vectors, knowledge_embedding_stats = await resolve_embeddings(
             [record["text"] for record in compiled.records],
             cache=cache,
             api_key=api_key,
         )
-        entity_vectors, entity_embedding_stats = resolve_embeddings(
+        entity_vectors, entity_embedding_stats = await resolve_embeddings(
             [entity_card_to_text(card) for card in cards],
             cache=cache,
             api_key=api_key,

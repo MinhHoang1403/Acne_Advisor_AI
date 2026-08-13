@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any
 
 from qdrant_client import AsyncQdrantClient, models
@@ -15,6 +16,7 @@ from src.ingestion.embedding import EMBEDDING_DIMENSIONS, EmbeddingCache, embed_
 from src.knowledge.entity_cards import entity_card_to_text
 from src.knowledge.entity_index import entity_point_id
 from src.knowledge.schemas import EntityCard
+from src.resilience.exceptions import ProviderUnavailableError
 
 
 logger = logging.getLogger(__name__)
@@ -86,32 +88,64 @@ async def _retrieve_dense_resilient(
         return [*left, *right], left_failed + right_failed
 
 
-def resolve_embeddings(
+async def resolve_embeddings(
     texts: list[str],
     *,
     cache: EmbeddingCache,
     api_key: str,
     batch_size: int = 16,
+    batch_delay_seconds: float | None = None,
+    max_retries: int = 4,
 ) -> tuple[list[list[float]], dict[str, int]]:
     """Resolve exact-cache hits and persist every successful provider batch."""
 
     vectors: list[list[float] | None] = [cache.get(text) for text in texts]
     misses = [index for index, vector in enumerate(vectors) if vector is None]
     provider_calls = 0
+    retry_count = 0
+    delay = batch_delay_seconds
+    if delay is None:
+        configured_delay = float(os.getenv("EMBEDDING_BATCH_DELAY", "10") or "10")
+        # Free-tier quota is counted per input, so 16 inputs need at least 9.6s
+        # to stay below 100 inputs/minute. Keep a small deterministic margin.
+        delay = max(configured_delay, 10.0)
     for start in range(0, len(misses), batch_size):
         indexes = misses[start:start + batch_size]
         batch_texts = [texts[index] for index in indexes]
-        batch_vectors = embed_documents(batch_texts, api_key=api_key)
-        provider_calls += 1
+        batch_vectors = None
+        for attempt in range(max_retries + 1):
+            try:
+                batch_vectors = await asyncio.to_thread(
+                    embed_documents, batch_texts, api_key=api_key
+                )
+                provider_calls += 1
+                break
+            except ProviderUnavailableError:
+                if attempt >= max_retries:
+                    raise
+                retry_count += 1
+                retry_delay = 30.0 * (attempt + 1)
+                logger.warning(
+                    "Embedding batch rate-limited; retry %d/%d in %.0f seconds.",
+                    attempt + 1,
+                    max_retries,
+                    retry_delay,
+                )
+                await asyncio.sleep(retry_delay)
+        if batch_vectors is None:
+            raise RuntimeError("Embedding provider returned no batch")
         for index, text, vector in zip(indexes, batch_texts, batch_vectors, strict=True):
             cache.put(text, vector)
             vectors[index] = vector
+        if start + batch_size < len(misses) and delay > 0:
+            await asyncio.sleep(delay)
     if any(vector is None for vector in vectors):
         raise RuntimeError("Embedding resolution left unresolved vectors")
     return [vector for vector in vectors if vector is not None], {
         "cache_hits": len(texts) - len(misses),
         "cache_misses": len(misses),
         "provider_calls": provider_calls,
+        "retry_count": retry_count,
     }
 
 
