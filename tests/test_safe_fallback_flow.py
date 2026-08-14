@@ -8,6 +8,7 @@ from src.agent.emergency_contract import first_sentence_has_immediate_emergency_
 from src.agent.nodes import fallback as fallback_node
 from src.agent.nodes import reason as reason_node
 from src.agent.nodes.cache import cache_lookup_node, cache_store_node
+from src.agent.nodes.workflow import abstain_node, decide_node
 from src.api.app import ChatRequest, chat_endpoint, _http_status_for_resilience_error
 from src.observability.trace_exporter import build_observability_event
 from src.observability.versioning import (
@@ -19,8 +20,6 @@ from src.quality.safe_fallback import (
     SAFE_FALLBACK_FLOW_VERSION,
     build_safe_fallback_answer,
     decide_generation_fallback,
-    decide_retrieval_fallback,
-    has_usable_evidence,
     sanitize_fallback_reason,
 )
 from src.quality.severity_guard import apply_severity_aware_answer_guard
@@ -33,68 +32,45 @@ from src.resilience.exceptions import (
 
 
 def test_empty_query_fallback_is_deterministic_and_short():
-    decision = decide_retrieval_fallback(
-        {"standalone_question": "", "vector_contexts": [], "graph_facts": [], "packed_context": None}
-    )
-    answer = build_safe_fallback_answer(decision.fallback_type)
+    answer = build_safe_fallback_answer("empty_query")
 
-    assert decision.fallback_applied is True
-    assert decision.fallback_type == "empty_query"
-    assert decision.fallback_cache_eligible is False
     assert "vấn đề da hoặc loại mụn" in answer
     assert "Thông tin này chỉ nhằm định hướng" in answer
 
 
-def test_no_evidence_and_insufficient_context_decisions():
-    no_evidence = decide_retrieval_fallback(
-        {
-            "standalone_question": "mụn đầu đen là gì?",
-            "retrieval_status": "no_evidence",
-            "vector_contexts": [],
-            "graph_facts": [],
-            "packed_context": {"items": [], "context_text": ""},
-        }
-    )
-    insufficient = decide_retrieval_fallback(
-        {
-            "standalone_question": "mụn đầu đen là gì?",
-            "retrieval_status": "insufficient_context",
-            "vector_contexts": [],
-            "graph_facts": [],
-        }
-    )
-
-    assert no_evidence.fallback_type == "no_retrieval_evidence"
-    assert insufficient.fallback_type == "insufficient_context"
+def test_insufficient_context_fallback_copy_remains_available():
     assert "chưa đủ bằng chứng" in build_safe_fallback_answer("insufficient_context")
 
 
-def test_raw_evidence_prevents_false_fallback_when_packed_context_empty():
-    state = {
-        "standalone_question": "benzoyl peroxide là gì?",
-        "retrieval_status": "success",
-        "vector_contexts": [{"text": "Benzoyl peroxide is an acne treatment ingredient."}],
-        "graph_facts": [],
-        "packed_context": {"items": [], "context_text": ""},
-    }
+@pytest.mark.asyncio
+async def test_sufficient_assessment_routes_to_generation():
+    result = await decide_node({"is_in_domain": True, "evidence_assessment": {"sufficient": True}})
 
-    assert has_usable_evidence(state) is True
-    assert decide_retrieval_fallback(state).fallback_applied is False
+    assert result == {"next_action": "generate"}
 
 
-def test_recoverable_retrieval_error_sanitizes_reason():
+@pytest.mark.asyncio
+async def test_retrieval_error_abstention_sanitizes_reason():
     reason = sanitize_fallback_reason("boom token=secret-value path C:/tmp")
-    decision = decide_retrieval_fallback(
+    decision = await abstain_node(
         {
             "standalone_question": "mụn viêm",
-            "retrieval_status": "recoverable_error",
             "retrieval_error": reason,
         }
     )
 
     assert "secret-value" not in reason
-    assert decision.fallback_type == "retrieval_error"
-    assert decision.fallback_cache_eligible is False
+    assert decision["fallback_type"] == "retrieval_error"
+    assert decision["fallback_cache_eligible"] is False
+
+
+def test_fallback_reason_redacts_password_in_connection_url():
+    reason = sanitize_fallback_reason(
+        "connection failed: postgresql://user:secret-password@localhost/database"
+    )
+
+    assert "secret-password" not in reason
+    assert "[REDACTED]" in reason
 
 
 @pytest.mark.parametrize(
@@ -155,65 +131,35 @@ async def test_generation_fallback_recovers_verified_entity_relation_instead_of_
 
 
 @pytest.mark.asyncio
-async def test_ambiguous_reference_requests_clarification_without_guessing():
-    result = await fallback_node.fallback_decision_node(
-        {
-            "standalone_question": "Nó có phải kháng sinh không?",
-            "conversation_context": {
-                "unresolved_user_reference": True,
-                "clarification_options": ["Differin", "Dalacin T"],
-            },
-            "retrieval_status": "success",
-            "vector_contexts": [{"text": "Some usable context."}],
-        }
-    )
-
-    assert result["fallback_type"] == "ambiguous_reference"
-    assert "Differin" in result["fallback_answer"]
-    assert "Dalacin T" in result["fallback_answer"]
-
-
-@pytest.mark.asyncio
 async def test_fallback_nodes_apply_answer_and_metadata():
-    decision = await fallback_node.fallback_decision_node(
+    decision = await abstain_node(
         {
             "standalone_question": "mụn đầu đen là gì?",
-            "retrieval_status": "no_evidence",
-            "vector_contexts": [],
-            "graph_facts": [],
-            "packed_context": None,
         }
     )
-    fallback = await fallback_node.safe_fallback_node(decision)
 
     assert decision["fallback_applied"] is True
     assert decision["fallback_type"] == "no_retrieval_evidence"
-    assert fallback["draft_answer"] == decision["fallback_answer"]
-    assert fallback["actual_provider"] == "system"
-    assert fallback["actual_model"] is None
-    assert fallback["llm_fallback_used"] is False
-    assert fallback["fallback_provider"] is None
-    assert fallback["fallback_model"] is None
-    assert fallback["fallback_applied"] is True
-    assert fallback["fallback_cache_eligible"] is False
+    assert decision["actual_provider"] == "system"
+    assert decision["actual_model"] is None
+    assert decision["llm_fallback_used"] is False
+    assert decision["fallback_provider"] is None
+    assert decision["fallback_model"] is None
+    assert decision["fallback_cache_eligible"] is False
 
 
 @pytest.mark.asyncio
 async def test_retrieval_error_fallback_keeps_emergency_action_first():
     query = "Môi và lưỡi sưng sau khi dùng thuốc mới trị mụn, nên làm gì ngay?"
-    decision = await fallback_node.fallback_decision_node(
+    decision = await abstain_node(
         {
             "standalone_question": query,
-            "retrieval_status": "recoverable_error",
             "retrieval_error": "SSLEOFError: provider disconnected",
         }
     )
-    fallback = await fallback_node.safe_fallback_node({**decision, "standalone_question": query})
 
     assert decision["medical_severity"] == "emergency"
-    assert first_sentence_has_immediate_emergency_action(decision["fallback_answer"]) is True
-    assert fallback["medical_severity"] == "emergency"
-    assert first_sentence_has_immediate_emergency_action(fallback["draft_answer"]) is True
+    assert first_sentence_has_immediate_emergency_action(decision["draft_answer"]) is True
 
 
 @pytest.mark.asyncio

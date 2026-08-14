@@ -12,9 +12,7 @@ from src.agent.answer_formatting import (
 from src.agent.state import ClinicalState
 from src.quality.safe_fallback import (
     build_safe_fallback_answer,
-    assess_answerability,
     decide_generation_fallback,
-    decide_retrieval_fallback,
 )
 from src.quality.severity_guard import apply_severity_aware_answer_guard
 
@@ -38,57 +36,6 @@ def _guarded_fallback_answer(
         "severity_guard": guarded.classification.model_dump(mode="json"),
         "severity_guard_modified": guarded.modified,
         "severity_guard_cache_eligible": guarded.cache_eligible,
-    }
-
-
-async def fallback_decision_node(state: ClinicalState) -> dict[str, Any]:
-    """Decide whether retrieval evidence is usable before answer generation."""
-
-    state_data = dict(state)
-    answerability = assess_answerability(state_data)
-    decision = decide_retrieval_fallback(state_data)
-    query = state.get("standalone_question") or state.get("user_question") or ""
-    recovery_answer = grounded_entity_relation_answer(str(query))
-    if recovery_answer and decision.fallback_applied:
-        return {
-            "fallback_applied": True,
-            "fallback_type": "grounded_direct_recovery",
-            "fallback_reason": "Retrieval had no usable evidence; returned a verified taxonomy relation.",
-            "fallback_answer": recovery_answer,
-            "fallback_cache_eligible": False,
-            "answerability": answerability.model_dump(mode="json"),
-        }
-    if not decision.fallback_applied:
-        return {
-            "fallback_applied": False,
-            "fallback_type": "none",
-            "fallback_reason": None,
-            "fallback_answer": None,
-            "fallback_cache_eligible": True,
-            "answerability": answerability.model_dump(mode="json"),
-        }
-    clarification_options = (state.get("conversation_context") or {}).get("clarification_options") or []
-    clarification_answer = None
-    if decision.fallback_type == "ambiguous_reference" and clarification_options:
-        clarification_answer = (
-            "Mình cần làm rõ bạn đang hỏi về "
-            + " hay ".join(str(option) for option in clarification_options)
-            + ". Bạn có thể cho biết tên thuốc hoặc hoạt chất cụ thể không?"
-        )
-    answer, severity_metadata = _guarded_fallback_answer(
-        decision.fallback_type,
-        query=state.get("standalone_question") or state.get("user_question"),
-        reason=decision.fallback_reason,
-        fallback_answer=clarification_answer,
-    )
-    return {
-        "fallback_applied": True,
-        "fallback_type": decision.fallback_type,
-        "fallback_reason": decision.fallback_reason,
-        "fallback_answer": answer,
-        "fallback_cache_eligible": decision.fallback_cache_eligible,
-        "answerability": answerability.model_dump(mode="json"),
-        **severity_metadata,
     }
 
 
@@ -166,7 +113,6 @@ async def safe_fallback_node(state: ClinicalState) -> dict[str, Any]:
 
 
 __all__ = [
-    "fallback_decision_node",
     "generation_fallback_decision_node",
     "safe_fallback_node",
 ]

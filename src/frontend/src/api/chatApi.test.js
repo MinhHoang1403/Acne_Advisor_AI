@@ -47,6 +47,32 @@ test('sendChatMessage distinguishes network failure from HTTP errors', async (t)
   );
 });
 
+test('sendChatMessage aborts after its finite client timeout', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = async (_url, init) =>
+    new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      });
+    });
+
+  await assert.rejects(
+    () => sendChatMessage({ message: 'mụn', sessionId: null, timeoutMs: 1 }),
+    (error) => {
+      assert.equal(error.status, 504);
+      assert.equal(error.isTimeout, true);
+      assert.match(error.message, /quá thời gian/);
+      return true;
+    },
+  );
+});
+
 test('checkBackendHealth returns degraded for reachable degraded backend', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

@@ -164,11 +164,12 @@ async def generate_node(state: ClinicalState) -> dict[str, Any]:
 async def abstain_node(state: ClinicalState) -> dict[str, Any]:
     """Produce an explicit safe abstention after the bounded retrieval budget."""
 
-    reason = state.get("retrieval_error") or "No provenance-complete source evidence after bounded retrieval."
+    retrieval_error = state.get("retrieval_error")
+    reason = retrieval_error or "No provenance-complete source evidence after bounded retrieval."
     fallback_state = {
         **state,
         "fallback_applied": True,
-        "fallback_type": "insufficient_evidence",
+        "fallback_type": "retrieval_error" if retrieval_error else "no_retrieval_evidence",
         "fallback_reason": reason,
         "fallback_cache_eligible": False,
     }

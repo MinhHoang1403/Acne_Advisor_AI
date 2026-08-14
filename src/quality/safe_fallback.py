@@ -21,16 +21,6 @@ FallbackType = Literal[
     "empty_generation",
     "invalid_generation",
     "grounded_direct_recovery",
-    "ambiguous_reference",
-]
-
-RetrievalStatus = Literal[
-    "not_started",
-    "success",
-    "empty_query",
-    "no_evidence",
-    "insufficient_context",
-    "recoverable_error",
 ]
 
 
@@ -43,19 +33,6 @@ class SafeFallbackDecision(BaseModel):
     fallback_cache_eligible: bool = True
 
 
-class AnswerabilityResult(BaseModel):
-    """Explicit answerability decision used before the safe fallback route."""
-
-    is_in_domain: bool
-    has_relevant_context: bool
-    has_minimum_evidence: bool
-    can_answer_directly: bool
-    requires_clarification: bool
-    requires_cautious_language: bool
-    requires_fallback: bool
-    reason_code: str
-
-
 def sanitize_fallback_reason(value: Any, *, max_chars: int = 160) -> str:
     """Return a short, secret-safe reason string."""
 
@@ -65,6 +42,11 @@ def sanitize_fallback_reason(value: Any, *, max_chars: int = 160) -> str:
     text = re.sub(
         r"(?i)(api[_-]?key|token|password|secret|authorization|bearer)\s*[:=]\s*\S+",
         r"\1=[REDACTED]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)(\b[a-z][a-z0-9+.-]*://[^\s/:]+:)[^\s/@]+(@)",
+        r"\1[REDACTED]\2",
         text,
     )
     text = re.sub(r"\s+", " ", text)
@@ -89,137 +71,6 @@ def is_usable_text(value: Any) -> bool:
         "<empty>",
     }
     return text.lower() not in placeholders
-
-
-def has_usable_packed_context(value: Any) -> bool:
-    if value is None:
-        return False
-    if hasattr(value, "model_dump"):
-        value = value.model_dump(mode="json")
-    if not isinstance(value, dict):
-        return False
-    items = value.get("items")
-    if isinstance(items, list) and any(_item_has_text(item) for item in items):
-        return True
-    return is_usable_text(value.get("context_text"))
-
-
-def has_usable_evidence(state: dict[str, Any]) -> bool:
-    vector_contexts = state.get("vector_contexts") or []
-    graph_facts = state.get("graph_facts") or []
-    if isinstance(vector_contexts, list) and any(_item_has_text(item) for item in vector_contexts):
-        return True
-    if isinstance(graph_facts, list) and any(_graph_fact_has_evidence(item) for item in graph_facts):
-        return True
-    return has_usable_packed_context(state.get("packed_context"))
-
-
-def assess_answerability(state: dict[str, Any]) -> AnswerabilityResult:
-    """Classify answerability without turning recoverable misses into refusals."""
-
-    in_domain = state.get("is_in_domain") is not False
-    query = state.get("standalone_question") or state.get("normalized_question") or state.get("user_question")
-    has_query = is_usable_text(query)
-    has_evidence = has_usable_evidence(state)
-    status = str(state.get("retrieval_status") or "not_started")
-    conversation_context = state.get("conversation_context") or {}
-    if not has_query:
-        return AnswerabilityResult(
-            is_in_domain=in_domain,
-            has_relevant_context=False,
-            has_minimum_evidence=False,
-            can_answer_directly=False,
-            requires_clarification=True,
-            requires_cautious_language=True,
-            requires_fallback=True,
-            reason_code="EMPTY_QUERY",
-        )
-    if not in_domain:
-        return AnswerabilityResult(
-            is_in_domain=False,
-            has_relevant_context=False,
-            has_minimum_evidence=False,
-            can_answer_directly=False,
-            requires_clarification=False,
-            requires_cautious_language=True,
-            requires_fallback=False,
-            reason_code="OUT_OF_DOMAIN",
-        )
-    if isinstance(conversation_context, dict) and conversation_context.get("unresolved_user_reference"):
-        return AnswerabilityResult(
-            is_in_domain=True,
-            has_relevant_context=has_evidence,
-            has_minimum_evidence=has_evidence,
-            can_answer_directly=False,
-            requires_clarification=True,
-            requires_cautious_language=True,
-            requires_fallback=True,
-            reason_code="AMBIGUOUS_USER_REFERENCE",
-        )
-    if has_evidence:
-        return AnswerabilityResult(
-            is_in_domain=True,
-            has_relevant_context=True,
-            has_minimum_evidence=True,
-            can_answer_directly=True,
-            requires_clarification=False,
-            requires_cautious_language=status in {"recoverable_error", "no_evidence"},
-            requires_fallback=False,
-            reason_code="RECOVERABLE_WITH_EVIDENCE" if status == "recoverable_error" else "RETRIEVED_EVIDENCE",
-        )
-    return AnswerabilityResult(
-        is_in_domain=True,
-        has_relevant_context=False,
-        has_minimum_evidence=False,
-        can_answer_directly=False,
-        requires_clarification=False,
-        requires_cautious_language=True,
-        requires_fallback=True,
-        reason_code="RETRIEVAL_ERROR" if status == "recoverable_error" else "NO_RELEVANT_CONTEXT",
-    )
-
-
-def decide_retrieval_fallback(state: dict[str, Any]) -> SafeFallbackDecision:
-    answerability = assess_answerability(state)
-    status = str(state.get("retrieval_status") or "not_started")
-    if answerability.reason_code == "EMPTY_QUERY":
-        return SafeFallbackDecision(
-            fallback_applied=True,
-            fallback_type="empty_query",
-            fallback_reason="Câu hỏi rỗng hoặc chưa đủ nội dung để xử lý.",
-            fallback_cache_eligible=False,
-        )
-    if answerability.reason_code == "AMBIGUOUS_USER_REFERENCE":
-        return SafeFallbackDecision(
-            fallback_applied=True,
-            fallback_type="ambiguous_reference",
-            fallback_reason="Cần làm rõ entity mà đại từ trong câu hỏi đang đề cập.",
-            fallback_cache_eligible=False,
-        )
-    if answerability.can_answer_directly:
-        return SafeFallbackDecision(fallback_applied=False, fallback_type="none", fallback_cache_eligible=True)
-    if status == "recoverable_error":
-        return SafeFallbackDecision(
-            fallback_applied=True,
-            fallback_type="retrieval_error",
-            fallback_reason=sanitize_fallback_reason(state.get("retrieval_error")),
-            fallback_cache_eligible=False,
-        )
-    if status == "insufficient_context":
-        return SafeFallbackDecision(
-            fallback_applied=True,
-            fallback_type="insufficient_context",
-            fallback_reason="Context packer không chọn được bằng chứng đủ dùng.",
-            fallback_cache_eligible=False,
-        )
-    if not answerability.has_minimum_evidence:
-        return SafeFallbackDecision(
-            fallback_applied=True,
-            fallback_type="no_retrieval_evidence",
-            fallback_reason="Không có vector context, graph fact hoặc packed context usable.",
-            fallback_cache_eligible=False,
-        )
-    return SafeFallbackDecision(fallback_applied=False, fallback_type="none", fallback_cache_eligible=True)
 
 
 def decide_generation_fallback(value: Any) -> SafeFallbackDecision:
@@ -286,11 +137,6 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
             "**Lưu ý**\n"
             "Mình sẽ không suy đoán hoặc bịa nguồn khi context chưa đủ."
         )
-    if fallback_type == "ambiguous_reference":
-        return (
-            "Mình cần làm rõ đối tượng bạn đang nói tới trước khi trả lời chính xác. "
-            "Bạn có thể cho biết tên thuốc, sản phẩm hoặc hoạt chất đang hỏi không?"
-        )
     if fallback_type in {"empty_generation", "invalid_generation"}:
         return (
             "**Tóm tắt ngắn**\n"
@@ -310,36 +156,12 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
     )
 
 
-def _item_has_text(item: Any) -> bool:
-    if hasattr(item, "model_dump"):
-        item = item.model_dump(mode="json")
-    if not isinstance(item, dict):
-        return False
-    return is_usable_text(item.get("text") or item.get("content") or item.get("page_content"))
-
-
-def _graph_fact_has_evidence(item: Any) -> bool:
-    if hasattr(item, "model_dump"):
-        item = item.model_dump(mode="json")
-    if not isinstance(item, dict):
-        return False
-    return any(
-        is_usable_text(item.get(key))
-        for key in ("evidence", "description", "related_description", "entity", "related_entity")
-    )
-
-
 __all__ = [
     "SAFE_FALLBACK_FLOW_VERSION",
     "FallbackType",
-    "RetrievalStatus",
     "SafeFallbackDecision",
     "build_safe_fallback_answer",
-    "assess_answerability",
     "decide_generation_fallback",
-    "decide_retrieval_fallback",
-    "has_usable_evidence",
-    "has_usable_packed_context",
     "is_usable_text",
     "sanitize_fallback_reason",
 ]

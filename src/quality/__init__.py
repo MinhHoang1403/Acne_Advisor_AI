@@ -18,7 +18,6 @@ from src.quality.safe_fallback import (
     SafeFallbackDecision,
     build_safe_fallback_answer,
     decide_generation_fallback,
-    decide_retrieval_fallback,
 )
 
 __all__ = [
@@ -35,6 +34,5 @@ __all__ = [
     "build_safe_fallback_answer",
     "classify_medical_severity",
     "decide_generation_fallback",
-    "decide_retrieval_fallback",
     "verify_answer_quality",
 ]

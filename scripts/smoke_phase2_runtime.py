@@ -68,7 +68,7 @@ def run_offline_smoke() -> dict:
     if len(graph_nodes) != 8:
         errors.append(f"Expected 8 semantic graph nodes, found {len(graph_nodes)}")
     if len(ClinicalState.__annotations__) >= 97:
-        errors.append("ClinicalState exceeds the frozen 68-field contract")
+        errors.append("ClinicalState exceeds the frozen compact-state upper bound")
     if not all(case["passed"] for case in cases):
         errors.append("One or more structural retrieval cases failed")
     return {

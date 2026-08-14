@@ -113,3 +113,12 @@ migration operation.
 
 `.env`, provider secrets, caches, databases, snapshots and generated reports
 remain local-only. Never print secrets or use destructive global Docker cleanup.
+
+## Local Trust Boundary
+
+Keep FastAPI, Qdrant, PostgreSQL, Neo4j, Redis, and the frontend bound to
+`127.0.0.1`/`localhost`. The current application has no end-user authentication
+or tenant authorization, and chat-history endpoints can read or mutate local
+history. Do not expose this development stack directly to an untrusted network.
+Production deployment requires TLS, authentication, authorization, rate
+limiting, restrictive CORS, tenant isolation, and managed secret storage.

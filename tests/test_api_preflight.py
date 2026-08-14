@@ -7,6 +7,17 @@ import pytest
 from src.api import preflight
 
 
+def test_dependency_error_detail_does_not_expose_raw_credentials(caplog):
+    detail = preflight._safe_dependency_error(
+        "PostgreSQL",
+        RuntimeError("postgresql://user:secret-password@localhost/database"),
+    )
+
+    assert "secret-password" not in detail
+    assert "secret-password" not in caplog.text
+    assert "RuntimeError" in detail
+
+
 @pytest.mark.asyncio
 async def test_bounded_preflight_check_reports_timeout(monkeypatch):
     monkeypatch.setattr(preflight, "PREFLIGHT_CHECK_TIMEOUT_SECONDS", 0.001)

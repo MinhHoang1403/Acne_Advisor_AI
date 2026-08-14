@@ -1,4 +1,4 @@
-"""Pydantic contracts for Phase 2A entity-aware retrieval."""
+"""Typed query, chunk-candidate, and context-packing contracts."""
 
 from __future__ import annotations
 

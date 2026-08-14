@@ -61,6 +61,33 @@ def test_release_checker_invalid_env_fixture_fails(tmp_path: Path) -> None:
     assert "END_TO_END_RELEASE_READINESS_VERSION" in report["missing"]
 
 
+def test_extract_data_counts_reads_current_readiness_schema() -> None:
+    summary = {
+        "checks": [
+            {
+                "name": "frozen_phase1_manifest",
+                "details": {"counts": {"entities": 32}},
+            },
+            {
+                "name": "qdrant_frozen_knowledge",
+                "details": {"points_count": 512},
+            },
+            {
+                "name": "neo4j_frozen_graph",
+                "details": {"nodes": 32, "relationships": 27},
+            },
+        ]
+    }
+
+    counts = checker.extract_data_counts(summary)
+
+    assert counts["passed"] is True
+    assert counts["acne_knowledge"] == 512
+    assert counts["acne_entities"] == 32
+    assert counts["neo4j_nodes"] == 32
+    assert counts["neo4j_relationships"] == 27
+
+
 def test_release_checker_utf8_stdio_survives_cp1252_console() -> None:
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "cp1252"

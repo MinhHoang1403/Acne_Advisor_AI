@@ -1,4 +1,4 @@
-"""Rule-based query normalization for Phase 2A retrieval."""
+"""Taxonomy-backed query normalization used by retrieval and answer policy."""
 
 from __future__ import annotations
 

@@ -105,6 +105,15 @@ def test_parse_cors_origins_defaults_and_dedupes():
     assert origins == ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 
+def test_used_retrieval_reflects_actual_runtime_path():
+    from src.api.app import _used_retrieval
+
+    assert _used_retrieval({"retrieval_attempt": 1, "retrieval_status": "ok"}, True) is True
+    assert _used_retrieval({"cache_hit": True, "retrieval_status": "ok"}, True) is False
+    assert _used_retrieval({"retrieval_status": "not_started"}, True) is False
+    assert _used_retrieval({"retrieval_attempt": 1}, False) is False
+
+
 @pytest.mark.asyncio
 async def test_cors_allows_localhost_and_127(monkeypatch):
     async def fake_preflight():
@@ -189,15 +198,15 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
         return {
             "answer": "Benzoyl peroxide không phải là kháng sinh.",
             "session_id": kwargs["session_id"],
-            "sources": ["entity:active_ingredient", "fixture.pdf"],
+            "sources": ["fixture.pdf"],
             "vector_contexts": [
-                {"source_file": "entity:active_ingredient", "retrieval_source": "entity"},
                 {"source_file": "fixture.pdf", "document_title": "Fixture Acne Guide"},
             ],
             "symptoms": [],
             "safety_flags": [],
             "graph_facts": [],
-            "retrieval_status": "hybrid",
+            "retrieval_status": "ok",
+            "retrieval_attempt": 1,
             "fallback_applied": False,
             "fallback_type": "none",
             "fallback_cache_eligible": True,
@@ -267,5 +276,38 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     assert metadata["response_origin"] == "llm"
     assert metadata["guardrail_applied"] is False
     body = response.json()
-    assert body["sources"] == ["Cơ sở tri thức hoạt chất", "Fixture Acne Guide"]
-    assert body["source_metadata"][0]["source_id"] == "entity:active_ingredient"
+    assert body["sources"] == ["Fixture Acne Guide"]
+    assert body["source_metadata"][0]["source_id"] == "fixture.pdf"
+    assert metadata["used_retrieval"] is True
+    assert metadata["retrieval"] == "dense_bm25_rrf"
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_unknown_provider_before_runtime():
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/chat",
+            json={"message": "Mụn đầu đen là gì?", "llm_provider": "unknown-provider"},
+        )
+
+    assert response.status_code == 422
+
+
+def test_openapi_has_explicit_success_schemas_for_active_endpoints():
+    schema = app.openapi()
+    expected = {
+        ("/models", "get"): "ModelsResponse",
+        ("/chat/sessions/{session_id}/messages", "get"): None,
+        ("/chat/sessions/{session_id}/rename", "patch"): "RenameResponse",
+        ("/chat/sessions/{session_id}/hide", "patch"): "HideResponse",
+    }
+
+    for (path, method), model_name in expected.items():
+        response_schema = schema["paths"][path][method]["responses"]["200"]["content"]["application/json"]["schema"]
+        if model_name:
+            assert response_schema["$ref"].endswith(f"/{model_name}")
+        else:
+            assert response_schema["type"] == "array"
+            assert response_schema["items"]["$ref"].endswith("/MessageResponse")

@@ -140,7 +140,7 @@ def _is_retryable_query_embedding_error(exc: Exception) -> bool:
 
 
 class QdrantVectorStore:
-    """Qdrant-backed vector store with named vector support.
+    """Read-only Qdrant runtime adapter with named vector support.
 
     The Pha 1 collection uses:
     - Named dense vector: ``"dense"`` (3072-dim, COSINE)
@@ -157,34 +157,6 @@ class QdrantVectorStore:
             logger.debug("Created process-level Qdrant client for read operations.")
         self._client = self.__class__._shared_client
         self._collection = QDRANT_COLLECTION_NAME
-
-    async def upsert(self, id: str, vector: list[float], payload: dict) -> None:
-        """Upsert dense and native BM25 inference inputs when text exists."""
-        from qdrant_client.models import PointStruct  # type: ignore[import]
-
-        text = str(
-            payload.get("text")
-            or payload.get("content")
-            or payload.get("page_content")
-            or ""
-        )
-        vectors: dict[str, Any] = {"dense": vector}
-        if text.strip():
-            vectors[BM25_VECTOR_NAME] = bm25_document(text)
-        else:
-            logger.warning(
-                "Upserting Qdrant point %s without BM25 input because payload text is empty.",
-                id,
-            )
-
-        await self._client.upsert(
-            collection_name=self._collection,
-            points=[PointStruct(
-                id=id,
-                vector=vectors,
-                payload=payload,
-            )],
-        )
 
     async def search(
         self, query_vector: list[float], top_k: int = 5, filter: dict | None = None
@@ -228,14 +200,6 @@ class QdrantVectorStore:
             limit=top_k,
         )
         return [{"id": r.id, "score": r.score, **(r.payload or {})} for r in response.points]
-
-    async def delete(self, id: str) -> None:
-        from qdrant_client.models import PointIdsList  # type: ignore[import]
-
-        await self._client.delete(
-            collection_name=self._collection,
-            points_selector=PointIdsList(points=[id]),
-        )
 
     async def close(self) -> None:
         """Keep the shared read client alive for the process lifetime."""

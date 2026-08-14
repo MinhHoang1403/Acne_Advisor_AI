@@ -1,6 +1,8 @@
 import pytest
 
+from src.agent import graph as graph_module
 from src.agent.graph import clinical_graph, route_agent_action
+from src.agent.state import ClinicalState
 from src.agent.nodes import workflow
 
 
@@ -29,6 +31,33 @@ async def test_agent_decision_is_bounded_and_meaningful() -> None:
 def test_route_reads_only_explicit_agent_action() -> None:
     assert route_agent_action({"next_action": "retrieve"}) == "retrieve"
     assert route_agent_action({}) == "abstain"
+
+
+def test_clinical_state_has_no_retired_fallback_or_error_fields() -> None:
+    fields = ClinicalState.__annotations__
+
+    assert "answerability" not in fields
+    assert "errors" not in fields
+    assert "prompt_budget" in fields
+
+
+@pytest.mark.asyncio
+async def test_run_clinical_agent_returns_prompt_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeGraph:
+        async def ainvoke(self, state):
+            return {
+                **state,
+                "final_answer": "Nguồn đã được đóng gói.",
+                "prompt_budget": {"accounting_mode": "observation_only"},
+            }
+
+    monkeypatch.setattr(graph_module, "clinical_graph", FakeGraph())
+    result = await graph_module.run_clinical_agent("Mụn đầu đen là gì?")
+
+    assert result["prompt_budget"] == {"accounting_mode": "observation_only"}
+    assert "answerability" not in result
+    assert "errors" not in result
+    assert "graph_relation_found" not in result
 
 
 @pytest.mark.asyncio

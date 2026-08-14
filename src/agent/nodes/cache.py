@@ -269,12 +269,8 @@ async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
         logger.info("Cache store SKIPPED: unsafe prompt/prescription request")
         return {}
         
-    if state.get("errors") or state.get("llm_fallback"):
-        logger.info(
-            "Cache store SKIPPED: error_count=%d, llm_fallback=%s",
-            len(state.get("errors") or []),
-            state.get("llm_fallback"),
-        )
+    if state.get("llm_fallback"):
+        logger.info("Cache store SKIPPED: llm_fallback=%s", state.get("llm_fallback"))
         return {}
         
     # Use final_answer (post-processed by finalize_response_node) instead of draft_answer
