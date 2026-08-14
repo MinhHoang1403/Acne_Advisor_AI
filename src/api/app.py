@@ -740,7 +740,6 @@ async def chat_endpoint(request: ChatRequest):
         safe_graph_facts: list[dict[str, Any]] = []
         is_in_domain = result.get("is_in_domain")
         used_retrieval = _used_retrieval(result, is_in_domain)
-        retrieval_status = result.get("retrieval_status") or ("not_started" if not used_retrieval else "ok")
         
         answer_text = repair_mojibake(result.get("answer", ""))
         raw_sources_list = result.get("sources", [])
