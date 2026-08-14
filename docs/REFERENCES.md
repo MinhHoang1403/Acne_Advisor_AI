@@ -1,4 +1,4 @@
-# Phase 1 Method And Medical Sources
+# Method, Provider, and Medical Sources
 
 Verified through 2026-08-14. Machine-readable claim mapping lives in
 `data/phase1_method_sources.json`; canonical corpus metadata lives in
