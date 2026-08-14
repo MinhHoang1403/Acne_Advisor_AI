@@ -95,7 +95,7 @@ def pack_context(
     )
 
 
-def packed_context_to_legacy_contexts(packed_context: PackedContext) -> list[dict[str, Any]]:
+def packed_context_to_response_contexts(packed_context: PackedContext) -> list[dict[str, Any]]:
     """Expose packed evidence in the existing API/prompt context shape."""
 
     contexts: list[dict[str, Any]] = []
@@ -149,4 +149,4 @@ def _source_id(payload: dict[str, Any]) -> str:
     ).strip()
 
 
-__all__ = ["pack_context", "packed_context_to_legacy_contexts"]
+__all__ = ["pack_context", "packed_context_to_response_contexts"]

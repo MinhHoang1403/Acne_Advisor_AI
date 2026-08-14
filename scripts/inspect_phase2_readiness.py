@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only readiness inspection for the frozen Phase 1 and S4B runtime."""
+"""Read-only readiness inspection for the frozen Phase 1 and Phase 2 runtime."""
 
 from __future__ import annotations
 

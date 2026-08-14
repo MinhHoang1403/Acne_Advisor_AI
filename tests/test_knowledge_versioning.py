@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from src.knowledge.entity_cards import build_entity_cards_from_taxonomy
-from src.knowledge.entity_index import build_entity_point_payload
 from src.knowledge.versioning import (
     get_embedding_metadata,
     get_knowledge_versions,
@@ -33,21 +31,6 @@ def test_get_knowledge_versions_reads_env(monkeypatch) -> None:
         "chunk_schema_version": "chunk-contract",
         "ingestion_pipeline_version": "pipeline-contract",
     }
-
-
-def test_entity_payload_has_embedding_and_taxonomy_metadata(monkeypatch) -> None:
-    monkeypatch.setenv("EMBEDDING_PROVIDER", "google")
-    monkeypatch.setenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
-    monkeypatch.setenv("EMBEDDING_DIMENSIONS", "3072")
-    card = next(
-        card for card in build_entity_cards_from_taxonomy()
-        if card.entity_type == "drug_product" and card.canonical_name == "Epiduo"
-    )
-    payload = build_entity_point_payload(card, kb_version="content-build")
-    assert payload["embedding_model"] == "models/gemini-embedding-2"
-    assert payload["embedding_dimensions"] == 3072
-    assert payload["kb_version"] == "content-build"
-    assert payload["taxonomy_version"] == "acne_taxonomy_2026_08"
 
 
 def test_compatibility_guard_detects_embedding_model_mismatch() -> None:

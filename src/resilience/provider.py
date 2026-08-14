@@ -6,7 +6,7 @@ import asyncio
 from typing import Awaitable, Callable, TypeVar
 
 from src.resilience.budget import DeadlineBudget
-from src.resilience.circuit_breaker import CircuitBreaker, CircuitState
+from src.resilience.circuit_breaker import CircuitBreaker
 from src.resilience.exceptions import (
     CircuitOpenError,
     ProviderTimeoutError,

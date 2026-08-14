@@ -1,4 +1,4 @@
-from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
+from src.retrieval.context_packer import pack_context, packed_context_to_response_contexts
 from src.retrieval.contracts import NormalizedQuery, RetrievedCandidate
 
 
@@ -71,9 +71,9 @@ def test_packer_deduplicates_only_by_stable_candidate_id() -> None:
     assert packed.debug["dropped"] == [{"candidate_id": "same", "reason": "duplicate_id"}]
 
 
-def test_legacy_context_adapter_retains_internal_source_identifiers() -> None:
+def test_response_context_adapter_retains_internal_source_identifiers() -> None:
     packed = pack_context(_query(), [_candidate("chunk-1", "Evidence", 1)])
-    context = packed_context_to_legacy_contexts(packed)[0]
+    context = packed_context_to_response_contexts(packed)[0]
 
     assert context["chunk_id"] == "chunk-1"
     assert context["source_id"] == "source-a"

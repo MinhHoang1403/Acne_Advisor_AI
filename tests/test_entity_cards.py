@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy, entity_card_to_text
-from src.knowledge.entity_index import build_entity_point_payload, entity_identity_key
+from src.knowledge.entity_identity import entity_identity_key, entity_point_id
 
 
 def _find_card(entity_type: str, canonical_name: str):
@@ -70,35 +70,11 @@ def test_entity_stable_id_deterministic() -> None:
     assert card.stable_id("acne_kb_v1") != card.stable_id("acne_kb_v2")
 
 
-def test_entity_payload_has_required_fields() -> None:
-    card = _find_card("drug_product", "Epiduo")
-
-    payload = build_entity_point_payload(card, kb_version="acne_kb_v1")
-
-    for field_name in [
-        "entity_type",
-        "canonical_name",
-        "aliases",
-        "active_ingredients",
-        "drug_class",
-        "taxonomy_version",
-        "entity_schema_version",
-        "kb_version",
-        "entity_id",
-        "text",
-        "embedding_provider",
-        "embedding_model",
-        "embedding_dimensions",
-    ]:
-        assert field_name in payload
-    assert payload["embedding_dimensions"] == 3072
-
-
-def test_dry_run_summary_does_not_require_qdrant() -> None:
+def test_entity_point_identity_matches_frozen_contract() -> None:
     cards = build_entity_cards_from_taxonomy()
-    payloads = [build_entity_point_payload(card) for card in cards]
 
     assert len(cards) == 32
     assert len({entity_identity_key(card) for card in cards}) == 32
-    preview_names = {payload["canonical_name"] for payload in payloads}
-    assert {"Dalacin T", "Epiduo", "Differin", "Tazorac", "benzoyl_peroxide", "tazarotene"}.issubset(preview_names)
+    assert len({entity_point_id(card) for card in cards}) == 32
+    assert entity_point_id(_find_card("drug_product", "Epiduo")) == "c7fa15d3-0a5a-5c77-9176-ffe251114253"
+    assert entity_point_id(_find_card("active_ingredient", "benzoyl_peroxide")) == "b7747ed6-eaf9-58d2-a50c-89fa46fcb5ad"

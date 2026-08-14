@@ -785,7 +785,6 @@ def grounded_entity_relation_answer(question: str) -> str | None:
         return f"Có. Trong taxonomy, {mention} là alias/map về entity {canonical_name}.{class_suffix}"
 
     product_cards = [card for card in cards if card.entity_type == "drug_product"]
-    ingredient_cards = [card for card in cards if card.entity_type == "active_ingredient"]
     product_cards = _cards_in_question_order(question, product_cards)
     if len(product_cards) >= 2 and (_is_comparison_question(folded) or "khac" in folded) and any(
         marker in folded for marker in ("thanh phan", "hoat chat", "khac")

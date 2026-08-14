@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from src.database.vector_store import QdrantVectorStore, embed_query
 from src.quality.safe_fallback import sanitize_fallback_reason
-from src.retrieval.context_packer import pack_context, packed_context_to_legacy_contexts
+from src.retrieval.context_packer import pack_context, packed_context_to_response_contexts
 from src.retrieval.contracts import NormalizedQuery, RetrievedCandidate
 from src.retrieval.rrf import reciprocal_rank_fusion
 
@@ -105,7 +105,7 @@ class EvidenceRetriever:
             max_items=context_items,
             max_chars=context_chars,
         )
-        contexts = packed_context_to_legacy_contexts(packed)
+        contexts = packed_context_to_response_contexts(packed)
         sources = list(dict.fromkeys(_source_id(context) for context in contexts if _source_id(context)))
         elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
 

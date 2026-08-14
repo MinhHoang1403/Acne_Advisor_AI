@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy
-from src.knowledge.entity_index import build_entity_point_payload
+from src.knowledge.entity_identity import entity_point_id
 from src.knowledge.graph_schema import (
     CANONICAL_RELATIONSHIP_SCHEMAS,
     ENTITY_TYPE_TO_LABEL,
@@ -122,11 +122,9 @@ def test_graph_and_entity_qdrant_identity_parity_is_exact() -> None:
         (ENTITY_TYPE_TO_LABEL[card.entity_type], card.canonical_name)
         for card in cards
     }
-    payloads = [build_entity_point_payload(card) for card in cards]
-
     assert _node_identities(records) == expected_nodes
-    assert len({payload["entity_id"] for payload in payloads}) == len(cards)
-    assert len({payload["point_id"] for payload in payloads}) == len(cards)
+    assert len({card.stable_id() for card in cards}) == len(cards)
+    assert len({entity_point_id(card) for card in cards}) == len(cards)
 
 
 def test_graph_edges_have_valid_endpoints_directions_and_provenance() -> None:

@@ -10,11 +10,6 @@ from typing import Any
 import yaml
 
 from src.knowledge.schemas import EntityCard, EntityType, canonical_text_key
-from src.knowledge.taxonomy_models import (
-    TaxonomyCatalog,
-    load_taxonomy_catalog,
-    normalize_taxonomy_alias,
-)
 
 
 # This YAML is the only active source-backed taxonomy for runtime normalization,
@@ -44,7 +39,12 @@ SECTION_TO_ENTITY_TYPE: dict[str, EntityType] = {
 def normalize_text_key(text: str) -> str:
     """Normalize free text while preserving Vietnamese characters."""
 
-    return normalize_taxonomy_alias(text)
+    normalized = unicodedata.normalize("NFKC", text or "")
+    normalized = normalized.replace("‐", "-").replace("‑", "-")
+    normalized = normalized.replace("–", "-").replace("—", "-")
+    normalized = re.sub(r"[()/]+", " ", normalized)
+    normalized = normalized.replace("-", " ").replace("_", " ")
+    return re.sub(r"\s+", " ", normalized.strip().lower())
 
 
 def _ascii_text_key(text: str) -> str:
@@ -99,10 +99,6 @@ class DrugEntityNormalizer:
         return data
 
     def _build_indexes(self) -> None:
-        if "entities" in self.taxonomy:
-            self._build_indexes_from_v2_catalog(load_taxonomy_catalog(self.taxonomy_path))
-            return
-
         for section, entity_type in SECTION_TO_ENTITY_TYPE.items():
             entries = self.taxonomy.get(section, {}) or {}
             if not isinstance(entries, dict):
@@ -125,27 +121,6 @@ class DrugEntityNormalizer:
                         self.alias_index[key].append(card)
                 self.cards_by_type[entity_type][normalize_text_key(str(canonical_key))] = card
                 self.cards_by_type[entity_type][normalize_text_key(card.canonical_name)] = card
-
-    def _build_indexes_from_v2_catalog(self, catalog: TaxonomyCatalog) -> None:
-        self.taxonomy_version = catalog.taxonomy_version
-        for card in catalog.to_entity_cards(verified_only=True):
-            lookup_keys = {
-                normalize_text_key(card.canonical_name),
-                _ascii_text_key(card.canonical_name),
-                *[normalize_text_key(alias) for alias in card.aliases],
-                *[_ascii_text_key(alias) for alias in card.aliases],
-            }
-            taxonomy_key = card.metadata.get("taxonomy_key")
-            if isinstance(taxonomy_key, str):
-                lookup_keys.add(normalize_text_key(taxonomy_key))
-                lookup_keys.add(_ascii_text_key(taxonomy_key))
-            for key in lookup_keys:
-                self.alias_index.setdefault(key, [])
-                if card not in self.alias_index[key]:
-                    self.alias_index[key].append(card)
-            self.cards_by_type[card.entity_type][normalize_text_key(card.canonical_name)] = card
-            if isinstance(taxonomy_key, str):
-                self.cards_by_type[card.entity_type][normalize_text_key(taxonomy_key)] = card
 
     def _entry_to_card(
         self,

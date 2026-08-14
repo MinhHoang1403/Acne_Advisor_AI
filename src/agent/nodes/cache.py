@@ -144,7 +144,6 @@ async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
     )
     
     if cached_data:
-        import os
         meta = cached_data.get("metadata", {})
         expected_version = get_answer_cache_version()
         cached_fingerprint = meta.get("pipeline_fingerprint") or cached_data.get("pipeline_fingerprint")
