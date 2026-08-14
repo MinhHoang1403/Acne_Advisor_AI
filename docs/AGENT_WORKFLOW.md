@@ -1,23 +1,27 @@
 # Agent Workflow
 
-The production entrypoint is `build_clinical_graph()` in `src/agent/graph.py`.
-It compiles a LangGraph `StateGraph` over `ClinicalState`.
-
-The main flow is:
+`build_clinical_graph()` in `src/agent/graph.py` compiles the production
+LangGraph `StateGraph`. The eight semantic nodes are:
 
 ```text
-normalize -> rewrite -> severity -> guard -> cache lookup
-  -> extract -> retrieve -> evidence sufficiency
-  -> bounded retry or abstention
-  -> safety -> generate -> provider fallback decision
-  -> claim grounding -> finalize -> answer quality
-  -> cache store -> observability export
+START -> prepare -> guard -> decide
+                           | retrieve -> assess -> decide
+                           | generate -> finalize -> END
+                           | abstain  -> finalize -> END
+                           | finalize -> END
 ```
 
-Conditional edges preserve early guard responses, valid cache hits, bounded P3
-retry, deterministic abstention, and generation fallback. The API path continues
-to call this graph; no minimal baseline or plain sequential chain replaces it.
+`decide` is a genuine action boundary. It chooses among `retrieve`, `generate`,
+`abstain`, and `finalize` from domain/cache status, provenance-complete evidence,
+and the bounded attempt count. Formatting and whitespace normalization are not
+treated as agent actions.
 
-The current `ClinicalState` is intentionally retained. A major field reduction,
-node merge, or tool-oriented redesign belongs to S4B and must be supported by
-behavioral evidence before implementation.
+`retrieve` calls the typed `retrieve_evidence` tool. `assess` requires non-empty
+text and source provenance, without a hidden semantic score. A request may make
+at most two retrieval attempts. After that, insufficient evidence routes to a
+deterministic, non-cacheable abstention.
+
+Safety remains deterministic and outside optional tool choice. Generation may
+use provider fallback, but the final node still applies answer verification,
+severity-aware safety, source validation, presentation, cache eligibility, and
+sanitized observability.

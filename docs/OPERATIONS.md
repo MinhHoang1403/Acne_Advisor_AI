@@ -29,5 +29,10 @@ Qdrant knowledge store.
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
+The production runtime is frozen as `s4b_final_agentic_rag_v1` with answer
+cache `v6`. Runtime retrieval is read-only Dense + native BM25 + RRF over
+`acne_knowledge`; it does not query EntityCards or Neo4j. Do not run Phase 1
+build, activation, reindexing, or embedding as part of Phase 2 startup.
+
 `.env`, provider secrets, caches, databases, snapshots and generated reports
 remain local-only. Never print secrets or use destructive global Docker cleanup.

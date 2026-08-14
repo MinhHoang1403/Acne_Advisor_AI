@@ -2,8 +2,9 @@
 
 Acne Advisor AI là hệ thống tư vấn thông tin về mụn theo hướng RAG
 (Retrieval-Augmented Generation). Hệ thống kết hợp FastAPI, React/Vite,
-Qdrant, Neo4j, PostgreSQL, Redis và LLM provider để trả lời câu hỏi dựa trên
-knowledge base đã ingest, entity graph và các lớp kiểm tra an toàn.
+Qdrant, PostgreSQL, Redis và LLM provider để trả lời câu hỏi dựa trên evidence
+có provenance cùng các lớp kiểm tra an toàn. EntityCards và Neo4j vẫn thuộc
+foundation Phase 1 nhưng không nằm trên đường trả lời production.
 
 > Acne Advisor AI chỉ cung cấp thông tin tham khảo. Hệ thống không chẩn đoán,
 > không kê đơn và không thay thế bác sĩ da liễu hoặc chuyên gia y tế.
@@ -13,8 +14,9 @@ Trạng thái tổng quát:
 - Backend runtime: FastAPI + LangGraph agent.
 - Frontend: React/Vite giao diện chat tối giản.
 - Vector retrieval: Qdrant hybrid dense + native BM25.
-- Knowledge graph: Neo4j deterministic entity graph.
-- Cache: Redis semantic answer cache, versioned bằng `CACHE_ANSWER_VERSION=v5`
+- Knowledge foundation: Neo4j deterministic entity graph, read-only và không
+  được dùng như medical evidence ở runtime.
+- Cache: Redis semantic answer cache, versioned bằng `CACHE_ANSWER_VERSION=v6`
   và pipeline fingerprint.
 - Chat history: PostgreSQL.
 - Validation: pytest, offline eval scripts, release-readiness checks và
@@ -56,9 +58,8 @@ Trạng thái tổng quát:
   tazarotene.
 - Hybrid retrieval từ Qdrant với named dense vector `dense` và native BM25
   lưu dưới named sparse vector `bm25`.
-- Entity-centric retrieval từ collection entity riêng.
-- Neo4j graph enrichment để bổ sung facts quan hệ giữa hoạt chất, nhóm thuốc,
-  sản phẩm, cơ chế và safety context.
+- Equal-weight RRF hợp nhất Dense và BM25, sau đó một bounded packer giữ nguyên
+  thứ tự fused và provenance.
 - Semantic cache bằng Redis, có version và fingerprint để tránh tái dùng answer
   cũ sau khi đổi prompt/policy.
 - PostgreSQL chat history cho session và message persistence.
@@ -66,8 +67,8 @@ Trạng thái tổng quát:
 - Severity-aware answer guard cho routine, caution, urgent và emergency cases.
 - Safe fallback flow khi query rỗng, thiếu evidence, retrieval lỗi recoverable
   hoặc model trả output không hợp lệ.
-- P3 kiểm tra evidence sufficiency với tối đa một retry; P4 ánh xạ từng claim
-  vào packed source evidence và chạy entailment diagnostics ở `shadow` mode.
+- LangGraph agent có decision boundary thật giữa retrieval, generation,
+  bounded retry, abstention và finalize; tối đa hai retrieval attempts.
 - Frontend ChatGPT-inspired UI, render Markdown, bảng, bullet, source display
   metadata và trạng thái backend connectivity.
 - Bộ test/eval offline để kiểm tra retrieval, answer quality, fallback,
@@ -82,10 +83,9 @@ Trạng thái tổng quát:
 | LLM | Google GenAI SDK, Ollama | Gemini generation, local fallback |
 | Embedding | Gemini `models/gemini-embedding-2` | Dense embeddings 3072 chiều |
 | Vector DB | Qdrant | Dense + sparse hybrid retrieval |
-| Graph DB | Neo4j 5 + APOC | Knowledge graph và entity relationships |
+| Graph DB | Neo4j 5 + APOC | Frozen Phase 1 structure, không ở runtime answer path |
 | SQL DB | PostgreSQL 16 + pgvector image | Chat sessions/messages |
 | Cache | Redis 7 | Semantic answer cache |
-| Reranker | sentence-transformers CrossEncoder optional | Local semantic reranking khi model có sẵn |
 | Frontend | React 19, Vite 8 | Web UI |
 | Tests | pytest, pytest-asyncio, pytest-cov, Node test runner | Backend/frontend validation |
 | Tooling | Docker Compose, GitHub Actions | Local services và CI |
@@ -98,8 +98,12 @@ flowchart LR
     UI --> API[FastAPI Backend]
     API --> Agent[LangGraph Agent]
     Agent --> Cache[(Redis Cache)]
-    Agent --> Qdrant[(Qdrant Chunks + Entities)]
-    Agent --> Neo4j[(Neo4j Entity Graph)]
+    Agent --> Tool[retrieve_evidence]
+    Tool --> Dense[Qdrant Dense]
+    Tool --> BM25[Qdrant native BM25]
+    Dense --> RRF[RRF]
+    BM25 --> RRF
+    RRF --> Agent
     Agent --> PG[(PostgreSQL Chat History)]
     Agent --> LLM[Gemini / Ollama]
     Agent --> API
@@ -119,28 +123,26 @@ sequenceDiagram
     participant API as FastAPI
     participant G as Guardrail/Safety
     participant C as Redis Cache
-    participant R as Retrieval
+    participant A as LangGraph Agent
+    participant R as retrieve_evidence
     participant Q as Qdrant
-    participant N as Neo4j
     participant L as LLM Provider
-    participant P3 as P3 Sufficiency
-    participant P4 as P4 Claim Grounding
     participant V as Verifier/Formatter
     participant DB as PostgreSQL
 
     U->>UI: Nhập câu hỏi
     UI->>API: POST /chat
     API->>G: Normalize, input guard, severity guard
-    G->>C: Lookup semantic cache
-    C-->>G: Hit hoặc miss
-    G->>R: Rewrite/context-aware retrieval nếu cần
-    R->>Q: Dense + sparse search, entity retrieval
-    R->>N: Graph enrichment
-    R->>P3: Kiểm tra role/provenance coverage
-    P3-->>R: Tối đa một bounded retry nếu thiếu evidence
-    R-->>L: Packed context
-    L-->>P4: Draft answer
-    P4-->>V: Shadow verdicts; giữ nguyên draft production
+    G->>A: Domain/severity result
+    A->>C: Lookup semantic cache
+    C-->>A: Hit hoặc miss
+    A->>R: Tool call khi cần evidence
+    R->>Q: Dense + native BM25
+    Q-->>R: Hai ranked lists
+    R-->>A: RRF + bounded provenance context
+    A->>A: Assess; retry tối đa 2 attempts hoặc abstain
+    A->>L: Generate khi evidence đủ
+    L-->>V: Draft answer
     V-->>V: Quality check, safety wording, Markdown finalizer
     V->>C: Store answer nếu đủ điều kiện
     V->>DB: Persist chat history
@@ -153,10 +155,10 @@ Các bước chính:
 1. API validate input và sửa lỗi mojibake cơ bản nếu client gửi sai encoding.
 2. Agent phân loại domain/safety, severity và cache eligibility.
 3. Nếu cache hit hợp lệ, hệ thống trả answer đã versioned mà không gọi LLM.
-4. Nếu cache miss, retrieval lấy evidence từ Qdrant và Neo4j.
-5. P3 kiểm tra sufficiency sau selection/packing và không vượt quá hai retrieval attempts.
-6. P4 `shadow` ánh xạ claim vào chunk đã có trong generation context; EntitySignal và GraphSignal không phải medical evidence.
-7. Answer đi qua verifier, formatter, source presentation và cache store; P4 shadow không đổi nội dung trả về.
+4. Nếu cache miss, agent gọi tool lấy Dense + native BM25 evidence từ Qdrant.
+5. RRF hợp nhất hai rank lists; packer giới hạn context và giữ provenance.
+6. Agent kiểm tra presence/provenance, rồi generate, retry có giới hạn hoặc abstain.
+7. Answer đi qua verifier, safety, formatter, source validation và cache store.
 8. Chat history được lưu vào PostgreSQL; lỗi DB persistence không được phép làm
    mất an toàn y khoa của answer.
 
@@ -180,7 +182,7 @@ src/
   observability/  Pipeline fingerprint, trace export, metadata sanitizer
   quality/        Answer verifier, severity guard, safety rules
   resilience/     Timeout, retry, circuit breaker settings
-  retrieval/      Query normalization, expansion, rerank, context packing
+  retrieval/      Dense + native BM25 + RRF service và một context packer
 
 scripts/          Supported init, ingestion, validation and regression entrypoints
 tests/            Python test suite
@@ -276,16 +278,11 @@ Các nhóm biến quan trọng trong `.env.example`:
 | PostgreSQL | `POSTGRES_*`, `DATABASE_URL`, `SYNC_DATABASE_URL`, `DB_POOL_*` | Compose publish port local 5433 |
 | Neo4j | `NEO4J_AUTH`, `NEO4J_URI`, `NEO4J_DATABASE` | Local khuyến nghị `bolt://127.0.0.1:7687` |
 | Qdrant | `QDRANT_URL`, `QDRANT_API_KEY`, collection names | `QDRANT_API_KEY` chỉ set khi Qdrant có auth |
-| Redis/cache | `REDIS_URL`, `CACHE_*`, `CACHE_ANSWER_VERSION` | Default answer cache version là `v5` |
+| Redis/cache | `REDIS_URL`, `CACHE_*`, `CACHE_ANSWER_VERSION` | Default answer cache version là `v6` |
 | Phase 1 | `LLAMA_CLOUD_API_KEY`, `EMBEDDING_BATCH_DELAY` | Chỉ cần khi build frozen foundation; chunk/filter contracts nằm trong `src/ingestion/` |
-| Retrieval | `RETRIEVAL_PIPELINE_VERSION`, `RETRIEVAL_CONTEXT_*` | V5 là mặc định; đặt `v4` để rollback tường minh |
-| Grounding | `P3_EVIDENCE_SUFFICIENCY_*`, `P4_MODE`, `P4_*` | P4 mặc định `shadow`; đặt `disabled` để rollback ngay |
-| Reranker | `RERANK_*`, `SEMANTIC_RERANK_*` | Model path là đường dẫn local cần đổi theo máy |
+| Retrieval | `RETRIEVAL_CANDIDATE_LIMIT`, `RETRIEVAL_CONTEXT_*`, `RETRIEVAL_TIMEOUT_SECONDS` | Giới hạn hữu hạn cho Dense + BM25 + RRF |
 | Safety/resilience | `ANSWER_*`, `SEVERITY_GUARD_VERSION`, `SAFE_FALLBACK_FLOW_VERSION`, timeout/retry | Không cần đổi cho setup thường |
 | Observability | `OBSERVABILITY_*`, `PHASE2_DEBUG_METADATA` | Mặc định tắt để không lộ metadata debug |
-
-`SEMANTIC_RERANK_MODEL_PATH=C:/Models/acne-reranker/bge-reranker-v2-m3` trong
-template chỉ là ví dụ đường dẫn local. Repository không tự tải model này.
 
 ## Chạy Docker Services
 

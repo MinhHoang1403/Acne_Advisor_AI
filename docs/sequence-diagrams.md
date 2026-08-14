@@ -45,8 +45,9 @@ sequenceDiagram
 
 ## Phase 2 Online Chat/RAG
 
-Phase 2 consumes the frozen contracts. It may orchestrate dense retrieval,
-Qdrant-native BM25, EntityCards, and Neo4j facts, but it does not rebuild them.
+Phase 2 consumes the frozen contracts read-only. Its production evidence path
+uses Qdrant Dense + native BM25 + RRF. EntityCards and Neo4j are intentionally
+absent from online answer generation.
 
 ```mermaid
 sequenceDiagram
@@ -55,9 +56,8 @@ sequenceDiagram
     participant API as FastAPI
     participant Agent as LangGraph
     participant Cache as Redis
-    participant Retriever as Retrieval V5
+    participant Tool as retrieve_evidence
     participant Qdrant
-    participant Neo4j
     participant LLM as Gemini/Ollama
 
     User->>API: POST /chat
@@ -67,15 +67,14 @@ sequenceDiagram
     alt Valid cache hit
         Cache-->>Agent: Cached grounded answer
     else Cache miss
-        Agent->>Retriever: Retrieve evidence
-        Retriever->>Qdrant: Dense query
-        Retriever->>Qdrant: Native BM25 Document query
-        Retriever->>Neo4j: Optional deterministic structural facts
-        Retriever-->>Agent: Ranked source chunks and structural context
-        Agent->>Agent: Evidence sufficiency and grounding controls
+        Agent->>Tool: Retrieve source evidence
+        Tool->>Qdrant: Dense + native BM25 queries
+        Qdrant-->>Tool: Two ranked lists
+        Tool-->>Agent: Equal-weight RRF + bounded source context
+        Agent->>Agent: Assess provenance; retry, abstain, or generate
         Agent->>LLM: Source-grounded prompt
         LLM-->>Agent: Draft answer
-        Agent->>Agent: Safety, formatting, and fallback policies
+        Agent->>Agent: Deterministic safety, formatting, and fallback
         Agent->>Cache: Store only eligible answer
     end
     Agent-->>API: Answer, source metadata, trace metadata
