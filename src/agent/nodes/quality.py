@@ -11,7 +11,7 @@ from src.agent.state import ClinicalState
 from src.quality.answer_verifier import apply_answer_guard
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.quality.severity_guard import apply_severity_aware_answer_guard
-from src.retrieval.contracts import PackedContext, RetrievalTrace
+from src.retrieval.contracts import PackedContext
 from src.retrieval.query_normalization import normalize_query
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,6 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
     try:
         normalized_query = normalize_query(query)
         packed_context = _parse_model(PackedContext, state.get("packed_context"))
-        retrieval_trace = _parse_model(RetrievalTrace, state.get("retrieval_trace"))
         guard_mode = os.getenv("ANSWER_GUARD_MODE", "metadata_only")
         strict_enabled = os.getenv("ANSWER_VERIFIER_STRICT", "false").strip().lower() in {
             "1",
@@ -56,7 +55,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             answer=answer,
             normalized_query=normalized_query,
             packed_context=packed_context,
-            retrieval_trace=retrieval_trace,
+            retrieval_trace=None,
             mode=guard_mode,
         )
         severity_guard = apply_severity_aware_answer_guard(query=query, answer=guard.answer)

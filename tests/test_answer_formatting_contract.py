@@ -537,19 +537,19 @@ def test_full_prompt_budget_observation_accounts_for_graph_and_all_rendered_text
     assert observation.enforced_max_tokens is None
 
 
-def test_v5_packed_context_order_is_not_reranked_after_budgeting() -> None:
+def test_s4b_packed_context_order_is_not_reranked_after_budgeting() -> None:
     contexts = [
         {
             "text": "First packed block",
             "score": 0.1,
-            "context_pack_reason": "v5_packer: selected",
-            "context_role": "primary_evidence",
+            "context_pack_reason": "rrf_rank",
+            "context_role": "medical_evidence",
         },
         {
             "text": "Second packed block",
             "score": 0.9,
-            "context_pack_reason": "v5_packer: selected",
-            "context_role": "supporting_evidence",
+            "context_pack_reason": "rrf_rank",
+            "context_role": "medical_evidence",
         },
     ]
 

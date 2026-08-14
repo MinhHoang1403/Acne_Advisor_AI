@@ -1,87 +1,61 @@
-"""
-src/agent/state.py – LangGraph Agent State
-==========================================
-Defines the `ClinicalState` representing the execution state of the
-Acne Advisor AI agent across graph nodes.
-"""
+"""Small shared state contract for the production LangGraph agent."""
 
-from typing import Any, TypedDict
+from __future__ import annotations
+
+from typing import Any, Literal, TypedDict
 
 
-class ClinicalState(TypedDict):
-    """The state payload passed between nodes in the LangGraph agent."""
+AgentAction = Literal["retrieve", "generate", "abstain", "finalize"]
 
-    # Input
+
+class ClinicalState(TypedDict, total=False):
+    """Fields that cross a production graph-node boundary.
+
+    Node-local calculations belong in local variables or compact trace objects;
+    retired experiment-specific fields are intentionally excluded.
+    """
+
+    # Request and conversation
     user_question: str
     user_id: str | None
     session_id: str | None
     conversation_history: list[dict[str, str]]
-    
-    # Processed Input
     standalone_question: str | None
-    use_history_context: bool | None
-    conversation_context: dict[str, Any] | None
     normalized_question: str
-    patient_profile: dict[str, Any]
+    use_history_context: bool
+    conversation_context: dict[str, Any] | None
     symptoms: list[str]
-    
-    # Guardrails
+
+    # Deterministic guard and agent decision
     is_in_domain: bool | None
     guardrail: str | None
-    ignored_out_of_domain_part: bool | None
+    ignored_out_of_domain_part: bool
     domain_reason: str | None
     refusal_message: str | None
-    
-    # Retrieval
+    medical_severity: str | None
+    severity_guard: dict[str, Any] | None
+    next_action: AgentAction
+
+    # Source evidence
     vector_contexts: list[dict[str, Any]]
-    graph_facts: list[dict[str, Any]]
-    graph_relation_found: bool
     sources: list[str]
     source_allowlist: list[dict[str, Any]]
     source_validation: dict[str, Any] | None
     retrieval_status: str | None
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
-    retrieval_trace_v5: dict[str, Any] | None
-    evidence_selector: dict[str, Any] | None
-    evidence_packer: dict[str, Any] | None
     packed_context: dict[str, Any] | None
-    retrieval_diagnostics: dict[str, Any] | None
-    p3_active: bool | None
-    evidence_sufficiency_pre_pack: dict[str, Any] | None
-    evidence_sufficiency_post_pack: dict[str, Any] | None
-    evidence_sufficiency: dict[str, Any] | None
+    evidence_assessment: dict[str, Any] | None
     retrieval_attempt: int
-    retry_plan: dict[str, Any] | None
     retry_history: list[dict[str, Any]]
-    abstention: dict[str, Any] | None
-    p3_trace: dict[str, Any] | None
-    p4_mode: str | None
-    claim_grounding: dict[str, Any] | None
-    p4_trace: list[dict[str, Any]]
-    p4_degraded: bool | None
-    p4_shadow_policy: str | None
-    shadow_verified_answer: str | None
-    p4_answer_modified: bool | None
-    prompt_evidence_trace: dict[str, Any] | None
-    prompt_budget: dict[str, Any] | None
-    pipeline_manifest: dict[str, Any] | None
-    pipeline_fingerprint: str | None
-    observability_exported: bool | None
-    runtime_budget: Any
-    runtime_resilience_settings: dict[str, Any] | None
-    runtime_resilience: dict[str, Any] | None
-    performance_timings: dict[str, float]
-    
-    # Reasoning & Generation
+
+    # Answer, safety and fallback
     safety_flags: list[str]
     draft_answer: str
     final_answer: str
     answer_quality_report: dict[str, Any] | None
     answer_guard_modified: bool | None
     answer_guard_mode: str | None
-    medical_severity: str | None
-    severity_guard: dict[str, Any] | None
     severity_guard_modified: bool | None
     severity_guard_cache_eligible: bool | None
     fallback_applied: bool
@@ -90,23 +64,15 @@ class ClinicalState(TypedDict):
     fallback_answer: str | None
     fallback_cache_eligible: bool | None
     answerability: dict[str, Any] | None
-    
-    # Error handling
     errors: list[str]
-    llm_fallback: bool | None
-    
-    # Cache
-    cache_enabled: bool | None
+
+    # Cache and provider identity
     cache_checked: bool | None
     cache_hit: bool | None
-    cache_key: str | None
-    cache_similarity: float | None
     cache_reason: str | None
     cached_answer: str | None
-    cached_sources: list[str] | None
     cache_metadata: dict[str, Any] | None
-    
-    # Multi-Model Support
+    bypass_cache: bool
     llm_provider: str | None
     llm_model: str | None
     allow_model_fallback: bool
@@ -118,13 +84,15 @@ class ClinicalState(TypedDict):
     fallback_provider: str | None
     fallback_model: str | None
     fallback_chain: list[dict[str, Any]] | None
-    
-    # Cache bypass (for test scripts)
-    bypass_cache: bool
 
-    # Internal-only execution mode used by the local evaluation runner. It is
-    # intentionally not exposed by the public API contract.
-    evaluation_mode: bool
-    evaluation_expected_concepts: list[str]
-    evaluation_critical_case: bool
-    evaluation_concept_matcher: Any
+    # Bounded runtime and observability
+    pipeline_manifest: dict[str, Any]
+    pipeline_fingerprint: str
+    runtime_budget: Any
+    runtime_resilience_settings: dict[str, Any]
+    runtime_resilience: dict[str, Any] | None
+    performance_timings: dict[str, float]
+    prompt_budget: dict[str, Any] | None
+    observability_exported: bool | None
+
+__all__ = ["AgentAction", "ClinicalState"]

@@ -15,11 +15,6 @@ logger = logging.getLogger(__name__)
 async def observability_export_node(state: ClinicalState) -> dict[str, Any]:
     """Export a sanitized trace when observability is explicitly enabled."""
 
-    if state.get("evaluation_mode"):
-        # Evaluation output is checkpointed by the local runner. Keeping it out
-        # of optional observability sinks preserves an isolated, reproducible run.
-        return {"observability_exported": False}
-
     enabled = os.getenv("OBSERVABILITY_ENABLED", "false").strip().lower() in {
         "1",
         "true",
