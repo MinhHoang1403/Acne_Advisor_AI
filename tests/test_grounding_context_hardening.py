@@ -5,7 +5,7 @@ import time
 import pytest
 
 from src.agent.answer_formatting import finalize_answer_presentation, grounded_entity_relation_answer
-from src.agent.nodes.fallback import fallback_decision_node
+from src.agent.nodes.fallback import generation_fallback_decision_node
 from src.agent.nodes.guardrails import domain_guard_node
 from src.agent.nodes.respond import finalize_response_node
 from src.agent.nodes.preparation import rewrite_question_node
@@ -14,7 +14,6 @@ from src.agent.source_presentation import (
     build_source_metadata,
     validate_answer_source_mentions,
 )
-from src.quality.safe_fallback import assess_answerability, decide_retrieval_fallback
 
 
 def _allowlist() -> list[dict]:
@@ -214,33 +213,13 @@ async def test_failed_coreference_rewrite_falls_back_without_fabrication(monkeyp
     assert result["conversation_context"]["rewrite_succeeded"] is False
 
 
-def test_recoverable_component_miss_with_evidence_does_not_trigger_generic_fallback() -> None:
-    state = {
-        "is_in_domain": True,
-        "standalone_question": "Differin liên hệ với adapalene như thế nào?",
-        "retrieval_status": "recoverable_error",
-        "vector_contexts": [{"text": "Differin contains adapalene."}],
-        "graph_facts": [],
-    }
-
-    answerability = assess_answerability(state)
-
-    assert answerability.reason_code == "RECOVERABLE_WITH_EVIDENCE"
-    assert decide_retrieval_fallback(state).fallback_applied is False
-
-
 @pytest.mark.asyncio
 async def test_taxonomy_relation_recovery_is_not_a_generic_safe_fallback() -> None:
-    result = await fallback_decision_node(
+    result = await generation_fallback_decision_node(
         {
             "user_question": "Thuốc đó thuộc nhóm nào?",
             "standalone_question": "Tazorac thuộc nhóm nào?",
-            "is_in_domain": True,
-            "retrieval_status": "no_evidence",
-            "vector_contexts": [],
-            "graph_facts": [],
-            "packed_context": None,
-            "conversation_context": {},
+            "draft_answer": "",
         }
     )
 

@@ -9,6 +9,33 @@ const STATUS_MESSAGES = {
   504: 'Yêu cầu xử lý quá thời gian. Vui lòng thử lại hoặc chọn mô hình khác.',
 };
 
+const API_TIMEOUT_MS = 10000;
+const CHAT_TIMEOUT_MS = 225000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const parentSignal = options.signal;
+  const timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
+
+  if (parentSignal) {
+    if (parentSignal.aborted) controller.abort(parentSignal.reason);
+    else parentSignal.addEventListener('abort', () => controller.abort(parentSignal.reason), { once: true });
+  }
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted && !parentSignal?.aborted) {
+      const timeoutError = new Error(`Request exceeded ${timeoutMs}ms.`);
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function parseApiError(response, fallbackPrefix = 'Lỗi server') {
   let detail;
   try {
@@ -58,10 +85,11 @@ export async function sendChatMessage({
   llmModel,
   allowModelFallback,
   bypassCache = false,
+  timeoutMs = CHAT_TIMEOUT_MS,
 }) {
   let response;
   try {
-    response = await fetch(buildApiUrl('/chat'), {
+    response = await fetchWithTimeout(buildApiUrl('/chat'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -74,12 +102,18 @@ export async function sendChatMessage({
         allow_model_fallback: allowModelFallback,
         bypass_cache: bypassCache,
       }),
-    });
+    }, timeoutMs);
   } catch (err) {
-    const error = new Error(`Không thể kết nối tới backend. Hãy kiểm tra FastAPI tại ${API_BASE_URL}.`);
+    const timedOut = err?.name === 'TimeoutError';
+    const error = new Error(
+      timedOut
+        ? 'Yêu cầu xử lý quá thời gian. Vui lòng thử lại hoặc chọn mô hình khác.'
+        : `Không thể kết nối tới backend. Hãy kiểm tra FastAPI tại ${API_BASE_URL}.`,
+    );
     error.cause = err;
-    error.status = null;
-    error.isNetworkError = true;
+    error.status = timedOut ? 504 : null;
+    error.isNetworkError = !timedOut;
+    error.isTimeout = timedOut;
     throw error;
   }
 
@@ -151,7 +185,7 @@ export async function checkBackendHealth({ timeoutMs = 4000, signal } = {}) {
  * @returns {Promise<Object>}
  */
 export async function fetchModels() {
-  const response = await fetch(buildApiUrl('/models'));
+  const response = await fetchWithTimeout(buildApiUrl('/models'));
   if (!response.ok) throw await parseApiError(response);
   return response.json();
 }
@@ -167,7 +201,7 @@ export async function fetchSessions(userId = null, includeHidden = false) {
   if (userId) params.set('user_id', userId);
   if (includeHidden) params.set('include_hidden', 'true');
 
-  const response = await fetch(buildApiUrl(`/chat/sessions?${params.toString()}`));
+  const response = await fetchWithTimeout(buildApiUrl(`/chat/sessions?${params.toString()}`));
   if (!response.ok) throw await parseApiError(response);
   const data = await response.json();
   return normalizeListResponse(data);
@@ -179,7 +213,7 @@ export async function fetchSessions(userId = null, includeHidden = false) {
  * @returns {Promise<Array>}
  */
 export async function fetchMessages(sessionId) {
-  const response = await fetch(buildApiUrl(`/chat/sessions/${sessionId}/messages`));
+  const response = await fetchWithTimeout(buildApiUrl(`/chat/sessions/${sessionId}/messages`));
   if (!response.ok) throw await parseApiError(response);
   const data = await response.json();
   return normalizeListResponse(data);
@@ -192,7 +226,7 @@ export async function fetchMessages(sessionId) {
  * @returns {Promise<Object>}
  */
 export async function renameSession(sessionId, title) {
-  const response = await fetch(buildApiUrl(`/chat/sessions/${sessionId}/rename`), {
+  const response = await fetchWithTimeout(buildApiUrl(`/chat/sessions/${sessionId}/rename`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
@@ -207,7 +241,7 @@ export async function renameSession(sessionId, title) {
  * @returns {Promise<Object>}
  */
 export async function hideSession(sessionId) {
-  const response = await fetch(buildApiUrl(`/chat/sessions/${sessionId}/hide`), {
+  const response = await fetchWithTimeout(buildApiUrl(`/chat/sessions/${sessionId}/hide`), {
     method: 'PATCH',
   });
   if (!response.ok) throw await parseApiError(response);
@@ -219,52 +253,9 @@ export async function hideSession(sessionId) {
  * @returns {Promise<Object>} deletion counts
  */
 export async function deleteAllChatSessions() {
-  const response = await fetch(buildApiUrl('/chat/sessions'), {
+  const response = await fetchWithTimeout(buildApiUrl('/chat/sessions'), {
     method: 'DELETE',
   });
   if (!response.ok) throw await parseApiError(response);
-  return response.json();
-}
-
-/**
- * Sync localStorage sessions to the backend.
- * @param {Array} sessions - Array of session objects with messages.
- * @returns {Promise<Object>} { synced, skipped, errors }
- */
-export async function syncSessionsToBackend(sessions) {
-  // Transform sessions to match backend SyncRequest format
-  const payload = sessions.map((s) => ({
-    id: s.id,
-    title: s.title || 'Đoạn chat mới',
-    created_at: s.createdAt || null,
-    updated_at: s.updatedAt || null,
-    hidden: s.hidden || false,
-    messages: (s.messages || []).map((m, idx) => ({
-      id: m.id || `${s.id}_msg_${idx}`,
-      role: m.role,
-      content: m.content,
-      sources: m.data?.sources || null,
-      symptoms: m.data?.symptoms || null,
-      safety_flags: m.data?.safety_flags || null,
-      graph_facts: m.data?.graph_facts || null,
-      metadata: m.data?.metadata ? {
-        model: m.data.metadata.model,
-        retrieval: m.data.metadata.retrieval,
-        guardrail: m.data.metadata.guardrail,
-        response_origin: m.data.metadata.response_origin,
-        guardrail_applied: m.data.metadata.guardrail_applied,
-        source_metadata: m.data.source_metadata || null,
-      } : null,
-      created_at: m.createdAt || null,
-    })),
-  }));
-
-  const response = await fetch(buildApiUrl('/chat/sessions/sync'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sessions: payload }),
-  });
-
-  if (!response.ok) throw await parseApiError(response, 'Sync failed');
   return response.json();
 }

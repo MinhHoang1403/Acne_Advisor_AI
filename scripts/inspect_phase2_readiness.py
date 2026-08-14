@@ -128,7 +128,7 @@ def _neo4j_check() -> dict[str, Any]:
 
         driver = GraphDatabase.driver(
             os.getenv("NEO4J_URI", "bolt://127.0.0.1:7687"),
-            auth=(os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", "password")),
+            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "password")),
         )
         with driver:
             with driver.session(database=os.getenv("NEO4J_DATABASE", "neo4j")) as session:

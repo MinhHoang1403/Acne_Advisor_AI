@@ -8,6 +8,13 @@ from src.database import vector_store
 from src.resilience.exceptions import PermanentProviderError
 
 
+def test_runtime_vector_store_exposes_read_only_operations_only():
+    assert hasattr(vector_store.QdrantVectorStore, "search")
+    assert hasattr(vector_store.QdrantVectorStore, "search_sparse")
+    assert not hasattr(vector_store.QdrantVectorStore, "upsert")
+    assert not hasattr(vector_store.QdrantVectorStore, "delete")
+
+
 @pytest.mark.asyncio
 async def test_embed_query_retries_transient_transport_errors(monkeypatch):
     attempts: list[str] = []

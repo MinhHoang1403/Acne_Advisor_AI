@@ -59,6 +59,6 @@ sequenceDiagram
     API-->>User: UTF-8 JSON
 ```
 
-The graph schema is `ClinicalState` in `src/agent/state.py` with 68 fields.
+The graph schema is `ClinicalState` in `src/agent/state.py` with 66 fields.
 `src/agent/nodes/workflow.py` owns all eight semantic node functions and routing
 decisions; support modules do not create hidden graph actions.

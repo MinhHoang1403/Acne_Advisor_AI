@@ -59,3 +59,20 @@ runtime implementation.
 PostgreSQL stores chat history, Redis stores versioned eligible answers,
 Qdrant serves read-only runtime evidence, and Neo4j stores the frozen structural
 graph. Only Qdrant knowledge chunks participate in online medical grounding.
+
+## Application Boundary
+
+`src/api/app.py::chat_endpoint` is the primary HTTP entrypoint and invokes
+`src/agent/graph.py::run_clinical_agent` directly. Retrieval, context packing,
+prompt assembly, and provider dispatch remain internal Python calls; there is
+no separate project-internal context HTTP service.
+
+The React client starts at `src/frontend/src/main.jsx`. `App.jsx::handleSubmit`
+calls `chatApi.js::sendChatMessage`, then updates session state from
+`ChatResponse`. `ChatWindow.jsx` and `ChatMessage.jsx` render the answer and
+source labels. Provider credentials remain backend-only.
+
+The supported deployment boundary is local, single-user development. The
+chat-history routes do not implement end-user authentication or tenant
+authorization, so a public deployment requires an authenticated TLS boundary,
+authorization, restrictive CORS, rate limiting, and tenant isolation.

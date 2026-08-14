@@ -9,10 +9,9 @@ Includes chat history persistence to PostgreSQL.
 import asyncio
 import logging
 import os
-import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -215,7 +214,7 @@ class ChatRequest(BaseModel):
     user_id: Optional[str] = None
     session_id: Optional[str] = None
     conversation_history: list[ChatHistoryMessage] = Field(default_factory=list)
-    llm_provider: Optional[str] = None
+    llm_provider: Literal["gemini", "ollama", "local"] | None = None
     llm_model: Optional[str] = None
     allow_model_fallback: bool = True
     bypass_cache: bool = False
@@ -310,12 +309,47 @@ def _guardrail_applied(result: dict[str, Any], is_in_domain: Optional[bool]) -> 
     return bool(guardrail and guardrail not in {"in_domain", "in_domain_rule", "in_domain_followup_rule"})
 
 
+def _used_retrieval(result: dict[str, Any], is_in_domain: Optional[bool]) -> bool:
+    """Report retrieval only when this request actually entered that runtime path."""
+
+    if is_in_domain is not True or result.get("cache_hit"):
+        return False
+    if int(result.get("retrieval_attempt") or 0) > 0:
+        return True
+    status = result.get("retrieval_status")
+    return status not in {None, "not_started", "skipped"}
+
+
+def _log_error_type(message: str, exc: Exception, *args: Any) -> None:
+    """Log operation context and exception class without raw exception text."""
+
+    logger.error(message + " error_type=%s", *args, exc.__class__.__name__)
+
+
 class RetrieveResponse(BaseModel):
     query: str
     vector_contexts: list[dict[str, Any]] = Field(default_factory=list)
     graph_facts: list[dict[str, Any]] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelEntry(BaseModel):
+    provider: str
+    model: str
+    model_id: str
+    label: str
+    display_name: str
+    type: str
+    available: bool
+    is_default: bool = False
+
+
+class ModelsResponse(BaseModel):
+    default_provider: str
+    default_model: str
+    default_model_id: str
+    models: list[ModelEntry] = Field(default_factory=list)
 
 
 # --- Chat History Models ---
@@ -340,6 +374,18 @@ class MessageResponse(BaseModel):
 
 class RenameRequest(BaseModel):
     title: str
+
+
+class RenameResponse(BaseModel):
+    status: str
+    session_id: str
+    title: str
+
+
+class HideResponse(BaseModel):
+    status: str
+    session_id: str
+    hidden: bool
 
 class SyncMessagePayload(BaseModel):
     id: Optional[str] = None
@@ -384,7 +430,7 @@ async def _get_db_session():
         from src.database.connection import AsyncSessionLocal
         return AsyncSessionLocal()
     except Exception as e:
-        logger.warning(f"Cannot create DB session: {e}")
+        logger.warning("Cannot create DB session: error_type=%s", e.__class__.__name__)
         return None
 
 
@@ -412,7 +458,11 @@ async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
             if msg.get("role") in {"user", "assistant"} and msg.get("content")
         ]
     except Exception as exc:
-        logger.warning("Could not load chat history from DB for session %s: %s", session_id, exc)
+        logger.warning(
+            "Could not load chat history from DB for session %s: error_type=%s",
+            session_id,
+            exc.__class__.__name__,
+        )
         return []
     finally:
         await db_session.close()
@@ -508,12 +558,12 @@ async def retrieve_endpoint(q: str, top_k: int = 5):
             metadata=result.metadata,
         )
     except Exception as exc:
-        logger.error("Retrieval endpoint failed: %s", exc, exc_info=True)
+        _log_error_type("Retrieval endpoint failed:", exc)
         raise HTTPException(status_code=500, detail="Retrieval failed.")
     finally:
         await retriever.close()
 
-@app.get("/models")
+@app.get("/models", response_model=ModelsResponse)
 async def list_models():
     """List available LLM models."""
     from src.agent.llm.ollama_client import list_ollama_models
@@ -681,90 +731,16 @@ async def chat_endpoint(request: ChatRequest):
                 bypass_cache=request.bypass_cache
             )
         
-        # Check if the agent reported critical errors
-        if result.get("errors"):
-            logger.error(f"Agent errors: {result['errors']}")
-            # We don't expose raw agent errors to the frontend for security reasons,
-            # but we could choose to return a 500 or just a generic safe message.
-            if not result.get("answer"):
-                 raise Exception("Agent failed to produce an answer.")
-        
         model_name = os.getenv("GOOGLE_MODEL", "gemini-3.5-flash")
         if model_name == "gemini-1.5-flash":
             model_name = "gemini-3.5-flash"
             
-        raw_graph_facts = result.get("graph_facts", [])
-        
-        # Determine prioritization keywords from user question and symptoms
-        query_lower = request.message.lower()
-        
-        # Base keywords
-        keywords = ["benzoyl peroxide", "bp", "topical retinoid", "acne", "mụn viêm", "trứng cá"]
-        
-        # Add blackhead-specific keywords if query mentions it
-        if "mụn đầu đen" in query_lower or "comedone" in query_lower:
-            keywords.extend(["mụn đầu đen", "comedone", "closed comedone", "open comedone", "skin care", "sữa rửa mặt", "dưỡng ẩm", "kem chống nắng", "salicylic acid", "bha"])
-            
-        symptoms = result.get("symptoms", [])
-        keywords.extend([s.lower() for s in symptoms])
-        
-        # Add keywords present in query to prioritize them
-        active_keywords = [kw for kw in keywords if kw in query_lower]
-        if not active_keywords:
-            active_keywords = keywords
-            
-        def score_fact(fact):
-            score = 0
-            text_to_search = (str(fact.get("entity", "")) + " " + 
-                              str(fact.get("description", "")) + " " + 
-                              str(fact.get("related_entity", ""))).lower()
-            
-            # Boost score if it contains active keywords
-            for kw in active_keywords:
-                if kw in text_to_search:
-                    score += 2
-                    
-            # Penalize unrelated facts if blackhead is queried but antibiotics/hormones are returned
-            if "mụn đầu đen" in query_lower and not any(k in query_lower for k in ["thuốc", "kháng sinh", "nội tiết", "antibiotic", "pill", "hormone"]):
-                if any(k in text_to_search for k in ["ethinyl estradiol", "oral contraceptive", "pill", "antibiotic", "kháng sinh", "clindamycin"]):
-                    score -= 5
-                    
-            return score
-            
-        sorted_facts = sorted(raw_graph_facts, key=score_fact, reverse=True)
-        top_facts = sorted_facts[:10]
-        
-        def sanitize_dosage(text):
-            if not text:
-                return text
-            # Remove dosage patterns like: 2.5%, 5%, 5 mg, 50 mcg, 2 lần/ngày, v.v...
-            pattern = r'\s*\d+(\.\d+)?\s*(%|mg|mcg|g|lần/ngày|tuần/lần|viên|/ngày).*'
-            return re.sub(pattern, '', text, flags=re.IGNORECASE).strip()
-
-        safe_graph_facts = []
-        for fact in top_facts:
-            related_ent = sanitize_dosage(fact.get("related_entity", ""))
-            
-            # If after sanitization it becomes empty, skip it
-            if not related_ent:
-                continue
-                
-            safe_fact = {
-                "entity": fact.get("entity"),
-                "entity_type": fact.get("entity_type"),
-                "relationship": fact.get("relationship"),
-                "related_entity": related_ent,
-                "related_type": fact.get("related_type"),
-            }
-            if fact.get("description"):
-                safe_desc = sanitize_dosage(fact.get("description"))
-                if safe_desc:
-                    safe_fact["description"] = safe_desc
-            safe_graph_facts.append(safe_fact)
-            
+        # graph_facts remains in the public/history contract for compatibility.
+        # The frozen S4B runtime does not perform Graph retrieval or ranking.
+        safe_graph_facts: list[dict[str, Any]] = []
         is_in_domain = result.get("is_in_domain")
-        used_retrieval = is_in_domain is True
-        retrieval_status = result.get("retrieval_status") or ("hybrid_qdrant_neo4j" if used_retrieval else "skipped")
+        used_retrieval = _used_retrieval(result, is_in_domain)
+        retrieval_status = result.get("retrieval_status") or ("not_started" if not used_retrieval else "ok")
         
         answer_text = repair_mojibake(result.get("answer", ""))
         raw_sources_list = result.get("sources", [])
@@ -818,7 +794,11 @@ async def chat_endpoint(request: ChatRequest):
             "fallback_model": result.get("fallback_model"),
             "fallback_reason": result.get("fallback_reason"),
             "fallback_chain": result.get("fallback_chain"),
-            "retrieval": retrieval_status,
+            "retrieval": (
+                pipeline_manifest.get("retrieval_architecture", "dense_bm25_rrf")
+                if used_retrieval and isinstance(pipeline_manifest, dict)
+                else "skipped"
+            ),
             "is_in_domain": is_in_domain,
             "guardrail": result.get("guardrail"),
             "response_origin": response_origin,
@@ -903,9 +883,9 @@ async def chat_endpoint(request: ChatRequest):
                 logger.debug("Chat exchange persisted for session %s", session_id)
             except Exception as db_err:
                 logger.warning(
-                    "Failed to persist chat to DB for session %s (non-fatal): %s",
+                    "Failed to persist chat to DB for session %s (non-fatal): error_type=%s",
                     session_id,
-                    db_err,
+                    db_err.__class__.__name__,
                 )
         
         return ChatResponse(
@@ -925,7 +905,11 @@ async def chat_endpoint(request: ChatRequest):
                 fallback_provider=result.get("fallback_provider"),
                 fallback_model=result.get("fallback_model"),
                 fallback_chain=result.get("fallback_chain"),
-                retrieval=retrieval_status,
+                retrieval=(
+                    pipeline_manifest.get("retrieval_architecture", "dense_bm25_rrf")
+                    if used_retrieval and isinstance(pipeline_manifest, dict)
+                    else "skipped"
+                ),
                 is_in_domain=is_in_domain,
                 guardrail=result.get("guardrail"),
                 ignored_out_of_domain_part=result.get("ignored_out_of_domain_part"),
@@ -963,13 +947,16 @@ async def chat_endpoint(request: ChatRequest):
     except asyncio.CancelledError:
         raise
     except RuntimeResilienceError as e:
-        logger.warning("Runtime resilience error processing chat request: %s", e)
+        logger.warning(
+            "Runtime resilience error processing chat request: error_type=%s",
+            e.__class__.__name__,
+        )
         raise HTTPException(
             status_code=_http_status_for_resilience_error(e),
             detail=_safe_resilience_detail(e),
         )
     except Exception as e:
-        logger.error(f"Error processing chat request: {str(e)}")
+        _log_error_type("Error processing chat request:", e)
         # Return generic 500 error without leaking sensitive info
         raise HTTPException(status_code=500, detail="Internal server error processing the request.")
     finally:
@@ -1037,7 +1024,11 @@ async def _persist_chat_to_db(
         
         logger.debug("Chat persisted to DB for session %s", session_id)
     except Exception as e:
-        logger.warning("DB persistence error for session %s: %s", session_id, e)
+        logger.warning(
+            "DB persistence error for session %s: error_type=%s",
+            session_id,
+            e.__class__.__name__,
+        )
         raise
     finally:
         await db_session.close()
@@ -1076,7 +1067,7 @@ async def get_chat_sessions(
             for s in sessions
         ]
     except Exception as e:
-        logger.error(f"Error fetching sessions: {e}")
+        _log_error_type("Error fetching sessions:", e)
         raise HTTPException(status_code=500, detail="Failed to fetch chat sessions.")
     finally:
         await db_session.close()
@@ -1113,13 +1104,13 @@ async def delete_all_chat_sessions():
             redis_key_patterns=patterns,
         )
     except Exception as exc:
-        logger.error("Failed to delete chat history: %s", exc, exc_info=True)
+        _log_error_type("Failed to delete chat history:", exc)
         raise HTTPException(status_code=500, detail="Failed to delete chat history.")
     finally:
         await db_session.close()
 
 
-@app.get("/chat/sessions/{session_id}/messages")
+@app.get("/chat/sessions/{session_id}/messages", response_model=list[MessageResponse])
 async def get_chat_messages(session_id: str, limit: int = 50):
     """Get messages for a specific chat session."""
     from src.database.repositories import chat_history as repo
@@ -1151,13 +1142,13 @@ async def get_chat_messages(session_id: str, limit: int = 50):
             for m in messages
         ]
     except Exception as e:
-        logger.error(f"Error fetching messages: {e}")
+        _log_error_type("Error fetching messages:", e)
         raise HTTPException(status_code=500, detail="Failed to fetch messages.")
     finally:
         await db_session.close()
 
 
-@app.patch("/chat/sessions/{session_id}/rename")
+@app.patch("/chat/sessions/{session_id}/rename", response_model=RenameResponse)
 async def rename_chat_session(session_id: str, body: RenameRequest):
     """Rename a chat session."""
     from src.database.repositories import chat_history as repo
@@ -1186,13 +1177,13 @@ async def rename_chat_session(session_id: str, body: RenameRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error renaming session: {e}")
+        _log_error_type("Error renaming session:", e)
         raise HTTPException(status_code=500, detail="Failed to rename session.")
     finally:
         await db_session.close()
 
 
-@app.patch("/chat/sessions/{session_id}/hide")
+@app.patch("/chat/sessions/{session_id}/hide", response_model=HideResponse)
 async def hide_chat_session(session_id: str):
     """
     Hide a chat session by setting hidden=true.
@@ -1218,7 +1209,7 @@ async def hide_chat_session(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error hiding session: {e}")
+        _log_error_type("Error hiding session:", e)
         raise HTTPException(status_code=500, detail="Failed to hide session.")
     finally:
         await db_session.close()
@@ -1306,13 +1297,17 @@ async def sync_sessions(body: SyncRequest):
                     synced += 1
                     
                 except Exception as e:
-                    logger.warning(f"Error syncing session {s_payload.id}: {e}")
+                    logger.warning(
+                        "Error syncing session %s: error_type=%s",
+                        s_payload.id,
+                        e.__class__.__name__,
+                    )
                     errors += 1
         
         return SyncResponse(synced=synced, skipped=skipped, errors=errors)
     
     except Exception as e:
-        logger.error(f"Sync failed: {e}")
+        _log_error_type("Sync failed:", e)
         raise HTTPException(status_code=500, detail="Sync failed.")
     finally:
         await db_session.close()

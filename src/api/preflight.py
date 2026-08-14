@@ -29,6 +29,17 @@ PREFLIGHT_CHECK_TIMEOUT_SECONDS = float(os.getenv("PREFLIGHT_CHECK_TIMEOUT_SECON
 REQUIRED_CORE_CHECKS = ("postgres", "qdrant", "neo4j", "redis")
 
 
+def _safe_dependency_error(service: str, exc: Exception) -> str:
+    """Describe failed dependency checks without returning raw connection details."""
+
+    logger.warning(
+        "Preflight dependency unavailable: service=%s error_type=%s",
+        service,
+        exc.__class__.__name__,
+    )
+    return f"{service} unavailable ({exc.__class__.__name__})."
+
+
 def _preload_check_dependencies() -> None:
     """Avoid concurrent cold imports consuming the bounded health-check budget."""
 
@@ -43,7 +54,11 @@ def _preload_check_dependencies() -> None:
             importlib.import_module(module_name)
         except Exception as exc:
             # The corresponding check owns the actionable availability error.
-            logger.debug("Preflight dependency preload failed for %s: %s", module_name, exc)
+            logger.debug(
+                "Preflight dependency preload failed for %s: error_type=%s",
+                module_name,
+                exc.__class__.__name__,
+            )
 
 
 @dataclass
@@ -145,7 +160,7 @@ async def check_postgres() -> CheckResult:
             await conn.exec_driver_sql("SELECT 1")
         return CheckResult("ok")
     except Exception as exc:
-        return CheckResult("unavailable", str(exc))
+        return CheckResult("unavailable", _safe_dependency_error("PostgreSQL", exc))
 
 
 async def check_redis() -> CheckResult:
@@ -154,7 +169,7 @@ async def check_redis() -> CheckResult:
 
         return CheckResult("ok" if await ping_redis() else "unavailable")
     except Exception as exc:
-        return CheckResult("unavailable", str(exc))
+        return CheckResult("unavailable", _safe_dependency_error("Redis", exc))
 
 
 def _get_named_config(config: Any, name: str) -> Any | None:
@@ -217,8 +232,8 @@ async def check_qdrant() -> CheckResult:
     except Exception as exc:
         return CheckResult(
             "unavailable",
-            f"Cannot connect/authenticate to Qdrant at {QDRANT_URL}. "
-            f"Check QDRANT_URL and QDRANT_API_KEY. Error: {exc}",
+            _safe_dependency_error("Qdrant", exc)
+            + " Check QDRANT_URL and QDRANT_API_KEY.",
         )
 
 
@@ -241,7 +256,7 @@ async def check_neo4j() -> CheckResult:
         finally:
             await driver.close()
     except Exception as exc:
-        return CheckResult("unavailable", str(exc))
+        return CheckResult("unavailable", _safe_dependency_error("Neo4j", exc))
 
 
 def _http_get_json(url: str, timeout: float = 5.0) -> Any:
@@ -272,7 +287,7 @@ async def check_ollama() -> CheckResult:
             )
         return CheckResult("ok", extra={"model": OLLAMA_MODEL})
     except (OSError, urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-        return CheckResult("unavailable", str(exc))
+        return CheckResult("unavailable", _safe_dependency_error("Ollama", exc))
 
 
 async def _bounded_check(name: str, check_coro: Any) -> CheckResult:

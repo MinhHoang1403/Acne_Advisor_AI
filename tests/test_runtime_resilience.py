@@ -240,7 +240,7 @@ async def test_chat_endpoint_maps_agent_timeout_to_504(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_cache_store_skips_runtime_fallback_or_errors(monkeypatch):
+async def test_cache_store_skips_runtime_fallback(monkeypatch):
     calls = []
 
     async def fake_set_answer_cache(**kwargs):
@@ -263,14 +263,8 @@ async def test_cache_store_skips_runtime_fallback_or_errors(monkeypatch):
         "actual_provider": "gemini",
         "actual_model": "gemini-2.5-flash",
         "answer_quality_report": {"passed": True, "issues": []},
-        "errors": ["provider_timeout"],
+        "llm_fallback_used": True,
     }
 
     await cache_node.cache_store_node(base_state)
-    assert calls == []
-
-    state_with_fallback = dict(base_state)
-    state_with_fallback["errors"] = []
-    state_with_fallback["llm_fallback_used"] = True
-    await cache_node.cache_store_node(state_with_fallback)
     assert calls == []

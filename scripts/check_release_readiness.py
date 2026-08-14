@@ -358,6 +358,20 @@ def extract_data_counts(summary: dict[str, Any]) -> dict[str, Any]:
         "neo4j_nodes": None,
         "neo4j_relationships": None,
     }
+    current_checks = summary.get("checks", [])
+    for item in current_checks:
+        name = item.get("name")
+        details = item.get("details", {})
+        if name == "frozen_phase1_manifest":
+            manifest_counts = details.get("counts", {})
+            counts["acne_entities"] = manifest_counts.get("entities")
+        elif name == "qdrant_frozen_knowledge":
+            counts["acne_knowledge"] = details.get("points_count")
+        elif name == "neo4j_frozen_graph":
+            counts["neo4j_nodes"] = details.get("nodes")
+            counts["neo4j_relationships"] = details.get("relationships")
+
+    # Preserve compatibility with older readiness artifacts used by operators.
     for item in summary.get("phase1_state_checks", []):
         name = item.get("name")
         details = item.get("details", {})

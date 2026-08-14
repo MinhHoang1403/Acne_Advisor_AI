@@ -63,8 +63,6 @@ class ClinicalState(TypedDict, total=False):
     fallback_reason: str | None
     fallback_answer: str | None
     fallback_cache_eligible: bool | None
-    answerability: dict[str, Any] | None
-    errors: list[str]
 
     # Cache and provider identity
     cache_checked: bool | None

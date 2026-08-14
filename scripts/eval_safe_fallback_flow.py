@@ -14,11 +14,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.agent.nodes.fallback import generation_fallback_decision_node, safe_fallback_node  # noqa: E402
+from src.agent.nodes.workflow import abstain_node, decide_node  # noqa: E402
 from src.quality.safe_fallback import (  # noqa: E402
     SAFE_FALLBACK_FLOW_VERSION,
     build_safe_fallback_answer,
     decide_generation_fallback,
-    decide_retrieval_fallback,
 )
 from src.quality.severity_guard import apply_severity_aware_answer_guard  # noqa: E402
 from src.resilience.exceptions import ProviderTimeoutError, ProviderUnavailableError  # noqa: E402
@@ -31,18 +31,14 @@ def _case(case_id: str, passed: bool, details: dict[str, Any] | None = None) -> 
 async def run_eval() -> dict[str, Any]:
     cases: list[dict[str, Any]] = []
 
-    empty_query = decide_retrieval_fallback({"standalone_question": "", "vector_contexts": [], "graph_facts": []})
-    cases.append(_case("empty_query", empty_query.fallback_type == "empty_query"))
+    empty_query = build_safe_fallback_answer("empty_query")
+    cases.append(_case("empty_query", "vấn đề da hoặc loại mụn" in empty_query))
 
-    no_evidence = decide_retrieval_fallback(
-        {"standalone_question": "mụn", "vector_contexts": [], "graph_facts": [], "packed_context": None}
-    )
-    cases.append(_case("no_vector_or_graph_evidence", no_evidence.fallback_type == "no_retrieval_evidence"))
+    no_evidence = await abstain_node({"standalone_question": "mụn"})
+    cases.append(_case("no_source_evidence", no_evidence["fallback_type"] == "no_retrieval_evidence"))
 
-    retrieval_error = decide_retrieval_fallback(
-        {"standalone_question": "mụn", "retrieval_status": "recoverable_error", "retrieval_error": "backend failed"}
-    )
-    cases.append(_case("recoverable_retrieval_error", retrieval_error.fallback_type == "retrieval_error"))
+    retrieval_error = await abstain_node({"standalone_question": "mụn", "retrieval_error": "backend failed"})
+    cases.append(_case("retrieval_error", retrieval_error["fallback_type"] == "retrieval_error"))
 
     cases.append(_case("empty_generation", decide_generation_fallback(" ").fallback_type == "empty_generation"))
     cases.append(_case("invalid_generation", decide_generation_fallback(None).fallback_type == "invalid_generation"))
@@ -68,10 +64,8 @@ async def run_eval() -> dict[str, Any]:
     )
     cases.append(_case("emergency_no_evidence", emergency.classification.severity == "emergency" and "cấp cứu" in emergency.answer))
 
-    valid_evidence = decide_retrieval_fallback(
-        {"standalone_question": "mụn", "vector_contexts": [{"text": "evidence"}], "graph_facts": []}
-    )
-    cases.append(_case("valid_evidence_no_fallback", valid_evidence.fallback_applied is False))
+    valid_evidence = await decide_node({"is_in_domain": True, "evidence_assessment": {"sufficient": True}})
+    cases.append(_case("valid_evidence_routes_generation", valid_evidence["next_action"] == "generate"))
 
     decision = await generation_fallback_decision_node({"draft_answer": ""})
     fallback = await safe_fallback_node(decision)
