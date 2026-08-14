@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -147,29 +146,6 @@ async def load_or_parse_source(
     return artifact, False
 
 
-def promote_frozen_markdown(
-    source: CanonicalSource,
-    markdown: str,
-    *,
-    cache_root: Path,
-) -> ParsedArtifact:
-    """Promote a verified legacy parser output into the frozen cache contract."""
-
-    raw_unit = ParsedUnit(locator="document", text=markdown)
-    normalized = normalize_parsed_text(markdown)
-    artifact = ParsedArtifact(
-        source_id=source.source_id,
-        source_hash=source.sha256,
-        parser_contract_id=PARSER_CONTRACT_ID,
-        normalization_contract_id=NORMALIZATION_CONTRACT_ID,
-        parsed_output_hash=sha256_text(markdown),
-        normalized_output_hash=sha256_text(normalized),
-        units=(ParsedUnit(locator="document", text=normalized),),
-    )
-    save_parsed_artifact(artifact_path(cache_root, source), artifact)
-    return artifact
-
-
 def _parse_markdown(path: Path) -> tuple[ParsedUnit, ...]:
     text = path.read_text(encoding="utf-8")
     marker = "Markdown Content:"
@@ -227,6 +203,5 @@ __all__ = [
     "artifact_path",
     "load_or_parse_source",
     "load_parsed_artifact",
-    "promote_frozen_markdown",
     "save_parsed_artifact",
 ]

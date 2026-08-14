@@ -89,12 +89,10 @@ yarn-error.log*
 .yarn/build-state.yml
 .yarn/install-state.gz
 
-# Build output
+# Frontend build output
 .next/
 out/
-dist/
 src/frontend/dist/
-build/
 .nuxt/
 .output/
 
@@ -118,7 +116,6 @@ data/sources/*
 !data/taxonomy/
 data/taxonomy/*
 !data/taxonomy/drug_aliases.yaml
-!data/taxonomy/drug_taxonomy_v2.yaml
 
 # Keep sample_data structure but ignore large files
 sample_data/
@@ -150,7 +147,6 @@ logs/
 *.log
 log/
 reports/
-reports/evaluation/
 
 # Local thesis/report artifacts
 /output/
@@ -174,10 +170,7 @@ reports/evaluation/
 Thumbs.db
 desktop.ini
 
-# ---------------------------------------------------------------------------
-# OS
-# ---------------------------------------------------------------------------
-.DS_Store
+# Additional OS metadata
 .DS_Store?
 ._*
 .Spotlight-V100

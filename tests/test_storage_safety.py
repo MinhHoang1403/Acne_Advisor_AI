@@ -6,8 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 from src.cache import redis_cache, semantic_cache
-from src.database.retriever import HybridRetriever
 from src.database.vector_store import QdrantVectorStore
+from src.retrieval.service import EvidenceRetriever
 
 
 @pytest.mark.asyncio
@@ -109,7 +109,7 @@ async def test_evidence_retriever_close_logs_sanitized_errors(caplog):
         async def close(self):
             raise RuntimeError("close failed api_key=secret-value")
 
-    retriever = HybridRetriever.__new__(HybridRetriever)
+    retriever = EvidenceRetriever.__new__(EvidenceRetriever)
     retriever._vector_store = BrokenComponent()
     with caplog.at_level(logging.WARNING):
         await retriever.close()

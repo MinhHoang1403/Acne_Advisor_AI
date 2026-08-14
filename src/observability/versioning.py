@@ -1,4 +1,4 @@
-"""Deterministic, secret-free manifest for the frozen S4B runtime."""
+"""Deterministic, secret-free manifest for the frozen runtime."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4", "v5"}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
     f"answer_formatting_contract_v{version}" for version in range(1, 11)
 }
-S4B_ARCHITECTURE_VERSION = "s4b_final_agentic_rag_v1"
-S4B_ARCHITECTURE_FROZEN = True
+ARCHITECTURE_VERSION = "s4b_final_agentic_rag_v1"
+ARCHITECTURE_FROZEN = True
 
 _SECRET_KEY_MARKERS = ("api_key", "token", "password", "secret", "authorization", "bearer", "cookie")
 
@@ -29,8 +29,8 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
 
     manifest = {
         "phase": "s4b",
-        "architecture_version": S4B_ARCHITECTURE_VERSION,
-        "architecture_frozen": S4B_ARCHITECTURE_FROZEN,
+        "architecture_version": ARCHITECTURE_VERSION,
+        "architecture_frozen": ARCHITECTURE_FROZEN,
         "orchestrator": "langgraph",
         "retrieval_architecture": "dense_bm25_rrf",
         "dense_vector_name": "dense",
@@ -177,8 +177,8 @@ def _runtime_chunk_collection_name(settings: Mapping[str, Any]) -> str:
 
 __all__ = [
     "DEFAULT_ANSWER_CACHE_VERSION",
-    "S4B_ARCHITECTURE_FROZEN",
-    "S4B_ARCHITECTURE_VERSION",
+    "ARCHITECTURE_FROZEN",
+    "ARCHITECTURE_VERSION",
     "build_pipeline_version_manifest",
     "compute_pipeline_fingerprint",
     "current_pipeline_fingerprint",

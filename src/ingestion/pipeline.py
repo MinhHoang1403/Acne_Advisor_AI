@@ -16,7 +16,6 @@ from src.ingestion.embedding import EmbeddingCache
 from src.ingestion.index import (
     build_entity_candidate,
     build_knowledge_candidate,
-    entity_physical_collection,
     resolve_embeddings,
     seed_embedding_cache_from_collection,
     switch_alias,

@@ -25,3 +25,40 @@ Safety remains deterministic and outside optional tool choice. Generation may
 use provider fallback, but the final node still applies answer verification,
 severity-aware safety, source validation, presentation, cache eligibility, and
 sanitized observability.
+
+## Request Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant API as FastAPI
+    participant Agent as LangGraph
+    participant Cache as Redis
+    participant Tool as retrieve_evidence
+    participant Qdrant
+    participant LLM as Gemini/Ollama
+
+    User->>API: POST /chat
+    API->>Agent: validated state and history
+    Agent->>Agent: prepare, guard, decide
+    Agent->>Cache: versioned cache lookup
+    alt eligible cache hit
+        Cache-->>Agent: grounded cached answer
+    else cache miss
+        Agent->>Tool: retrieve source evidence
+        Tool->>Qdrant: Dense and native BM25 queries
+        Qdrant-->>Tool: ranked source chunks
+        Tool-->>Agent: equal RRF and bounded provenance
+        Agent->>Agent: assess, retry, abstain, or generate
+        Agent->>LLM: source-grounded prompt
+        LLM-->>Agent: draft answer
+        Agent->>Agent: verify, safety, format, finalize
+        Agent->>Cache: store only when eligible
+    end
+    Agent-->>API: answer, sources, sanitized metadata
+    API-->>User: UTF-8 JSON
+```
+
+The graph schema is `ClinicalState` in `src/agent/state.py` with 68 fields.
+`src/agent/nodes/workflow.py` owns all eight semantic node functions and routing
+decisions; support modules do not create hidden graph actions.

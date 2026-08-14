@@ -26,7 +26,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from src.agent.main import run_clinical_agent
+from src.agent.graph import run_clinical_agent
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
 from src.agent.text_encoding import repair_mojibake
 from src.observability.versioning import get_answer_cache_version
@@ -489,15 +489,15 @@ async def health_check():
 
 @app.get("/retrieve", response_model=RetrieveResponse)
 async def retrieve_endpoint(q: str, top_k: int = 5):
-    """Debug retrieval endpoint for Phase 2 Qdrant + Neo4j hybrid retrieval."""
+    """Debug endpoint for the canonical Dense + BM25 + RRF retrieval path."""
     query = q.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
     top_k = max(1, min(top_k, 20))
 
-    from src.database.retriever import HybridRetriever
+    from src.retrieval.service import EvidenceRetriever
 
-    retriever = HybridRetriever()
+    retriever = EvidenceRetriever()
     try:
         result = await retriever.retrieve(query=query, top_k=top_k)
         return RetrieveResponse(

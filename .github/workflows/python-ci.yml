@@ -5,19 +5,16 @@ on:
   push:
     branches:
       - main
-      - phase1-phase2-hardening
   workflow_dispatch:
 
 env:
   GOOGLE_API_KEY: ""
   LLAMA_CLOUD_API_KEY: ""
-  HF_HUB_OFFLINE: "1"
-  TRANSFORMERS_OFFLINE: "1"
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
   OBSERVABILITY_ENABLED: "false"
   PHASE2_DEBUG_METADATA: "false"
-  CACHE_ANSWER_VERSION: v5
+  CACHE_ANSWER_VERSION: v6
   GOOGLE_GENAI_SDK_VERSION: google_genai_sdk_v1
   REPRODUCIBLE_ENVIRONMENT_VERSION: reproducible_environment_v1
   END_TO_END_RELEASE_READINESS_VERSION: end_to_end_release_readiness_v1
@@ -79,6 +76,11 @@ jobs:
             exit 1
           }
 
+      - name: Python lint
+        shell: pwsh
+        run: |
+          python -m ruff check src scripts tests
+
       - name: Full test suite
         shell: pwsh
         run: |
@@ -103,6 +105,10 @@ jobs:
       - name: Clean install frontend dependencies
         working-directory: src/frontend
         run: npm ci
+
+      - name: Frontend tests
+        working-directory: src/frontend
+        run: npm test
 
       - name: Build frontend
         working-directory: src/frontend

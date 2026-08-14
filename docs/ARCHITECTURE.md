@@ -38,5 +38,24 @@ Neo4j remain frozen Phase 1 assets for offline inspection and future
 evidence-driven proposals; they are intentionally absent from the production
 answer path and never count as medical evidence.
 
-`S4B_ARCHITECTURE_FROZEN` in `src/observability/versioning.py` freezes this
-production architecture for E0/E1 evaluation-methodology work.
+The active architecture marker and pipeline fingerprint are computed in
+`src/observability/versioning.py`. Its serialized architecture value remains an
+external cache/diagnostic compatibility contract; it does not select an older
+runtime implementation.
+
+## Package Boundaries
+
+| Package | Current responsibility |
+|---|---|
+| `src/ingestion` | immutable Phase 1 compilation and activation contracts |
+| `src/knowledge` | taxonomy identities, EntityCards and deterministic graph build |
+| `src/retrieval` | one source-evidence retrieval service |
+| `src/agent` | state graph, generation and presentation |
+| `src/quality` | deterministic safety and answer-quality gates |
+| `src/integrations` | external generation and embedding provider adapters |
+| `src/api` | HTTP boundary and dependency preflight |
+| `src/cache`, `src/database` | answer cache and storage adapters |
+
+PostgreSQL stores chat history, Redis stores versioned eligible answers,
+Qdrant serves read-only runtime evidence, and Neo4j stores the frozen structural
+graph. Only Qdrant knowledge chunks participate in online medical grounding.

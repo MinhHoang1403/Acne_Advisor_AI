@@ -2,10 +2,6 @@
 
 from src.knowledge.normalizer import DrugEntityNormalizer, normalize_text_key
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy, entity_card_to_text
-from src.knowledge.entity_index import (
-    build_entity_point_payload,
-    get_entity_collection_name,
-)
 from src.knowledge.graph_schema import (
     build_entity_graph_records,
     get_entity_graph_constraints,
@@ -37,14 +33,12 @@ __all__ = [
     "SafetyContext",
     "build_entity_cards_from_taxonomy",
     "build_entity_graph_records",
-    "build_entity_point_payload",
     "canonical_text_key",
     "entity_card_to_text",
     "expected_kb_payload_metadata",
     "get_embedding_metadata",
     "get_entity_graph_constraints",
     "get_entity_graph_indexes",
-    "get_entity_collection_name",
     "get_knowledge_versions",
     "normalize_text_key",
     "validate_embedding_config_compatibility",

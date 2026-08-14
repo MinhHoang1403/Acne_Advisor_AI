@@ -4,8 +4,8 @@ import pytest
 
 from src.agent.nodes import cache as cache_node
 from src.observability.versioning import (
-    S4B_ARCHITECTURE_FROZEN,
-    S4B_ARCHITECTURE_VERSION,
+    ARCHITECTURE_FROZEN,
+    ARCHITECTURE_VERSION,
     build_pipeline_version_manifest,
     compute_pipeline_fingerprint,
     current_pipeline_fingerprint,
@@ -24,12 +24,12 @@ def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
     assert len(compute_pipeline_fingerprint(manifest)) == 24
 
 
-def test_manifest_describes_only_the_active_s4b_architecture() -> None:
+def test_manifest_describes_only_the_frozen_runtime_architecture() -> None:
     manifest = build_pipeline_version_manifest()
     serialized = str(manifest).casefold()
 
-    assert manifest["architecture_version"] == S4B_ARCHITECTURE_VERSION
-    assert manifest["architecture_frozen"] is S4B_ARCHITECTURE_FROZEN
+    assert manifest["architecture_version"] == ARCHITECTURE_VERSION
+    assert manifest["architecture_frozen"] is ARCHITECTURE_FROZEN
     assert manifest["orchestrator"] == "langgraph"
     assert manifest["retrieval_architecture"] == "dense_bm25_rrf"
     assert manifest["rrf_k"] == 60
@@ -118,7 +118,7 @@ def test_manifest_summary_is_a_compact_s4b_contract() -> None:
     summary = pipeline_manifest_summary(manifest)
 
     assert summary["phase"] == "s4b"
-    assert summary["architecture_version"] == S4B_ARCHITECTURE_VERSION
+    assert summary["architecture_version"] == ARCHITECTURE_VERSION
     assert summary["retrieval_architecture"] == "dense_bm25_rrf"
     assert summary["answer_cache_version"] == "v6"
     assert summary["embedding_dimensions"] == 3072

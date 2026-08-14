@@ -53,7 +53,6 @@ SYNC_DATABASE_URL = os.getenv(
     ),
 )
 
-VECTOR_DB_PROVIDER = os.getenv("VECTOR_DB_PROVIDER", "qdrant").lower()
 QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
 
 
@@ -130,10 +129,6 @@ async def _setup_postgres() -> None:
 
         await conn.execute(_raw_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'))
 
-        if VECTOR_DB_PROVIDER == "pgvector":
-            await conn.execute(_raw_sql("CREATE EXTENSION IF NOT EXISTS vector;"))
-            logger.info("✓ pgvector extension enabled.")
-
         logger.info("Creating SQLAlchemy model tables if available...")
 
         try:
@@ -178,12 +173,11 @@ async def main() -> int:
         logger.error("PostgreSQL setup failed: %s", exc, exc_info=True)
         return 1
 
-    if VECTOR_DB_PROVIDER == "qdrant":
-        try:
-            await _setup_qdrant()
-        except Exception as exc:
-            logger.error("Qdrant setup failed: %s", exc, exc_info=True)
-            return 1
+    try:
+        await _setup_qdrant()
+    except Exception as exc:
+        logger.error("Qdrant ownership check failed: %s", exc, exc_info=True)
+        return 1
 
     logger.info("=" * 60)
     logger.info("✅ Schema initialisation completed successfully.")

@@ -1,7 +1,7 @@
 """
 domain_metadata.py
 ==================
-Phase 1.5 – Rule-based dermatology metadata extractor.
+Rule-based dermatology metadata extractor.
 
 Provides :func:`extract_dermatology_metadata` which scans a chunk's text
 (and optional header path) for domain-specific keywords and returns a
@@ -13,7 +13,6 @@ No LLM calls – pure keyword / regex matching.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 from typing import Any

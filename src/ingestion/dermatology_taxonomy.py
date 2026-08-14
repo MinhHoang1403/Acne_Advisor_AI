@@ -1,7 +1,7 @@
 """
 dermatology_taxonomy.py
 =======================
-Phase 1.5 – Dermatology domain taxonomy for acne-agent-system.
+Dermatology domain vocabulary for acne-agent-system.
 
 Defines canonical categories, keyword dictionaries, and Vietnamese → English
 mappings used by the rule-based metadata extractor in ``domain_metadata.py``.

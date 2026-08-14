@@ -47,7 +47,7 @@ async def inspect_cache_versions(max_scan: int = 1000) -> dict[str, Any]:
     configured_version = os.getenv("CACHE_ANSWER_VERSION")
     if configured_version and configured_version != answer_version:
         warnings.append(
-            f"CACHE_ANSWER_VERSION={configured_version!r} is legacy for S4B; effective answer cache version is {answer_version!r}."
+            f"CACHE_ANSWER_VERSION={configured_version!r} is obsolete; effective answer cache version is {answer_version!r}."
         )
 
     redis = await get_redis()

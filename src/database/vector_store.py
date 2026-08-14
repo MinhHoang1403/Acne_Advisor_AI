@@ -1,20 +1,6 @@
-"""
-src/database/vector_store.py – Vector Store Abstraction
-=======================================================
-Provides a unified interface for Qdrant and pgvector backends.
-The active backend is selected via the VECTOR_DB_PROVIDER env var.
-
-Pha 2 updates
--------------
-- Fixed named vector support: Qdrant collection uses "dense" + "bm25"
-- Added embed_query() under the Gemini Embedding 2 no-task-type contract
-- Added search_sparse() for Qdrant-native true BM25
-- Added close() method for cleanup
-"""
-
+"""Qdrant retrieval and Gemini query-embedding adapter."""
 from __future__ import annotations
 
-import abc
 import asyncio
 import logging
 import os
@@ -42,7 +28,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration (from .env)
 # ---------------------------------------------------------------------------
-VECTOR_DB_PROVIDER = os.getenv("VECTOR_DB_PROVIDER", "qdrant").lower()
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "").strip()
 QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
@@ -154,30 +139,7 @@ def _is_retryable_query_embedding_error(exc: Exception) -> bool:
     return isinstance(exc, httpx.TransportError)
 
 
-# ---------------------------------------------------------------------------
-# Abstract base
-# ---------------------------------------------------------------------------
-
-class VectorStore(abc.ABC):
-    """Abstract vector store interface."""
-
-    @abc.abstractmethod
-    async def upsert(self, id: str, vector: list[float], payload: dict) -> None: ...
-
-    @abc.abstractmethod
-    async def search(
-        self, query_vector: list[float], top_k: int = 5, filter: dict | None = None
-    ) -> list[dict[str, Any]]: ...
-
-    @abc.abstractmethod
-    async def delete(self, id: str) -> None: ...
-
-
-# ---------------------------------------------------------------------------
-# Qdrant implementation
-# ---------------------------------------------------------------------------
-
-class QdrantVectorStore(VectorStore):
+class QdrantVectorStore:
     """Qdrant-backed vector store with named vector support.
 
     The Pha 1 collection uses:
@@ -287,33 +249,3 @@ class QdrantVectorStore(VectorStore):
         if cls._shared_client is not None:
             await cls._shared_client.close()
             cls._shared_client = None
-
-
-# ---------------------------------------------------------------------------
-# pgvector implementation (placeholder)
-# ---------------------------------------------------------------------------
-
-class PgVectorStore(VectorStore):
-    """pgvector-backed vector store (placeholder)."""
-
-    async def upsert(self, id: str, vector: list[float], payload: dict) -> None:
-        raise NotImplementedError("pgvector store not yet implemented.")
-
-    async def search(
-        self, query_vector: list[float], top_k: int = 5, filter: dict | None = None
-    ) -> list[dict[str, Any]]:
-        raise NotImplementedError("pgvector store not yet implemented.")
-
-    async def delete(self, id: str) -> None:
-        raise NotImplementedError("pgvector store not yet implemented.")
-
-
-# ---------------------------------------------------------------------------
-# Factory
-# ---------------------------------------------------------------------------
-
-def get_vector_store() -> VectorStore:
-    """Factory – returns the configured vector store instance."""
-    if VECTOR_DB_PROVIDER == "qdrant":
-        return QdrantVectorStore()
-    return PgVectorStore()

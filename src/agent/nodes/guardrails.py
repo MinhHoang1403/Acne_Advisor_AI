@@ -4,7 +4,6 @@ src/agent/nodes/guardrails.py
 Topic guardrail for Acne Advisor AI.
 """
 
-import os
 import json
 import logging
 import re

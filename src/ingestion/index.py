@@ -14,7 +14,7 @@ from src.ingestion.bm25 import BM25_VECTOR_NAME, bm25_document, bm25_sparse_vect
 from src.ingestion.build import CompiledKnowledge
 from src.ingestion.embedding import EMBEDDING_DIMENSIONS, EmbeddingCache, embed_documents
 from src.knowledge.entity_cards import entity_card_to_text
-from src.knowledge.entity_index import entity_point_id
+from src.knowledge.entity_identity import entity_point_id
 from src.knowledge.schemas import EntityCard
 from src.resilience.exceptions import ProviderUnavailableError
 
