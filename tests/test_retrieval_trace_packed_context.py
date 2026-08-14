@@ -1,39 +1,43 @@
+from src.observability.trace_exporter import build_observability_event
 from src.retrieval.context_packer import pack_context
-from src.retrieval.contracts import QueryExpansion, RetrievalTrace
-from src.retrieval.query_normalization import normalize_query
-from src.database.retriever import _sources_for_contexts
+from src.retrieval.contracts import NormalizedQuery, RetrievedCandidate
 
 
-def test_retrieval_trace_accepts_packed_context_without_breaking_old_fields():
-    normalized = normalize_query("Mụn đầu đen là gì?")
-    expansion = QueryExpansion(
-        original_query=normalized.original_query,
-        normalized_query=normalized,
-        expanded_terms=[normalized.original_query],
+def test_retrieval_trace_and_packed_context_have_one_obvious_contract() -> None:
+    query = NormalizedQuery(
+        original_query="Mụn đầu đen là gì?",
+        normalized_text="Mụn đầu đen là gì?",
+        intent="medical_question",
     )
-    packed = pack_context(normalized, [], max_items=3)
-    trace = RetrievalTrace(
-        original_query=normalized.original_query,
-        normalized_query=normalized,
-        expansion=expansion,
-        packed_context=packed,
+    candidate = RetrievedCandidate(
+        candidate_id="chunk-1",
+        source="chunk",
+        collection="acne_knowledge",
+        text="Source-backed acne evidence.",
+        fused_score=0.03,
+        rank=1,
+        payload={"chunk_id": "chunk-1", "source_id": "guideline"},
+    )
+    packed = pack_context(query, [candidate])
+    trace = {
+        "architecture": "dense_bm25_rrf",
+        "channels": {"dense": {"count": 1}, "bm25": {"count": 1}},
+        "selected_ids": ["chunk-1"],
+        "warnings": [],
+        "elapsed_ms": 3.0,
+    }
+
+    event = build_observability_event(
+        query=query.original_query,
+        state={
+            "retrieval_trace": trace,
+            "packed_context": packed.model_dump(mode="json"),
+            "retrieval_attempt": 1,
+            "evidence_assessment": {"sufficient": True},
+        },
     )
 
-    data = trace.model_dump(mode="json")
-
-    assert data["selected_context"] == []
-    assert data["packed_context"]["intent"] == "acne_type"
-    assert "warnings" in data["packed_context"]
-
-
-def test_sources_include_every_document_used_in_the_packed_prompt_context():
-    sources = _sources_for_contexts(
-        [
-            {"source_file": "entity:active_ingredient", "retrieval_source": "entity"},
-            {"source_file": "guideline.pdf", "retrieval_source": "chunk"},
-            {"source_file": "dataset.json", "retrieval_source": "chunk"},
-            {"source_file": "guideline.pdf", "retrieval_source": "chunk"},
-        ]
-    )
-
-    assert sources == ["guideline.pdf", "dataset.json"]
+    assert event.summary.retrieval_candidates_count == 2
+    assert event.summary.packed_context_items_count == 1
+    assert event.summary.evidence_sufficient is True
+    assert "rerank" not in event.model_dump_json().lower()

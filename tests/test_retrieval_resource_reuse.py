@@ -1,86 +1,77 @@
-from __future__ import annotations
+import asyncio
 
 import pytest
 
-from src.database.graph_store import Neo4jGraphStore
-from src.database.retriever import HybridRetriever
 from src.database.vector_store import QdrantVectorStore
-from src.retrieval.entity_retriever import EntityRetriever
-
-
-class _Closable:
-    def __init__(self) -> None:
-        self.closed = False
-
-    async def close(self) -> None:
-        self.closed = True
-
-
-def test_qdrant_client_reused() -> None:
-    original = QdrantVectorStore._shared_client
-    shared = _Closable()
-    QdrantVectorStore._shared_client = shared
-    try:
-        first = QdrantVectorStore()
-        second = QdrantVectorStore()
-
-        assert first._client is shared
-        assert second._client is shared
-    finally:
-        QdrantVectorStore._shared_client = original
-
-
-def test_neo4j_driver_reused() -> None:
-    original = Neo4jGraphStore._shared_driver
-    shared = _Closable()
-    Neo4jGraphStore._shared_driver = shared
-    try:
-        first = Neo4jGraphStore()
-        second = Neo4jGraphStore()
-
-        assert first._driver is shared
-        assert second._driver is shared
-    finally:
-        Neo4jGraphStore._shared_driver = original
+from src.retrieval.service import EvidenceRetriever
 
 
 @pytest.mark.asyncio
-async def test_embedding_failure_cancels_overlapping_entity_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
-    cancelled = False
+async def test_vector_store_reuses_process_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    created: list[object] = []
 
-    class _EntityRetriever:
-        async def retrieve(self, **kwargs):
-            nonlocal cancelled
-            try:
-                await __import__("asyncio").sleep(1)
-            except __import__("asyncio").CancelledError:
-                cancelled = True
-                raise
+    class FakeClient:
+        def __init__(self, **kwargs):
+            created.append(self)
 
-    async def _failing_embedding(query: str) -> list[float]:
+    monkeypatch.setattr("qdrant_client.AsyncQdrantClient", FakeClient)
+    QdrantVectorStore._shared_client = None
+    first = QdrantVectorStore()
+    second = QdrantVectorStore()
+
+    assert first._client is second._client
+    assert len(created) == 1
+    QdrantVectorStore._shared_client = None
+
+
+@pytest.mark.asyncio
+async def test_dense_failure_degrades_to_bm25(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeStore:
+        async def search(self, *_args, **_kwargs):
+            raise AssertionError("dense search is not reached when embedding fails")
+
+        async def search_sparse(self, _query, top_k):
+            return [
+                {
+                    "id": "bm25-1",
+                    "score": 5.0,
+                    "text": "Benzoyl peroxide is an antimicrobial acne treatment.",
+                    "chunk_id": "bm25-1",
+                    "source_id": "guideline",
+                }
+            ]
+
+        async def close(self):
+            return None
+
+    async def fail_embedding(_query: str):
         raise RuntimeError("embedding unavailable")
 
-    retriever = object.__new__(HybridRetriever)
-    retriever._entity_retriever = _EntityRetriever()
-    monkeypatch.setattr("src.database.retriever.embed_query", _failing_embedding)
+    monkeypatch.setattr("src.retrieval.service.embed_query", fail_embedding)
+    result = await EvidenceRetriever(FakeStore()).retrieve("benzoyl peroxide", top_k=4)
 
-    with pytest.raises(RuntimeError, match="embedding unavailable"):
-        await retriever.retrieve("benzoyl peroxide là gì?")
-
-    assert cancelled is True
+    assert [item["id"] for item in result.vector_contexts] == ["bm25-1"]
+    assert result.metadata["retrieval_trace"]["channels"]["dense"]["error"] == "RuntimeError"
+    assert result.metadata["retrieval_status"] == "ok"
 
 
 @pytest.mark.asyncio
-async def test_shared_entity_payload_cache_avoids_a_second_scroll() -> None:
-    original_client = EntityRetriever._shared_client
-    original_cache = EntityRetriever._payload_cache
-    EntityRetriever._shared_client = _Closable()
-    EntityRetriever._payload_cache = {"acne_entities": [{"canonical_name": "adapalene"}]}
-    try:
-        retriever = EntityRetriever("acne_entities")
-        payloads = await retriever._scroll_entity_payloads()
+async def test_retrieval_timeout_is_finite(monkeypatch: pytest.MonkeyPatch) -> None:
+    class SlowStore:
+        async def search(self, *_args, **_kwargs):
+            await asyncio.sleep(1)
 
-        assert payloads == [{"canonical_name": "adapalene"}]
-    finally:
-        EntityRetriever._shared_client = original_client
-        EntityRetriever._payload_cache = original_cache
+        async def search_sparse(self, *_args, **_kwargs):
+            await asyncio.sleep(1)
+
+        async def close(self):
+            return None
+
+    async def slow_embedding(_query: str):
+        await asyncio.sleep(1)
+
+    monkeypatch.setenv("RETRIEVAL_TIMEOUT_SECONDS", "0.1")
+    monkeypatch.setattr("src.retrieval.service.embed_query", slow_embedding)
+
+    with pytest.raises(TimeoutError):
+        await EvidenceRetriever(SlowStore()).retrieve("mụn viêm")

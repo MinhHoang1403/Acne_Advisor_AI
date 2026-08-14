@@ -57,24 +57,6 @@ class NormalizedQuery(BaseModel):
         return value
 
 
-class QueryExpansion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    original_query: str
-    normalized_query: NormalizedQuery
-    expanded_terms: list[str] = Field(default_factory=list)
-    canonical_terms: list[str] = Field(default_factory=list)
-    alias_terms: list[str] = Field(default_factory=list)
-    expansion_reason: list[str] = Field(default_factory=list)
-
-    @field_validator("expanded_terms", "canonical_terms", "alias_terms", "expansion_reason", mode="before")
-    @classmethod
-    def _normalize_lists(cls, value: Any) -> Any:
-        if isinstance(value, list):
-            return _dedupe_strings(value)
-        return value
-
-
 class RetrievedCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -129,87 +111,10 @@ class PackedContext(BaseModel):
     debug: dict[str, Any] = Field(default_factory=dict)
 
 
-class RerankRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    original_query: str
-    normalized_query: NormalizedQuery
-    expansion: QueryExpansion | None = None
-    candidates: list[RetrievedCandidate] = Field(default_factory=list)
-    top_n: int
-    provider: str = "local_rules"
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class RerankScoreBreakdown(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    base_score: float | None = None
-    semantic_score: float | None = None
-    rule_score: float | None = None
-    retrieval_score: float | None = None
-    lexical_score: float = 0.0
-    entity_match_score: float = 0.0
-    metadata_match_score: float = 0.0
-    intent_alignment_score: float = 0.0
-    safety_alignment_score: float = 0.0
-    source_priority_score: float = 0.0
-    penalty: float = 0.0
-    final_score: float = 0.0
-    reasons: list[str] = Field(default_factory=list)
-
-
-class RerankedCandidate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    candidate: RetrievedCandidate
-    rerank_score: float
-    rerank_rank: int
-    score_breakdown: RerankScoreBreakdown
-
-
-class RerankTrace(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    provider: str
-    enabled: bool
-    input_count: int
-    output_count: int
-    top_n: int
-    ranked_candidates: list[RerankedCandidate] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
-    timings_ms: dict[str, float] = Field(default_factory=dict)
-    requested_provider: str | None = None
-    fallback_used: bool = False
-    semantic_model_available: bool = False
-
-
-class RetrievalTrace(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    original_query: str
-    normalized_query: NormalizedQuery
-    expansion: QueryExpansion
-    entity_candidates: list[RetrievedCandidate] = Field(default_factory=list)
-    chunk_candidates: list[RetrievedCandidate] = Field(default_factory=list)
-    merged_candidates: list[RetrievedCandidate] = Field(default_factory=list)
-    selected_context: list[RetrievedCandidate] = Field(default_factory=list)
-    packed_context: PackedContext | None = None
-    rerank_trace: RerankTrace | None = None
-    warnings: list[str] = Field(default_factory=list)
-    timings_ms: dict[str, float] = Field(default_factory=dict)
-
-
 __all__ = [
     "ContextItem",
     "ContextPackTrace",
     "NormalizedQuery",
     "PackedContext",
-    "QueryExpansion",
-    "RerankRequest",
-    "RerankScoreBreakdown",
-    "RerankTrace",
-    "RerankedCandidate",
     "RetrievedCandidate",
-    "RetrievalTrace",
 ]
