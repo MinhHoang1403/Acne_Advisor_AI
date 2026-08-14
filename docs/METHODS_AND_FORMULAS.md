@@ -2,17 +2,18 @@
 
 ## Dense Retrieval
 
-Gemini `models/gemini-embedding-2`, 3072 dimensions and cosine distance. The
-model does not receive a task type. Cache identity binds provider, model,
-dimension, distance, task configuration and exact normalized text. Code:
-`src/ingestion/embedding.py`.
+The frozen knowledge collection uses `models/gemini-embedding-2`, 3072
+dimensions, and cosine distance. Runtime query embeddings use the same model
+contract. S4B does not rebuild or alter stored vectors.
 
-## BM25
+## Native BM25
 
-The sparse channel is Qdrant-native BM25 with collection IDF and shared
-document/query preprocessing (`src/ingestion/bm25.py`). For term `t`, document
-`d`, corpus size `N`, document frequency `n(t)`, length `|d|`, and average
-length `avgdl`:
+The sparse channel is Qdrant-native BM25 with collection-side IDF and the frozen
+Phase 1 configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer `word`,
+lowercase enabled, language `none`, no stemming, and no stopword list.
+
+For term `t`, document `d`, corpus size `N`, document frequency `n(t)`, document
+length `|d|`, and average length `avgdl`:
 
 ```text
 IDF(t) = ln((N - n(t) + 0.5) / (n(t) + 0.5) + 1)
@@ -20,23 +21,32 @@ score(t,d) = IDF(t) * tf(t,d) * (k1 + 1)
              / (tf(t,d) + k1 * (1 - b + b * |d| / avgdl))
 ```
 
-Frozen Qdrant configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer
-`word`, lowercase enabled, language `none`, no stemming, stopword list or ASCII
-folding. These are explicit implementation/project parameters, not claimed
-clinical constants. Tests compare hand calculations and provider schema.
+## Reciprocal Rank Fusion
 
-## Chunking and Filtering
+Dense and BM25 results are fused only by rank in `src/retrieval/rrf.py`:
 
-Structure-first Markdown chunking uses a 2400 Unicode-character cap and zero
-overlap. It was selected from three actual-corpus candidates using chunk length,
-boundary, duplication and safety-text retention diagnostics. Filtering removes
-only empty/page-number/TOC/parser artifacts and exact duplicates; short medical
-content is retained.
+```text
+RRF(d) = sum_r w_r / (k + rank_r(d))
+```
 
-## Retrieval V5 and P3/P4
+S4B uses `k=60`, `w_dense=1.0`, and `w_bm25=1.0`. Equal weights are an explicit
+engineering policy, not a clinical constant. No metadata boost, reranker,
+candidate policy, selector, Entity score, or Graph score changes relevance.
 
-Reciprocal Rank Fusion remains in `src/retrieval/rrf.py`; retrieval orchestration
-is Phase 2 and is not part of the frozen Phase 1 build formula. P3 allows at
-most two retrieval attempts. P4 remains shadow-only. EntityCards and graph
-signals are discovery/structure aids and cannot independently ground medical
-answers.
+## Context and Evidence Contracts
+
+`src/retrieval/context_packer.py` preserves fused order, deduplicates only by
+stable item identity, retains provenance, and enforces finite item/character
+budgets. Evidence is sufficient only when at least one packed item has both
+medical text and a source identifier. This is a deterministic provenance gate;
+semantic interpretation remains with the LLM.
+
+Retrieval is bounded by `RETRIEVAL_TIMEOUT_SECONDS` and two attempts. These are
+engineering safety/latency policies. Failure to obtain provenance-complete
+evidence results in explicit abstention.
+
+## Frozen Phase 1
+
+Structure-first chunking remains capped at 2400 Unicode characters with zero
+overlap. Phase 1 filtering, provenance, embedding, BM25, taxonomy, EntityCards,
+and Neo4j contracts are unchanged by S4B.

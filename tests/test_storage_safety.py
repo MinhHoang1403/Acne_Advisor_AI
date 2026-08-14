@@ -104,16 +104,13 @@ async def test_qdrant_vector_store_search_passes_filter_to_client():
 
 
 @pytest.mark.asyncio
-async def test_hybrid_retriever_close_logs_sanitized_errors(caplog):
+async def test_evidence_retriever_close_logs_sanitized_errors(caplog):
     class BrokenComponent:
         async def close(self):
             raise RuntimeError("close failed api_key=secret-value")
 
     retriever = HybridRetriever.__new__(HybridRetriever)
     retriever._vector_store = BrokenComponent()
-    retriever._graph_store = BrokenComponent()
-    retriever._entity_retriever = BrokenComponent()
-
     with caplog.at_level(logging.WARNING):
         await retriever.close()
 

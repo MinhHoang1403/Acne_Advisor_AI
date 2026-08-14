@@ -292,11 +292,10 @@ def test_emergency_rules_have_priority_over_caution_active_ingredient():
     assert result.answer.startswith("**Tóm tắt ngắn**")
 
 
-def test_graph_routing_helpers_keep_cache_position_after_guard():
-    assert graph_module.route_after_guard({"is_in_domain": True}) == "cache_lookup"
-    assert graph_module.route_after_guard({"is_in_domain": False}) == "finalize"
-    assert graph_module.route_after_cache({"cache_hit": True}) == "finalize"
-    assert graph_module.route_after_cache({"cache_hit": False}) == "extract"
+def test_graph_routing_uses_the_explicit_agent_action():
+    assert graph_module.route_agent_action({"next_action": "finalize"}) == "finalize"
+    assert graph_module.route_agent_action({"next_action": "retrieve"}) == "retrieve"
+    assert graph_module.route_agent_action({}) == "abstain"
 
 
 def test_cache_model_key_resolution_variants(monkeypatch):
@@ -426,7 +425,7 @@ async def test_cache_lookup_hit_and_invalid_metadata(monkeypatch):
                 "sources": ["source.pdf"],
                 "metadata": {
                     "quality_passed": True,
-                    "answer_version": "v5",
+                    "answer_version": "v6",
                     "pipeline_fingerprint": "fp123",
                 },
                 "model_name": "gemini-2.5-flash",
@@ -436,7 +435,7 @@ async def test_cache_lookup_hit_and_invalid_metadata(monkeypatch):
             "sources": [],
             "metadata": {
                 "quality_passed": False,
-                "answer_version": "v5",
+                "answer_version": "v6",
                 "pipeline_fingerprint": "fp123",
             },
         }

@@ -8,7 +8,6 @@ from httpx import ASGITransport, AsyncClient
 from src.agent.llm import provider as llm_provider
 from src.agent.nodes import cache as cache_node
 from src.api import app as app_module
-from src.database import retriever as retriever_module
 from src.resilience.budget import DeadlineBudget
 from src.resilience.circuit_breaker import CircuitBreaker, CircuitState, InMemoryCircuitStateStore
 from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilience_settings_from_env
@@ -44,13 +43,6 @@ def test_runtime_resilience_defaults_reserve_time_for_one_compact_ollama_retry(m
     assert settings.ollama_timeout_seconds == 160
     assert settings.agent_total_timeout_seconds == 210
     assert settings.agent_total_timeout_seconds > settings.ollama_timeout_seconds
-
-
-def test_rerank_timeout_is_capped_below_retrieval_timeout(monkeypatch):
-    monkeypatch.setenv("RETRIEVAL_TIMEOUT_SECONDS", "20")
-    monkeypatch.setenv("RERANK_TIMEOUT_SECONDS", "20")
-
-    assert retriever_module._rerank_timeout_within_retrieval_budget() == 10
 
 
 def test_deadline_budget_fake_clock_caps_and_expires():

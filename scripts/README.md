@@ -17,11 +17,12 @@ read-only regression gates.
 
 ## Regression Gates
 
-- `eval_retrieval_v5_release.py`: provider-free Retrieval V5 contract.
-- `eval_p3_evidence_sufficiency.py`: P3 bounded retry/abstention contract.
+- `smoke_phase2_runtime.py`: provider-free eight-case structural agent smoke.
+- `eval_phase2_answer_quality.py`: retained answer-policy regression.
+- `eval_safe_fallback_flow.py`: deterministic fallback regression.
+- `eval_runtime_resilience.py`: timeout/retry/circuit-breaker regression.
 - `eval_phase2_all.py`: aggregate supported offline checks.
-- Other `eval_phase2_*`, resilience, fallback and reranker scripts are focused
-  Phase 2 regression gates, not Phase 1 build paths or clinical validation.
+- `inspect_cache_versions.py`: cache/fingerprint contract inspection.
 
 Historical incremental ingestion, the retired sparse implementation, and LLM
 semantic graph scripts were removed. Git history and rollback artifacts preserve

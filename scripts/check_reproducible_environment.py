@@ -22,7 +22,7 @@ REQUIRED_ENV_EXAMPLE_KEYS = {
     "SAFE_FALLBACK_FLOW_VERSION": "safe_fallback_flow_v1",
     "SEVERITY_GUARD_VERSION": "severity_aware_answer_guard_v1",
     "RUNTIME_RESILIENCE_VERSION": "runtime_resilience_v1",
-    "CACHE_ANSWER_VERSION": "v5",
+    "CACHE_ANSWER_VERSION": "v6",
     "ENTITY_FOUNDATION_VERSION": "entity_foundation_v2",
     "REPRODUCIBLE_ENVIRONMENT_VERSION": "reproducible_environment_v1",
     "END_TO_END_RELEASE_READINESS_VERSION": "end_to_end_release_readiness_v1",

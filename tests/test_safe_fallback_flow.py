@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 from fastapi import HTTPException
 
@@ -9,7 +7,6 @@ from src.agent import graph as graph_module
 from src.agent.emergency_contract import first_sentence_has_immediate_emergency_action
 from src.agent.nodes import fallback as fallback_node
 from src.agent.nodes import reason as reason_node
-from src.agent.nodes import retrieve as retrieve_node
 from src.agent.nodes.cache import cache_lookup_node, cache_store_node
 from src.api.app import ChatRequest, chat_endpoint, _http_status_for_resilience_error
 from src.observability.trace_exporter import build_observability_event
@@ -217,83 +214,6 @@ async def test_retrieval_error_fallback_keeps_emergency_action_first():
     assert first_sentence_has_immediate_emergency_action(decision["fallback_answer"]) is True
     assert fallback["medical_severity"] == "emergency"
     assert first_sentence_has_immediate_emergency_action(fallback["draft_answer"]) is True
-
-
-@pytest.mark.asyncio
-async def test_retrieve_empty_query_does_not_call_retriever(monkeypatch):
-    called = False
-
-    class FakeRetriever:
-        def __init__(self):
-            nonlocal called
-            called = True
-
-    monkeypatch.setattr(retrieve_node, "HybridRetriever", FakeRetriever)
-    result = await retrieve_node.retrieve_context_node({"standalone_question": ""})
-
-    assert called is False
-    assert result["retrieval_status"] == "empty_query"
-    assert result["vector_contexts"] == []
-
-
-@pytest.mark.asyncio
-async def test_retrieve_success_and_no_evidence_status(monkeypatch):
-    class Result:
-        vector_contexts = [{"text": "Mụn đầu đen là dạng nhân mụn mở.", "source_file": "doc.pdf"}]
-        graph_facts = []
-        sources = ["doc.pdf"]
-        metadata = {"retrieval_trace": {"ok": True}, "packed_context": {"items": [], "context_text": ""}}
-
-    class FakeRetriever:
-        async def retrieve(self, query, top_k):
-            return Result()
-
-        async def close(self):
-            return None
-
-    monkeypatch.setattr(retrieve_node, "HybridRetriever", FakeRetriever)
-    success = await retrieve_node.retrieve_context_node({"standalone_question": "mụn đầu đen"})
-
-    Result.vector_contexts = []
-    Result.sources = []
-    empty = await retrieve_node.retrieve_context_node({"standalone_question": "mụn đầu đen"})
-
-    assert success["retrieval_status"] == "success"
-    assert empty["retrieval_status"] == "no_evidence"
-
-
-@pytest.mark.asyncio
-async def test_retrieve_recoverable_error_resets_context(monkeypatch):
-    class FakeRetriever:
-        async def retrieve(self, query, top_k):
-            raise ValueError("backend failed password=secret")
-
-        async def close(self):
-            return None
-
-    monkeypatch.setattr(retrieve_node, "HybridRetriever", FakeRetriever)
-    result = await retrieve_node.retrieve_context_node(
-        {"standalone_question": "mụn viêm", "errors": [], "vector_contexts": [{"text": "old"}]}
-    )
-
-    assert result["retrieval_status"] == "recoverable_error"
-    assert result["vector_contexts"] == []
-    assert "secret" not in result["retrieval_error"]
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("exc", [StageTimeoutError("timeout"), asyncio.CancelledError()])
-async def test_retrieve_timeout_and_cancelled_propagate(monkeypatch, exc):
-    class FakeRetriever:
-        async def retrieve(self, query, top_k):
-            raise exc
-
-        async def close(self):
-            return None
-
-    monkeypatch.setattr(retrieve_node, "HybridRetriever", FakeRetriever)
-    with pytest.raises(type(exc)):
-        await retrieve_node.retrieve_context_node({"standalone_question": "mụn viêm"})
 
 
 @pytest.mark.asyncio
@@ -553,10 +473,9 @@ async def test_cache_hit_does_not_run_retrieval_fallback():
 
 
 def test_graph_routes_and_compile_safe_fallback_flow():
-    assert graph_module.route_after_fallback_decision({"fallback_applied": True}) == "safe_fallback"
-    assert graph_module.route_after_fallback_decision({"fallback_applied": False}) == "safety"
-    assert graph_module.route_after_generation_fallback_decision({"fallback_applied": True}) == "safe_fallback"
-    assert graph_module.route_after_generation_fallback_decision({"fallback_applied": False}) == "claim_grounding"
+    assert graph_module.route_agent_action({"next_action": "retrieve"}) == "retrieve"
+    assert graph_module.route_agent_action({"next_action": "generate"}) == "generate"
+    assert graph_module.route_agent_action({}) == "abstain"
     assert graph_module.build_clinical_graph() is not None
 
 
@@ -671,4 +590,4 @@ def test_versioning_changes_fingerprint_without_cache_version_change():
 
     assert new["safe_fallback_flow_version"] == SAFE_FALLBACK_FLOW_VERSION
     assert compute_pipeline_fingerprint(old) != compute_pipeline_fingerprint(new)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v5"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v6"

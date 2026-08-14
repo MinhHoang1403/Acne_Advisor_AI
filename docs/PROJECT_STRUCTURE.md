@@ -8,7 +8,7 @@
 - `data/taxonomy/drug_aliases.yaml`: active source-backed taxonomy.
 - `data/phase1_method_sources.json`: machine-readable method/source registry.
 - `src/database/`: Qdrant, Neo4j and PostgreSQL runtime adapters.
-- `src/retrieval/`: Retrieval V5 contracts and evidence selection.
+- `src/retrieval/`: Dense + native BM25 + RRF evidence service and one bounded packer.
 - `src/agent/`: LangGraph workflow, prompts, generation and presentation.
 - `src/quality/`: deterministic medical safety and grounding checks.
 - `src/api/`: FastAPI application and preflight.

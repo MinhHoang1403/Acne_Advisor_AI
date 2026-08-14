@@ -11,7 +11,7 @@ from typing import Any
 
 from src.agent.answer_formatting import assess_structural_quality, infer_response_profile
 from src.agent.requested_structure import canonical_column_name, parse_requested_structure
-from src.retrieval.contracts import NormalizedQuery, PackedContext, RetrievalTrace
+from src.retrieval.contracts import NormalizedQuery, PackedContext
 from src.retrieval.query_normalization import normalize_query
 from src.quality.contracts import (
     AnswerGuardResult,
@@ -36,7 +36,7 @@ def verify_answer_quality(
     answer: str,
     normalized_query: NormalizedQuery | None = None,
     packed_context: PackedContext | None = None,
-    retrieval_trace: RetrievalTrace | None = None,
+    retrieval_trace: Any | None = None,
 ) -> AnswerVerificationReport:
     """Verify answer quality with deterministic medical/domain rules."""
 
@@ -117,7 +117,7 @@ def apply_answer_guard(
     answer: str,
     normalized_query: NormalizedQuery | None = None,
     packed_context: PackedContext | None = None,
-    retrieval_trace: RetrievalTrace | None = None,
+    retrieval_trace: Any | None = None,
     mode: str = "metadata_only",
 ) -> AnswerGuardResult:
     """Apply answer guard in metadata-only, append-warnings, or strict-safe mode."""

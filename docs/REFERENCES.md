@@ -16,6 +16,27 @@ clinical sources are deliberately separated.
   Fusion Outperforms Condorcet and Individual Rank Learning Methods*. SIGIR.
   DOI: 10.1145/1571941.1572114. Supports rank-only fusion at the runtime
   boundary; it is not part of Phase 1 indexing.
+- Lewis, P. et al. (2020). *Retrieval-Augmented Generation for
+  Knowledge-Intensive NLP Tasks*. NeurIPS. Establishes retrieval-grounded
+  generation as a distinct model/evidence architecture.
+- Yao, S. et al. (2023). *ReAct: Synergizing Reasoning and Acting in Language
+  Models*. ICLR. Supports explicit interleaving of model decisions and bounded
+  actions/tools.
+- Jiang, Z. et al. (2023). *Active Retrieval Augmented Generation*. EMNLP.
+  Supports retrieval decisions driven by evidence need rather than an
+  unconditionally fixed sequence.
+- Jeong, S. et al. (2024). *Adaptive-RAG: Learning to Adapt Retrieval-Augmented
+  Large Language Models through Question Complexity*. NAACL. Supports bounded
+  adaptation of retrieval behavior to the request.
+
+## Framework Contracts
+
+- LangGraph, *Graph API* and `StateGraph` reference, verified 2026-08-14.
+  https://docs.langchain.com/oss/python/langgraph/graph-api
+  https://reference.langchain.com/python/langgraph/graph/state/StateGraph
+- LangChain, *Tools* and LangGraph *Agentic RAG*, verified 2026-08-14.
+  https://docs.langchain.com/oss/python/langchain/tools
+  https://docs.langchain.com/oss/python/langgraph/agentic-rag
 - Karpukhin, V. et al. (2020). *Dense Passage Retrieval for Open-Domain
   Question Answering*. EMNLP. DOI: 10.18653/v1/2020.emnlp-main.550. Supports
   dense retrieval as a semantic channel.

@@ -9,7 +9,7 @@ from src.agent.emergency_contract import (
 )
 from src.agent.nodes import reason as reason_node
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.nodes.retrieve import rewrite_question_node
+from src.agent.nodes.preparation import rewrite_question_node
 from src.agent.requested_structure import parse_requested_structure
 from src.quality.answer_verifier import verify_answer_quality
 from src.quality.severity_guard import apply_severity_aware_answer_guard, classify_medical_severity
@@ -250,108 +250,52 @@ async def test_finalize_response_live_path_repairs_cached_exact_sign_drift():
 
 
 @pytest.mark.asyncio
-async def test_coreference_rewrite_resolves_second_epiduo_ingredient_to_bpo():
+async def test_coreference_rewrite_uses_llm_without_taxonomy_rules(monkeypatch):
+    expected = "Benzoyl peroxide trong Epiduo có phải là kháng sinh không?"
+    captured: dict[str, str] = {}
+
+    async def fake_generate_llm_response(**kwargs):
+        captured["prompt"] = kwargs["prompt"]
+        return {"text": expected}
+
+    monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fake_generate_llm_response)
     result = await rewrite_question_node(
         {
             "user_question": "Hoạt chất thứ hai có phải kháng sinh không?",
-            "normalized_question": "hoạt chất thứ hai có phải kháng sinh không?",
-            "conversation_history": [{"role": "user", "content": "Epiduo gồm những hoạt chất nào?"}],
+            "normalized_question": "Hoạt chất thứ hai có phải kháng sinh không?",
+            "conversation_history": [{"role": "user", "content": "Epiduo gồm adapalene và benzoyl peroxide."}],
+            "llm_provider": "mock",
         }
     )
 
-    assert result["standalone_question"] == "benzoyl peroxide trong Epiduo có phải kháng sinh không?"
+    assert result["standalone_question"] == expected
     assert result["use_history_context"] is True
+    assert result["conversation_context"]["rewrite_succeeded"] is True
+    assert "Epiduo" in captured["prompt"]
+    assert "không thêm dữ kiện" in captured["prompt"]
 
 
 @pytest.mark.asyncio
-async def test_coreference_rewrite_preserves_bpo_antimicrobial_followup_intent():
-    result = await rewrite_question_node(
-        {
-            "user_question": "Vậy tại sao nó lại có tác dụng kháng khuẩn?",
-            "normalized_question": "vậy tại sao nó lại có tác dụng kháng khuẩn?",
-            "conversation_history": [
-                {"role": "user", "content": "Benzoyl peroxide có phải kháng sinh không?"},
-                {"role": "assistant", "content": "Benzoyl peroxide không phải là kháng sinh."},
-            ],
-        }
-    )
+async def test_history_without_reference_does_not_trigger_rewrite(monkeypatch):
+    called = False
 
-    assert result["standalone_question"].startswith("Vì sao benzoyl peroxide")
-    assert "kháng khuẩn/antimicrobial" in result["standalone_question"]
+    async def fake_generate_llm_response(**kwargs):
+        nonlocal called
+        called = True
+        return {"text": "unexpected"}
 
-
-@pytest.mark.asyncio
-async def test_coreference_rewrite_resolves_tazorac_group_followup():
-    result = await rewrite_question_node(
-        {
-            "user_question": "Nó thuộc nhóm nào?",
-            "normalized_question": "nó thuộc nhóm nào?",
-            "conversation_history": [{"role": "assistant", "content": "Tazorac chứa tazarotene."}],
-        }
-    )
-
-    assert result["standalone_question"] == "Tazorac (tazarotene) thuộc nhóm thuốc nào?"
-
-
-@pytest.mark.asyncio
-async def test_coreference_rewrite_resolves_product_comparison_with_explicit_comparator():
-    result = await rewrite_question_node(
-        {
-            "user_question": "Sản phẩm đó khác Differin ở điểm nào?",
-            "normalized_question": "sản phẩm đó khác differin ở điểm nào?",
-            "conversation_history": [
-                {"role": "user", "content": "Tôi vừa hỏi về Epiduo."},
-                {"role": "assistant", "content": "Tôi đã ghi nhận thông tin này để trả lời câu tiếp theo."},
-            ],
-        }
-    )
-
-    assert result["standalone_question"] == "Epiduo khác Differin ở điểm nào?"
-    assert result["use_history_context"] is True
-
-
-@pytest.mark.asyncio
-async def test_coreference_rewrite_preserves_clindamycin_monotherapy_polarity():
-    result = await rewrite_question_node(
-        {
-            "user_question": "Có nên dùng riêng nó kéo dài không?",
-            "normalized_question": "có nên dùng riêng nó kéo dài không?",
-            "conversation_history": [
-                {"role": "user", "content": "Bác sĩ từng kê clindamycin bôi cho tôi."},
-            ],
-        }
-    )
-
-    assert result["standalone_question"] == "Có nên dùng clindamycin đơn độc hoặc kéo dài để trị mụn không?"
-    assert result["use_history_context"] is True
-
-
-@pytest.mark.asyncio
-async def test_coreference_rewrite_resolves_name_reference_to_prior_product():
-    result = await rewrite_question_node(
-        {
-            "user_question": "Tên đó liên quan đến hoạt chất nào?",
-            "normalized_question": "tên đó liên quan đến hoạt chất nào?",
-            "conversation_history": [{"role": "user", "content": "Tôi đang nói về Dalacin T."}],
-        }
-    )
-
-    assert result["standalone_question"].startswith("Dalacin T:")
-    assert result["use_history_context"] is True
-
-
-@pytest.mark.asyncio
-async def test_coreference_rewrite_carries_active_product_for_context_dependent_routine_followup():
+    monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fake_generate_llm_response)
     result = await rewrite_question_node(
         {
             "user_question": "Vì sao không nên thêm nhiều hoạt chất mạnh cùng lúc?",
-            "normalized_question": "vì sao không nên thêm nhiều hoạt chất mạnh cùng lúc?",
+            "normalized_question": "Vì sao không nên thêm nhiều hoạt chất mạnh cùng lúc?",
             "conversation_history": [{"role": "user", "content": "Tôi có dùng Epiduo."}],
         }
     )
 
-    assert result["standalone_question"].startswith("Epiduo:")
-    assert result["use_history_context"] is True
+    assert called is False
+    assert result["standalone_question"] == "Vì sao không nên thêm nhiều hoạt chất mạnh cùng lúc?"
+    assert result["use_history_context"] is False
 
 
 @pytest.mark.asyncio

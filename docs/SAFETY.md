@@ -1,19 +1,23 @@
 # Safety Contracts
 
-Safety behavior is implemented under `src/quality/` and invoked by LangGraph
-nodes under `src/agent/nodes/`. Regression tests cover emergency escalation,
-pregnancy constraints, medication-risk wording, safe fallback, severity-aware
-answers and presentation consistency.
+Authoritative deterministic safety behavior lives under `src/quality/` and is
+invoked from the LangGraph workflow. It is not delegated to an optional LLM
+tool.
 
 Key invariants:
 
-- emergency guidance is prioritized over routine acne advice;
-- the system does not diagnose or prescribe;
-- insufficient evidence can produce deterministic abstention;
-- provider failure can produce a safe fallback;
-- cached answers remain versioned and pass eligibility checks;
-- P4 shadow output does not rewrite the user-visible answer;
-- EntitySignal and GraphSignal are not treated as source-backed medical evidence.
+- emergency guidance precedes routine acne advice;
+- the system does not diagnose, prescribe, or replace a clinician;
+- pregnancy and medication-risk wording is preserved by final guards;
+- evidence must include medical text and source provenance;
+- insufficient evidence after two attempts produces explicit abstention;
+- provider failure produces a safe, non-fabricated fallback;
+- cache entries are versioned, fingerprinted, and quality-gated;
+- EntityCards and graph structure are not medical evidence;
+- observability redacts raw queries and secret-like values.
 
-Files under `tests/fixtures/` are regression data unless explicitly documented
-otherwise. They are not clinical gold and do not establish external validity.
+Regression tests cover emergency escalation, pregnancy constraints,
+medication wording, severity-aware answers, fallback, source validation,
+Markdown presentation, and cache eligibility. Regression fixtures protect
+software behavior; they are not clinical gold and do not establish answer
+quality or external validity.

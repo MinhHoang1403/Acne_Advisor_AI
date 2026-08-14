@@ -8,7 +8,7 @@ from src.agent.answer_formatting import finalize_answer_presentation, grounded_e
 from src.agent.nodes.fallback import fallback_decision_node
 from src.agent.nodes.guardrails import domain_guard_node
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.nodes.retrieve import build_conversation_context, rewrite_question_node
+from src.agent.nodes.preparation import rewrite_question_node
 from src.agent.source_presentation import (
     build_source_allowlist,
     build_source_metadata,
@@ -159,71 +159,6 @@ def test_alias_map_retains_verified_active_ingredient_class() -> None:
     assert "kháng sinh bôi" in answer
 
 
-@pytest.mark.asyncio
-async def test_followup_frequency_reduction_and_moisturizer_are_resolved_from_history() -> None:
-    result = await rewrite_question_node(
-        {
-            "normalized_question": "vậy tôi nên điều chỉnh tần suất thế nào?",
-            "user_question": "Vậy tôi nên điều chỉnh tần suất thế nào?",
-            "conversation_history": [
-                {"role": "user", "content": "Da tôi đang dùng benzoyl peroxide và bị khô nhẹ."},
-                {"role": "assistant", "content": "Đã ghi nhận."},
-            ],
-        }
-    )
-
-    assert "benzoyl peroxide" in result["standalone_question"].lower()
-    assert "dưỡng ẩm" in result["standalone_question"].lower()
-    assert result["conversation_context"]["tolerance_context"] == "khô nhẹ"
-
-    answer = finalize_answer_presentation(
-        "Bản nháp không liên quan.",
-        user_question=result["standalone_question"],
-    )
-    assert "benzoyl peroxide" in answer.lower()
-    assert "giảm tần suất" in answer.lower()
-    assert "dưỡng ẩm" in answer.lower()
-
-
-@pytest.mark.asyncio
-async def test_irritated_skin_followup_about_active_ingredients_preserves_moisturizer_action() -> None:
-    result = await rewrite_question_node(
-        {
-            "normalized_question": "nên làm gì với các hoạt chất lúc này?",
-            "user_question": "Nên làm gì với các hoạt chất lúc này?",
-            "conversation_history": [
-                {"role": "user", "content": "Tôi đã dùng routine nhiều bước và bị rát."},
-                {"role": "assistant", "content": "Tôi đã ghi nhận thông tin này."},
-            ],
-        }
-    )
-
-    assert "rát" in result["standalone_question"].lower()
-    assert "dưỡng ẩm" in result["standalone_question"].lower()
-
-    answer = finalize_answer_presentation("Bản nháp không liên quan.", user_question=result["standalone_question"])
-    assert "kích ứng" in answer.lower()
-    assert "giảm" in answer.lower()
-    assert "dưỡng ẩm" in answer.lower()
-
-
-@pytest.mark.asyncio
-async def test_daytime_retinoid_followup_preserves_treatment_class_from_history() -> None:
-    result = await rewrite_question_node(
-        {
-            "normalized_question": "ban ngày có bước nào đặc biệt quan trọng?",
-            "user_question": "Ban ngày có bước nào đặc biệt quan trọng?",
-            "conversation_history": [
-                {"role": "user", "content": "Tôi đang dùng retinoid bôi buổi tối."},
-                {"role": "assistant", "content": "Tôi đã ghi nhận thông tin này."},
-            ],
-        }
-    )
-
-    assert "retinoid bôi" in result["standalone_question"].lower()
-    assert "hạn chế kích ứng" in result["standalone_question"].lower()
-
-
 def test_daytime_retinoid_followup_answer_covers_sunscreen_and_irritation() -> None:
     answer = finalize_answer_presentation(
         "Một câu trả lời nháp không đầy đủ.",
@@ -236,98 +171,47 @@ def test_daytime_retinoid_followup_answer_covers_sunscreen_and_irritation() -> N
 
 
 @pytest.mark.asyncio
-async def test_product_to_ingredient_coreference() -> None:
+async def test_coreference_rewrite_uses_bounded_history_and_llm(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    async def fake_generate_llm_response(**kwargs):
+        captured["prompt"] = kwargs["prompt"]
+        return {"text": "Hoạt chất chính của Differin là gì?"}
+
+    monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fake_generate_llm_response)
     result = await rewrite_question_node(
         {
-            "normalized_question": "hoạt chất chính của thuốc đó là gì?",
-            "user_question": "Hoạt chất chính của thuốc đó là gì?",
-            "conversation_history": [{"role": "user", "content": "Tôi đang nói về Differin."}],
-        }
-    )
-
-    assert "Differin" in result["standalone_question"]
-    assert "adapalene" in result["standalone_question"].lower()
-
-
-@pytest.mark.asyncio
-async def test_ambiguous_pronoun_requests_clarification() -> None:
-    result = await rewrite_question_node(
-        {
-            "normalized_question": "nó có phải kháng sinh không?",
-            "user_question": "Nó có phải kháng sinh không?",
+            "normalized_question": "Hoạt chất chính của thuốc đó là gì?",
             "conversation_history": [
-                {"role": "user", "content": "Tôi đang dùng Differin và Dalacin T."},
-            ],
+                {"role": "user", "content": f"old-{index}"} for index in range(8)
+            ] + [{"role": "user", "content": "Tôi đang nói về Differin."}],
+            "llm_provider": "mock",
         }
     )
 
-    assert result["conversation_context"]["unresolved_user_reference"] is True
-    assert result["conversation_context"]["clarification_options"] == ["Differin", "Dalacin T"]
+    assert result["standalone_question"] == "Hoạt chất chính của Differin là gì?"
+    assert result["use_history_context"] is True
+    assert "old-0" not in captured["prompt"]
+    assert "Differin" in captured["prompt"]
 
 
 @pytest.mark.asyncio
-async def test_pregnancy_and_antibiotic_constraints_persist_from_user_history() -> None:
-    pregnancy = await rewrite_question_node(
+async def test_failed_coreference_rewrite_falls_back_without_fabrication(monkeypatch) -> None:
+    async def fail_generate_llm_response(**kwargs):
+        raise RuntimeError("provider unavailable token=secret")
+
+    monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fail_generate_llm_response)
+    result = await rewrite_question_node(
         {
-            "normalized_question": "liệu adapalene có nên tự tiếp tục không?",
-            "user_question": "Liệu adapalene có nên tự tiếp tục không?",
-            "conversation_history": [{"role": "user", "content": "Tôi đang mang thai và vừa hỏi về retinoid."}],
-        }
-    )
-    antibiotic = await rewrite_question_node(
-        {
-            "normalized_question": "có nên dùng riêng nó kéo dài không?",
-            "user_question": "Có nên dùng riêng nó kéo dài không?",
-            "conversation_history": [{"role": "user", "content": "Bác sĩ từng kê clindamycin bôi cho tôi."}],
+            "normalized_question": "Nó có phải kháng sinh không?",
+            "conversation_history": [{"role": "user", "content": "Tôi đang dùng hai sản phẩm."}],
+            "llm_provider": "mock",
         }
     )
 
-    assert pregnancy["conversation_context"]["pregnancy_context"] is True
-    assert antibiotic["conversation_context"]["antibiotic_context"] is True
-    assert "clindamycin" in antibiotic["standalone_question"].lower()
-
-
-@pytest.mark.asyncio
-async def test_followup_blackhead_and_body_acne_context_are_resolved_without_assumption() -> None:
-    blackhead = await rewrite_question_node(
-        {
-            "normalized_question": "dạng đó có phải mụn viêm không?",
-            "user_question": "Dạng đó có phải mụn viêm không?",
-            "conversation_history": [{"role": "user", "content": "Tôi đang nói về mụn đầu đen."}],
-        }
-    )
-    body = await rewrite_question_node(
-        {
-            "normalized_question": "thói quen nào nên chú ý thêm?",
-            "user_question": "Thói quen nào nên chú ý thêm?",
-            "conversation_history": [{"role": "user", "content": "Tôi bị mụn lưng sau khi tập."}],
-        }
-    )
-
-    assert blackhead["standalone_question"] == "Mụn đầu đen có phải là mụn viêm không?"
-    assert "mụn lưng" in body["standalone_question"].lower()
-    assert "mồ hôi" in body["standalone_question"].lower()
-    assert "mụn viêm" not in body["standalone_question"].lower()
-
-
-def test_conversation_context_does_not_leak_between_histories() -> None:
-    active = build_conversation_context([{"role": "user", "content": "Tôi dùng Differin."}])
-    empty = build_conversation_context([])
-
-    assert active["active_product"] == "Differin"
-    assert empty["active_product"] is None
-    assert empty["active_topic"] is None
-
-
-def test_conversation_context_ignores_assistant_only_entity_mentions() -> None:
-    context = build_conversation_context(
-        [
-            {"role": "user", "content": "Tôi đang nói về mụn đầu đen."},
-            {"role": "assistant", "content": "Bạn có thể cân nhắc Differin."},
-        ]
-    )
-
-    assert context["active_product"] is None
+    assert result["standalone_question"] == "Nó có phải kháng sinh không?"
+    assert result["use_history_context"] is True
+    assert result["conversation_context"]["rewrite_succeeded"] is False
 
 
 def test_recoverable_component_miss_with_evidence_does_not_trigger_generic_fallback() -> None:

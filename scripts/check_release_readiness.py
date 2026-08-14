@@ -29,7 +29,7 @@ except ImportError:
     pass
 
 EXPECTED_VERSION = "end_to_end_release_readiness_v1"
-EXPECTED_CACHE_VERSION = "v5"
+EXPECTED_CACHE_VERSION = "v6"
 EXPECTED_FINGERPRINT_BEFORE_STEP10 = "c8507401e35043380fd119e7"
 EXPECTED_COUNTS = {
     "acne_knowledge": 512,
@@ -158,7 +158,13 @@ async def run_offline(*, run_pip_check: bool = True) -> dict[str, Any]:
             {"fingerprint": fingerprint, "previous": EXPECTED_FINGERPRINT_BEFORE_STEP10},
         )
     )
-    checks.append(check("cache_version_v5", get_answer_cache_version() == EXPECTED_CACHE_VERSION, {"cache_version": get_answer_cache_version()}))
+    checks.append(
+        check(
+            "cache_version_current",
+            get_answer_cache_version() == EXPECTED_CACHE_VERSION,
+            {"cache_version": get_answer_cache_version()},
+        )
+    )
 
     api_report = await offline_api_contract_checks()
     checks.extend(api_report)

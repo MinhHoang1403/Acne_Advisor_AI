@@ -20,27 +20,12 @@ from src.quality.safe_fallback import (
     decide_generation_fallback,
     decide_retrieval_fallback,
 )
-from src.quality.claim_grounding import (
-    AnswerClaim,
-    ClaimEntailmentVerdict,
-    ClaimEvidenceLink,
-    ClaimGroundingResult,
-    EntailmentStatus,
-    P4Mode,
-    evaluate_claim_grounding,
-)
 
 __all__ = [
     "AnswerGuardResult",
-    "AnswerClaim",
     "AnswerQualityIssue",
     "AnswerVerificationReport",
     "DomainProposition",
-    "ClaimEntailmentVerdict",
-    "ClaimEvidenceLink",
-    "ClaimGroundingResult",
-    "EntailmentStatus",
-    "P4Mode",
     "SeverityClassification",
     "SeverityGuardResult",
     "SAFE_FALLBACK_FLOW_VERSION",
@@ -51,6 +36,5 @@ __all__ = [
     "classify_medical_severity",
     "decide_generation_fallback",
     "decide_retrieval_fallback",
-    "evaluate_claim_grounding",
     "verify_answer_quality",
 ]

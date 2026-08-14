@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import pytest
 
-from src.agent.graph import route_after_guard
+from src.agent.graph import route_agent_action
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.nodes.reason import _select_answer_contexts, filter_graph_facts_for_prompt
-from src.agent.nodes.retrieve import rewrite_question_node
+from src.agent.nodes.reason import _select_answer_contexts
+from src.agent.nodes.preparation import rewrite_question_node
 from src.agent.prompts.medical_answer import MEDICAL_RAG_SYSTEM_PROMPT
 
 
@@ -39,92 +39,36 @@ def test_medical_prompt_contains_direct_answer_and_entity_preservation_rules():
     assert "ý nghĩ tự làm hại bản thân" in prompt
 
 
-def test_graph_fact_filter_removes_document_code_and_empty_fact():
-    facts = [
-        {
-            "entity": "ng198",
-            "relationship": "TREATS",
-            "related_entity": "acne",
-            "description": "guideline code",
-            "evidence": "citation",
-        },
-        {
-            "entity": "benzoyl peroxide",
-            "relationship": "TREATS",
-            "related_entity": "mụn trứng cá",
-            "description": "",
-            "evidence": "",
-        },
-        {
-            "entity": "benzoyl peroxide",
-            "relationship": "TREATS",
-            "related_entity": "mụn trứng cá",
-            "description": "Hoạt chất bôi trị mụn.",
-            "evidence": "AAD recommendation",
-        },
-    ]
-
-    filtered = filter_graph_facts_for_prompt(
-        query="benzoyl peroxide trị mụn",
-        contexts=[{"text": "benzoyl peroxide là hoạt chất bôi trị mụn.", "graph_nodes": ["benzoyl peroxide"]}],
-        graph_facts=facts,
-    )
-
-    assert len(filtered) == 1
-    assert filtered[0]["entity"] == "benzoyl peroxide"
-    assert filtered[0]["evidence"] == "AAD recommendation"
-
-
-def test_graph_fact_filter_removes_mechanism_treats_noise_without_context_support():
-    facts = [
-        {
-            "entity": "C. acnes",
-            "relationship": "TREATS",
-            "related_entity": "mụn trứng cá",
-            "description": "Noisy graph edge.",
-            "evidence": "citation",
-        }
-    ]
-
-    filtered = filter_graph_facts_for_prompt(
-        query="cơ chế mụn",
-        contexts=[{"text": "Mụn liên quan đến bít tắc nang lông và tăng tiết bã."}],
-        graph_facts=facts,
-    )
-
-    assert filtered == []
-
-
-def test_context_selection_prefers_clinical_chunk_over_abbreviation():
+def test_context_selection_preserves_packer_order_without_hidden_boost():
     contexts = [
-        {
-            "header": "Abbreviations",
-            "text": "BP: benzoyl peroxide",
-            "score": 0.99,
-        },
         {
             "header": "Treatment recommendations",
             "text": "Benzoyl peroxide may be used as an acne treatment and can cause irritation.",
             "score": 0.75,
         },
+        {
+            "header": "Abbreviations",
+            "text": "BP: benzoyl peroxide",
+            "score": 0.99,
+        },
     ]
 
-    selected = _select_answer_contexts(contexts, limit=1)
+    selected = _select_answer_contexts(contexts, limit=2)
 
-    assert selected[0]["header"] == "Treatment recommendations"
+    assert [item["header"] for item in selected] == ["Treatment recommendations", "Abbreviations"]
 
 
 def test_context_selection_prefers_bp_not_antibiotic_chunk_over_oral_antibiotics():
     contexts = [
         {
-            "header": "Oral antibiotics",
-            "text": "Oral antibiotics such as doxycycline may be used for acne in selected cases.",
-            "score": 0.95,
-        },
-        {
             "header": "Benzoyl peroxide (BP)",
             "text": "Benzoyl peroxide (BP) does not contain antibiotics and may reduce antibiotic resistance.",
             "score": 0.70,
+        },
+        {
+            "header": "Oral antibiotics",
+            "text": "Oral antibiotics such as doxycycline may be used for acne in selected cases.",
+            "score": 0.95,
         },
     ]
 
@@ -469,4 +413,4 @@ async def test_rewrite_preserves_explicit_primary_entity_with_history():
 
 
 def test_out_of_domain_guard_routes_to_finalize_without_retrieval():
-    assert route_after_guard({"is_in_domain": False}) == "finalize"
+    assert route_agent_action({"next_action": "finalize"}) == "finalize"

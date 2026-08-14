@@ -4,6 +4,8 @@ import pytest
 
 from src.agent.nodes import cache as cache_node
 from src.observability.versioning import (
+    S4B_ARCHITECTURE_FROZEN,
+    S4B_ARCHITECTURE_VERSION,
     build_pipeline_version_manifest,
     compute_pipeline_fingerprint,
     current_pipeline_fingerprint,
@@ -12,311 +14,130 @@ from src.observability.versioning import (
 )
 
 
-def test_pipeline_fingerprint_is_deterministic_and_changes():
-    manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "RERANKER_VERSION": "local_reranker_v1",
-        }
+def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
+    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v6"})
+    reversed_manifest = dict(reversed(list(manifest.items())))
+    changed = {**manifest, "context_packer_version": "bounded_provenance_packer_v2"}
+
+    assert compute_pipeline_fingerprint(manifest) == compute_pipeline_fingerprint(reversed_manifest)
+    assert compute_pipeline_fingerprint(manifest) != compute_pipeline_fingerprint(changed)
+    assert len(compute_pipeline_fingerprint(manifest)) == 24
+
+
+def test_manifest_describes_only_the_active_s4b_architecture() -> None:
+    manifest = build_pipeline_version_manifest()
+    serialized = str(manifest).casefold()
+
+    assert manifest["architecture_version"] == S4B_ARCHITECTURE_VERSION
+    assert manifest["architecture_frozen"] is S4B_ARCHITECTURE_FROZEN
+    assert manifest["orchestrator"] == "langgraph"
+    assert manifest["retrieval_architecture"] == "dense_bm25_rrf"
+    assert manifest["rrf_k"] == 60
+    assert manifest["rrf_dense_weight"] == 1.0
+    assert manifest["rrf_bm25_weight"] == 1.0
+    assert manifest["max_retrieval_attempts"] == 2
+    assert "rerank" not in serialized
+    assert "candidate_policy" not in serialized
+    assert "claim_shadow" not in serialized
+
+
+def test_retrieval_limits_partition_cache_identity() -> None:
+    baseline = build_pipeline_version_manifest(
+        {"RETRIEVAL_CONTEXT_MAX_ITEMS": "8", "RETRIEVAL_CONTEXT_MAX_CHARS": "6000"}
     )
-    fingerprint_a = compute_pipeline_fingerprint(manifest)
-    fingerprint_b = compute_pipeline_fingerprint(dict(reversed(list(manifest.items()))))
-
-    changed = dict(manifest)
-    changed["reranker_version"] = "local_reranker_v2"
-
-    assert fingerprint_a == fingerprint_b
-    assert fingerprint_a != compute_pipeline_fingerprint(changed)
-    assert len(fingerprint_a) == 24
-
-
-def test_retrieval_pipeline_version_partitions_cache_identity():
-    v4_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "RETRIEVAL_PIPELINE_VERSION": "v4",
-        }
-    )
-    v5_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "RETRIEVAL_PIPELINE_VERSION": "v5",
-        }
-    )
-
-    assert v4_manifest["retrieval_pipeline_version"] == "v4"
-    assert v5_manifest["retrieval_pipeline_version"] == "v5"
-    assert compute_pipeline_fingerprint(v4_manifest) != compute_pipeline_fingerprint(v5_manifest)
-
-
-def test_retrieval_pipeline_manifest_defaults_to_v5():
-    manifest = build_pipeline_version_manifest({"RETRIEVAL_PIPELINE_VERSION": ""})
-
-    assert manifest["retrieval_pipeline_version"] == "v5"
-
-
-def test_retrieval_v5_config_version_partitions_cache_identity():
-    previous = build_pipeline_version_manifest(
-        {
-            "RETRIEVAL_PIPELINE_VERSION": "v5",
-            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_entity_graph_signals_v1",
-        }
-    )
-    current = build_pipeline_version_manifest(
-        {
-            "RETRIEVAL_PIPELINE_VERSION": "v5",
-            "RETRIEVAL_V5_CONFIG_VERSION": "retrieval_v5_conformance_closure_v1",
-        }
+    changed = build_pipeline_version_manifest(
+        {"RETRIEVAL_CONTEXT_MAX_ITEMS": "6", "RETRIEVAL_CONTEXT_MAX_CHARS": "5000"}
     )
 
-    assert current["retrieval_v5_config_version"] == "retrieval_v5_conformance_closure_v1"
-    assert compute_pipeline_fingerprint(previous) != compute_pipeline_fingerprint(current)
-
-
-def test_retrieval_context_token_budget_partitions_cache_identity():
-    baseline = build_pipeline_version_manifest({"RETRIEVAL_CONTEXT_MAX_TOKENS": "1050"})
-    changed = build_pipeline_version_manifest({"RETRIEVAL_CONTEXT_MAX_TOKENS": "1051"})
-
-    assert baseline["retrieval_context_max_tokens"] == 1050
-    assert changed["retrieval_context_max_tokens"] == 1051
+    assert baseline["retrieval_context_max_items"] == 8
+    assert changed["retrieval_context_max_items"] == 6
     assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
-def test_answer_verifier_version_is_in_manifest_and_changes_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
+def test_answer_and_safety_versions_partition_cache_identity() -> None:
+    baseline = build_pipeline_version_manifest(
         {
-            "CACHE_ANSWER_VERSION": "v5",
             "ANSWER_VERIFIER_VERSION": "answer_verifier_v1",
+            "SEVERITY_GUARD_VERSION": "severity_guard_v1",
         }
     )
-    new_manifest = build_pipeline_version_manifest(
+    changed = build_pipeline_version_manifest(
         {
-            "CACHE_ANSWER_VERSION": "v5",
             "ANSWER_VERIFIER_VERSION": "answer_verifier_v2",
+            "SEVERITY_GUARD_VERSION": "severity_guard_v2",
         }
     )
 
-    assert new_manifest["answer_verifier_version"] == "answer_verifier_v2"
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
+    assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
-def test_answer_formatting_contract_version_is_in_manifest_and_changes_fingerprint():
-    old_manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v5"})
-    old_manifest["answer_formatting_contract_version"] = "answer_formatting_contract_v6"
-    new_manifest = build_pipeline_version_manifest(
+def test_provider_fallback_contract_partitions_cache_identity() -> None:
+    baseline = build_pipeline_version_manifest(
+        {"LLM_FALLBACK_POLICY_VERSION": "fallback_v1", "GOOGLE_FALLBACK_MODELS": ""}
+    )
+    changed = build_pipeline_version_manifest(
         {
-            "CACHE_ANSWER_VERSION": "v5",
-            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v11",
+            "LLM_FALLBACK_POLICY_VERSION": "fallback_v2",
+            "GOOGLE_FALLBACK_MODELS": "gemini-3.1-flash-lite",
         }
     )
 
-    assert new_manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v11"
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
+    assert changed["google_fallback_models"] == ["gemini-3.1-flash-lite"]
+    assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v11():
+def test_legacy_cache_versions_are_promoted_to_v6() -> None:
+    for version in ("", "v1", "v2", "v3", "v4", "v5"):
+        assert get_answer_cache_version({"CACHE_ANSWER_VERSION": version}) == "v6"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v7"}) == "v7"
+
+
+def test_legacy_answer_formatting_contract_is_promoted_to_v11() -> None:
     manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8",
-        }
+        {"ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8"}
     )
 
     assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v11"
 
 
-def test_llm_fallback_policy_and_google_fallback_models_change_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "LLM_FALLBACK_POLICY_VERSION": "llm_fallback_policy_v1",
-            "GOOGLE_MODEL": "gemini-3.5-flash",
-            "GOOGLE_FALLBACK_MODELS": "",
-        }
-    )
-    new_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "LLM_FALLBACK_POLICY_VERSION": "llm_fallback_policy_v2",
-            "GOOGLE_MODEL": "gemini-3.5-flash",
-            "GOOGLE_FALLBACK_MODELS": "gemini-3.1-flash-lite",
-        }
-    )
-
-    assert new_manifest["answer_cache_version"] == "v5"
-    assert new_manifest["llm_fallback_policy_version"] == "llm_fallback_policy_v2"
-    assert new_manifest["google_fallback_models"] == ["gemini-3.1-flash-lite"]
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-
-
-def test_severity_guard_version_is_in_manifest_and_changes_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "SEVERITY_GUARD_VERSION": "severity_aware_answer_guard_v0",
-        }
-    )
-    new_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "SEVERITY_GUARD_VERSION": "severity_aware_answer_guard_v1",
-        }
-    )
-
-    assert new_manifest["severity_guard_version"] == "severity_aware_answer_guard_v1"
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-
-
-def test_entity_foundation_version_is_in_manifest_and_changes_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "ENTITY_FOUNDATION_VERSION": "entity_foundation_v1",
-        }
-    )
-    new_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "ENTITY_FOUNDATION_VERSION": "entity_foundation_v2",
-        }
-    )
-
-    assert new_manifest["entity_foundation_version"] == "entity_foundation_v2"
-    assert new_manifest["answer_cache_version"] == "v5"
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-
-
-def test_grounding_context_and_performance_versions_change_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "SOURCE_NORMALIZATION_VERSION": "source_normalization_v0",
-            "ANSWERABILITY_POLICY_VERSION": "answerability_policy_v0",
-            "CONVERSATION_CONTEXT_VERSION": "conversation_context_v0",
-            "GRAPH_ENTITY_ANSWER_VERSION": "graph_entity_answer_v0",
-            "PERFORMANCE_INSTRUMENTATION_VERSION": "performance_instrumentation_v0",
-        }
-    )
-    new_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "SOURCE_NORMALIZATION_VERSION": "source_normalization_v1",
-            "ANSWERABILITY_POLICY_VERSION": "answerability_policy_v1",
-            "CONVERSATION_CONTEXT_VERSION": "conversation_context_v1",
-            "GRAPH_ENTITY_ANSWER_VERSION": "graph_entity_answer_v1",
-            "PERFORMANCE_INSTRUMENTATION_VERSION": "performance_instrumentation_v1",
-        }
-    )
-
-    assert new_manifest["source_normalization_version"] == "source_normalization_v1"
-    assert new_manifest["answerability_policy_version"] == "answerability_policy_v1"
-    assert new_manifest["conversation_context_version"] == "conversation_context_v1"
-    assert new_manifest["graph_entity_answer_version"] == "graph_entity_answer_v1"
-    assert new_manifest["performance_instrumentation_version"] == "performance_instrumentation_v1"
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-
-
-def test_google_genai_sdk_version_is_in_manifest_and_changes_fingerprint():
-    old_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "GOOGLE_GENAI_SDK_VERSION": "legacy_google_sdk",
-        }
-    )
-    new_manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "GOOGLE_GENAI_SDK_VERSION": "google_genai_sdk_v1",
-        }
-    )
-
-    assert new_manifest["google_genai_sdk_version"] == "google_genai_sdk_v1"
-    assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-
-
-def test_pipeline_manifest_does_not_include_secret_keys():
+def test_pipeline_manifest_does_not_include_secrets() -> None:
     manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "QDRANT_API_KEY": "secret",
-            "GOOGLE_API_KEY": "secret",
-        }
+        {"QDRANT_API_KEY": "secret", "GOOGLE_API_KEY": "secret", "PASSWORD": "secret"}
     )
-    serialized = str(manifest).lower()
+    serialized = str(manifest).casefold()
 
     assert "api_key" not in serialized
+    assert "password" not in serialized
     assert "secret" not in serialized
 
 
-def test_manifest_summary_includes_severity_and_runtime_fields():
+def test_manifest_summary_is_a_compact_s4b_contract() -> None:
     manifest = build_pipeline_version_manifest(
-        {
-            "CACHE_ANSWER_VERSION": "v5",
-            "SEVERITY_GUARD_VERSION": "severity_aware_answer_guard_v1",
-            "CHUNK_QDRANT_COLLECTION_NAME": "acne_chunks_v2",
-            "QDRANT_COLLECTION_NAME": "acne_knowledge",
-            "ENTITY_QDRANT_COLLECTION_NAME": "acne_entities_v2",
-            "EMBEDDING_DIMENSIONS": "not-an-int",
-            "RERANK_ENABLED": "off",
-            "RERANK_TOP_N": "bad",
-            "SEMANTIC_RERANK_MODEL_PATH": "C:/Models/acne-reranker/bge-reranker-v2-m3",
-            "SEMANTIC_RERANK_MAX_CANDIDATES": "bad",
-            "SEMANTIC_RERANK_WEIGHT": "bad",
-            "RULE_RERANK_WEIGHT": "0.25",
-            "RETRIEVAL_RERANK_WEIGHT": "bad",
-        }
+        {"QDRANT_COLLECTION_NAME": "acne_knowledge", "EMBEDDING_DIMENSIONS": "bad"}
     )
     summary = pipeline_manifest_summary(manifest)
 
-    assert manifest["severity_guard_version"] == "severity_aware_answer_guard_v1"
-    assert manifest["entity_foundation_version"] == "entity_foundation_v2"
-    assert manifest["qdrant_collection_name"] == "acne_chunks_v2"
-    assert manifest["entity_collection_name"] == "acne_entities_v2"
-    assert manifest["embedding_dimensions"] == 3072
-    assert manifest["rerank_enabled"] is False
-    assert manifest["rerank_top_n"] == 8
-    assert manifest["semantic_rerank_model_identifier"] == "bge-reranker-v2-m3"
-    assert manifest["semantic_rerank_max_candidates"] == 32
-    assert manifest["semantic_rerank_weight"] == 0.70
-    assert manifest["rule_rerank_weight"] == 0.25
-    assert manifest["retrieval_rerank_weight"] == 0.10
-    assert summary["severity_guard_version"] == manifest["severity_guard_version"]
-    assert summary["entity_foundation_version"] == manifest["entity_foundation_version"]
+    assert summary["phase"] == "s4b"
+    assert summary["architecture_version"] == S4B_ARCHITECTURE_VERSION
+    assert summary["retrieval_architecture"] == "dense_bm25_rrf"
+    assert summary["answer_cache_version"] == "v6"
+    assert summary["embedding_dimensions"] == 3072
+    assert summary["qdrant_collection_name"] == "acne_knowledge"
 
 
-def test_manifest_preserves_explicit_chunk_collection_and_uses_canonical_entity_default():
-    manifest = build_pipeline_version_manifest(
-        {
-            "CHUNK_QDRANT_COLLECTION_NAME": "alternate_chunk_fixture",
-            "QDRANT_COLLECTION_NAME": "acne_knowledge",
-            "ENTITY_QDRANT_COLLECTION_NAME": "",
-            "CACHE_ANSWER_VERSION": "",
-            "RERANK_ENABLED": "maybe",
-        }
-    )
-
-    assert manifest["qdrant_collection_name"] == "alternate_chunk_fixture"
-    assert manifest["entity_collection_name"] == "acne_entities"
-    assert manifest["answer_cache_version"] == "v5"
-    assert manifest["rerank_enabled"] is True
-
-
-def test_current_pipeline_fingerprint_uses_environment(monkeypatch):
-    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v5")
-    monkeypatch.setenv("SEVERITY_GUARD_VERSION", "severity_aware_answer_guard_test")
+def test_current_pipeline_fingerprint_uses_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v6")
+    monkeypatch.setenv("SEVERITY_GUARD_VERSION", "severity_guard_test")
 
     assert current_pipeline_fingerprint() == compute_pipeline_fingerprint(
         build_pipeline_version_manifest()
     )
 
 
-def test_legacy_answer_cache_version_is_promoted_to_phase2e_default():
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v4"}) == "v5"
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v6"}) == "v6"
-
-
 @pytest.mark.asyncio
-async def test_cache_store_metadata_has_pipeline_fingerprint(monkeypatch):
+async def test_cache_store_metadata_has_s4b_fingerprint_and_v6(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict = {}
 
     async def fake_set_answer_cache(**kwargs):
@@ -325,7 +146,8 @@ async def test_cache_store_metadata_has_pipeline_fingerprint(monkeypatch):
     monkeypatch.setattr(cache_node, "set_answer_cache", fake_set_answer_cache)
     monkeypatch.setenv("CACHE_MIN_ANSWER_CHARS", "10")
     monkeypatch.setenv("CACHE_REQUIRED_ENTITY_CHECK", "false")
-    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v5")
+    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v6")
+    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v6"})
 
     result = await cache_node.cache_store_node(
         {
@@ -340,14 +162,15 @@ async def test_cache_store_metadata_has_pipeline_fingerprint(monkeypatch):
             "llm_fallback_used": False,
             "guardrail": "in_domain",
             "fallback_provider": None,
+            "fallback_applied": False,
             "user_question": "Mụn đầu đen là gì?",
             "standalone_question": None,
             "final_answer": "Mụn đầu đen là dạng nhân mụn mở liên quan bít tắc nang lông.",
             "sources": ["source.pdf"],
             "actual_provider": "gemini",
-            "actual_model": "gemini-2.5-flash",
+            "actual_model": "gemini-3.5-flash",
             "answer_quality_report": {"passed": True, "issues": []},
-            "pipeline_manifest": {"phase": "phase2e", "cache_schema_version": "v3"},
+            "pipeline_manifest": manifest,
             "pipeline_fingerprint": "abc123fingerprint",
         }
     )
@@ -355,4 +178,5 @@ async def test_cache_store_metadata_has_pipeline_fingerprint(monkeypatch):
     assert result == {}
     assert captured["pipeline_fingerprint"] == "abc123fingerprint"
     assert captured["metadata"]["pipeline_fingerprint"] == "abc123fingerprint"
-    assert captured["metadata"]["answer_cache_version"] == "v5"
+    assert captured["metadata"]["answer_cache_version"] == "v6"
+    assert captured["metadata"]["retrieval"] == "dense_bm25_rrf"
