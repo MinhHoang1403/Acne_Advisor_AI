@@ -1,128 +1,33 @@
-# =============================================================================
-# requirements.txt – Acne Agent System
-# =============================================================================
-# File này khai báo các dependency trực tiếp theo từng layer.
-# =============================================================================
+# Direct dependencies for the current Acne Advisor AI system.
 
-
-# ---------------------------------------------------------------------------
-# Core / Configuration
-# ---------------------------------------------------------------------------
+# Configuration and schemas
 python-dotenv>=1.0.0
 pydantic>=2.7.0
-pydantic-settings>=2.3.0
+PyYAML>=6.0.1
 
-
-# ---------------------------------------------------------------------------
-# API Layer – src/api
-# ---------------------------------------------------------------------------
+# HTTP API
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 httpx>=0.27.0
-python-multipart>=0.0.9
 
-
-# ---------------------------------------------------------------------------
-# Agent Layer – src/agent
-# ---------------------------------------------------------------------------
-langchain>=0.2.0
+# Agent and provider adapters
 langchain-core>=0.2.0
-langchain-community>=0.2.0
-
-langchain-openai>=0.1.0
-langchain-anthropic>=0.1.0
-langchain-google-genai>=1.0.0
-langchain-ollama>=0.1.0
-
 langgraph>=0.1.0
-
-openai>=1.30.0
-anthropic>=0.28.0
-
-# Google Gen AI SDK mới.
-# Giữ nhánh 1.x trong Step 8 để migration có phạm vi kiểm soát được.
 google-genai>=1.75.0,<2.0.0
 
+# Frozen Phase 1 parsing
+llama-parse>=0.4.0
 
-# ---------------------------------------------------------------------------
-# Skills Layer – src/skills
-# ---------------------------------------------------------------------------
-requests>=2.32.0
-aiohttp>=3.9.5
-beautifulsoup4>=4.12.3
-lxml>=5.2.0
-pdfplumber>=0.11.0
-pypdf>=4.2.0
-
-
-# ---------------------------------------------------------------------------
-# Database Layer – src/database
-# ---------------------------------------------------------------------------
+# Datastores
 sqlalchemy[asyncio]>=2.0.30
-
-# PostgreSQL drivers
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
-
-# Database migrations
-alembic>=1.13.0
-
-# Cache and vector/graph databases
 redis[hiredis]>=5.0.4
 qdrant-client>=1.9.0
 neo4j>=5.0.0
 
-
-# ---------------------------------------------------------------------------
-# Vector / Embedding / Local Reranker
-# ---------------------------------------------------------------------------
-sentence-transformers>=3.0.0
-numpy>=1.26.4
-
-# Optional local vector-store fallback.
-faiss-cpu>=1.8.0
-
-
-# ---------------------------------------------------------------------------
-# Knowledge Ingestion – scripts/
-# ---------------------------------------------------------------------------
-tiktoken>=0.7.0
-langchain-text-splitters>=0.2.0
-
-# LlamaParse client
-llama-parse>=0.4.0
-
-PyYAML>=6.0.1
-tqdm>=4.66.4
-
-
-# ---------------------------------------------------------------------------
-# Observability
-# ---------------------------------------------------------------------------
-opentelemetry-api>=1.24.0
-opentelemetry-sdk>=1.24.0
-opentelemetry-exporter-otlp>=1.24.0
-
-prometheus-client>=0.20.0
-structlog>=24.2.0
-sentry-sdk[fastapi]>=2.4.0
-
-
-# ---------------------------------------------------------------------------
-# Testing
-# ---------------------------------------------------------------------------
+# Test and coverage gates
 pytest>=8.2.0
 pytest-asyncio>=0.23.7
 pytest-cov>=5.0.0
-
-
-# ---------------------------------------------------------------------------
-# Development / Linting
-# ---------------------------------------------------------------------------
-# Hiện dự án chưa có requirements-dev.txt.
-# Khi cần tách development dependencies, hãy tạo file riêng và đưa các package
-# dưới đây vào file đó:
-#
-# ruff>=0.4.7
-# mypy>=1.10.0
-# pre-commit>=3.7.0
+ruff>=0.16.3,<0.17.0

@@ -1,15 +1,15 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "acne-agent-system"
 version = "0.1.0"
-description = "AI-powered acne knowledge agent – 12-Factor App"
-requires-python = ">=3.11"
+description = "Vietnamese acne information assistant with frozen Agentic RAG"
+requires-python = ">=3.11,<3.12"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Your Name", email = "you@example.com" }]
+authors = [{ name = "Minh Hoang" }]
 
 [project.scripts]
 init-schema = "scripts.init_schema:cli"
@@ -28,11 +28,12 @@ target-version = "py311"
 src = ["src", "scripts", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C4", "ANN"]
-ignore = ["ANN101", "ANN102", "ANN401"]
+select = ["E4", "E7", "E9", "F"]
 
-[tool.ruff.lint.isort]
-known-first-party = ["src"]
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]
+"src/api/app.py" = ["E402"]
+"src/agent/nodes/reason.py" = ["E402"]
 
 # ---------------------------------------------------------------------------
 # Mypy
