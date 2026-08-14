@@ -248,7 +248,6 @@ async def test_cache_store_skips_runtime_fallback(monkeypatch):
 
     monkeypatch.setattr(cache_node, "set_answer_cache", fake_set_answer_cache)
     monkeypatch.setenv("CACHE_MIN_ANSWER_CHARS", "10")
-    monkeypatch.setenv("CACHE_REQUIRED_ENTITY_CHECK", "false")
 
     base_state = {
         "cache_hit": False,

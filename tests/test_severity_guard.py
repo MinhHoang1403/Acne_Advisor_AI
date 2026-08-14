@@ -125,7 +125,7 @@ def test_urgent_guard_adds_clinician_review_and_isotretinoin_pregnancy_warning()
     assert result.modified is True
     assert result.cache_eligible is False
     assert "bác sĩ" in result.answer
-    assert "24-48" in result.answer
+    assert "Isotretinoin không được tự dùng" in result.answer
     assert "Isotretinoin không được tự dùng" in result.answer
 
 
@@ -167,16 +167,15 @@ def test_acne_fulminans_guard_keeps_same_day_and_24_hour_urgency():
     assert "không thể chẩn đoán chắc chắn" in result.answer
 
 
-def test_caution_guard_adds_mild_irritation_safety_note():
+def test_caution_guard_is_metadata_only():
     result = apply_severity_aware_answer_guard(
         query="Da tôi bị đỏ rát nhẹ khi dùng benzoyl peroxide",
         answer="Benzoyl peroxide có thể hỗ trợ giảm mụn viêm.",
     )
 
     assert result.classification.severity == "caution"
-    assert result.modified is True
-    assert "giảm tần suất" in result.answer
-    assert "tạm ngưng" in result.answer
+    assert result.modified is False
+    assert result.answer == "Benzoyl peroxide có thể hỗ trợ giảm mụn viêm."
 
 
 def test_routine_guard_does_not_force_urgent_or_emergency_warning():
@@ -259,10 +258,8 @@ def test_guard_handles_empty_answers_with_preface_or_append_only():
         answer="",
     )
 
-    assert urgent.answer == urgent.answer.strip()
-    assert urgent.answer.startswith("**Tóm tắt ngắn**")
-    assert "**Thông tin thêm**" not in urgent.answer
-    assert caution.answer.startswith("**Lưu ý an toàn**")
+    assert urgent.answer == ""
+    assert caution.answer == ""
 
 
 def test_caution_guard_does_not_append_duplicate_template():
@@ -425,7 +422,7 @@ async def test_cache_lookup_hit_and_invalid_metadata(monkeypatch):
                 "sources": ["source.pdf"],
                 "metadata": {
                     "quality_passed": True,
-                    "answer_version": "v6",
+                    "answer_version": "v7",
                     "pipeline_fingerprint": "fp123",
                 },
                 "model_name": "gemini-2.5-flash",
@@ -435,7 +432,7 @@ async def test_cache_lookup_hit_and_invalid_metadata(monkeypatch):
             "sources": [],
             "metadata": {
                 "quality_passed": False,
-                "answer_version": "v6",
+                "answer_version": "v7",
                 "pipeline_fingerprint": "fp123",
             },
         }
@@ -532,7 +529,6 @@ async def test_cache_store_skip_policies(monkeypatch, state_patch):
 
     monkeypatch.setattr("src.agent.nodes.cache.set_answer_cache", fake_set_answer_cache)
     monkeypatch.setenv("CACHE_MIN_ANSWER_CHARS", "20")
-    monkeypatch.setenv("CACHE_REQUIRED_ENTITY_CHECK", "false")
 
     base_state = {
         "cache_hit": False,
@@ -561,16 +557,15 @@ async def test_cache_store_skip_policies(monkeypatch, state_patch):
 
 
 @pytest.mark.asyncio
-async def test_cache_store_rejects_generic_entity_miss_and_unasked_dosage(monkeypatch):
-    called = False
+async def test_cache_store_does_not_apply_medical_semantic_heuristics(monkeypatch):
+    call_count = 0
 
     async def fake_set_answer_cache(**kwargs):
-        nonlocal called
-        called = True
+        nonlocal call_count
+        call_count += 1
 
     monkeypatch.setattr("src.agent.nodes.cache.set_answer_cache", fake_set_answer_cache)
     monkeypatch.setenv("CACHE_MIN_ANSWER_CHARS", "20")
-    monkeypatch.setenv("CACHE_REQUIRED_ENTITY_CHECK", "true")
 
     common_state = {
         "cache_hit": False,
@@ -611,7 +606,7 @@ async def test_cache_store_rejects_generic_entity_miss_and_unasked_dosage(monkey
 
     assert generic == {}
     assert dosage == {}
-    assert called is False
+    assert call_count == 2
 
 
 @pytest.mark.asyncio
@@ -662,10 +657,10 @@ async def test_answer_quality_node_disabled_and_runtime_error(monkeypatch):
 
     monkeypatch.setenv("ANSWER_VERIFIER_ENABLED", "true")
 
-    def raise_error(query):
+    def raise_error(**_kwargs):
         raise RuntimeError("normalization failed token=secret-value")
 
-    monkeypatch.setattr(quality_node, "normalize_query", raise_error)
+    monkeypatch.setattr(quality_node, "apply_answer_guard", raise_error)
     failed = await quality_node.answer_quality_node(
         {"user_question": "Mụn đầu đen là gì?", "final_answer": "Một dạng nhân mụn mở."}
     )

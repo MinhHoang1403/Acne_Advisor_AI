@@ -43,8 +43,8 @@ def test_insufficient_context_fallback_copy_remains_available():
 
 
 @pytest.mark.asyncio
-async def test_sufficient_assessment_routes_to_generation():
-    result = await decide_node({"is_in_domain": True, "evidence_assessment": {"sufficient": True}})
+async def test_usable_assessment_routes_to_generation():
+    result = await decide_node({"is_in_domain": True, "evidence_assessment": {"usable": True}})
 
     assert result == {"next_action": "generate"}
 
@@ -118,7 +118,7 @@ async def test_generation_fallback_removes_an_empty_markdown_heading_before_fall
 
 
 @pytest.mark.asyncio
-async def test_generation_fallback_recovers_verified_entity_relation_instead_of_refusal():
+async def test_generation_fallback_does_not_synthesize_entity_relation():
     result = await fallback_node.generation_fallback_decision_node(
         {
             "standalone_question": "Tazarotene có alias tazaroten không?",
@@ -126,8 +126,8 @@ async def test_generation_fallback_recovers_verified_entity_relation_instead_of_
         }
     )
 
-    assert result["fallback_type"] == "grounded_direct_recovery"
-    assert "alias" in result["draft_answer"].lower()
+    assert result["fallback_type"] == "empty_generation"
+    assert result["fallback_applied"] is True
 
 
 @pytest.mark.asyncio
@@ -322,7 +322,7 @@ def test_severity_precedence_over_generic_fallback():
     assert emergency.classification.severity == "emergency"
     assert "cấp cứu" in emergency.answer
     assert urgent.classification.severity == "urgent"
-    assert "24-48" in urgent.answer
+    assert "Isotretinoin không được tự dùng" in urgent.answer
     assert caution.answer.count("**Lưu ý an toàn**") <= 1
     assert routine.answer == generic
 
@@ -365,7 +365,6 @@ async def test_routine_valid_answer_still_can_store(monkeypatch):
 
     monkeypatch.setattr("src.agent.nodes.cache.set_answer_cache", fake_set_answer_cache)
     monkeypatch.setenv("CACHE_MIN_ANSWER_CHARS", "10")
-    monkeypatch.setenv("CACHE_REQUIRED_ENTITY_CHECK", "false")
     await cache_store_node(
         {
             "cache_hit": False,
@@ -536,4 +535,4 @@ def test_versioning_changes_fingerprint_without_cache_version_change():
 
     assert new["safe_fallback_flow_version"] == SAFE_FALLBACK_FLOW_VERSION
     assert compute_pipeline_fingerprint(old) != compute_pipeline_fingerprint(new)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v6"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v7"

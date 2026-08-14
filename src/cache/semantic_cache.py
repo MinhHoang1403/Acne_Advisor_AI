@@ -22,7 +22,7 @@ from src.observability.versioning import (
 from src.quality.safe_fallback import sanitize_fallback_reason
 
 CACHE_SCHEMA_VERSION = os.getenv("CACHE_SCHEMA_VERSION", "v3")
-CACHE_PROMPT_VERSION = os.getenv("CACHE_PROMPT_VERSION", "medical_prompt_v2")
+CACHE_PROMPT_VERSION = os.getenv("CACHE_PROMPT_VERSION", "medical_prompt_v3")
 logger = logging.getLogger(__name__)
 
 

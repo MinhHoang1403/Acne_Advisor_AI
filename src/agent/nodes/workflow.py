@@ -49,9 +49,11 @@ async def decide_node(state: ClinicalState) -> dict[str, AgentAction]:
         action: AgentAction = "finalize"
     else:
         assessment = state.get("evidence_assessment") or {}
-        if assessment.get("sufficient"):
+        if assessment.get("usable"):
             action = "generate"
-        elif state.get("retrieval_attempt", 0) >= MAX_RETRIEVAL_ATTEMPTS:
+        elif state.get("retrieval_attempt", 0) == 0:
+            action = "retrieve"
+        elif _next_retrieval_query(state) is None:
             action = "abstain"
         else:
             action = "retrieve"
@@ -62,11 +64,12 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
     """Invoke the one source-evidence tool and preserve its typed trace."""
 
     attempt = state.get("retrieval_attempt", 0) + 1
-    question = state.get("standalone_question") or state.get("user_question", "")
-    if attempt > 1:
-        original = state.get("user_question", "").strip()
-        if original and original != question:
-            question = f"{question}\n{original}"
+    retry_plan = _next_retrieval_query(state)
+    if retry_plan is None:
+        question = state.get("standalone_question") or state.get("user_question", "")
+        retry_reason = "initial_retrieval"
+    else:
+        question, retry_reason = retry_plan
 
     started = time.perf_counter()
     try:
@@ -78,6 +81,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "attempt": attempt,
             "query": question,
             "status": status,
+            "reason": retry_reason,
             "selected_ids": trace.get("selected_ids", []),
         }
         return {
@@ -112,7 +116,13 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "packed_context": None,
             "retry_history": [
                 *(state.get("retry_history") or []),
-                {"attempt": attempt, "query": question, "status": "failed", "error": error},
+                {
+                    "attempt": attempt,
+                    "query": question,
+                    "status": "failed",
+                    "reason": retry_reason,
+                    "error": error,
+                },
             ],
         }
 
@@ -135,11 +145,12 @@ async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
             usable.append(context)
             source_ids.append(source_id)
 
-    sufficient = bool(usable)
-    reason = "source_evidence_available" if sufficient else "no_provenance_complete_evidence"
+    evidence_usable = bool(usable)
+    reason = "provenance_complete_evidence_available" if evidence_usable else "no_provenance_complete_evidence"
     return {
         "evidence_assessment": {
-            "sufficient": sufficient,
+            "usable": evidence_usable,
+            "assessment_kind": "provenance_complete_evidence_presence",
             "reason": reason,
             "usable_items": len(usable),
             "source_ids": list(dict.fromkeys(source_ids)),
@@ -147,6 +158,31 @@ async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
             "max_attempts": MAX_RETRIEVAL_ATTEMPTS,
         }
     }
+
+
+def _next_retrieval_query(state: ClinicalState) -> tuple[str, str] | None:
+    """Return a justified next query; never spend an attempt without a reason."""
+
+    attempt = int(state.get("retrieval_attempt", 0) or 0)
+    if attempt >= MAX_RETRIEVAL_ATTEMPTS:
+        return None
+    standalone = str(state.get("standalone_question") or state.get("user_question") or "").strip()
+    if attempt == 0:
+        return (standalone, "initial_retrieval") if standalone else None
+
+    status = str(state.get("retrieval_status") or "")
+    if status in {"failed", "recoverable_error"}:
+        return (standalone, "retry_transient_retrieval_failure") if standalone else None
+
+    original = str(state.get("user_question") or "").strip()
+    previous_queries = {
+        str(entry.get("query") or "").strip()
+        for entry in state.get("retry_history") or []
+        if isinstance(entry, dict)
+    }
+    if status == "no_evidence" and original and original != standalone and original not in previous_queries:
+        return original, "retry_with_materially_distinct_original_query"
+    return None
 
 
 async def generate_node(state: ClinicalState) -> dict[str, Any]:

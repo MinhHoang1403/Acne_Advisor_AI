@@ -115,7 +115,7 @@ async def finalize_response_node(state: ClinicalState) -> dict:
             "symptoms": [],
             "sources": [],
             "actual_provider": "system",
-            "actual_model": "guardrail-rule",
+            "actual_model": None,
             "response_profile": profile,
             "source_validation": source_validation,
             "performance_timings": {

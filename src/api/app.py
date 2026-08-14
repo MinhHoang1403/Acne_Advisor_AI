@@ -111,6 +111,13 @@ def _release_readiness_test_mode_enabled() -> bool:
     return os.getenv("RELEASE_READINESS_TEST_MODE", "").strip().lower() in RELEASE_READINESS_TEST_MODES
 
 
+def _env_enabled(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def _run_release_readiness_agent_override(request: "ChatRequest", session_id: str) -> dict[str, Any]:
     """Deterministic HTTP-boundary doubles for release-readiness checks only."""
 
@@ -138,7 +145,7 @@ async def _run_release_readiness_agent_override(request: "ChatRequest", session_
         "Không có đủ bằng chứng đáng tin cậy trong kho tri thức để trả lời chắc chắn. "
         "Bạn nên hỏi bác sĩ da liễu nếu triệu chứng nặng lên."
         if fallback_applied
-        else "Benzoyl peroxide không phải là kháng sinh. Đây là hoạt chất bôi trị mụn có tác dụng kháng khuẩn và hỗ trợ giảm bít tắc."
+        else "Phản hồi kiểm tra hợp đồng HTTP bằng tiếng Việt."
     )
 
     return {
@@ -216,7 +223,7 @@ class ChatRequest(BaseModel):
     conversation_history: list[ChatHistoryMessage] = Field(default_factory=list)
     llm_provider: Literal["gemini", "ollama", "local"] | None = None
     llm_model: Optional[str] = None
-    allow_model_fallback: bool = True
+    allow_model_fallback: bool = False
     bypass_cache: bool = False
 
 class ChatCacheMetadata(BaseModel):
@@ -291,12 +298,14 @@ def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> st
     # The severity guard may replace a prior guardrail response with the
     # deterministic emergency contract. Attribute that final response to the
     # safety fallback so provenance reflects what the user actually received.
-    if result.get("fallback_type") == "severity_emergency_safety_fallback":
+    if str(result.get("fallback_type") or "").startswith("severity_"):
         return "safe_fallback"
     if _guardrail_applied(result, is_in_domain):
         return "guardrail"
     if result.get("fallback_applied"):
         return "safe_fallback"
+    if result.get("severity_guard_modified"):
+        return "safety_augmented_llm"
     if result.get("actual_provider") == "system":
         return "deterministic"
     return "llm"
@@ -540,6 +549,8 @@ async def health_check():
 @app.get("/retrieve", response_model=RetrieveResponse)
 async def retrieve_endpoint(q: str, top_k: int = 5):
     """Debug endpoint for the canonical Dense + BM25 + RRF retrieval path."""
+    if not _env_enabled("ENABLE_DIAGNOSTIC_RETRIEVE"):
+        raise HTTPException(status_code=404, detail="Not found.")
     query = q.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty.")

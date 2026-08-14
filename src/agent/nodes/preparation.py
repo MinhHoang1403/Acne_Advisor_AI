@@ -67,7 +67,7 @@ async def rewrite_question_node(state: ClinicalState) -> dict[str, object]:
             provider=state.get("llm_provider") or "gemini",
             model=state.get("llm_model"),
             temperature=0.0,
-            allow_fallback=state.get("allow_model_fallback", True),
+            allow_fallback=state.get("allow_model_fallback", False),
             use_sync=False,
             budget=_runtime_budget(state),
             resilience_settings=_runtime_settings(state),

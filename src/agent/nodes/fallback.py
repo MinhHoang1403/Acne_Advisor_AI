@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from src.agent.answer_formatting import (
-    grounded_entity_relation_answer,
     normalize_answer_markdown,
     repair_terminal_punctuation,
 )
@@ -57,17 +56,6 @@ async def generation_fallback_decision_node(state: ClinicalState) -> dict[str, A
             "fallback_reason": None,
             "fallback_answer": None,
             "fallback_cache_eligible": True,
-        }
-    query = state.get("standalone_question") or state.get("user_question") or ""
-    recovery_answer = grounded_entity_relation_answer(str(query))
-    if recovery_answer and decision.fallback_type in {"empty_generation", "invalid_generation"}:
-        return {
-            "draft_answer": recovery_answer,
-            "fallback_applied": True,
-            "fallback_type": "grounded_direct_recovery",
-            "fallback_reason": "Model generation was unusable; returned a verified taxonomy relation.",
-            "fallback_answer": recovery_answer,
-            "fallback_cache_eligible": False,
         }
     answer, severity_metadata = _guarded_fallback_answer(
         decision.fallback_type,

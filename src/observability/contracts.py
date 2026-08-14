@@ -15,7 +15,7 @@ class PipelineTraceSummary(BaseModel):
     retrieval_candidates_count: int = 0
     packed_context_items_count: int = 0
     retrieval_attempts: int = 0
-    evidence_sufficient: bool | None = None
+    evidence_usable: bool | None = None
     answer_quality_passed: bool | None = None
     critical_issues_count: int = 0
     warnings_count: int = 0

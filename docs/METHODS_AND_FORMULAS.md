@@ -37,13 +37,17 @@ adjustment or structural-store score changes the fused ranking.
 
 `src/retrieval/context_packer.py` preserves fused order, deduplicates only by
 stable item identity, retains provenance, and enforces finite item/character
-budgets. Evidence is sufficient only when at least one packed item has both
-medical text and a source identifier. This is a deterministic provenance gate;
-semantic interpretation remains with the LLM.
+budgets. Evidence is marked usable only when at least one packed item has both
+text and a source identifier. This is a deterministic presence/provenance gate,
+not a semantic sufficiency or entailment claim. The exact bounded
+`PackedContext.context_text` is the evidence sent to generation; full candidate
+text cannot bypass the configured character limit.
 
 Retrieval is bounded by `RETRIEVAL_TIMEOUT_SECONDS` and two attempts. These are
 engineering safety/latency policies. Failure to obtain provenance-complete
-evidence results in explicit abstention.
+evidence results in explicit abstention. One failed Dense or BM25 channel is
+reported as `degraded_dense` or `degraded_bm25`; ranking policy and RRF weights
+remain unchanged.
 
 ## Frozen Phase 1
 

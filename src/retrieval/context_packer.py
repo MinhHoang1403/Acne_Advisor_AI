@@ -41,7 +41,8 @@ def pack_context(
             dropped.append({"candidate_id": candidate_id, "reason": "item_limit"})
             continue
 
-        block = _render_block(candidate, len(selected) + 1)
+        index = len(selected) + 1
+        block = _render_block(candidate, index)
         separator = 2 if selected else 0
         remaining = char_limit - rendered_chars - separator
         if remaining <= 0:
@@ -51,7 +52,13 @@ def pack_context(
             if selected:
                 dropped.append({"candidate_id": candidate_id, "reason": "character_limit"})
                 continue
-            block = block[:remaining].rstrip()
+            header = _render_header(candidate.payload, candidate.candidate_id, index)
+            text_budget = max(0, remaining - len(header) - 1)
+            text = text[:text_budget].rstrip()
+            if not text:
+                dropped.append({"candidate_id": candidate_id, "reason": "character_limit"})
+                continue
+            block = f"{header}\n{text}"
             warnings.append("The first evidence item was truncated to the context character limit.")
 
         selected.append(
@@ -60,7 +67,7 @@ def pack_context(
                 source="chunk",
                 role="medical_evidence",
                 text=text,
-                payload=dict(candidate.payload),
+                payload=_provenance_payload(candidate.payload),
                 score=candidate.score,
                 fused_score=candidate.fused_score,
                 rank=candidate.rank,
@@ -124,7 +131,7 @@ def _render_block(candidate: RetrievedCandidate, index: int) -> str:
         source="chunk",
         role="medical_evidence",
         text=candidate.text.strip(),
-        payload=dict(candidate.payload),
+        payload=_provenance_payload(candidate.payload),
         score=candidate.score,
         fused_score=candidate.fused_score,
         rank=candidate.rank,
@@ -134,9 +141,13 @@ def _render_block(candidate: RetrievedCandidate, index: int) -> str:
 
 
 def _render_block_from_item(item: ContextItem, index: int) -> str:
-    source_id = _source_id(item.payload) or "unknown"
-    chunk_id = str(item.payload.get("chunk_id") or item.item_id)
-    return f"[Evidence {index} | source={source_id} | chunk={chunk_id}]\n{item.text.strip()}"
+    return f"{_render_header(item.payload, item.item_id, index)}\n{item.text.strip()}"
+
+
+def _render_header(payload: dict[str, Any], item_id: str, index: int) -> str:
+    source_id = _source_id(payload) or "unknown"
+    chunk_id = str(payload.get("chunk_id") or item_id)
+    return f"[Evidence {index} | source={source_id} | chunk={chunk_id}]"
 
 
 def _source_id(payload: dict[str, Any]) -> str:
@@ -147,6 +158,13 @@ def _source_id(payload: dict[str, Any]) -> str:
         or payload.get("document_id")
         or ""
     ).strip()
+
+
+def _provenance_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Keep provenance/metadata without duplicate unbounded document bodies."""
+
+    body_keys = {"text", "content", "page_content"}
+    return {key: value for key, value in payload.items() if key not in body_keys}
 
 
 __all__ = ["pack_context", "packed_context_to_response_contexts"]

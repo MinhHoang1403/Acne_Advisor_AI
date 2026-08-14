@@ -87,6 +87,11 @@ async def test_ollama_retries_one_compact_generation_after_truncation(monkeypatc
 
     assert answer == "Câu trả lời hoàn chỉnh."
     assert len(_FakeAsyncClient.posted_payloads) == 2
+    assert _FakeAsyncClient.posted_payloads[0]["messages"][0] == {
+        "role": "system",
+        "content": "System",
+    }
+    assert _FakeAsyncClient.posted_payloads[0]["messages"][1]["role"] == "user"
     assert _FakeAsyncClient.posted_payloads[1]["messages"][-1]["content"] == ollama_client._COMPACT_RETRY_INSTRUCTION
 
 

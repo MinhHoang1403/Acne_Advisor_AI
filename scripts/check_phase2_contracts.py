@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the full offline/read-only Phase 2 evaluation suite."""
+"""Run the full offline/read-only Phase 2 implementation contract suite."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 CHECKS = [
     ["scripts/inspect_phase2_readiness.py"],
-    ["scripts/eval_phase2_answer_quality.py"],
-    ["scripts/eval_safe_fallback_flow.py"],
+    ["scripts/check_answer_contracts.py"],
+    ["scripts/check_safe_fallback_flow.py"],
     ["scripts/smoke_phase2_runtime.py", "--mode", "offline"],
     ["scripts/inspect_cache_versions.py"],
 ]
 
 
-def run_phase2_all(timeout_seconds: int = 120) -> dict[str, Any]:
+def run_phase2_contracts(timeout_seconds: int = 120) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     for command in CHECKS:
         started = time.perf_counter()
@@ -81,7 +81,7 @@ def _parse_json_or_excerpt(text: str) -> Any:
 
 
 def main() -> int:
-    summary = run_phase2_all()
+    summary = run_phase2_contracts()
     print(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
     return 0 if summary["passed"] else 1
 

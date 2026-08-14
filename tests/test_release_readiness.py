@@ -34,7 +34,7 @@ def test_release_readiness_version_changes_fingerprint_without_cache_bump() -> N
 
     assert new_manifest["end_to_end_release_readiness_version"] == "end_to_end_release_readiness_v1"
     assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v6"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v7"
 
 
 @pytest.mark.asyncio
@@ -128,7 +128,7 @@ async def test_http_structured_503_504_and_safe_fallback(monkeypatch) -> None:
     assert checker.structured_error_ok(err504, 504, "agent_timeout")
     assert checker.safe_fallback_ok(fallback)
     assert unicode_response.status_code == 200
-    assert "kháng sinh" in unicode_response.json()["answer"]
+    assert "tiếng Việt" in unicode_response.json()["answer"]
     assert invalid.status_code == 400
     assert invalid.json()["detail"]["code"] == "empty_message"
 

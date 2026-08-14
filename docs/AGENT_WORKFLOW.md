@@ -16,10 +16,12 @@ START -> prepare -> guard -> decide
 and the bounded attempt count. Formatting and whitespace normalization are not
 treated as agent actions.
 
-`retrieve` calls the typed `retrieve_evidence` tool. `assess` requires non-empty
-text and source provenance, without a hidden semantic score. A request may make
-at most two retrieval attempts. After that, insufficient evidence routes to a
-deterministic, non-cacheable abstention.
+`retrieve` calls the typed `retrieve_evidence` tool. `assess` proves only that at
+least one item has non-empty text and source identity. It does not prove medical
+relevance, completeness, or claim entailment. A request may make at most two
+retrieval attempts. A second attempt occurs only after a transient retrieval
+failure or with a materially distinct original query after a rewrite returned
+no evidence. Otherwise the agent abstains immediately.
 
 Safety remains deterministic and outside optional tool choice. Generation may
 use provider fallback, but the final node still applies answer verification,
@@ -50,7 +52,7 @@ sequenceDiagram
         Qdrant-->>Tool: ranked source chunks
         Tool-->>Agent: equal RRF and bounded provenance
         Agent->>Agent: assess, retry, abstain, or generate
-        Agent->>LLM: source-grounded prompt
+        Agent->>LLM: system policy + user data + bounded source evidence
         LLM-->>Agent: draft answer
         Agent->>Agent: verify, safety, format, finalize
         Agent->>Cache: store only when eligible
@@ -62,3 +64,7 @@ sequenceDiagram
 The graph schema is `ClinicalState` in `src/agent/state.py` with 66 fields.
 `src/agent/nodes/workflow.py` owns all eight semantic node functions and routing
 decisions; support modules do not create hidden graph actions.
+
+Normal medical meaning follows `retrieved evidence -> LLM synthesis -> narrow
+presentation/provenance processing`. Deterministic Python may replace content
+only for the documented safety/failsafe paths in [Safety](SAFETY.md).

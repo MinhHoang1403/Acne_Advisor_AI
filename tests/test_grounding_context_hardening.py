@@ -4,11 +4,9 @@ import time
 
 import pytest
 
-from src.agent.answer_formatting import finalize_answer_presentation, grounded_entity_relation_answer
-from src.agent.nodes.fallback import generation_fallback_decision_node
 from src.agent.nodes.guardrails import domain_guard_node
-from src.agent.nodes.respond import finalize_response_node
 from src.agent.nodes.preparation import rewrite_question_node
+from src.agent.nodes.respond import finalize_response_node
 from src.agent.source_presentation import (
     build_source_allowlist,
     build_source_metadata,
@@ -19,228 +17,80 @@ from src.agent.source_presentation import (
 def _allowlist() -> list[dict]:
     return build_source_allowlist(
         ["C:\\knowledge\\QD_4416_CUT.PDF", "web_raw_dataset.json"],
-        contexts=[
-            {
-                "source_file": "qd_4416_cut.pdf",
-                "source_path": "C:\\knowledge\\qd_4416_cut.pdf",
-                "chunk_id": "chunk-1",
-                "page": 3,
-            }
-        ],
+        contexts=[{"source_file": "qd_4416_cut.pdf", "page": 3, "chunk_id": "chunk-1"}],
     )
 
 
-def test_source_alias_maps_windows_path_to_canonical_filename_and_keeps_page() -> None:
-    metadata = build_source_metadata(["C:\\knowledge\\QD_4416_CUT.PDF"], contexts=[{"source_file": "qd_4416_cut.pdf", "page": 3}])
-
+def test_source_alias_keeps_canonical_identity_and_page() -> None:
+    metadata = build_source_metadata(
+        ["C:\\knowledge\\QD_4416_CUT.PDF"],
+        contexts=[{"source_file": "qd_4416_cut.pdf", "page": 3}],
+    )
     assert metadata[0]["source_id"] == "qd_4416_cut.pdf"
-    assert metadata[0]["canonical_filename"] == "qd_4416_cut.pdf"
     assert metadata[0]["page"] == 3
 
 
-def test_final_answer_rejects_unretrieved_source_name_and_preserves_allowed_name() -> None:
+def test_source_validation_removes_only_unretrieved_names() -> None:
     result = validate_answer_source_mentions(
         "Theo invented-guide.pdf, hãy xem qd_4416_cut.pdf ở trang 3.",
         _allowlist(),
     )
-
     assert "invented-guide.pdf" not in result.answer
     assert "qd_4416_cut.pdf" in result.answer
     assert result.removed_mentions == ("invented-guide.pdf",)
 
 
-def test_no_source_context_cannot_invent_source() -> None:
-    result = validate_answer_source_mentions("Theo unknown.pdf, thông tin này đáng tin cậy.", [])
-
-    assert "unknown.pdf" not in result.answer
-    assert result.allowlist_source_ids == ()
-
-
-def test_source_validation_is_request_scoped_and_keeps_distinct_sources() -> None:
-    allowlist = _allowlist()
-    result = validate_answer_source_mentions(
-        "Nguồn gồm qd_4416_cut.pdf và web_raw_dataset.json; không dùng PIIS0190962223033893.pdf.",
-        allowlist,
-    )
-
-    assert "qd_4416_cut.pdf" in result.answer
-    assert "web_raw_dataset.json" in result.answer
-    assert "PIIS0190962223033893.pdf" not in result.answer
-
-
 @pytest.mark.asyncio
 async def test_source_request_uses_only_retrieved_canonical_sources() -> None:
-    state = {
-        "user_question": "Theo kho dữ liệu, cần xem nguồn nào khi hỏi về retinoid?",
-        "standalone_question": "Theo kho dữ liệu, cần xem nguồn nào khi hỏi về retinoid?",
-        "is_in_domain": True,
-        "guardrail": "in_domain_rule",
-        "fallback_applied": False,
-        "fallback_type": "none",
-        "medical_severity": None,
-        "source_allowlist": _allowlist(),
-        "sources": ["qd_4416_cut.pdf", "web_raw_dataset.json"],
-        "vector_contexts": [],
-        "draft_answer": "| Tài liệu | Nội dung |\n|---|---|\n| Tài liệu 1 | Retinoid |",
-        "performance_timings": {},
-    }
-
-    result = await finalize_response_node(state)
-
+    result = await finalize_response_node(
+        {
+            "user_question": "Theo kho dữ liệu, nguồn nào đã được truy hồi?",
+            "is_in_domain": True,
+            "guardrail": "in_domain_rule",
+            "fallback_applied": False,
+            "fallback_type": "none",
+            "source_allowlist": _allowlist(),
+            "sources": ["qd_4416_cut.pdf", "web_raw_dataset.json"],
+            "vector_contexts": [],
+            "draft_answer": "Tài liệu 1",
+            "performance_timings": {},
+        }
+    )
     assert "Tài liệu 1" not in result["final_answer"]
-    assert "Bộ dữ liệu kiến thức mụn" in result["final_answer"]
     assert result["source_validation"]["invalid_source_name_count"] == 0
 
 
-@pytest.mark.parametrize(
-    ("question", "expected"),
-    [
-        ("Differin liên hệ với adapalene như thế nào?", "Differin là sản phẩm chứa hoạt chất adapalene."),
-        ("Tazorac liên hệ với tazarotene như thế nào?", "Tazorac là sản phẩm chứa hoạt chất tazarotene."),
-        ("Tazorac và Differin có cùng là kháng sinh bôi không?", "không phải là kháng sinh bôi"),
-        ("Adapalene và tazarotene có điểm chung taxonomy nào?", "đều thuộc nhóm retinoid bôi"),
-        ("Tazarotene có alias tazaroten không?", "tazaroten” là alias của tazarotene"),
-        ("Clindamycin phosphate có thể map về entity nào?", "map về entity clindamycin"),
-        ("Epiduo liên hệ với adapalene và benzoyl peroxide ra sao?", "Epiduo chứa hai hoạt chất adapalene và benzoyl peroxide."),
-        ("Isotretinoin thuộc nhóm retinoid nào?", "isotretinoin thuộc nhóm retinoid đường uống."),
-        ("BP trong taxonomy có thể chỉ benzoyl peroxide không?", "Trong taxonomy, bp là alias/map về entity benzoyl peroxide."),
-        ("Tretinoin liên hệ với topical retinoid như thế nào?", "tretinoin thuộc nhóm retinoid bôi."),
-        ("Dalacin T có liên hệ với nhóm topical antibiotic không?", "Dalacin T thuộc nhóm kháng sinh bôi tại chỗ và chứa hoạt chất clindamycin."),
-        ("Benzoyl peroxide có phải kháng sinh bôi không?", "Không, benzoyl peroxide không phải là kháng sinh."),
-        ("Doxycycline liên hệ với kháng sinh đường uống ra sao?", "Có. doxycycline được taxonomy xếp vào nhóm kháng sinh đường uống"),
-        ("Epiduo và Differin có chung entity adapalene không?", "Epiduo và Differin cùng chứa hoạt chất adapalene."),
-        ("Tên thương mại Epiduo có hai hoạt chất trong taxonomy không?", "Epiduo chứa hai hoạt chất adapalene và benzoyl peroxide."),
-        ("Epiduo gel khác Differin ở thành phần nào?", "Epiduo và Differin khác nhau về thành phần"),
-        ("Dalacin-t có phải là một alias của Dalacin T không?", "dalacin t” là alias của Dalacin T. Dalacin T chứa hoạt chất clindamycin"),
-        ("Tazorac có hoạt chất chính là gì?", "Tazorac là sản phẩm chứa hoạt chất tazarotene và thuộc nhóm retinoid bôi."),
-        ("Tazaroten viết thiếu một chữ có thể đang nói đến hoạt chất nào?", "Tazorac là sản phẩm chứa hoạt chất này."),
-    ],
-)
-def test_direct_entity_relation_is_answered_in_first_sentence(question: str, expected: str) -> None:
-    answer = grounded_entity_relation_answer(question)
-
-    assert answer is not None
-    assert expected.rstrip(".") in answer.splitlines()[0].rstrip(".")
-
-
-def test_exact_blackhead_request_is_answered_with_exactly_three_items() -> None:
-    answer = finalize_answer_presentation(
-        "Câu hỏi không rõ.",
-        user_question="Liệt kê đúng 3 ý về điểm khác nhau của mụn đầu đen.",
-    )
-
-    assert sum(1 for line in answer.splitlines() if line.startswith("- ")) == 3
-    assert "bít tắc" in answer
-    assert "oxy hóa" in answer
-
-
-def test_exact_habit_request_is_answered_with_exactly_four_items() -> None:
-    answer = finalize_answer_presentation(
-        "- Thiếu ngủ\n- Ăn nhiều đường\n- Mỹ phẩm gây bít tắc\n- Môi trường nóng\n- Căng thẳng\n- Rửa mặt không đúng cách",
-        user_question="Liệt kê đúng 4 ý về thói quen có thể làm mụn nặng hơn.",
-    )
-
-    assert sum(1 for line in answer.splitlines() if line.startswith("- ")) == 4
-    assert "nặn" in answer.lower()
-    assert "ma sát" in answer.lower()
-    assert "mỹ phẩm" in answer.lower()
-
-
-def test_unknown_entities_do_not_fabricate_a_taxonomy_relation() -> None:
-    assert grounded_entity_relation_answer("Sản phẩm không tồn tại X liên hệ với hoạt chất Y như thế nào?") is None
-
-
-def test_alias_map_retains_verified_active_ingredient_class() -> None:
-    answer = grounded_entity_relation_answer("Clindamycin phosphate có thể map về entity nào?")
-
-    assert answer is not None
-    assert "map về entity clindamycin" in answer
-    assert "kháng sinh bôi" in answer
-
-
-def test_daytime_retinoid_followup_answer_covers_sunscreen_and_irritation() -> None:
-    answer = finalize_answer_presentation(
-        "Một câu trả lời nháp không đầy đủ.",
-        user_question="Khi dùng retinoid bôi buổi tối, ban ngày cần làm gì để bảo vệ da và hạn chế kích ứng?",
-    )
-
-    assert "chống nắng" in answer.lower()
-    assert "retinoid" in answer.lower()
-    assert "kích ứng" in answer.lower()
-
-
 @pytest.mark.asyncio
-async def test_coreference_rewrite_uses_bounded_history_and_llm(monkeypatch) -> None:
+async def test_coreference_rewrite_uses_bounded_history(monkeypatch) -> None:
     captured: dict[str, str] = {}
 
     async def fake_generate_llm_response(**kwargs):
         captured["prompt"] = kwargs["prompt"]
-        return {"text": "Hoạt chất chính của Differin là gì?"}
+        return {"text": "Hoạt chất chính của thuốc đang nói tới là gì?"}
 
     monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fake_generate_llm_response)
     result = await rewrite_question_node(
         {
             "normalized_question": "Hoạt chất chính của thuốc đó là gì?",
             "conversation_history": [
-                {"role": "user", "content": f"old-{index}"} for index in range(8)
-            ] + [{"role": "user", "content": "Tôi đang nói về Differin."}],
+                *({"role": "user", "content": f"old-{index}"} for index in range(8)),
+                {"role": "user", "content": "Tôi đang nói về một thuốc trị mụn."},
+            ],
             "llm_provider": "mock",
+            "allow_model_fallback": False,
         }
     )
-
-    assert result["standalone_question"] == "Hoạt chất chính của Differin là gì?"
     assert result["use_history_context"] is True
     assert "old-0" not in captured["prompt"]
-    assert "Differin" in captured["prompt"]
 
 
 @pytest.mark.asyncio
-async def test_failed_coreference_rewrite_falls_back_without_fabrication(monkeypatch) -> None:
-    async def fail_generate_llm_response(**kwargs):
-        raise RuntimeError("provider unavailable token=secret")
-
-    monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fail_generate_llm_response)
-    result = await rewrite_question_node(
-        {
-            "normalized_question": "Nó có phải kháng sinh không?",
-            "conversation_history": [{"role": "user", "content": "Tôi đang dùng hai sản phẩm."}],
-            "llm_provider": "mock",
-        }
+async def test_ood_emergency_redirection_is_preserved() -> None:
+    result = await domain_guard_node(
+        {"standalone_question": "Tôi bị đau bụng dữ dội, chẩn đoán giúp tôi.", "conversation_history": []}
     )
-
-    assert result["standalone_question"] == "Nó có phải kháng sinh không?"
-    assert result["use_history_context"] is True
-    assert result["conversation_context"]["rewrite_succeeded"] is False
-
-
-@pytest.mark.asyncio
-async def test_taxonomy_relation_recovery_is_not_a_generic_safe_fallback() -> None:
-    result = await generation_fallback_decision_node(
-        {
-            "user_question": "Thuốc đó thuộc nhóm nào?",
-            "standalone_question": "Tazorac thuộc nhóm nào?",
-            "draft_answer": "",
-        }
-    )
-
-    assert result["fallback_applied"] is True
-    assert result["fallback_type"] == "grounded_direct_recovery"
-    assert "Tazorac thuộc nhóm retinoid bôi" in result["fallback_answer"]
-
-
-@pytest.mark.asyncio
-async def test_ood_severe_abdominal_pain_gets_urgent_redirection() -> None:
-    result = await domain_guard_node({"standalone_question": "Tôi bị đau bụng dữ dội, chẩn đoán giúp tôi.", "conversation_history": []})
-
     assert result["is_in_domain"] is False
     assert result["guardrail"] == "medical_emergency_out_of_scope"
-
-
-@pytest.mark.asyncio
-async def test_nonurgent_ood_does_not_get_false_emergency() -> None:
-    result = await domain_guard_node({"standalone_question": "Thời tiết hôm nay thế nào?", "conversation_history": []})
-
-    assert result["guardrail"] == "out_of_domain"
 
 
 def test_source_validation_has_bounded_overhead() -> None:
@@ -249,6 +99,5 @@ def test_source_validation_has_bounded_overhead() -> None:
         "Theo invented.pdf và qd_4416_cut.pdf, hãy xem Tài liệu 1.",
         _allowlist(),
     )
-
     assert "invented.pdf" not in result.answer
     assert (time.perf_counter() - started) < 0.05

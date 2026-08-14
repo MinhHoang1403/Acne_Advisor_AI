@@ -5,7 +5,6 @@ from src.quality.contracts import (
     AnswerGuardResult,
     AnswerQualityIssue,
     AnswerVerificationReport,
-    DomainProposition,
 )
 from src.quality.severity_guard import (
     SeverityClassification,
@@ -24,7 +23,6 @@ __all__ = [
     "AnswerGuardResult",
     "AnswerQualityIssue",
     "AnswerVerificationReport",
-    "DomainProposition",
     "SeverityClassification",
     "SeverityGuardResult",
     "SAFE_FALLBACK_FLOW_VERSION",

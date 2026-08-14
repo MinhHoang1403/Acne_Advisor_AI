@@ -108,9 +108,22 @@ class EvidenceRetriever:
         contexts = packed_context_to_response_contexts(packed)
         sources = list(dict.fromkeys(_source_id(context) for context in contexts if _source_id(context)))
         elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+        dense_failed = isinstance(dense_result, BaseException)
+        bm25_failed = isinstance(bm25_result, BaseException)
+        if contexts and dense_failed:
+            retrieval_status = "degraded_dense"
+        elif contexts and bm25_failed:
+            retrieval_status = "degraded_bm25"
+        elif contexts:
+            retrieval_status = "ok"
+        elif dense_failed or bm25_failed:
+            retrieval_status = "recoverable_error"
+        else:
+            retrieval_status = "no_evidence"
 
         trace = {
             "architecture": "dense_bm25_rrf",
+            "status": retrieval_status,
             "query": clean_query,
             "channels": {
                 "dense": {"count": len(dense_results), "error": _error_name(dense_result)},
@@ -135,7 +148,7 @@ class EvidenceRetriever:
             metadata={
                 "retrieval_trace": trace,
                 "packed_context": packed.model_dump(mode="json"),
-                "retrieval_status": "ok" if contexts else "no_evidence",
+                "retrieval_status": retrieval_status,
                 "timings": {"retrieval_total_ms": elapsed_ms},
             },
         )

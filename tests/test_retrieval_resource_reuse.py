@@ -52,7 +52,7 @@ async def test_dense_failure_degrades_to_bm25(monkeypatch: pytest.MonkeyPatch) -
 
     assert [item["id"] for item in result.vector_contexts] == ["bm25-1"]
     assert result.metadata["retrieval_trace"]["channels"]["dense"]["error"] == "RuntimeError"
-    assert result.metadata["retrieval_status"] == "ok"
+    assert result.metadata["retrieval_status"] == "degraded_dense"
 
 
 @pytest.mark.asyncio

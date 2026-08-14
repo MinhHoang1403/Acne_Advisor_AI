@@ -117,8 +117,9 @@ START -> prepare -> guard -> decide
 
 `decide_node` selects a typed action from `retrieve`, `generate`, `abstain`, or
 `finalize`. `MAX_RETRIEVAL_ATTEMPTS = 2`; the loop is bounded. Cache hits and
-out-of-domain responses finalize without retrieval. Source evidence routes to
-generation; exhausted evidence attempts route to explicit safe abstention.
+out-of-domain responses finalize without retrieval. Provenance-complete source
+evidence routes to generation. This check establishes presence and identity
+only, not semantic sufficiency. Exhausted evidence routes to safe abstention.
 
 The runtime has no active reranker, Candidate Policy, selector, metadata score
 boost, EntityCard retrieval, or Graph retrieval. Historical P3/P4 subsystems are
@@ -177,7 +178,7 @@ Application entrypoint: `src.api.app:app`. The current route inventory is:
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/health` | bounded dependency and generation-runtime health |
-| GET | `/retrieve?q=...` | diagnostic access to canonical source retrieval |
+| GET | `/retrieve?q=...` | operator diagnostic retrieval; disabled by default |
 | GET | `/models` | generation model catalog |
 | POST | `/chat` | complete guarded Agentic RAG request |
 | GET | `/chat/sessions` | list persisted sessions |
@@ -187,8 +188,9 @@ Application entrypoint: `src.api.app:app`. The current route inventory is:
 | PATCH | `/chat/sessions/{session_id}/hide` | mark a session hidden |
 | POST | `/chat/sessions/sync` | external/backward-compatible history import |
 
-`/retrieve` is diagnostics, not an alternate evidence pipeline. It uses the
-same Dense + BM25 + RRF service as the agent. OpenAPI/Swagger is available at
+`/retrieve` is diagnostics, not an alternate evidence pipeline. It returns 404
+unless `ENABLE_DIAGNOSTIC_RETRIEVE=true` is explicitly set by a trusted local
+operator. It uses the same Dense + BM25 + RRF service as the agent. OpenAPI/Swagger is available at
 `http://127.0.0.1:8000/docs`.
 
 ## React Frontend
@@ -265,8 +267,12 @@ foundation must already exist in the local stores.
 `.env.example` documents non-secret defaults and blank secret slots. Important
 groups are provider selection, embedding identity, frozen version markers,
 PostgreSQL/Neo4j/Qdrant/Redis connections, retrieval limits, answer safety,
-runtime resilience, and observability. `CACHE_ANSWER_VERSION=v6` is the current
+runtime resilience, and observability. `CACHE_ANSWER_VERSION=v7` is the current
 cache namespace.
+
+Provider fallback is disabled by default. It is effective only when both
+`LLM_PROVIDER_FALLBACK_ENABLED=true` and request field
+`allow_model_fallback=true`; the frontend request opt-in also defaults to false.
 
 This repository currently provides **no end-user authentication or tenant
 authorization**. Chat-history endpoints can enumerate or change local history.
@@ -314,6 +320,7 @@ Backend and contract checks:
 .\venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
 .\venv\Scripts\python.exe scripts\check_reproducible_environment.py
 .\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
+.\venv\Scripts\python.exe scripts\check_phase2_contracts.py
 ```
 
 Frontend:
@@ -340,6 +347,9 @@ those payloads through RRF and context packing. `build_source_allowlist` and
 outside the request evidence. FastAPI returns both friendly `sources` and raw
 traceable `source_metadata`; React renders the friendly labels.
 
+Source allowlisting validates source identity and display attribution. It does
+not prove that every answer claim is entailed by a cited chunk.
+
 `cache_lookup_node` and `cache_store_node` use the same resolved model identity,
 pipeline fingerprint, prompt/version manifest, and answer-cache namespace.
 Out-of-domain, failed, fallback, unsafe, or quality-rejected answers are not
@@ -348,8 +358,8 @@ stored as ordinary reusable answers.
 ## Safety
 
 - The assistant does not diagnose or prescribe.
-- Emergency, pregnancy, severe-acne, medication, guardrail, and abstention
-  contracts are deterministic and regression-tested.
+- Emergency, self-harm, acne-fulminans, high-risk pregnancy, prescription
+  refusal, and abstention contracts are deterministic and regression-tested.
 - Insufficient provenance-complete evidence triggers bounded retry and then a
   safe abstention rather than an unsupported answer.
 - Provider/runtime failure produces structured 503/504 responses or a defined
