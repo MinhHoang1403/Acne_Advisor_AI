@@ -51,7 +51,7 @@ runtime implementation.
 | `src/knowledge` | taxonomy identities, EntityCards and deterministic graph build |
 | `src/retrieval` | one source-evidence retrieval service |
 | `src/agent` | state graph, generation and presentation |
-| `src/quality` | deterministic safety and answer-quality gates |
+| `src/quality` | deterministic safety plus structural/provenance verification |
 | `src/integrations` | external generation and embedding provider adapters |
 | `src/api` | HTTP boundary and dependency preflight |
 | `src/cache`, `src/database` | answer cache and storage adapters |
@@ -71,6 +71,11 @@ The React client starts at `src/frontend/src/main.jsx`. `App.jsx::handleSubmit`
 calls `chatApi.js::sendChatMessage`, then updates session state from
 `ChatResponse`. `ChatWindow.jsx` and `ChatMessage.jsx` render the answer and
 source labels. Provider credentials remain backend-only.
+
+Generation passes policy through the provider's real system-instruction field.
+The question, bounded history, source allowlist, and exact packed evidence stay
+inside delimited user data. Presentation code does not contain a normal medical
+answer table, and the verifier does not judge ordinary medical truth.
 
 The supported deployment boundary is local, single-user development. The
 chat-history routes do not implement end-user authentication or tenant

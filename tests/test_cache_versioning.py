@@ -15,7 +15,7 @@ from src.observability.versioning import (
 
 
 def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
-    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v6"})
+    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v7"})
     reversed_manifest = dict(reversed(list(manifest.items())))
     changed = {**manifest, "context_packer_version": "bounded_provenance_packer_v2"}
 
@@ -86,18 +86,18 @@ def test_provider_fallback_contract_partitions_cache_identity() -> None:
     assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
-def test_legacy_cache_versions_are_promoted_to_v6() -> None:
-    for version in ("", "v1", "v2", "v3", "v4", "v5"):
-        assert get_answer_cache_version({"CACHE_ANSWER_VERSION": version}) == "v6"
+def test_legacy_cache_versions_are_promoted_to_v7() -> None:
+    for version in ("", "v1", "v2", "v3", "v4", "v5", "v6"):
+        assert get_answer_cache_version({"CACHE_ANSWER_VERSION": version}) == "v7"
     assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v7"}) == "v7"
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v11() -> None:
+def test_legacy_answer_formatting_contract_is_promoted_to_v12() -> None:
     manifest = build_pipeline_version_manifest(
         {"ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8"}
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v11"
+    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v12"
 
 
 def test_pipeline_manifest_does_not_include_secrets() -> None:
@@ -120,13 +120,14 @@ def test_manifest_summary_is_a_compact_s4b_contract() -> None:
     assert summary["phase"] == "s4b"
     assert summary["architecture_version"] == ARCHITECTURE_VERSION
     assert summary["retrieval_architecture"] == "dense_bm25_rrf"
-    assert summary["answer_cache_version"] == "v6"
+    assert summary["answer_cache_version"] == "v7"
+    assert summary["evidence_grounding_version"] == "evidence_grounded_runtime_v1"
     assert summary["embedding_dimensions"] == 3072
     assert summary["qdrant_collection_name"] == "acne_knowledge"
 
 
 def test_current_pipeline_fingerprint_uses_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v6")
+    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v7")
     monkeypatch.setenv("SEVERITY_GUARD_VERSION", "severity_guard_test")
 
     assert current_pipeline_fingerprint() == compute_pipeline_fingerprint(
@@ -135,7 +136,7 @@ def test_current_pipeline_fingerprint_uses_environment(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_cache_store_metadata_has_s4b_fingerprint_and_v6(
+async def test_cache_store_metadata_has_s4b_fingerprint_and_v7(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict = {}
@@ -145,9 +146,8 @@ async def test_cache_store_metadata_has_s4b_fingerprint_and_v6(
 
     monkeypatch.setattr(cache_node, "set_answer_cache", fake_set_answer_cache)
     monkeypatch.setenv("CACHE_MIN_ANSWER_CHARS", "10")
-    monkeypatch.setenv("CACHE_REQUIRED_ENTITY_CHECK", "false")
-    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v6")
-    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v6"})
+    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v7")
+    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v7"})
 
     result = await cache_node.cache_store_node(
         {
@@ -172,11 +172,16 @@ async def test_cache_store_metadata_has_s4b_fingerprint_and_v6(
             "answer_quality_report": {"passed": True, "issues": []},
             "pipeline_manifest": manifest,
             "pipeline_fingerprint": "abc123fingerprint",
+            "source_allowlist": [{"source_id": "source.pdf", "display_name": "Source"}],
+            "packed_context": {
+                "items": [{"item_id": "chunk-1", "payload": {"source_id": "source.pdf"}}]
+            },
         }
     )
 
     assert result == {}
     assert captured["pipeline_fingerprint"] == "abc123fingerprint"
     assert captured["metadata"]["pipeline_fingerprint"] == "abc123fingerprint"
-    assert captured["metadata"]["answer_cache_version"] == "v6"
+    assert captured["metadata"]["answer_cache_version"] == "v7"
     assert captured["metadata"]["retrieval"] == "dense_bm25_rrf"
+    assert captured["metadata"]["selected_evidence_ids"] == ["chunk-1"]

@@ -182,6 +182,7 @@ async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
             # Since it's a hit, we bypass LLM generation
             "final_answer": cached_answer,
             "sources": cached_data.get("sources", []),
+            "source_allowlist": meta.get("source_allowlist", []),
             "actual_provider": "cache",
             "actual_model": cached_data.get("model_name", "unknown")
         }
@@ -287,8 +288,6 @@ async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
         logger.info(f"Quality Gate Failed: Answer too short ({len(answer)} < {min_chars})")
         return {}
         
-    answer_lower = answer.lower()
-    
     if state.get("llm_fallback") or state.get("llm_fallback_used"):
         logger.info(f"Quality Gate Failed: Answer is a fallback (llm_fallback={state.get('llm_fallback')}, llm_fallback_used={state.get('llm_fallback_used')})")
         return {}
@@ -297,63 +296,13 @@ async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
         logger.info(f"Quality Gate Failed: rule_based/in_domain_fallback (fallback_provider={state.get('fallback_provider')}, guardrail={state.get('guardrail')})")
         return {}
         
-    generic_phrases = [
-        "dựa trên các thông tin bạn cung cấp, đây là những lưu ý chăm sóc da cơ bản",
-        "giữ vệ sinh da sạch sẽ",
-        "sử dụng kem dưỡng ẩm phù hợp"
-    ]
-    has_generic = any(phrase in answer_lower for phrase in generic_phrases)
-    if has_generic and state.get("actual_provider") != "cache":
-        # Check if the fallback answer actually mentions the key entities from the question
-        target_question = state.get("standalone_question")
-        if not target_question or not target_question.strip():
-            target_question = state.get("user_question", "")
-        question_lower = target_question.lower()
-        key_entities = ["benzoyl peroxide", "retinoid", "adapalene", "clindamycin", "isotretinoin"]
-        mentioned_entities = [entity for entity in key_entities if entity in question_lower]
-        if mentioned_entities:
-            # If the question had entities but the answer uses generic fallback without addressing them, do not cache
-            if not any(entity in answer_lower for entity in mentioned_entities):
-                logger.info("Quality Gate Failed: Answer is generic and misses key entities.")
-                return {}
-                
-    # Check if answer contains entities from the question if required
-    require_entity_check = os.getenv("CACHE_REQUIRED_ENTITY_CHECK", "true").lower() == "true"
-    if require_entity_check:
-        key_entities = ["benzoyl peroxide", "retinoid", "adapalene", "clindamycin", "isotretinoin"]
-        target_question = state.get("standalone_question")
-        if not target_question or not target_question.strip():
-            target_question = state.get("user_question", "")
-        question_lower = target_question.lower()
-        
-        for entity in key_entities:
-            if entity in question_lower and entity not in answer_lower:
-                logger.info(f"Quality Gate Failed: Missing required entity '{entity}' in answer.")
-                return {}
-                
     # Check if sources are empty but in-domain
     if not sources and state.get("is_in_domain"):
         logger.info(f"Quality Gate Failed: No sources for in-domain question. sources={sources}")
         return {}
     
-    # Check for residual dosage/frequency patterns that shouldn't be cached
-    import re
-    user_question = (state.get("user_question") or "").lower()
-    dosage_query_keywords = ["cách dùng", "dùng thế nào", "tần suất", "bôi mấy lần", "liều", "bao lâu", "mấy lần", "dùng sao"]
-    user_asked_dosage = any(kw in user_question for kw in dosage_query_keywords)
-    
-    if not user_asked_dosage:
-        unsafe_dosage_patterns = [
-            r"\d+-\d+ lần/tuần",
-            r"\d+ lần/ngày",
-            r"bôi sau khi dưỡng ẩm",
-            r"dùng kem dưỡng ẩm trước khi bôi",
-        ]
-        for pat in unsafe_dosage_patterns:
-            if re.search(pat, answer_lower):
-                logger.info(f"Quality Gate Failed: Answer contains dosage pattern '{pat}' but user didn't ask about dosage.")
-                return {}
-    # --- END QUALITY GATE ---
+    # Semantic medical validity is not inferred by cache heuristics. The cache
+    # only stores responses that passed runtime structure/provenance contracts.
     
     # Use same cache key logic as cache_lookup_node
     raw_question = state.get("user_question", "")
@@ -387,6 +336,21 @@ async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
         if isinstance(answer_quality_report, dict)
         else []
     )
+    packed_context = state.get("packed_context") or {}
+    packed_items = packed_context.get("items") or []
+    selected_evidence = [
+        {
+            "item_id": item.get("item_id"),
+            "source_id": (
+                (item.get("payload") or {}).get("source_id")
+                or (item.get("payload") or {}).get("source_path")
+                or (item.get("payload") or {}).get("source_file")
+                or (item.get("payload") or {}).get("document_id")
+            ),
+        }
+        for item in packed_items
+        if isinstance(item, dict) and item.get("item_id")
+    ]
     metadata = {
         "provider": state.get("actual_provider"),
         "model": state.get("actual_model"),
@@ -416,6 +380,10 @@ async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
         "answer_cache_version": answer_cache_version,
         "pipeline_fingerprint": pipeline_fingerprint,
         "pipeline_manifest": pipeline_manifest_summary(pipeline_manifest),
+        "source_ids": list(dict.fromkeys(str(source) for source in sources if source)),
+        "source_allowlist": list(state.get("source_allowlist") or []),
+        "selected_evidence": selected_evidence,
+        "selected_evidence_ids": [item["item_id"] for item in selected_evidence],
         "raw_question": raw_question,
         "standalone_question": standalone_q or "",
         "cache_key_question": target_question,

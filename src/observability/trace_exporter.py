@@ -102,7 +102,7 @@ def build_observability_event(
         ),
         packed_context_items_count=selected_count or len(packed.get("items", []) or []),
         retrieval_attempts=int(result.get("retrieval_attempt", state.get("retrieval_attempt", 0)) or 0),
-        evidence_sufficient=assessment.get("sufficient") if assessment else None,
+        evidence_usable=assessment.get("usable") if assessment else None,
         answer_quality_passed=quality.get("passed") if quality else None,
         critical_issues_count=sum(
             1 for issue in issues if isinstance(issue, dict) and issue.get("severity") == "critical"

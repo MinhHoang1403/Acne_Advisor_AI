@@ -59,12 +59,15 @@ async def generate_answer_node(state: ClinicalState) -> dict:
     try:
         from src.agent.prompts.medical_answer import (
             build_medical_prompt,
+            build_medical_system_instruction,
             observe_medical_prompt_budget,
         )
 
         answer_contexts = _select_answer_contexts(contexts, limit=5, query=question)
         prompt_graph_facts: list[dict[str, Any]] = []
         retrieval_diagnostics = state.get("retrieval_diagnostics")
+        packed_context = state.get("packed_context") or {}
+        packed_context_text = str(packed_context.get("context_text") or "")
         
         prompt_started = time.perf_counter()
         prompt = build_medical_prompt(
@@ -76,13 +79,18 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             conversation_history=prompt_history,
             ignored_out_of_domain_part=ignored_out_of_domain_part,
             available_sources=source_allowlist,
+            packed_context_text=packed_context_text,
+        )
+        system_prompt = build_medical_system_instruction(
+            question,
+            ignored_out_of_domain_part=ignored_out_of_domain_part,
         )
         prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         
         llm_provider = state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")
         llm_model = state.get("llm_model")
-        allow_model_fallback = state.get("allow_model_fallback", True)
+        allow_model_fallback = state.get("allow_model_fallback", False)
         settings = _runtime_settings(state)
         
         logger.info(f"Generating answer with LLM: provider={llm_provider}, model={llm_model}")
@@ -90,6 +98,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         generation_started = time.perf_counter()
         response_data = await generate_llm_response(
             prompt=prompt,
+            system_prompt=system_prompt,
             provider=llm_provider,
             model=llm_model,
             temperature=0.2,

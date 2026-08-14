@@ -10,9 +10,8 @@ from src.agent.answer_formatting import finalize_answer_presentation, infer_resp
 from src.agent.state import ClinicalState
 from src.quality.answer_verifier import apply_answer_guard
 from src.quality.safe_fallback import sanitize_fallback_reason
-from src.quality.severity_guard import apply_severity_aware_answer_guard
+from src.quality.severity_guard import SAFETY_POLICY_PROVENANCE, apply_severity_aware_answer_guard
 from src.retrieval.contracts import PackedContext
-from src.retrieval.query_normalization import normalize_query
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,6 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
         return {}
 
     try:
-        normalized_query = normalize_query(query)
         packed_context = _parse_model(PackedContext, state.get("packed_context"))
         guard_mode = os.getenv("ANSWER_GUARD_MODE", "metadata_only")
         strict_enabled = os.getenv("ANSWER_VERIFIER_STRICT", "false").strip().lower() in {
@@ -53,9 +51,8 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
         guard = apply_answer_guard(
             query=query,
             answer=answer,
-            normalized_query=normalized_query,
             packed_context=packed_context,
-            retrieval_trace=None,
+            retrieval_trace=state.get("retrieval_trace"),
             mode=guard_mode,
         )
         severity_guard = apply_severity_aware_answer_guard(query=query, answer=guard.answer)
@@ -84,6 +81,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             "modified": severity_guard.modified,
             "modification_reason": severity_guard.modification_reason,
             "cache_eligible": severity_guard.cache_eligible,
+            "policy_sources": _severity_policy_sources(severity_guard.classification.matched_rules),
         }
         if severity_guard.modified:
             report_data.setdefault("issues", []).append(
@@ -114,13 +112,14 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             "severity_guard_cache_eligible": severity_guard.cache_eligible,
             "response_profile": response_profile,
         }
-        if (
-            severity_guard.modified
-            and severity_guard.classification.severity == "emergency"
-        ):
-            # The emergency template replaces the generated text completely, so
-            # provenance must describe the final deterministic answer, not the
-            # discarded provider draft.
+        full_safety_replacements = {
+            "severity_emergency_safety_fallback",
+            "severity_self_harm_crisis_preface",
+            "severity_acne_fulminans_urgent_preface",
+        }
+        if severity_guard.modification_reason in full_safety_replacements:
+            # A full safety replacement is system-authored and has no retrieved
+            # source attribution from the discarded provider draft.
             result.update(
                 {
                     "actual_provider": "system",
@@ -129,10 +128,20 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
                     "fallback_provider": None,
                     "fallback_model": None,
                     "fallback_applied": True,
-                    "fallback_type": "severity_emergency_safety_fallback",
+                    "fallback_type": severity_guard.modification_reason,
                     "fallback_reason": severity_guard.modification_reason,
                     "fallback_answer": presented_answer,
                     "fallback_cache_eligible": False,
+                    "sources": [],
+                    "source_allowlist": [],
+                    "vector_contexts": [],
+                    "source_validation": {
+                        "version": "source_validation_v1",
+                        "allowlist_source_ids": [],
+                        "removed_invalid_source_mentions": [],
+                        "invalid_source_name_count": 0,
+                        "origin": "deterministic_safety_policy",
+                    },
                 }
             )
         return result
@@ -154,12 +163,10 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
                         "suggested_fix": None,
                     }
                 ],
-                "required_facts": [],
-                "detected_facts": [],
-                "missing_facts": [],
-                "contradictions": [],
-                "safety_warnings": [],
-                "metadata": {},
+                "metadata": {
+                    "verification_scope": ["presentation", "structural_contract", "provenance_identity"],
+                    "medical_semantic_verification": False,
+                },
             },
             "answer_guard_modified": False,
         }
@@ -173,6 +180,20 @@ def _parse_model(model_cls: Any, value: Any) -> Any | None:
     if isinstance(value, dict):
         return model_cls.model_validate(value)
     return None
+
+
+def _severity_policy_sources(matched_rules: list[str]) -> list[str]:
+    sources: list[str] = []
+    for rule in matched_rules:
+        if rule.startswith("emergency_"):
+            sources.extend(SAFETY_POLICY_PROVENANCE["emergency"])
+        elif rule == "urgent_self_harm_ideation":
+            sources.extend(SAFETY_POLICY_PROVENANCE["self_harm"])
+        elif rule == "urgent_acne_fulminans_like":
+            sources.extend(SAFETY_POLICY_PROVENANCE["acne_fulminans"])
+        elif rule == "urgent_pregnancy_high_risk_acne_medication":
+            sources.extend(SAFETY_POLICY_PROVENANCE["isotretinoin_pregnancy"])
+    return list(dict.fromkeys(sources))
 
 
 __all__ = ["answer_quality_node"]

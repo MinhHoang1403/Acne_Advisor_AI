@@ -58,7 +58,7 @@ def test_reproducible_environment_version_changes_fingerprint() -> None:
 
     assert new_manifest["reproducible_environment_version"] == "reproducible_environment_v1"
     assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v6"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v7"
 
 
 def test_checker_passes_without_network_or_pip_check() -> None:

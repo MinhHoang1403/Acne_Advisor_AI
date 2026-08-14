@@ -28,7 +28,7 @@ def _case(case_id: str, passed: bool, details: dict[str, Any] | None = None) -> 
     return {"id": case_id, "passed": bool(passed), "details": details or {}}
 
 
-async def run_eval() -> dict[str, Any]:
+async def run_check() -> dict[str, Any]:
     cases: list[dict[str, Any]] = []
 
     empty_query = build_safe_fallback_answer("empty_query")
@@ -56,7 +56,13 @@ async def run_eval() -> dict[str, Any]:
         "Tôi đang mang thai, có dùng isotretinoin trị mụn được không?",
         build_safe_fallback_answer("no_retrieval_evidence"),
     )
-    cases.append(_case("urgent_no_evidence", urgent.classification.severity == "urgent" and "24-48" in urgent.answer))
+    cases.append(
+        _case(
+            "urgent_no_evidence",
+            urgent.classification.severity == "urgent"
+            and "Isotretinoin không được tự dùng" in urgent.answer,
+        )
+    )
 
     emergency = apply_severity_aware_answer_guard(
         "Bôi thuốc xong tôi khó thở, sưng môi và nổi mề đay",
@@ -64,7 +70,7 @@ async def run_eval() -> dict[str, Any]:
     )
     cases.append(_case("emergency_no_evidence", emergency.classification.severity == "emergency" and "cấp cứu" in emergency.answer))
 
-    valid_evidence = await decide_node({"is_in_domain": True, "evidence_assessment": {"sufficient": True}})
+    valid_evidence = await decide_node({"is_in_domain": True, "evidence_assessment": {"usable": True}})
     cases.append(_case("valid_evidence_routes_generation", valid_evidence["next_action"] == "generate"))
 
     decision = await generation_fallback_decision_node({"draft_answer": ""})
@@ -99,7 +105,7 @@ async def run_eval() -> dict[str, Any]:
 
 
 def main() -> int:
-    report = asyncio.run(run_eval())
+    report = asyncio.run(run_check())
     print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
     print("SAFE_FALLBACK_FLOW: PASS" if report["passed"] else "SAFE_FALLBACK_FLOW: FAIL")
     return 0 if report["passed"] else 1

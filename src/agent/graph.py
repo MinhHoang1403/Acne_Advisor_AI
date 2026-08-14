@@ -77,7 +77,7 @@ async def run_clinical_agent(
     conversation_history: list[dict[str, str]] | None = None,
     llm_provider: str | None = None,
     llm_model: str | None = None,
-    allow_model_fallback: bool = True,
+    allow_model_fallback: bool = False,
     bypass_cache: bool = False,
 ) -> dict[str, Any]:
     """Run one bounded LangGraph request and return the stable API contract."""
@@ -85,6 +85,9 @@ async def run_clinical_agent(
     manifest = build_pipeline_version_manifest()
     fingerprint = compute_pipeline_fingerprint(manifest)
     settings = runtime_resilience_settings_from_env()
+    effective_model_fallback = bool(
+        allow_model_fallback and settings.llm_provider_fallback_enabled
+    )
     budget = DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
     initial_state: ClinicalState = {
         "user_question": message,
@@ -118,7 +121,7 @@ async def run_clinical_agent(
         "cache_hit": False,
         "llm_provider": llm_provider,
         "llm_model": llm_model,
-        "allow_model_fallback": allow_model_fallback,
+        "allow_model_fallback": effective_model_fallback,
         "llm_fallback_used": False,
         "bypass_cache": bypass_cache,
         "pipeline_manifest": manifest,

@@ -33,11 +33,11 @@ def test_retrieval_trace_and_packed_context_have_one_obvious_contract() -> None:
             "retrieval_trace": trace,
             "packed_context": packed.model_dump(mode="json"),
             "retrieval_attempt": 1,
-            "evidence_assessment": {"sufficient": True},
+            "evidence_assessment": {"usable": True},
         },
     )
 
     assert event.summary.retrieval_candidates_count == 2
     assert event.summary.packed_context_items_count == 1
-    assert event.summary.evidence_sufficient is True
+    assert event.summary.evidence_usable is True
     assert "rerank" not in event.model_dump_json().lower()

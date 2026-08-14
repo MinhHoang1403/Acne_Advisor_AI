@@ -35,7 +35,7 @@ export default function ModelSelector({ onModelConfigChange }) {
     () => localStorage.getItem('acneAdvisorSelectedModel') || ''
   );
   const [allowFallback, setAllowFallback] = useState(
-    () => localStorage.getItem('acneAdvisorAllowModelFallback') !== 'false'
+    () => localStorage.getItem('acneAdvisorAllowModelFallback') === 'true'
   );
   const [loading, setLoading] = useState(true);
 

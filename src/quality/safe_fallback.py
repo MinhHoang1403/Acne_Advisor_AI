@@ -20,7 +20,6 @@ FallbackType = Literal[
     "retrieval_error",
     "empty_generation",
     "invalid_generation",
-    "grounded_direct_recovery",
 ]
 
 

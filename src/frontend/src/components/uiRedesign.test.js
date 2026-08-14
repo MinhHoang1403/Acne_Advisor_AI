@@ -35,6 +35,7 @@ test('advanced fallback toggle keeps existing localStorage and submit contract',
   assert.match(modelSelector, /checked=\{allowFallback\}/);
   assert.match(modelSelector, /setAllowFallback\(e\.target\.checked\)/);
   assert.match(modelSelector, /allowModelFallback: allowFallback/);
+  assert.match(modelSelector, /acneAdvisorAllowModelFallback'\) === 'true'/);
   assert.match(chatInput, /onSubmit\(message, modelConfig\)/);
 });
 

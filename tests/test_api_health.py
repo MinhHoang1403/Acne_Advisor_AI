@@ -239,7 +239,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
                     "status": "success",
                 },
             ],
-            "pipeline_manifest": {"phase": "s4b", "answer_cache_version": "v6"},
+            "pipeline_manifest": {"phase": "s4b", "answer_cache_version": "v7"},
             "pipeline_fingerprint": "fixture-fingerprint",
             "answer_quality_report": {"passed": True, "issues": []},
         }

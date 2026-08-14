@@ -301,7 +301,7 @@ Câu hỏi cần phân loại:
     try:
         llm_provider = state.get("llm_provider", "gemini")
         llm_model = state.get("llm_model")
-        allow_model_fallback = state.get("allow_model_fallback", True)
+        allow_model_fallback = state.get("allow_model_fallback", False)
         settings = _runtime_settings(state)
         
         response_data = await generate_llm_response(

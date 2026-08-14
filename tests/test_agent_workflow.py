@@ -18,12 +18,12 @@ async def test_agent_decision_is_bounded_and_meaningful() -> None:
     assert (await workflow.decide_node({"is_in_domain": True, "retrieval_attempt": 0}))["next_action"] == "retrieve"
     assert (
         await workflow.decide_node(
-            {"is_in_domain": True, "retrieval_attempt": 1, "evidence_assessment": {"sufficient": True}}
+            {"is_in_domain": True, "retrieval_attempt": 1, "evidence_assessment": {"usable": True}}
         )
     )["next_action"] == "generate"
     assert (
         await workflow.decide_node(
-            {"is_in_domain": True, "retrieval_attempt": 2, "evidence_assessment": {"sufficient": False}}
+            {"is_in_domain": True, "retrieval_attempt": 2, "evidence_assessment": {"usable": False}}
         )
     )["next_action"] == "abstain"
 
@@ -69,8 +69,9 @@ async def test_assessment_requires_text_and_provenance() -> None:
         {"vector_contexts": [{"text": "Medical text", "source_id": "guideline"}], "retrieval_attempt": 1}
     )
 
-    assert missing_source["evidence_assessment"]["sufficient"] is False
-    assert complete["evidence_assessment"]["sufficient"] is True
+    assert missing_source["evidence_assessment"]["usable"] is False
+    assert complete["evidence_assessment"]["usable"] is True
+    assert complete["evidence_assessment"]["assessment_kind"] == "provenance_complete_evidence_presence"
     assert complete["evidence_assessment"]["source_ids"] == ["guideline"]
 
 

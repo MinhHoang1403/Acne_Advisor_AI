@@ -48,7 +48,7 @@ Qdrant knowledge store.
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
-The production runtime uses answer cache `v6`. Runtime retrieval is read-only
+The production runtime uses answer cache `v7`. Runtime retrieval is read-only
 Dense + native BM25 + RRF over
 `acne_knowledge`; it does not query EntityCards or Neo4j. Do not run Phase 1
 build, activation, reindexing, or embedding as part of Phase 2 startup.
@@ -65,8 +65,8 @@ checks.
 | `inspect_phase2_readiness.py`, `pre_ui_runtime_check.py` | local readiness |
 | `check_reproducible_environment.py`, `check_release_readiness.py` | release gates |
 | `smoke_phase2_runtime.py` | provider-free structural agent smoke |
-| `eval_phase2_answer_quality.py`, `eval_phase2_all.py` | offline answer contracts |
-| `eval_safe_fallback_flow.py`, `eval_runtime_resilience.py` | fallback/resilience gates |
+| `check_answer_contracts.py`, `check_phase2_contracts.py` | implementation contracts; not clinical evaluation |
+| `check_safe_fallback_flow.py`, `check_runtime_resilience.py` | fallback/resilience gates |
 | `inspect_cache_versions.py` | cache and fingerprint inspection |
 | `clear_redis_cache.py` | explicit, developer-triggered answer-cache cleanup |
 
