@@ -28,16 +28,25 @@ from src.retrieval.service import retrieve_evidence
 async def prepare_node(state: ClinicalState) -> dict[str, Any]:
     """Chuẩn hóa request và chỉ đưa conversation context hữu hạn vào state."""
 
-    return await prepare_request_node(state)
+    started = time.perf_counter()
+    updates = await prepare_request_node(state)
+    return {
+        **updates,
+        "performance_timings": {
+            **(state.get("performance_timings") or {}),
+            "prepare": round((time.perf_counter() - started) * 1000, 3),
+        },
+    }
 
 
 async def guard_node(state: ClinicalState) -> dict[str, Any]:
     """Áp dụng safety override hẹp; nếu không khớp mới đọc exact cache."""
 
+    started = time.perf_counter()
     question = state.get("normalized_question") or state.get("user_question") or ""
     safety = evaluate_safety(question)
     if safety is not None:
-        return {
+        updates = {
             "safety_override": True,
             "safety_decision": {
                 "rule_id": safety.rule_id,
@@ -55,7 +64,15 @@ async def guard_node(state: ClinicalState) -> dict[str, Any]:
             "fallback_cache_eligible": False,
             "cache_reason": "deterministic_safety_override",
         }
-    return await cache_lookup_node(state)
+    else:
+        updates = await cache_lookup_node(state)
+    return {
+        **updates,
+        "performance_timings": {
+            **(state.get("performance_timings") or {}),
+            "guard": round((time.perf_counter() - started) * 1000, 3),
+        },
+    }
 
 
 async def decide_node(state: ClinicalState) -> dict[str, Any]:
@@ -203,12 +220,18 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
 async def finalize_node(state: ClinicalState) -> dict[str, Any]:
     """Áp dụng presentation, verifier, exact cache và observability theo thứ tự."""
 
+    started = time.perf_counter()
     updates = await finalize_response_node(state)
     quality = await answer_quality_node({**state, **updates})
     updates.update(quality)
     cache = await cache_store_node({**state, **updates})
     updates.update(cache)
     updates.update(await observability_export_node({**state, **updates}))
+    updates["performance_timings"] = {
+        **(state.get("performance_timings") or {}),
+        **(updates.get("performance_timings") or {}),
+        "finalize": round((time.perf_counter() - started) * 1000, 3),
+    }
     return updates
 
 

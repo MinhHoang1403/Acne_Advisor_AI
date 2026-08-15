@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from src.agent.llm import ollama_client
@@ -109,3 +111,30 @@ async def test_ollama_marks_output_truncated_after_the_single_retry(monkeypatch)
 
     assert answer == "Lần hai\n...[truncated_generation]"
     assert len(_FakeAsyncClient.posted_payloads) == 2
+
+
+@pytest.mark.asyncio
+async def test_ollama_logs_native_provider_durations_in_milliseconds(monkeypatch, caplog):
+    _FakeAsyncClient.responses = [
+        {
+            "done_reason": "stop",
+            "eval_count": 2,
+            "total_duration": 12_000_000,
+            "load_duration": 3_000_000,
+            "prompt_eval_duration": 4_000_000,
+            "eval_duration": 5_000_000,
+            "message": {"content": "OK"},
+        }
+    ]
+    _FakeAsyncClient.posted_payloads = []
+    monkeypatch.setenv("OLLAMA_TRUNCATION_RETRY_ATTEMPTS", "0")
+    monkeypatch.setattr(ollama_client.httpx, "AsyncClient", _FakeAsyncClient)
+
+    with caplog.at_level(logging.INFO):
+        answer = await generate_ollama_response("qwen3:8b", None, "Return OK")
+
+    assert answer == "OK"
+    assert "total_duration_ms=12.0" in caplog.text
+    assert "load_duration_ms=3.0" in caplog.text
+    assert "prompt_eval_duration_ms=4.0" in caplog.text
+    assert "eval_duration_ms=5.0" in caplog.text

@@ -11,9 +11,25 @@ from typing import Any
 
 FILE_SOURCE_DISPLAY_NAMES = {
     "web_raw_dataset.json": "Bộ dữ liệu kiến thức mụn",
+    "aad_public_acne_2026_07": "Bộ dữ liệu kiến thức mụn",
     "PIIS0190962223033893.pdf": "Tài liệu chuyên môn về điều trị mụn",
+    "aad_acne_guideline_2024": "Tài liệu chuyên môn về điều trị mụn",
     "acne-vulgaris-management-pdf-66142088866501.pdf": "Hướng dẫn quản lý mụn trứng cá",
+    "nice_ng198_2026-08-03.md": "Acne vulgaris: management (NG198)",
+    "nice_ng198_2026_08": "Acne vulgaris: management (NG198)",
     "qd_4416_cut.pdf": "Tài liệu tiếng Việt về mụn trứng cá",
+    "vn_moh_dermatology_4416_2023_acne": "Tài liệu tiếng Việt về mụn trứng cá",
+}
+
+_SOURCE_IDENTITY_ALIASES = {
+    "web_raw_dataset.json": "aad_public_acne_2026_07",
+    "aad_public_acne_2026_07": "aad_public_acne_2026_07",
+    "piis0190962223033893.pdf": "aad_acne_guideline_2024",
+    "aad_acne_guideline_2024": "aad_acne_guideline_2024",
+    "nice_ng198_2026-08-03.md": "nice_ng198_2026_08",
+    "nice_ng198_2026_08": "nice_ng198_2026_08",
+    "qd_4416_cut.pdf": "vn_moh_dermatology_4416_2023_acne",
+    "vn_moh_dermatology_4416_2023_acne": "vn_moh_dermatology_4416_2023_acne",
 }
 
 SOURCE_TYPE_ORDER = {
@@ -70,7 +86,14 @@ def build_source_metadata(
         if source_id not in ordered_ids:
             ordered_ids.append(source_id)
 
-    entries = [_source_entry(source_id, context_by_id.get(source_id, {})) for source_id in ordered_ids]
+    entries: list[dict[str, Any]] = []
+    seen_identities: set[str] = set()
+    for source_id in ordered_ids:
+        identity = _canonical_source_identity(source_id)
+        if identity in seen_identities:
+            continue
+        seen_identities.add(identity)
+        entries.append(_source_entry(source_id, context_by_id.get(source_id, {})))
     entries.sort(key=lambda item: (SOURCE_TYPE_ORDER.get(item["source_type"], 99), item["display_name"].casefold(), item["source_id"]))
     return entries
 
@@ -301,6 +324,14 @@ def _source_aliases(entry: dict[str, Any]) -> set[str]:
 
 def _source_match_key(value: Any) -> str:
     return _fold_source_text(normalize_source_identifier(value) or str(value or ""))
+
+
+def _canonical_source_identity(value: Any) -> str:
+    """Gộp local filename và stable source ID nhưng không đổi raw metadata."""
+
+    normalized = normalize_source_identifier(value)
+    folded = normalized.casefold()
+    return _SOURCE_IDENTITY_ALIASES.get(folded, folded)
 
 
 def _fold_source_text(value: Any) -> str:

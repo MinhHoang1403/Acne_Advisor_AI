@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph  # type: ignore[import]
@@ -97,6 +98,7 @@ async def run_clinical_agent(
     tổng ngân sách. Hàm chỉ chọn các field public sau khi graph hoàn tất.
     """
 
+    started = time.perf_counter()
     manifest = build_pipeline_version_manifest()
     fingerprint = compute_pipeline_fingerprint(manifest)
     settings = runtime_resilience_settings_from_env()
@@ -157,6 +159,10 @@ async def run_clinical_agent(
             f"Agent exceeded total timeout of {settings.agent_total_timeout_seconds:.1f}s."
         ) from exc
 
+    performance_timings = {
+        **(final.get("performance_timings") or {}),
+        "agent_total": round((time.perf_counter() - started) * 1000, 3),
+    }
     return {
         "answer": final.get("final_answer", ""),
         "user_id": final.get("user_id"),
@@ -179,7 +185,7 @@ async def run_clinical_agent(
         "pipeline_fingerprint": final.get("pipeline_fingerprint"),
         "observability_exported": final.get("observability_exported"),
         "runtime_resilience": final.get("runtime_resilience"),
-        "performance_timings": final.get("performance_timings", {}),
+        "performance_timings": performance_timings,
         "prompt_budget": final.get("prompt_budget"),
         "answer_quality_report": final.get("answer_quality_report"),
         "safety_severity": final.get("safety_severity"),
