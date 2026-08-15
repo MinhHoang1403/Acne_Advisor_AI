@@ -66,7 +66,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             response_profile=profile,
             severity=state.get("safety_severity"),
             fallback_type=state.get("fallback_type") if state.get("fallback_applied") else None,
-            add_disclaimer=None,
+            add_disclaimer=True,
         )
         report = report_model.model_dump(mode="json")
         report.setdefault("metadata", {})["source_validation"] = dict(

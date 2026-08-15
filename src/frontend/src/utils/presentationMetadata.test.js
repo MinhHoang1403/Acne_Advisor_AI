@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  responseBadgeLabel,
-  sourceDisplayLabels,
-} from './presentationMetadata.js';
+import { sourceDisplayLabels } from './presentationMetadata.js';
 
 test('sourceDisplayLabels prefers friendly metadata and hides raw technical ids', () => {
   const labels = sourceDisplayLabels({
@@ -26,23 +23,9 @@ test('sourceDisplayLabels prefers friendly metadata and hides raw technical ids'
   assert.equal(labels.includes('web_raw_dataset.json'), false);
 });
 
-test('responseBadgeLabel labels deterministic system output without a retired guardrail concept', () => {
-  const label = responseBadgeLabel({
-    provider: 'system',
-    model: null,
-    response_origin: 'deterministic',
-  });
-
-  assert.equal(label, '🧭 Hướng dẫn an toàn');
-  assert.equal(label.includes('Guardrail'), false);
-});
-
-test('responseBadgeLabel identifies a deterministic safety override', () => {
-  const label = responseBadgeLabel({
-    provider: 'system',
-    model: null,
-    response_origin: 'deterministic_safety',
-  });
-
-  assert.equal(label, 'An toàn');
+test('sourceDisplayLabels does not expose raw source ids without display metadata', () => {
+  assert.deepEqual(
+    sourceDisplayLabels({ sources: ['qd_4416_cut.pdf', 'internal-source-id'] }),
+    [],
+  );
 });

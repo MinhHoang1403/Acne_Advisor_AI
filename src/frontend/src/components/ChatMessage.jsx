@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { formatText } from '../utils/markdown.js';
-import { responseBadgeLabel, sourceDisplayLabels } from '../utils/presentationMetadata.js';
+import { sourceDisplayLabels } from '../utils/presentationMetadata.js';
 
 export default function ChatMessage({ msg }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -8,8 +8,7 @@ export default function ChatMessage({ msg }) {
   const isUser = msg.role === 'user';
   const data = msg.data || null;
   const sourceLabels = sourceDisplayLabels(data);
-  const hasMetadata = Boolean(data?.metadata && Object.keys(data.metadata).length > 0);
-  const hasAnswerDetails = Boolean(data && (sourceLabels.length > 0 || hasMetadata));
+  const hasAnswerDetails = sourceLabels.length > 0;
 
   return (
     <div className={`chat-message ${isUser ? 'chat-message-user' : 'chat-message-assistant'}`}>
@@ -49,22 +48,12 @@ export default function ChatMessage({ msg }) {
                         <div id={detailPanelId} className="answer-details-panel">
                           {sourceLabels.length > 0 && (
                             <div className="chat-meta-sources">
-                              <span className="chat-meta-label">Nguồn đã truy hồi:</span>
+                              <span className="chat-meta-label">Tài liệu tham khảo</span>
                               <ul className="chat-meta-source-list">
                                 {sourceLabels.map((label) => (
                                   <li key={label}>{label}</li>
                                 ))}
                               </ul>
-                            </div>
-                          )}
-                          {hasMetadata && (
-                            <div className="chat-meta-info">
-                              <span title="Mô hình ngôn ngữ">
-                                {responseBadgeLabel(data.metadata)}
-                              </span>
-                              {data.metadata.retrieval && (
-                                <span title="Phương pháp truy xuất">🔍 {data.metadata.retrieval}</span>
-                              )}
                             </div>
                           )}
                         </div>

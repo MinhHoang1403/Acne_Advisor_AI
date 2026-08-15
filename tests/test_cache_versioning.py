@@ -15,7 +15,7 @@ from src.observability.versioning import (
 
 
 def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
-    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v8"})
+    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v9"})
     reversed_manifest = dict(reversed(list(manifest.items())))
     changed = {**manifest, "context_packer_version": "bounded_provenance_packer_v2"}
 
@@ -57,13 +57,13 @@ def test_retrieval_limits_partition_cache_identity() -> None:
 def test_answer_and_fallback_versions_partition_cache_identity() -> None:
     baseline = build_pipeline_version_manifest(
         {
-            "PROMPT_VERSION": "medical_prompt_v3",
+            "PROMPT_VERSION": "medical_prompt_v4",
             "SAFE_FALLBACK_FLOW_VERSION": "safe_fallback_v1",
         }
     )
     changed = build_pipeline_version_manifest(
         {
-            "PROMPT_VERSION": "medical_prompt_v4",
+            "PROMPT_VERSION": "medical_prompt_v5",
             "SAFE_FALLBACK_FLOW_VERSION": "safe_fallback_v2",
         }
     )
@@ -86,18 +86,24 @@ def test_provider_fallback_contract_partitions_cache_identity() -> None:
     assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
-def test_legacy_cache_versions_are_promoted_to_v8() -> None:
-    for version in ("", "v1", "v2", "v3", "v4", "v5", "v6", "v7"):
-        assert get_answer_cache_version({"CACHE_ANSWER_VERSION": version}) == "v8"
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v8"}) == "v8"
+def test_legacy_cache_versions_are_promoted_to_v9() -> None:
+    for version in ("", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"):
+        assert get_answer_cache_version({"CACHE_ANSWER_VERSION": version}) == "v9"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v9"}) == "v9"
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v12() -> None:
+def test_legacy_answer_formatting_contract_is_promoted_to_v13() -> None:
     manifest = build_pipeline_version_manifest(
         {"ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8"}
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v12"
+    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v13"
+
+
+def test_legacy_prompt_version_is_promoted_to_v4() -> None:
+    manifest = build_pipeline_version_manifest({"PROMPT_VERSION": "medical_prompt_v3"})
+
+    assert manifest["prompt_version"] == "medical_prompt_v4"
 
 
 def test_pipeline_manifest_does_not_include_secrets() -> None:
@@ -120,14 +126,14 @@ def test_manifest_summary_is_a_compact_production_contract() -> None:
     assert summary["phase"] == "production"
     assert summary["architecture_version"] == ARCHITECTURE_VERSION
     assert summary["retrieval_architecture"] == "dense_bm25_rrf"
-    assert summary["answer_cache_version"] == "v8"
+    assert summary["answer_cache_version"] == "v9"
     assert summary["evidence_grounding_version"] == "evidence_grounded_runtime_v1"
     assert summary["embedding_dimensions"] == 3072
     assert summary["qdrant_collection_name"] == "acne_knowledge"
 
 
 def test_current_pipeline_fingerprint_uses_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v8")
+    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v9")
 
     assert current_pipeline_fingerprint() == compute_pipeline_fingerprint(
         build_pipeline_version_manifest()
@@ -135,7 +141,7 @@ def test_current_pipeline_fingerprint_uses_environment(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_cache_store_metadata_has_production_fingerprint_and_v8(
+async def test_cache_store_metadata_has_production_fingerprint_and_v9(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict = {}
@@ -145,8 +151,8 @@ async def test_cache_store_metadata_has_production_fingerprint_and_v8(
         captured.update(kwargs)
 
     monkeypatch.setattr(cache_node, "set_answer_cache", fake_set_answer_cache)
-    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v8")
-    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v8"})
+    monkeypatch.setenv("CACHE_ANSWER_VERSION", "v9")
+    manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v9"})
 
     result = await cache_node.cache_store_node(
         {
@@ -177,5 +183,5 @@ async def test_cache_store_metadata_has_production_fingerprint_and_v8(
     assert result == {}
     assert captured["pipeline_fingerprint"] == "abc123fingerprint"
     assert captured["args"][3]["pipeline_fingerprint"] == "abc123fingerprint"
-    assert captured["args"][3]["answer_version"] == "v8"
+    assert captured["args"][3]["answer_version"] == "v9"
     assert captured["args"][3]["selected_evidence_ids"] == ["chunk-1"]

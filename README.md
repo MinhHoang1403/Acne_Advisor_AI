@@ -208,7 +208,7 @@ evidence identifiers and the source allowlist. Answers involving history,
 safety overrides, fallback, failed retrieval, or failed quality checks are not
 reused as ordinary cache entries.
 
-The effective answer-cache namespace is `v8`. The pipeline fingerprint is
+The effective answer-cache namespace is `v9`. The pipeline fingerprint is
 computed from a secret-free runtime manifest. Provider calls, retrieval
 channels, the overall Agent request, and frontend requests use finite timeouts.
 Retries are bounded, and provider fallback requires both server configuration

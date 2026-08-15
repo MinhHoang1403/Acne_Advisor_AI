@@ -13,12 +13,14 @@ import json
 import os
 from typing import Any, Mapping
 
-DEFAULT_ANSWER_CACHE_VERSION = "v8"
-DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v12"
-LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4", "v5", "v6", "v7"}
+DEFAULT_ANSWER_CACHE_VERSION = "v9"
+DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v13"
+DEFAULT_PROMPT_VERSION = "medical_prompt_v4"
+LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
-    f"answer_formatting_contract_v{version}" for version in range(1, 12)
+    f"answer_formatting_contract_v{version}" for version in range(1, 13)
 }
+LEGACY_PROMPT_VERSIONS = {"medical_prompt_v1", "medical_prompt_v2", "medical_prompt_v3"}
 ARCHITECTURE_VERSION = "minimal_agentic_rag_v1"
 ARCHITECTURE_FROZEN = True
 
@@ -75,7 +77,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "embedding_dimensions": _env_int(value("EMBEDDING_DIMENSIONS", "3072"), 3072),
         "qdrant_collection_name": _runtime_chunk_collection_name(settings),
         "kb_version": value("KB_VERSION", "frozen_phase1_build"),
-        "prompt_version": value("PROMPT_VERSION", "medical_prompt_v3"),
+        "prompt_version": _effective_prompt_version(value("PROMPT_VERSION", DEFAULT_PROMPT_VERSION)),
         "taxonomy_version": value("TAXONOMY_VERSION", "acne_taxonomy_2026_08"),
         "neo4j_schema_version": value("NEO4J_SCHEMA_VERSION", "neo4j_schema_v1"),
         "source_normalization_version": value("SOURCE_NORMALIZATION_VERSION", "source_normalization_v1"),
@@ -154,6 +156,13 @@ def _effective_answer_formatting_contract_version(configured: Any) -> str:
     text = str(configured or "").strip()
     if not text or text.lower() in LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS:
         return DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION
+    return text
+
+
+def _effective_prompt_version(configured: Any) -> str:
+    text = str(configured or "").strip()
+    if not text or text.lower() in LEGACY_PROMPT_VERSIONS:
+        return DEFAULT_PROMPT_VERSION
     return text
 
 

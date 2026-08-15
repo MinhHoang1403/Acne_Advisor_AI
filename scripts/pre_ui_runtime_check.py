@@ -57,7 +57,7 @@ def run_pre_ui_check() -> dict[str, Any]:
     frontend = frontend_config_status()
     checks = [
         check("backend_readiness", readiness["passed"], {"checks": readiness["checks"]}),
-        check("cache_version", get_answer_cache_version() == "v8", {"answer_cache_version": get_answer_cache_version()}),
+        check("cache_version", get_answer_cache_version() == "v9", {"answer_cache_version": get_answer_cache_version()}),
         check(
             "frontend_config",
             all(frontend[key] for key in ("frontend_exists", "package_json", "api_contract_source")),

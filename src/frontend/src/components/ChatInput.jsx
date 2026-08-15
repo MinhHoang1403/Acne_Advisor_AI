@@ -79,9 +79,6 @@ export default function ChatInput({ message, setMessage, isLoading, onSubmit }) 
             </div>
           )}
         </form>
-        <div className="chat-input-disclaimer">
-          Acne Advisor AI chỉ cung cấp thông tin tham khảo, không thay thế tư vấn y khoa chuyên nghiệp.
-        </div>
       </div>
     </div>
   );

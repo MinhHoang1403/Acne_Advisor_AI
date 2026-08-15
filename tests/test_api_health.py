@@ -236,7 +236,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
                     "status": "success",
                 },
             ],
-            "pipeline_manifest": {"phase": "production", "answer_cache_version": "v8"},
+            "pipeline_manifest": {"phase": "production", "answer_cache_version": "v9"},
             "pipeline_fingerprint": "fixture-fingerprint",
             "answer_quality_report": {"passed": True, "issues": []},
             "performance_timings": {"agent_total": 1.25},
