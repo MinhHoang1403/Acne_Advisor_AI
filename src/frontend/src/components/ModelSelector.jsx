@@ -16,7 +16,7 @@ function compactModelLabel(model) {
   if (normalized.includes('gemini') && normalized.includes('3.1')) return 'Gemini 3.1';
   if (normalized.includes('gemini') && normalized.includes('3.5')) return 'Gemini 3.5';
   if (normalized.includes('gemini') && normalized.includes('2.5')) return 'Gemini 2.5';
-  if (normalized.includes('qwen') && normalized.includes('8b')) return 'Qwen 8B';
+  if (normalized.includes('qwen') && normalized.includes('3:8b')) return 'Qwen 3:8B';
   if (normalized.includes('qwen')) return 'Qwen';
   return fullLabel
     .replace(/\s+Flash(?:-Lite)?/i, '')

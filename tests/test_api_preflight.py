@@ -84,7 +84,7 @@ async def test_preflight_keeps_optional_ollama_unavailability_out_of_core_status
     monkeypatch.setattr(preflight, "check_redis", ok_check)
     monkeypatch.setattr(preflight, "check_ollama", unavailable_ollama)
 
-    result = await preflight.run_phase2_preflight()
+    result = await preflight.run_runtime_preflight()
 
     assert result["status"] == "ok"
     assert result["checks"]["redis"]["status"] == "ok"
@@ -112,7 +112,7 @@ async def test_preflight_preloads_dependencies_before_starting_bounded_checks(mo
     monkeypatch.setattr(preflight, "check_ollama", ok_check)
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
 
-    result = await preflight.run_phase2_preflight()
+    result = await preflight.run_runtime_preflight()
 
     assert result["status"] == "ok"
 
@@ -133,7 +133,7 @@ async def test_preflight_degrades_when_ollama_is_configured_as_primary(monkeypat
     monkeypatch.setattr(preflight, "check_redis", ok_check)
     monkeypatch.setattr(preflight, "check_ollama", unavailable_ollama)
 
-    result = await preflight.run_phase2_preflight()
+    result = await preflight.run_runtime_preflight()
 
     assert result["status"] == "degraded"
     assert result["checks"]["ollama"]["required"] is True
@@ -158,7 +158,7 @@ async def test_preflight_treats_redis_as_optional_runtime_dependency(monkeypatch
     monkeypatch.setattr(preflight, "check_redis", unavailable_redis)
     monkeypatch.setattr(preflight, "check_ollama", ok_check)
 
-    result = await preflight.run_phase2_preflight()
+    result = await preflight.run_runtime_preflight()
 
     assert result["status"] == "ok"
     assert result["checks"]["redis"]["status"] == "unavailable"

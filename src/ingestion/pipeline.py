@@ -1,7 +1,7 @@
 """Điều phối knowledge build được operator CLI sử dụng.
 
-``prepare_phase1`` parse/compile/validate offline; ``build_phase1`` tạo physical
-Qdrant candidates và manifest; ``activate_phase1`` chỉ cut over sau khi có
+``prepare_knowledge`` parse/compile/validate offline; ``build_knowledge`` tạo physical
+Qdrant candidates và manifest; ``activate_knowledge`` chỉ cut over sau khi có
 rollback artifacts và validation live. Neo4j graph/EntityCards ở đây là tài sản
 cấu trúc của knowledge build, không phải evidence source trong normal answer
 runtime. Muốn đổi thuật toán parse/chunk/embed/index nên sửa owner tương ứng thay
@@ -48,13 +48,13 @@ DEFAULT_SOURCE_MANIFEST = Path("data/sources/manifest.yaml")
 DEFAULT_TAXONOMY = Path("data/taxonomy/drug_aliases.yaml")
 DEFAULT_PARSED_CACHE = Path("data/cache/phase1/parsed")
 DEFAULT_EMBEDDING_CACHE = Path("data/cache/phase1/embeddings")
-DEFAULT_BUILD_MANIFEST = Path("data/phase1_build_manifest.json")
+DEFAULT_BUILD_MANIFEST = Path("data/knowledge_build_manifest.json")
 LEGACY_INGESTION_MANIFEST = Path("data/ingestion_manifest.json")
 KNOWLEDGE_LOGICAL_COLLECTION = "acne_knowledge"
 ENTITY_LOGICAL_COLLECTION = "acne_entities"
 
 
-async def prepare_phase1(
+async def prepare_knowledge(
     *,
     source_dir: Path = DEFAULT_SOURCE_DIR,
     source_manifest_path: Path = DEFAULT_SOURCE_MANIFEST,
@@ -81,7 +81,7 @@ async def prepare_phase1(
     graph_records = build_entity_graph_records(cards, kb_version=identity.build_id)
     taxonomy_source_ids = {
         str(record.get("source_id"))
-        for record in json.loads(Path("data/phase1_method_sources.json").read_text(encoding="utf-8"))["sources"]
+        for record in json.loads(Path("data/method_sources.json").read_text(encoding="utf-8"))["sources"]
     }
     layers = combine_validation_layers(
         validate_compiled_knowledge(compiled, sources),
@@ -102,7 +102,7 @@ async def prepare_phase1(
     }
 
 
-async def build_phase1(
+async def build_knowledge(
     *,
     source_dir: Path = DEFAULT_SOURCE_DIR,
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
@@ -111,9 +111,9 @@ async def build_phase1(
     """Embed dữ liệu thiếu, tạo candidate collections và lưu build manifest.
 
     Hàm ghi Qdrant candidates/cache/manifest nhưng chưa đổi logical aliases và
-    chưa thay graph live; cutover thuộc ``activate_phase1``.
+    chưa thay graph live; cutover thuộc ``activate_knowledge``.
     """
-    prepared = await prepare_phase1(source_dir=source_dir)
+    prepared = await prepare_knowledge(source_dir=source_dir)
     compiled = prepared["compiled"]
     cards = prepared["cards"]
     cache = EmbeddingCache(DEFAULT_EMBEDDING_CACHE)
@@ -197,13 +197,13 @@ async def build_phase1(
     return manifest
 
 
-async def validate_phase1(
+async def validate_knowledge(
     *,
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     live: bool = True,
 ) -> dict[str, Any]:
     """So build identity offline và tùy chọn kiểm candidate collections live."""
-    prepared = await prepare_phase1()
+    prepared = await prepare_knowledge()
     manifest = load_build_manifest(manifest_path) if manifest_path.is_file() else None
     layers = list(prepared["offline_validation"]["layers"])
     if manifest is not None:
@@ -234,7 +234,7 @@ async def validate_phase1(
     return combine_validation_layers(*layers)
 
 
-async def activate_phase1(
+async def activate_knowledge(
     *,
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     rollback_root: Path,
@@ -247,12 +247,12 @@ async def activate_phase1(
     """
 
     _verify_rollback_artifacts(rollback_root)
-    validation = await validate_phase1(manifest_path=manifest_path, live=True)
+    validation = await validate_knowledge(manifest_path=manifest_path, live=True)
     if not validation["passed"]:
         raise RuntimeError(f"Candidate cutover validation failed: {validation['errors']}")
 
     manifest = load_build_manifest(manifest_path)
-    prepared = await prepare_phase1()
+    prepared = await prepare_knowledge()
     if manifest["build_id"] != prepared["identity"].build_id:
         raise RuntimeError("Candidate manifest does not match the validated input build identity")
 
@@ -326,9 +326,9 @@ async def activate_phase1(
     return manifest
 
 
-async def phase1_status(manifest_path: Path = DEFAULT_BUILD_MANIFEST) -> dict[str, Any]:
+async def knowledge_status(manifest_path: Path = DEFAULT_BUILD_MANIFEST) -> dict[str, Any]:
     """Tính expected build từ source hiện tại và đối chiếu manifest, không index."""
-    prepared = await prepare_phase1()
+    prepared = await prepare_knowledge()
     manifest = load_build_manifest(manifest_path) if manifest_path.is_file() else None
     return {
         "expected_build_id": prepared["identity"].build_id,
@@ -368,9 +368,9 @@ def _git_commit() -> str:
 
 
 __all__ = [
-    "activate_phase1",
-    "build_phase1",
-    "phase1_status",
-    "prepare_phase1",
-    "validate_phase1",
+    "activate_knowledge",
+    "build_knowledge",
+    "knowledge_status",
+    "prepare_knowledge",
+    "validate_knowledge",
 ]

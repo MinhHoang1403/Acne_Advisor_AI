@@ -195,7 +195,7 @@ medical confidence, source reliability score, or scientific formula.
 These values are not clinical constants. Their definitions, code owners, sources,
 adaptations, and limitations are mapped in
 [Method Traceability](METHOD_TRACEABILITY.md),
-`data/phase1_method_sources.json`, and [References](REFERENCES.md).
+`data/method_sources.json`, and [References](REFERENCES.md).
 
 ## Source Classification
 

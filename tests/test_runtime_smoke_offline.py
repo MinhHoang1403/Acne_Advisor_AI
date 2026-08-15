@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from scripts.smoke_phase2_runtime import run_offline_smoke
+from scripts.smoke_runtime import run_offline_smoke
 
 
-def test_phase2_runtime_smoke_offline_passes_without_live_chat():
+def test_runtime_smoke_offline_passes_without_live_chat():
     report = run_offline_smoke()
 
     assert report["mode"] == "offline"

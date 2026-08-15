@@ -24,7 +24,7 @@ async def test_health_returns_ok(monkeypatch):
             },
         }
 
-    monkeypatch.setattr("src.api.preflight.run_phase2_preflight", fake_preflight)
+    monkeypatch.setattr("src.api.preflight.run_runtime_preflight", fake_preflight)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -51,7 +51,7 @@ async def test_health_returns_degraded_with_reachable_backend(monkeypatch):
             },
         }
 
-    monkeypatch.setattr("src.api.preflight.run_phase2_preflight", fake_preflight)
+    monkeypatch.setattr("src.api.preflight.run_runtime_preflight", fake_preflight)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -85,7 +85,7 @@ async def test_health_reports_optional_ollama_without_degrading_core_runtime(mon
             },
         }
 
-    monkeypatch.setattr("src.api.preflight.run_phase2_preflight", fake_preflight)
+    monkeypatch.setattr("src.api.preflight.run_runtime_preflight", fake_preflight)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -128,7 +128,7 @@ async def test_cors_allows_localhost_and_127(monkeypatch):
             },
         }
 
-    monkeypatch.setattr("src.api.preflight.run_phase2_preflight", fake_preflight)
+    monkeypatch.setattr("src.api.preflight.run_runtime_preflight", fake_preflight)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

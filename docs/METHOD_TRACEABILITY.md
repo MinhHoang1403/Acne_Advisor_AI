@@ -66,4 +66,4 @@ liệu này không thay đổi embedding request, stored vector hoặc index.
   effectiveness hoặc parameter optimality.
 
 Chi tiết công thức nằm tại [Methods and Formulas](METHODS_AND_FORMULAS.md); metadata
-nguồn nằm tại `data/phase1_method_sources.json` và [References](REFERENCES.md).
+nguồn nằm tại `data/method_sources.json` và [References](REFERENCES.md).

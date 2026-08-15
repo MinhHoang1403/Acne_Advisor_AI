@@ -22,17 +22,17 @@ docker compose ps
 ## Knowledge Build
 
 ```powershell
-.\venv\Scripts\python.exe scripts\phase1.py build --source sample_data
-.\venv\Scripts\python.exe scripts\phase1.py validate --offline
-.\venv\Scripts\python.exe scripts\phase1.py validate
-.\venv\Scripts\python.exe scripts\phase1.py status
+.\venv\Scripts\python.exe scripts\knowledge_build.py build --source sample_data
+.\venv\Scripts\python.exe scripts\knowledge_build.py validate --offline
+.\venv\Scripts\python.exe scripts\knowledge_build.py validate
+.\venv\Scripts\python.exe scripts\knowledge_build.py status
 ```
 
 Activation is intentionally guarded and requires verified native Qdrant
 snapshots plus a Neo4j cold backup:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\phase1.py build --activate --rollback-root data\backups\<snapshot>
+.\venv\Scripts\python.exe scripts\knowledge_build.py build --activate --rollback-root data\backups\<snapshot>
 ```
 
 Starting the UI or API normally reuses the existing indexed knowledge.
@@ -42,7 +42,7 @@ recreate, or delete the Qdrant knowledge index.
 ## Runtime Checks
 
 ```powershell
-.\venv\Scripts\python.exe scripts\inspect_phase2_readiness.py
+.\venv\Scripts\python.exe scripts\inspect_runtime_readiness.py
 .\venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
 .\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
 .\venv\Scripts\python.exe -m pytest -q
@@ -63,12 +63,12 @@ checks.
 
 | Script | Responsibility |
 |---|---|
-| `phase1.py` | controlled build, validate and status |
+| `knowledge_build.py` | controlled build, validate and status |
 | `init_schema.py`, `init_chat_schema.py` | relational schema initialization |
-| `inspect_phase2_readiness.py`, `pre_ui_runtime_check.py` | local readiness |
+| `inspect_runtime_readiness.py`, `pre_ui_runtime_check.py` | local readiness |
 | `check_reproducible_environment.py`, `check_release_readiness.py` | environment and release-readiness checks |
-| `smoke_phase2_runtime.py` | provider-free structural agent smoke |
-| `check_answer_contracts.py`, `check_phase2_contracts.py` | implementation contracts; not clinical evaluation |
+| `smoke_runtime.py` | provider-free structural agent smoke |
+| `check_answer_contracts.py`, `check_runtime_contracts.py` | implementation contracts; not clinical evaluation |
 | `check_safe_fallback_flow.py`, `check_runtime_resilience.py` | fallback and resilience checks |
 | `inspect_cache_versions.py` | cache and fingerprint inspection |
 | `clear_redis_cache.py` | explicit, developer-triggered answer-cache cleanup |

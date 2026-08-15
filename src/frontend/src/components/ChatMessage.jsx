@@ -49,7 +49,7 @@ export default function ChatMessage({ msg }) {
                         <div id={detailPanelId} className="answer-details-panel">
                           {sourceLabels.length > 0 && (
                             <div className="chat-meta-sources">
-                              <span className="chat-meta-label">Tài liệu tham khảo</span>
+                              <span className="chat-meta-label">Tài liệu tham khảo:</span>
                               <ul className="chat-meta-source-list">
                                 {sourceLabels.map((label) => (
                                   <li key={label}>{label}</li>
@@ -59,7 +59,7 @@ export default function ChatMessage({ msg }) {
                           )}
                           {answerModelName && (
                             <div className="chat-meta-info">
-                              <span title="Mô hình trả lời">✨ {answerModelName}</span>
+                              <span title="Mô hình trả lời">{answerModelName}</span>
                             </div>
                           )}
                         </div>

@@ -57,7 +57,7 @@ jobs:
         run: |
           python scripts/check_release_readiness.py --mode offline
 
-      - name: Legacy Google SDK scan
+      - name: Disallowed Google SDK scan
         shell: pwsh
         run: |
           $patterns = @(

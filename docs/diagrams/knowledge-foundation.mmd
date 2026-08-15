@@ -1,14 +1,14 @@
 sequenceDiagram
     autonumber
     actor Operator
-    participant CLI as scripts/phase1.py
+    participant CLI as scripts/knowledge_build.py
     participant Sources as Canonical source manifest
     participant Build as src/ingestion
     participant Gemini as Gemini Embedding 2
     participant Qdrant
     participant Neo4j
 
-    Operator->>CLI: phase1.py build
+    Operator->>CLI: knowledge_build.py build
     CLI->>Sources: Verify portable IDs and SHA-256 hashes
     Sources-->>Build: Four canonical source records
     Build->>Build: Reuse content-addressed parsed artifacts
@@ -23,7 +23,7 @@ sequenceDiagram
     CLI-->>Operator: Candidate build ID and validation result
 
     opt Explicit guarded activation
-        Operator->>CLI: phase1.py build --activate --rollback-root
+        Operator->>CLI: knowledge_build.py build --activate --rollback-root
         CLI->>CLI: Verify Qdrant snapshots and Neo4j cold backup
         CLI->>Qdrant: Switch aliases to validated physical build
         CLI->>Neo4j: Reconcile deterministic source-backed graph

@@ -6,7 +6,7 @@ from src.ingestion.build import compute_build_identity
 
 def test_segmentation_reference_uses_verified_acl_metadata() -> None:
     registry = json.loads(
-        Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
+        Path("data/method_sources.json").read_text(encoding="utf-8")
     )
     records = {record["source_id"]: record for record in registry["sources"]}
 
@@ -20,7 +20,7 @@ def test_segmentation_reference_uses_verified_acl_metadata() -> None:
 
 def test_nice_source_provenance_is_disclosed_in_registry_and_docs() -> None:
     registry = json.loads(
-        Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
+        Path("data/method_sources.json").read_text(encoding="utf-8")
     )
     records = {record["source_id"]: record for record in registry["sources"]}
     nice = records["nice_ng198_2026_08"]
@@ -47,7 +47,7 @@ def test_method_registry_correction_does_not_change_validated_build_identity() -
 
 def test_method_traceability_covers_methods_and_technical_standards() -> None:
     registry = json.loads(
-        Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
+        Path("data/method_sources.json").read_text(encoding="utf-8")
     )
     records = {record["source_id"]: record for record in registry["sources"]}
     traceability = Path("docs/METHOD_TRACEABILITY.md").read_text(encoding="utf-8")
@@ -71,7 +71,7 @@ def test_method_traceability_covers_methods_and_technical_standards() -> None:
 
 def test_gemini_retrieval_instruction_is_an_evaluation_question_only() -> None:
     registry = json.loads(
-        Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
+        Path("data/method_sources.json").read_text(encoding="utf-8")
     )
     records = {record["source_id"]: record for record in registry["sources"]}
     methods = Path("docs/METHODS_AND_FORMULAS.md").read_text(encoding="utf-8")

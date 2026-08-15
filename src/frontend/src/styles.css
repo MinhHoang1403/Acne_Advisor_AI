@@ -1,6 +1,6 @@
 /* ============================================================
    Acne Advisor AI — Global Styles
-   Clean, professional ChatGPT-like design.
+   Clean, professional chat interface.
   White tone, dark text, compact sidebar.
    ============================================================ */
 
@@ -1034,7 +1034,7 @@ body {
 }
 
 /* ============================================================
-   ChatGPT-inspired minimal redesign
+   Minimal chat interface foundation
    ============================================================ */
 :root {
   --app-bg: #f7f7f4;
@@ -1821,7 +1821,7 @@ summary:focus-visible {
 }
 
 /* ============================================================
-   Final white/neutral polish
+   White/neutral theme overrides
    ============================================================ */
 :root {
   --app-bg: #ffffff;
@@ -2050,7 +2050,7 @@ summary:focus-visible {
 }
 
 /* ============================================================
-   Round 2 compact chat polish
+   Compact chat layout
    ============================================================ */
 .chat-window {
   position: relative;
@@ -2280,7 +2280,7 @@ summary:focus-visible {
 }
 
 /* ============================================================
-   Round 3 minimal polish
+   Minimal sidebar and metadata
    ============================================================ */
 .sidebar-header {
   padding: 14px 14px 10px;
@@ -2459,7 +2459,7 @@ summary:focus-visible {
 }
 
 /* ============================================================
-   Round 4 hero, brand, fallback popover, and title polish
+   Empty state, brand, fallback popover, and title
    ============================================================ */
 .sidebar-header {
   padding: 18px 16px 14px;
@@ -2610,7 +2610,7 @@ summary:focus-visible {
 }
 
 /* ============================================================
-   Round 5 composer focus and message hierarchy polish
+   Composer focus and message hierarchy
    ============================================================ */
 .chat-textarea,
 .chat-textarea:focus,
