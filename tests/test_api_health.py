@@ -202,9 +202,6 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
             "vector_contexts": [
                 {"source_file": "fixture.pdf", "document_title": "Fixture Acne Guide"},
             ],
-            "symptoms": [],
-            "safety_flags": [],
-            "graph_facts": [],
             "retrieval_status": "ok",
             "retrieval_attempt": 1,
             "fallback_applied": False,
@@ -239,7 +236,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
                     "status": "success",
                 },
             ],
-            "pipeline_manifest": {"phase": "s4b", "answer_cache_version": "v7"},
+            "pipeline_manifest": {"phase": "production", "answer_cache_version": "v8"},
             "pipeline_fingerprint": "fixture-fingerprint",
             "answer_quality_report": {"passed": True, "issues": []},
         }
@@ -274,7 +271,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     assert metadata["fallback_reason"] == "quota_exhausted"
     assert metadata["fallback_chain"][1]["model"] == "gemini-3.1-flash-lite"
     assert metadata["response_origin"] == "llm"
-    assert metadata["guardrail_applied"] is False
+    assert "guardrail_applied" not in metadata
     body = response.json()
     assert body["sources"] == ["Fixture Acne Guide"]
     assert body["source_metadata"][0]["source_id"] == "fixture.pdf"

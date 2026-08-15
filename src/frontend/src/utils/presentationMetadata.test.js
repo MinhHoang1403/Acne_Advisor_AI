@@ -26,27 +26,23 @@ test('sourceDisplayLabels prefers friendly metadata and hides raw technical ids'
   assert.equal(labels.includes('web_raw_dataset.json'), false);
 });
 
-test('responseBadgeLabel does not show Guardrail for system deterministic routine answer', () => {
+test('responseBadgeLabel labels deterministic system output without a retired guardrail concept', () => {
   const label = responseBadgeLabel({
     provider: 'system',
     model: null,
     response_origin: 'deterministic',
-    guardrail_applied: false,
-    guardrail: 'in_domain',
   });
 
   assert.equal(label, '🧭 Hướng dẫn an toàn');
   assert.equal(label.includes('Guardrail'), false);
 });
 
-test('responseBadgeLabel only shows Guardrail for real guardrail intervention', () => {
+test('responseBadgeLabel identifies a deterministic safety override', () => {
   const label = responseBadgeLabel({
     provider: 'system',
-    model: 'guardrail-rule',
-    response_origin: 'guardrail',
-    guardrail_applied: true,
-    guardrail: 'out_of_domain',
+    model: null,
+    response_origin: 'deterministic_safety',
   });
 
-  assert.equal(label, '🛡️ Guardrail');
+  assert.equal(label, 'An toàn');
 });

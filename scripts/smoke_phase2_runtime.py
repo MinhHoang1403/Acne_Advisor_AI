@@ -40,7 +40,6 @@ def run_offline_smoke() -> dict:
         candidates = [
             RetrievedCandidate(
                 candidate_id=point_id,
-                source="chunk",
                 collection="acne_knowledge",
                 text=fused[0]["text"],
                 score=fused[0]["rrf_score"],
@@ -52,7 +51,6 @@ def run_offline_smoke() -> dict:
         normalized = NormalizedQuery(
             original_query=query,
             normalized_text=query,
-            intent="medical_question",
         )
         packed = pack_context(normalized, candidates, max_items=4, max_chars=2000)
         passed = (

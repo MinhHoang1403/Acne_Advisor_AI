@@ -37,7 +37,9 @@ async def test_embed_query_retries_transient_transport_errors(monkeypatch):
 
     assert await vector_store.embed_query("mụn viêm") == [0.1, 0.2, 0.3]
     assert attempts == ["call", "call", "call"]
-    assert delays == [0.25, 0.5]
+    assert len(delays) == 2
+    assert 0.25 <= delays[0] <= 0.275
+    assert 0.5 <= delays[1] <= 0.55
 
 
 @pytest.mark.asyncio

@@ -20,11 +20,6 @@ class RuntimeResilienceSettings(BaseModel):
     llm_retry_base_delay_seconds: float = Field(default=1.0, ge=0)
     llm_retry_max_delay_seconds: float = Field(default=4.0, ge=0)
 
-    circuit_breaker_enabled: bool = True
-    circuit_breaker_failure_threshold: int = Field(default=3, ge=1)
-    circuit_breaker_recovery_seconds: float = Field(default=60.0, gt=0)
-    circuit_breaker_half_open_max_calls: int = Field(default=1, ge=1)
-
     llm_provider_fallback_enabled: bool = False
     llm_fallback_provider: str = "ollama"
 
@@ -60,10 +55,6 @@ def runtime_resilience_settings_from_env(env: dict[str, str] | None = None) -> R
         "llm_max_retries": get_int("LLM_MAX_RETRIES", 1),
         "llm_retry_base_delay_seconds": get_float("LLM_RETRY_BASE_DELAY_SECONDS", 1.0),
         "llm_retry_max_delay_seconds": get_float("LLM_RETRY_MAX_DELAY_SECONDS", 4.0),
-        "circuit_breaker_enabled": get_bool("CIRCUIT_BREAKER_ENABLED", True),
-        "circuit_breaker_failure_threshold": get_int("CIRCUIT_BREAKER_FAILURE_THRESHOLD", 3),
-        "circuit_breaker_recovery_seconds": get_float("CIRCUIT_BREAKER_RECOVERY_SECONDS", 60.0),
-        "circuit_breaker_half_open_max_calls": get_int("CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS", 1),
         "llm_provider_fallback_enabled": get_bool("LLM_PROVIDER_FALLBACK_ENABLED", False),
         "llm_fallback_provider": source.get("LLM_FALLBACK_PROVIDER", "ollama") or "ollama",
     }

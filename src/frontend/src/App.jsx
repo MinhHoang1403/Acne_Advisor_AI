@@ -199,9 +199,6 @@ export default function App() {
           data: m.role === 'assistant' ? {
             answer: m.content,
             sources: m.sources || [],
-            symptoms: m.symptoms || [],
-            safety_flags: m.safety_flags || [],
-            graph_facts: m.graph_facts || [],
             metadata: m.metadata || {},
             source_metadata: m.metadata?.source_metadata || [],
           } : undefined,

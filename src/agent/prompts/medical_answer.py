@@ -27,8 +27,6 @@ POLICY:
 
 def build_medical_system_instruction(
     question: str,
-    *,
-    ignored_out_of_domain_part: bool = False,
 ) -> str:
     """Build policy/shape instructions for the provider's system channel."""
 
@@ -37,27 +35,18 @@ def build_medical_system_instruction(
         ANSWER_FORMATTING_CONTRACT.strip(),
         answer_format_instruction_for_question(question).strip(),
     ]
-    if ignored_out_of_domain_part:
-        parts.append(
-            "Từ chối ngắn gọn phần ngoài phạm vi, rồi chỉ trả lời phần liên quan đến mụn/da liễu."
-        )
     return "\n\n".join(part for part in parts if part)
 
 
 def build_medical_prompt(
     question: str,
-    symptoms: list[str],
-    safety_flags: list[str],
     contexts: list[dict[str, Any]],
-    graph_facts: list[dict[str, Any]],
     conversation_history: list[dict[str, str]] | None = None,
-    ignored_out_of_domain_part: bool = False,
     available_sources: list[dict[str, Any]] | None = None,
     packed_context_text: str | None = None,
 ) -> str:
     """Build user/data content; system policy is passed separately by the caller."""
 
-    del graph_facts, ignored_out_of_domain_part
     lines = ["<USER_DATA>"]
     if conversation_history:
         lines.append("<CONVERSATION_HISTORY>")
@@ -68,10 +57,6 @@ def build_medical_prompt(
         lines.append("</CONVERSATION_HISTORY>")
 
     lines.extend(("<CURRENT_QUESTION>", question, "</CURRENT_QUESTION>"))
-    if symptoms:
-        lines.extend(("<EXTRACTED_SYMPTOMS>", *symptoms, "</EXTRACTED_SYMPTOMS>"))
-    if safety_flags:
-        lines.extend(("<SAFETY_FLAGS>", *safety_flags, "</SAFETY_FLAGS>"))
 
     lines.append("<AVAILABLE_SOURCES>")
     if available_sources:
@@ -118,7 +103,7 @@ def _render_legacy_contexts(contexts: list[dict[str, Any]]) -> str:
 def observe_medical_prompt_budget(prompt: str):
     """Return size-only accounting for the exact user prompt."""
 
-    from src.retrieval.token_budget import observe_prompt_components
+    from src.retrieval.prompt_size import observe_prompt_components
 
     start_marker = "<EVIDENCE>\n"
     end_marker = "\n</EVIDENCE>"

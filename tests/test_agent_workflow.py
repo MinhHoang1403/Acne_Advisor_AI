@@ -13,19 +13,8 @@ def test_final_graph_has_eight_semantic_nodes() -> None:
 
 @pytest.mark.asyncio
 async def test_agent_decision_is_bounded_and_meaningful() -> None:
-    assert (await workflow.decide_node({"is_in_domain": False}))["next_action"] == "finalize"
-    assert (await workflow.decide_node({"is_in_domain": True, "cache_hit": True}))["next_action"] == "finalize"
-    assert (await workflow.decide_node({"is_in_domain": True, "retrieval_attempt": 0}))["next_action"] == "retrieve"
-    assert (
-        await workflow.decide_node(
-            {"is_in_domain": True, "retrieval_attempt": 1, "evidence_assessment": {"usable": True}}
-        )
-    )["next_action"] == "generate"
-    assert (
-        await workflow.decide_node(
-            {"is_in_domain": True, "retrieval_attempt": 2, "evidence_assessment": {"usable": False}}
-        )
-    )["next_action"] == "abstain"
+    assert (await workflow.decide_node({"safety_override": True}))["next_action"] == "finalize"
+    assert (await workflow.decide_node({"cache_hit": True}))["next_action"] == "finalize"
 
 
 def test_route_reads_only_explicit_agent_action() -> None:

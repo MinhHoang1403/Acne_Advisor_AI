@@ -115,11 +115,12 @@ START -> prepare -> guard -> decide
                           `-> finalize -> END
 ```
 
-`decide_node` selects a typed action from `retrieve`, `generate`, `abstain`, or
-`finalize`. `MAX_RETRIEVAL_ATTEMPTS = 2`; the loop is bounded. Cache hits and
-out-of-domain responses finalize without retrieval. Provenance-complete source
-evidence routes to generation. This check establishes presence and identity
-only, not semantic sufficiency. Exhausted evidence routes to safe abstention.
+For ordinary requests, `decide_node` asks the configured model for a strict
+typed action from `retrieve`, `retry`, `generate`, or `abstain`. Cache hits and
+narrow safety overrides take a deterministic terminal `finalize` route.
+`MAX_RETRIEVAL_ATTEMPTS = 2`; invalid actions and exhausted evidence fail closed
+to abstention. The deterministic evidence check establishes presence and source
+identity only, not semantic sufficiency.
 
 The runtime has no active reranker, Candidate Policy, selector, metadata score
 boost, EntityCard retrieval, or Graph retrieval. Historical P3/P4 subsystems are
@@ -166,8 +167,8 @@ weight `1.0`. Definitions and formulas are in
 9. Finalization validates source mentions, applies safety/presentation rules,
    writes only eligible answers to the versioned Redis cache, and exports
    bounded observability metadata.
-10. `ChatResponse` returns the answer, display sources, source metadata, safety
-    fields, compatibility `graph_facts`, and runtime metadata.
+10. `ChatResponse` returns the answer, display sources, raw source metadata,
+    the safety decision when applicable, and bounded runtime metadata.
 11. `App.sendQuestion` updates React session state. `ChatWindow.jsx` selects the
     conversation and `ChatMessage.jsx` renders Markdown, badges, and citations.
 
@@ -216,7 +217,8 @@ values to client code, so never place API keys, passwords, or private URLs in a
 | `src/knowledge/` | taxonomy, source-backed EntityCards, deterministic graph |
 | `src/retrieval/` | Dense + BM25 + RRF and bounded context packing |
 | `src/agent/` | LangGraph state, decisions, generation, presentation |
-| `src/quality/` | deterministic safety, verification, fallback contracts |
+| `src/quality/` | structural/provenance verification and fallback contracts |
+| `src/agent/safety_policy.py` | narrow source-mapped safety overrides |
 | `src/api/` | FastAPI routes and runtime preflight |
 | `src/cache/`, `src/database/` | answer cache and application persistence |
 | `src/integrations/` | external provider SDK adapters |
@@ -267,7 +269,7 @@ foundation must already exist in the local stores.
 `.env.example` documents non-secret defaults and blank secret slots. Important
 groups are provider selection, embedding identity, frozen version markers,
 PostgreSQL/Neo4j/Qdrant/Redis connections, retrieval limits, answer safety,
-runtime resilience, and observability. `CACHE_ANSWER_VERSION=v7` is the current
+runtime resilience, and observability. `CACHE_ANSWER_VERSION=v8` is the current
 cache namespace.
 
 Provider fallback is disabled by default. It is effective only when both
@@ -351,7 +353,8 @@ Source allowlisting validates source identity and display attribution. It does
 not prove that every answer claim is entailed by a cited chunk.
 
 `cache_lookup_node` and `cache_store_node` use the same resolved model identity,
-pipeline fingerprint, prompt/version manifest, and answer-cache namespace.
+pipeline fingerprint, exact normalized question, and answer-cache namespace.
+The cache performs no semantic-similarity matching.
 Out-of-domain, failed, fallback, unsafe, or quality-rejected answers are not
 stored as ordinary reusable answers.
 
@@ -399,16 +402,22 @@ Official runtime contracts include the
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
 
-These files describe the current frozen architecture. Git history and merged
+These files describe the current production architecture. Git history and merged
 pull requests retain development history; active docs do not serve as a changelog.
 
-## Frozen Architecture and Evaluation Status
+## Provenance Limitation and Evaluation Status
 
-Phase 1 build `ec0a6de32d58ac181af6` and the S4B eight-node Phase 2 architecture
-are frozen. S4D verifies implementation, contracts, security configuration, and
-end-to-end traceability without changing either semantic architecture. No final
-AI-quality claim is made here. E0 must first research and approve evaluation
-methodology through the stated research cutoff.
+Phase 1 build `ec0a6de32d58ac181af6` is frozen. Its NICE-derived snapshot was
+acquired through a text-rendering transport. The snapshot reports a represented
+date of 2026-08-03, while official NICE NG198 metadata reports 2026-04-30. A
+complete official replacement could not be acquired through the approved
+routes, so this remains an unresolved corpus/provenance limitation. The project
+does not claim that this snapshot is fully or currently verified.
+
+The Phase 2 marker is `minimal_agentic_rag_v1`; its architecture conformance
+does not repair that Phase 1 limitation. No final AI-quality claim is made here.
+E0 remains a separate future evaluation-methodology task and is not started by
+this work.
 
 ## License
 

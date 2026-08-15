@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.cache import redis_cache, semantic_cache
+from src.cache import exact_cache, redis_cache
 from src.database.vector_store import QdrantVectorStore
 from src.retrieval.service import EvidenceRetriever
 
@@ -36,7 +36,7 @@ async def test_redis_connection_error_log_is_sanitized(monkeypatch, caplog):
 
 
 @pytest.mark.asyncio
-async def test_semantic_cache_store_error_log_is_sanitized(monkeypatch, caplog):
+async def test_exact_cache_store_error_log_is_sanitized(monkeypatch, caplog):
     class FakeRedis:
         async def setex(self, key, ttl, value):
             del key, ttl, value
@@ -45,12 +45,11 @@ async def test_semantic_cache_store_error_log_is_sanitized(monkeypatch, caplog):
     async def fake_get_redis():
         return FakeRedis()
 
-    monkeypatch.setattr(semantic_cache, "get_redis", fake_get_redis)
+    monkeypatch.setattr(exact_cache, "get_redis", fake_get_redis)
 
-    with caplog.at_level(logging.ERROR):
-        await semantic_cache.set_answer_cache(
+    with caplog.at_level(logging.WARNING):
+        await exact_cache.set_answer_cache(
             normalized_question="mụn đầu đen là gì",
-            standalone_question="Mụn đầu đen là gì?",
             answer="Mụn đầu đen là dạng nhân mụn mở.",
             sources=[],
             metadata={},

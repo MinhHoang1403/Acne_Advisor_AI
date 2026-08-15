@@ -10,8 +10,8 @@ Acne Advisor AI separates a frozen knowledge foundation from a small runtime:
 ```text
 User -> FastAPI -> LangGraph
                      |
-                     +-> deterministic domain/severity guard
-                     +-> decide action
+                     +-> narrow source-mapped safety policy / exact cache
+                     +-> model-selected typed action
                      +-> retrieve_evidence
                      |      +-> Dense search
                      |      +-> native BM25 search
@@ -30,8 +30,10 @@ User -> FastAPI -> LangGraph
 | One bounded context packer | `src/retrieval/context_packer.py` |
 | LangGraph orchestration and decisions | `src/agent/graph.py`, `src/agent/nodes/workflow.py` |
 | Generation and final presentation | `src/agent/nodes/reason.py`, `src/agent/nodes/respond.py` |
-| Deterministic medical safety | `src/quality/`, `src/agent/nodes/severity.py` |
-| API, cache, persistence | `src/api/`, `src/cache/`, `src/database/` |
+| Narrow deterministic safety overrides | `src/agent/safety_policy.py` |
+| Structural/provenance verification | `src/quality/answer_verifier.py` |
+| Exact normalized answer cache | `src/cache/exact_cache.py` |
+| API and persistence | `src/api/`, `src/database/` |
 
 The runtime has one typed evidence tool: `retrieve_evidence`. EntityCards and
 Neo4j remain frozen Phase 1 assets for offline inspection and future
@@ -51,7 +53,7 @@ runtime implementation.
 | `src/knowledge` | taxonomy identities, EntityCards and deterministic graph build |
 | `src/retrieval` | one source-evidence retrieval service |
 | `src/agent` | state graph, generation and presentation |
-| `src/quality` | deterministic safety plus structural/provenance verification |
+| `src/quality` | structural/provenance verification and safe fallback contracts |
 | `src/integrations` | external generation and embedding provider adapters |
 | `src/api` | HTTP boundary and dependency preflight |
 | `src/cache`, `src/database` | answer cache and storage adapters |
@@ -59,6 +61,8 @@ runtime implementation.
 PostgreSQL stores chat history, Redis stores versioned eligible answers,
 Qdrant serves read-only runtime evidence, and Neo4j stores the frozen structural
 graph. Only Qdrant knowledge chunks participate in online medical grounding.
+The Redis cache uses exact normalized question identity plus provider, model,
+pipeline fingerprint, and cache version; it performs no semantic lookup.
 
 ## Application Boundary
 

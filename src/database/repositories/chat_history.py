@@ -68,9 +68,6 @@ async def save_message(
     content: str,
     message_id: Optional[str] = None,
     sources: Optional[list] = None,
-    symptoms: Optional[list] = None,
-    safety_flags: Optional[list] = None,
-    graph_facts: Optional[list] = None,
     metadata: Optional[dict] = None,
     created_at: Optional[datetime] = None,
 ) -> dict:
@@ -89,11 +86,9 @@ async def save_message(
     result = await session.execute(
         text("""
             INSERT INTO chat_messages
-                (id, session_id, role, content, sources, symptoms,
-                 safety_flags, graph_facts, metadata, created_at)
+                (id, session_id, role, content, sources, metadata, created_at)
             VALUES
-                (:id, :session_id, :role, :content, :sources, :symptoms,
-                 :safety_flags, :graph_facts, :metadata, :created_at)
+                (:id, :session_id, :role, :content, :sources, :metadata, :created_at)
             ON CONFLICT (id) DO NOTHING
             RETURNING id, session_id, role, content, created_at
         """),
@@ -103,9 +98,6 @@ async def save_message(
             "role": role,
             "content": content,
             "sources": _json_or_none(sources),
-            "symptoms": _json_or_none(symptoms),
-            "safety_flags": _json_or_none(safety_flags),
-            "graph_facts": _json_or_none(graph_facts),
             "metadata": _json_or_none(safe_metadata),
             "created_at": ts,
         },
@@ -157,8 +149,7 @@ async def get_messages(
     """
     result = await session.execute(
         text("""
-            SELECT id, session_id, role, content, sources, symptoms,
-                   safety_flags, graph_facts, metadata, created_at
+            SELECT id, session_id, role, content, sources, metadata, created_at
             FROM chat_messages
             WHERE session_id = :session_id
             ORDER BY created_at ASC

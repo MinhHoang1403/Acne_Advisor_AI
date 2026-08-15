@@ -49,6 +49,62 @@ evidence results in explicit abstention. One failed Dense or BM25 channel is
 reported as `degraded_dense` or `degraded_bm25`; ranking policy and RRF weights
 remain unchanged.
 
+## Bounded Agent Decision
+
+`src/agent/action_decision.py` asks the configured generation model for one
+strict `AgentDecision` JSON object. The action space is `retrieve`, `retry`,
+`generate`, or `abstain`; the object may also carry a bounded retrieval query
+and a reason code, but no medical answer or free-form chain of thought. This is
+an implemented agent method related to ReAct, Active RAG, and Adaptive-RAG, not
+a reproduction of any one paper.
+
+Python enforces the transition contract and `MAX_RETRIEVAL_ATTEMPTS = 2`.
+Schema-invalid output, a model-selected impossible transition, a repeated
+non-recoverable query, or an exhausted attempt budget becomes abstention. The
+model owns semantic action choice; deterministic code owns finite execution and
+fail-closed behavior.
+
+## Exact Cache Identity
+
+`src/cache/exact_cache.py` normalizes a question by Unicode-aware case folding,
+replacing `?!.,:;` with spaces, collapsing whitespace, and then requiring an
+exact normalized match. The SHA-256 cache-key payload is:
+
+```text
+cache_schema_version | answer_cache_version | pipeline_fingerprint
+| normalized_question | provider | model
+```
+
+This is an engineering cache policy. It does not compute embedding similarity
+and makes no semantic-equivalence claim.
+
+## Runtime Resilience
+
+Provider retries use bounded exponential delay with positive jitter:
+
+```text
+base(i)  = base_delay * 2^(max(0, i - 1))
+capped   = min(base(i), max_delay)
+delay(i) = min(capped + U(0, capped * jitter_ratio), max_delay)
+```
+
+The default is one retry, a 1-second base, a 4-second cap, and a 0.1 jitter
+ratio, always constrained by the request deadline. HTTP 429/500/502/503/504,
+timeouts, and transport failures are transient; HTTP 400/401/403/404/422 and
+validation/configuration failures are permanent. These classifications are an
+engineering resilience policy, not a medical or research result.
+
+## Safety and Verification
+
+`src/agent/safety_policy.py` owns seven narrow deterministic overrides mapped to
+clinical/public-health sources or an explicit no-prescription engineering
+policy. It is not a general medical reasoner. Ordinary answer meaning remains
+`source evidence -> LLM synthesis`.
+
+`src/quality/answer_verifier.py` checks answer structure, source allowlisting,
+and provenance-related contracts. It does not prove medical truth, semantic
+entailment, or evidence completeness.
+
 ## Frozen Phase 1
 
 Structure-first chunking remains capped at 2400 Unicode characters with zero
@@ -65,8 +121,34 @@ and Neo4j contracts are frozen.
 | BM25 `k1`, `b`, `avg_len` | 1.2, 0.75, 256 | frozen provider configuration |
 | RRF `k` | 60 | runtime engineering policy |
 | channel weights | 1.0 / 1.0 | runtime engineering policy |
-| context items/chars | env-bounded defaults 8 / 6000 | runtime resource policy |
+| retrieval candidates | default 16 | runtime resource policy |
+| context items/chars | defaults 8 / 6000 | runtime resource policy |
 | retrieval attempts | maximum 2 | bounded safety/latency policy |
+| agent action schema | 4 semantic actions | implemented research method + engineering contract |
+| exact cache namespace | v8 | engineering invalidation policy |
+| cache question/TTL | 600 chars / 86400 seconds | engineering resource policy |
+| request/history bounds | 500 chars; 10 messages x 1000 chars | engineering resource policy |
+| total/retrieval deadlines | 210 / 20 seconds | engineering resilience policy |
+| Gemini/Ollama call deadlines | 45 / 160 seconds | engineering resilience policy |
+| LLM retries | 1 retry, 1-second base, 4-second cap, 0.1 jitter | engineering resilience policy |
+| safety overrides | 7 source-mapped rules | clinical safety sources + engineering policy |
+| answer shape parsing | requested table/column/item/style only | structural engineering policy |
+| source allowlist | evidence source IDs only | provenance engineering contract |
+| core preflight | Qdrant, query embedding, generation provider | architecture dependency contract |
 
 These values are not clinical constants. Their definitions and method sources
 are mapped in `data/phase1_method_sources.json` and [References](REFERENCES.md).
+
+## Source Classification
+
+Project claims use these labels:
+
+| Classification | Meaning |
+|---|---|
+| `IMPLEMENTED_RESEARCH_METHOD` | a cited method is present in code, with project-specific adaptation stated |
+| `OFFICIAL_PROVIDER_CONTRACT` | behavior required by an external SDK/service contract |
+| `OFFICIAL_FRAMEWORK_CONTRACT` | orchestration or API behavior required by framework documentation |
+| `CLINICAL_SAFETY_SOURCE` | an external source supports a narrow deterministic safety action |
+| `RELATED_LITERATURE` | relevant research that is not claimed as implemented |
+| `ENGINEERING_POLICY` | a bounded project decision without scientific-universality claim |
+| `EMPIRICAL_PROJECT_DECISION` | a value selected from project measurements and valid only for this system |

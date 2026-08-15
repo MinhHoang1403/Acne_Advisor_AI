@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal, TypedDict
 
 
-AgentAction = Literal["retrieve", "generate", "abstain", "finalize"]
+AgentAction = Literal["retrieve", "retry", "generate", "abstain", "finalize"]
 
 
 class ClinicalState(TypedDict, total=False):
@@ -22,19 +22,15 @@ class ClinicalState(TypedDict, total=False):
     conversation_history: list[dict[str, str]]
     standalone_question: str | None
     normalized_question: str
-    use_history_context: bool
     conversation_context: dict[str, Any] | None
-    symptoms: list[str]
 
     # Deterministic guard and agent decision
     is_in_domain: bool | None
-    guardrail: str | None
-    ignored_out_of_domain_part: bool
-    domain_reason: str | None
-    refusal_message: str | None
-    medical_severity: str | None
-    severity_guard: dict[str, Any] | None
+    safety_severity: str | None
+    safety_decision: dict[str, Any] | None
     next_action: AgentAction
+    agent_decision: dict[str, Any] | None
+    safety_override: bool
 
     # Source evidence
     vector_contexts: list[dict[str, Any]]
@@ -50,14 +46,9 @@ class ClinicalState(TypedDict, total=False):
     retry_history: list[dict[str, Any]]
 
     # Answer, safety and fallback
-    safety_flags: list[str]
     draft_answer: str
     final_answer: str
     answer_quality_report: dict[str, Any] | None
-    answer_guard_modified: bool | None
-    answer_guard_mode: str | None
-    severity_guard_modified: bool | None
-    severity_guard_cache_eligible: bool | None
     fallback_applied: bool
     fallback_type: str | None
     fallback_reason: str | None
@@ -91,6 +82,7 @@ class ClinicalState(TypedDict, total=False):
     runtime_resilience: dict[str, Any] | None
     performance_timings: dict[str, float]
     prompt_budget: dict[str, Any] | None
+    response_profile: str | None
     observability_exported: bool | None
 
 __all__ = ["AgentAction", "ClinicalState"]

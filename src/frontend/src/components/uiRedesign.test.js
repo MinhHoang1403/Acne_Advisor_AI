@@ -73,20 +73,17 @@ test('assistant messages no longer render a leading lightning avatar', () => {
   assert.doesNotMatch(chatWindow, /M13 10V3L4 14h7v7l9-11h-7z/);
 });
 
-test('source, debug, and markdown table presentation remain accessible', () => {
+test('source details and markdown table presentation remain accessible', () => {
   const chatMessage = readSource('./ChatMessage.jsx');
-  const debugPanel = readSource('./DebugPanel.jsx');
   const markdown = readSource('../utils/markdown.js');
   const styles = readSource('../styles.css');
 
   assert.match(chatMessage, /sourceDisplayLabels/);
-  assert.match(chatMessage, /DebugPanel/);
+  assert.doesNotMatch(chatMessage, /graph_facts|DebugPanel|guardrail/);
   assert.match(chatMessage, /answer-details-toggle/);
   assert.match(chatMessage, /aria-expanded=\{detailsOpen\}/);
   assert.match(chatMessage, /Chi tiết/);
   assert.match(chatMessage, /detailsOpen &&/);
-  assert.match(debugPanel, /<details className="debug-panel">/);
-  assert.match(debugPanel, /<summary className="debug-panel-summary">/);
   assert.match(markdown, /className: 'chat-markdown-table'/);
   assert.match(styles, /\.chat-table-wrapper/);
   assert.match(styles, /\.answer-details-panel/);

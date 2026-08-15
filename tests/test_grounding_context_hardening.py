@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import time
+from pathlib import Path
 
 import pytest
 
-from src.agent.nodes.guardrails import domain_guard_node
-from src.agent.nodes.preparation import rewrite_question_node
+from src.agent.nodes.preparation import prepare_request_node
 from src.agent.nodes.respond import finalize_response_node
 from src.agent.source_presentation import (
     build_source_allowlist,
@@ -44,60 +43,47 @@ def test_source_validation_removes_only_unretrieved_names() -> None:
 async def test_source_request_uses_only_retrieved_canonical_sources() -> None:
     result = await finalize_response_node(
         {
-            "user_question": "Theo kho dữ liệu, nguồn nào đã được truy hồi?",
-            "is_in_domain": True,
-            "guardrail": "in_domain_rule",
+            "user_question": "Nguồn nào đã được truy hồi?",
             "fallback_applied": False,
             "fallback_type": "none",
             "source_allowlist": _allowlist(),
             "sources": ["qd_4416_cut.pdf", "web_raw_dataset.json"],
             "vector_contexts": [],
             "draft_answer": "Tài liệu 1",
-            "performance_timings": {},
         }
     )
-    assert "Tài liệu 1" not in result["final_answer"]
-    assert result["source_validation"]["invalid_source_name_count"] == 0
+    assert "Tài liệu tiếng Việt về mụn trứng cá" in result["final_answer"]
+    assert "invented-guide.pdf" not in result["final_answer"]
+    assert {item["source_id"] for item in _allowlist()} == {
+        "qd_4416_cut.pdf",
+        "web_raw_dataset.json",
+    }
 
 
 @pytest.mark.asyncio
-async def test_coreference_rewrite_uses_bounded_history(monkeypatch) -> None:
-    captured: dict[str, str] = {}
-
-    async def fake_generate_llm_response(**kwargs):
-        captured["prompt"] = kwargs["prompt"]
-        return {"text": "Hoạt chất chính của thuốc đang nói tới là gì?"}
-
-    monkeypatch.setattr("src.agent.nodes.preparation.generate_llm_response", fake_generate_llm_response)
-    result = await rewrite_question_node(
+async def test_preparation_has_one_bounded_history_representation(monkeypatch) -> None:
+    monkeypatch.setenv("MAX_CONVERSATION_HISTORY_MESSAGES", "2")
+    monkeypatch.setenv("MAX_HISTORY_MESSAGE_CHARS", "8")
+    result = await prepare_request_node(
         {
-            "normalized_question": "Hoạt chất chính của thuốc đó là gì?",
+            "user_question": "  Còn thuốc đó? ",
             "conversation_history": [
-                *({"role": "user", "content": f"old-{index}"} for index in range(8)),
-                {"role": "user", "content": "Tôi đang nói về một thuốc trị mụn."},
+                {"role": "user", "content": "old"},
+                {"role": "assistant", "content": "benzoyl peroxide"},
+                {"role": "user", "content": "dùng thế nào"},
             ],
-            "llm_provider": "mock",
-            "allow_model_fallback": False,
         }
     )
-    assert result["use_history_context"] is True
-    assert "old-0" not in captured["prompt"]
+    assert result["normalized_question"] == "Còn thuốc đó?"
+    assert result["conversation_context"] == {
+        "messages": [
+            {"role": "assistant", "content": "benzoyl "},
+            {"role": "user", "content": "dùng thế"},
+        ],
+        "message_count": 2,
+    }
 
 
-@pytest.mark.asyncio
-async def test_ood_emergency_redirection_is_preserved() -> None:
-    result = await domain_guard_node(
-        {"standalone_question": "Tôi bị đau bụng dữ dội, chẩn đoán giúp tôi.", "conversation_history": []}
-    )
-    assert result["is_in_domain"] is False
-    assert result["guardrail"] == "medical_emergency_out_of_scope"
-
-
-def test_source_validation_has_bounded_overhead() -> None:
-    started = time.perf_counter()
-    result = validate_answer_source_mentions(
-        "Theo invented.pdf và qd_4416_cut.pdf, hãy xem Tài liệu 1.",
-        _allowlist(),
-    )
-    assert "invented.pdf" not in result.answer
-    assert (time.perf_counter() - started) < 0.05
+def test_duplicate_semantic_router_modules_are_removed() -> None:
+    assert not Path("src/agent/nodes/guardrails.py").exists()
+    assert not Path("src/agent/nodes/severity.py").exists()

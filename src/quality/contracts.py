@@ -22,24 +22,11 @@ class AnswerVerificationReport(BaseModel):
 
     passed: bool
     original_query: str
-    intent: str | None = None
     checked_answer: str
     issues: list[AnswerQualityIssue] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-
-class AnswerGuardResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    answer: str
-    original_answer: str
-    report: AnswerVerificationReport
-    modified: bool
-    modification_reason: str | None = None
-
-
 __all__ = [
-    "AnswerGuardResult",
     "AnswerQualityIssue",
     "AnswerVerificationReport",
 ]

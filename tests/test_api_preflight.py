@@ -142,7 +142,7 @@ async def test_preflight_degrades_when_ollama_is_configured_as_primary(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_preflight_requires_redis_as_a_core_runtime_dependency(monkeypatch):
+async def test_preflight_treats_redis_as_optional_runtime_dependency(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
 
@@ -160,5 +160,6 @@ async def test_preflight_requires_redis_as_a_core_runtime_dependency(monkeypatch
 
     result = await preflight.run_phase2_preflight()
 
-    assert result["status"] == "degraded"
+    assert result["status"] == "ok"
     assert result["checks"]["redis"]["status"] == "unavailable"
+    assert result["checks"]["redis"]["required"] is False

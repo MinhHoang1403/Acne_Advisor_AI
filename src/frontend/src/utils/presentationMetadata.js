@@ -39,8 +39,8 @@ export function sourceDisplayLabels(data) {
 export function responseBadgeLabel(meta) {
   if (!meta) return '';
 
-  if (meta.response_origin === 'guardrail' || meta.guardrail_applied === true) {
-    return '🛡️ Guardrail';
+  if (meta.response_origin === 'deterministic_safety') {
+    return 'An toàn';
   }
   if (meta.cache && meta.cache.hit) {
     const originalName = modelDisplayName(meta.cached_from_provider, meta.cached_from_model);

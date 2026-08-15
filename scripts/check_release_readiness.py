@@ -29,7 +29,7 @@ except ImportError:
     pass
 
 EXPECTED_VERSION = "end_to_end_release_readiness_v1"
-EXPECTED_CACHE_VERSION = "v7"
+EXPECTED_CACHE_VERSION = "v8"
 EXPECTED_COUNTS = {
     "acne_knowledge": 512,
     "acne_entities": 32,

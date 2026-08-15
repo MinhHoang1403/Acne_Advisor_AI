@@ -8,68 +8,66 @@ from typing import Any
 
 from src.agent.nodes.cache import cache_lookup_node, cache_store_node
 from src.agent.nodes.fallback import generation_fallback_decision_node, safe_fallback_node
-from src.agent.nodes.guardrails import domain_guard_node
 from src.agent.nodes.observability import observability_export_node
 from src.agent.nodes.quality import answer_quality_node
 from src.agent.nodes.reason import generate_answer_node
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.nodes.preparation import extract_symptoms_node, normalize_question_node, rewrite_question_node
-from src.agent.nodes.severity import severity_classification_node
+from src.agent.action_decision import MAX_RETRIEVAL_ATTEMPTS, select_agent_action
+from src.agent.nodes.preparation import prepare_request_node
 from src.agent.source_presentation import build_source_allowlist
-from src.agent.state import AgentAction, ClinicalState
+from src.agent.safety_policy import evaluate_safety
+from src.agent.state import ClinicalState
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.retrieval.service import retrieve_evidence
 
-MAX_RETRIEVAL_ATTEMPTS = 2
-
-
 async def prepare_node(state: ClinicalState) -> dict[str, Any]:
-    """Normalize the request, resolve conversation context, and classify severity."""
+    """Normalize the request and expose bounded conversation context."""
 
-    updates: dict[str, Any] = {}
-    for node in (normalize_question_node, rewrite_question_node, extract_symptoms_node, severity_classification_node):
-        updates.update(await node({**state, **updates}))
-    return updates
+    return await prepare_request_node(state)
 
 
 async def guard_node(state: ClinicalState) -> dict[str, Any]:
-    """Apply deterministic domain/safety policy before consulting the cache."""
+    """Apply narrow safety overrides, otherwise consult the exact cache."""
 
-    guard = await domain_guard_node(state)
-    updates: dict[str, Any] = dict(guard)
-    if guard.get("is_in_domain"):
-        updates.update(await cache_lookup_node({**state, **updates}))
-    return updates
+    question = state.get("normalized_question") or state.get("user_question") or ""
+    safety = evaluate_safety(question)
+    if safety is not None:
+        return {
+            "safety_override": True,
+            "safety_decision": {
+                "rule_id": safety.rule_id,
+                "severity": safety.severity,
+                "action": safety.action,
+                "source_ids": list(safety.source_ids),
+                "source_urls": list(safety.source_urls),
+            },
+            "safety_severity": safety.severity,
+            "draft_answer": safety.response,
+            "sources": [],
+            "source_allowlist": [],
+            "actual_provider": "system",
+            "actual_model": None,
+            "fallback_cache_eligible": False,
+            "cache_reason": "deterministic_safety_override",
+        }
+    return await cache_lookup_node(state)
 
 
-async def decide_node(state: ClinicalState) -> dict[str, AgentAction]:
-    """Choose the next meaningful bounded agent action."""
+async def decide_node(state: ClinicalState) -> dict[str, Any]:
+    """Use one semantic decision owner for every bounded agent transition."""
 
-    if state.get("is_in_domain") is False or state.get("cache_hit"):
-        action: AgentAction = "finalize"
-    else:
-        assessment = state.get("evidence_assessment") or {}
-        if assessment.get("usable"):
-            action = "generate"
-        elif state.get("retrieval_attempt", 0) == 0:
-            action = "retrieve"
-        elif _next_retrieval_query(state) is None:
-            action = "abstain"
-        else:
-            action = "retrieve"
-    return {"next_action": action}
+    if state.get("safety_override") or state.get("cache_hit"):
+        return {"next_action": "finalize"}
+    return await select_agent_action(state)
 
 
 async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
     """Invoke the one source-evidence tool and preserve its typed trace."""
 
     attempt = state.get("retrieval_attempt", 0) + 1
-    retry_plan = _next_retrieval_query(state)
-    if retry_plan is None:
-        question = state.get("standalone_question") or state.get("user_question", "")
-        retry_reason = "initial_retrieval"
-    else:
-        question, retry_reason = retry_plan
+    decision = state.get("agent_decision") or {}
+    question = str(decision.get("retrieval_query") or state.get("standalone_question") or "").strip()
+    retry_reason = str(decision.get("reason_code") or "needs_evidence")
 
     started = time.perf_counter()
     try:
@@ -158,31 +156,6 @@ async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
             "max_attempts": MAX_RETRIEVAL_ATTEMPTS,
         }
     }
-
-
-def _next_retrieval_query(state: ClinicalState) -> tuple[str, str] | None:
-    """Return a justified next query; never spend an attempt without a reason."""
-
-    attempt = int(state.get("retrieval_attempt", 0) or 0)
-    if attempt >= MAX_RETRIEVAL_ATTEMPTS:
-        return None
-    standalone = str(state.get("standalone_question") or state.get("user_question") or "").strip()
-    if attempt == 0:
-        return (standalone, "initial_retrieval") if standalone else None
-
-    status = str(state.get("retrieval_status") or "")
-    if status in {"failed", "recoverable_error"}:
-        return (standalone, "retry_transient_retrieval_failure") if standalone else None
-
-    original = str(state.get("user_question") or "").strip()
-    previous_queries = {
-        str(entry.get("query") or "").strip()
-        for entry in state.get("retry_history") or []
-        if isinstance(entry, dict)
-    }
-    if status == "no_evidence" and original and original != standalone and original not in previous_queries:
-        return original, "retry_with_materially_distinct_original_query"
-    return None
 
 
 async def generate_node(state: ClinicalState) -> dict[str, Any]:

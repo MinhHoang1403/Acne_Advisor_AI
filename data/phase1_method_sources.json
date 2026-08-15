@@ -63,19 +63,19 @@
       "limitations": "Does not validate Gemini Embedding 2 or this medical corpus."
     },
     {
-      "source_id": "qu_segmentation_2025",
+      "source_id": "wang_segmentation_2025",
       "title": "Document Segmentation Matters for Retrieval-Augmented Generation",
-      "authors_or_organization": "Chen Qu et al.",
+      "authors_or_organization": "Zhitong Wang et al.",
       "publication_date": "2025",
-      "venue_or_publisher": "Findings of ACL",
+      "venue_or_publisher": "Findings of the Association for Computational Linguistics: ACL 2025",
       "doi": "10.18653/v1/2025.findings-acl.422",
       "url": "https://aclanthology.org/2025.findings-acl.422/",
       "source_type": "peer_reviewed_paper",
-      "role": "current",
-      "claim_supported": "Segmentation strategy should be evaluated rather than treated as a universal constant.",
+      "role": "related_literature",
+      "claim_supported": "Document segmentation can affect retrieval and downstream RAG quality; the paper evaluates PIC on open-domain benchmarks.",
       "project_method": "Actual-corpus chunking comparison",
       "date_verified": "2026-08-14",
-      "limitations": "Does not prescribe the project's 2400-character cap."
+      "limitations": "The project does not implement PIC. The paper does not prescribe or validate this project's 2400-character cap or acne corpus policy."
     },
     {
       "source_id": "nice_ng198_2026_08",

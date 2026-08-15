@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from src.agent.answer_formatting import assess_structural_quality, infer_response_profile
-from src.quality.contracts import AnswerGuardResult, AnswerQualityIssue, AnswerVerificationReport
-from src.retrieval.contracts import NormalizedQuery, PackedContext
+from src.quality.contracts import AnswerQualityIssue, AnswerVerificationReport
+from src.retrieval.contracts import PackedContext
 
 
 ERROR = "error"
@@ -16,7 +16,6 @@ WARNING = "warning"
 def verify_answer_quality(
     query: str,
     answer: str,
-    normalized_query: NormalizedQuery | None = None,
     packed_context: PackedContext | None = None,
     retrieval_trace: Any | None = None,
 ) -> AnswerVerificationReport:
@@ -41,7 +40,6 @@ def verify_answer_quality(
     return AnswerVerificationReport(
         passed=not has_error,
         original_query=query,
-        intent=normalized_query.intent if normalized_query else None,
         checked_answer=answer or "",
         issues=issues,
         metadata={
@@ -49,41 +47,9 @@ def verify_answer_quality(
             "medical_semantic_verification": False,
             "packed_context_items": len(packed_context.items) if packed_context else 0,
             "retrieval_trace_available": retrieval_trace is not None,
-            "answer_verifier": {"version": "answer_verifier_v3"},
+            "answer_validation": {"version": "structural_provenance_validation_v1"},
         },
     )
-
-
-def apply_answer_guard(
-    query: str,
-    answer: str,
-    normalized_query: NormalizedQuery | None = None,
-    packed_context: PackedContext | None = None,
-    retrieval_trace: Any | None = None,
-    mode: str = "metadata_only",
-) -> AnswerGuardResult:
-    """Return verifier metadata without replacing ordinary medical content."""
-
-    report = verify_answer_quality(
-        query=query,
-        answer=answer,
-        normalized_query=normalized_query,
-        packed_context=packed_context,
-        retrieval_trace=retrieval_trace,
-    )
-    normalized_mode = (mode or "metadata_only").strip().lower()
-    return AnswerGuardResult(
-        answer=answer,
-        original_answer=answer,
-        report=report,
-        modified=False,
-        modification_reason=(
-            "unsupported_guard_mode_preserved_answer"
-            if normalized_mode not in {"metadata_only", "append_warnings", "strict_safe"}
-            else None
-        ),
-    )
-
 
 def _packed_context_provenance_errors(packed_context: PackedContext | None) -> list[AnswerQualityIssue]:
     if packed_context is None:
@@ -124,4 +90,4 @@ def _issue(
     )
 
 
-__all__ = ["apply_answer_guard", "verify_answer_quality"]
+__all__ = ["verify_answer_quality"]
