@@ -1,14 +1,15 @@
 # Safety Contracts
 
-Authoritative deterministic safety behavior lives under `src/quality/` and is
-invoked from the LangGraph workflow. It is not delegated to an optional LLM
-tool.
+Authoritative deterministic safety behavior lives in
+`src/agent/safety_policy.py` and is invoked before cache lookup or optional
+retrieval. It is not delegated to an LLM tool. Structural/provenance verification
+and safe fallback contracts remain under `src/quality/`.
 
 Key invariants:
 
 - emergency guidance precedes routine acne advice;
 - the system does not diagnose, prescribe, or replace a clinician;
-- ordinary medication content is never appended by the severity guard;
+- ordinary medication content is never replaced by a broad severity classifier;
 - evidence must include medical text and source provenance;
 - insufficient evidence after two attempts produces explicit abstention;
 - provider failure produces a safe, non-fabricated fallback;
@@ -16,8 +17,7 @@ Key invariants:
 - EntityCards and graph structure are not medical evidence;
 - observability redacts raw queries and secret-like values.
 
-Regression tests cover emergency escalation, narrow high-risk pregnancy policy,
-severity-aware answers, fallback, source validation,
+Regression tests cover all seven narrow rules, fallback, source validation,
 Markdown presentation, and cache eligibility. Regression fixtures protect
 software behavior; they are not clinical gold and do not establish answer
 quality or external validity.
@@ -26,11 +26,19 @@ quality or external validity.
 
 | Override | Trigger boundary | Authoritative policy source |
 |---|---|---|
-| anaphylaxis/severe emergency | breathing difficulty with swelling/rash, or severe drug-reaction alarms | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) and the [DailyMed isotretinoin medication guide](https://dailymed.nlm.nih.gov/dailymed/fda/fdaDrugXsl.cfm?setid=1cf11710-f966-4529-8e08-02175f588bca) |
+| anaphylaxis-like emergency | breathing difficulty with swelling of the lips/mouth/tongue/throat or rapidly spreading hives | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) |
+| chest pain with breathlessness | unnegated chest pain/tightness plus breathlessness | [NHS Chest pain](https://www.nhs.uk/symptoms/chest-pain/) |
 | immediate self-harm safety | explicit self-harm/suicide intent | [WHO Suicide Q&A](https://www.who.int/news-room/questions-and-answers/item/suicide) |
-| suspected acne fulminans | abrupt ulcerative/hemorrhagic nodules plus systemic symptoms | [NICE NG198 recommendation 1.4.1](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) |
-| isotretinoin and pregnancy | pregnancy context plus isotretinoin/oral retinoid | [NICE NG198 recommendation 1.5.22](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) and [MHRA isotretinoin precautions](https://www.gov.uk/drug-safety-update/isotretinoin-roaccutane-reminder-of-important-risks-and-precautions) |
+| suspected acne fulminans | acne plus fever/joint pain and severe nodular, cystic, ulcerative, or rapidly erupting lesions | [NICE NG198 recommendation 1.4.1](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) |
+| isotretinoin and pregnancy | pregnancy context plus isotretinoin/oral retinoid | [NICE NG198 recommendation 1.5.22](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) and [MHRA oral-retinoid pregnancy prevention](https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk) |
+| isotretinoin with severe headache and visual/GI symptoms | isotretinoin plus severe headache and blurred vision or nausea/vomiting | [DailyMed isotretinoin medication guide](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72867c88-070f-4608-bfef-cc5225ebce6d) |
+| prescription execution request | explicit request to prescribe, choose a drug, or choose a dose | project `ENGINEERING_POLICY_NO_PRESCRIPTION`; no external clinical-source claim |
 
 These rules are action-oriented safety boundaries, not a general medical answer
 engine. A full deterministic replacement is attributed to provider `system`,
 clears retrieved-source display attribution, and is never answer-cache eligible.
+
+The two NICE-mapped rules use the official recommendation URL as the current
+safety cross-check. The frozen NICE-derived retrieval snapshot has the accepted
+date/provenance conflict documented in [Data Pipeline](DATA_PIPELINE.md); passing
+this safety contract does not resolve that corpus limitation.

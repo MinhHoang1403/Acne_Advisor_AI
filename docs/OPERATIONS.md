@@ -48,7 +48,9 @@ Qdrant knowledge store.
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
-The production runtime uses answer cache `v7`. Runtime retrieval is read-only
+The production runtime uses exact normalized answer cache `v8`. Cache identity
+includes provider, model, pipeline fingerprint, and the normalized question; no
+semantic-similarity lookup is performed. Runtime retrieval is read-only
 Dense + native BM25 + RRF over
 `acne_knowledge`; it does not query EntityCards or Neo4j. Do not run Phase 1
 build, activation, reindexing, or embedding as part of Phase 2 startup.

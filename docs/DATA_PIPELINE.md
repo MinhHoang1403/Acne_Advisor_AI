@@ -6,6 +6,20 @@ The machine record is `data/phase1_build_manifest.json`, build
 `ec0a6de32d58ac181af6`: four sources, 512 knowledge chunks, 32 EntityCards, and
 a Neo4j graph with 32 nodes and 27 relationships.
 
+## Accepted NICE Provenance Limitation
+
+The frozen NICE-derived snapshot was acquired through a text-rendering
+transport. Its represented date is 2026-08-03, while official NICE NG198
+metadata reports 2026-04-30. A complete replacement from the official source
+could not be acquired through the approved routes. The frozen bytes and build
+are therefore retained with this unresolved corpus/provenance limitation; the
+project does not claim that the snapshot is fully or currently verified.
+
+This disclosure does not alter source identity, build identity, Qdrant, Neo4j,
+or any Phase 1 artifact. Passing Phase 2 architecture checks does not repair the
+limitation. Replacing the snapshot requires a separately approved Phase 1
+migration with new provenance and a new build identity.
+
 ```text
 data/sources/manifest.yaml
   -> content-addressed parse

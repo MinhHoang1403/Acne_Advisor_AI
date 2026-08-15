@@ -40,10 +40,12 @@ clinical sources are deliberately separated.
 - Karpukhin, V. et al. (2020). *Dense Passage Retrieval for Open-Domain
   Question Answering*. EMNLP. DOI: 10.18653/v1/2020.emnlp-main.550. Supports
   dense retrieval as a semantic channel.
-- Qu, C. et al. (2025). *Document Segmentation Matters for Retrieval-Augmented
-  Generation*. Findings of ACL. DOI: 10.18653/v1/2025.findings-acl.422.
-  Supports evaluating segmentation on the actual corpus instead of assuming a
-  universal chunk size.
+- Wang, Z. et al. (2025). *Document Segmentation Matters for
+  Retrieval-Augmented Generation*. Findings of the Association for
+  Computational Linguistics: ACL 2025, 8063-8075.
+  DOI: 10.18653/v1/2025.findings-acl.422. This is related literature on PIC and
+  segmentation effects. The project does not implement PIC, and the paper does
+  not validate the project's 2400-character cap.
 
 ## Provider Contracts
 
@@ -59,7 +61,7 @@ clinical sources are deliberately separated.
 ## Canonical Clinical Corpus
 
 - National Institute for Health and Care Excellence. *Acne vulgaris:
-  management (NG198)*. Updated 2026-08-03.
+  management (NG198)*. Official metadata reports an update on 2026-04-30.
   https://www.nice.org.uk/guidance/ng198
 - Reynolds, R. V. et al. (2024). *Guidelines of care for the management of acne
   vulgaris*. Journal of the American Academy of Dermatology.
@@ -70,6 +72,16 @@ clinical sources are deliberately separated.
 - American Academy of Dermatology public acne education pages, frozen crawl
   retrieved 2026-07-03. https://www.aad.org/public/diseases/acne
 
+### Accepted NICE Corpus Limitation
+
+The frozen Phase 1 NICE-derived snapshot was acquired through a text-rendering
+transport and represents 2026-08-03, which conflicts with the official NICE
+metadata date above. A complete official replacement was blocked through the
+approved acquisition routes. The project therefore retains the frozen snapshot
+as an unresolved provenance limitation and does not claim it is fully or
+currently verified. This reference correction does not change the frozen source
+bytes, source ID, build identity, Qdrant index, or Neo4j graph.
+
 ## Current Safety Cross-Checks
 
 These sources validate currency and safety review; they are not silently
@@ -77,5 +89,13 @@ inserted into the canonical retrieval corpus.
 
 - UK MHRA isotretinoin safety communications, verified 2026-08-14.
   https://www.gov.uk/drug-safety-update/isotretinoin-roaccutanev-new-safety-measures-to-be-introduced-in-the-coming-months-including-additional-oversight-on-initiation-of-treatment-for-patients-under-18-years
+  https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk
 - European Medicines Agency, retinoid pregnancy-prevention measures, verified
   2026-08-14. https://www.ema.europa.eu/en/medicines/human/referrals/retinoid-containing-medicinal-products
+- NHS, *Anaphylaxis* and *Chest pain*, verified 2026-08-14.
+  https://www.nhs.uk/conditions/anaphylaxis/
+  https://www.nhs.uk/symptoms/chest-pain/
+- World Health Organization, *Suicide: questions and answers*, verified
+  2026-08-14. https://www.who.int/news-room/questions-and-answers/item/suicide
+- DailyMed, isotretinoin medication guide, verified 2026-08-14.
+  https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72867c88-070f-4608-bfef-cc5225ebce6d
