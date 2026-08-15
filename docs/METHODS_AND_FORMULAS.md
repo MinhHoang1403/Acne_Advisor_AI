@@ -43,11 +43,13 @@ not a semantic sufficiency or entailment claim. The exact bounded
 `PackedContext.context_text` is the evidence sent to generation; full candidate
 text cannot bypass the configured character limit.
 
-Retrieval is bounded by `RETRIEVAL_TIMEOUT_SECONDS` and two attempts. These are
-engineering safety/latency policies. Failure to obtain provenance-complete
-evidence results in explicit abstention. One failed Dense or BM25 channel is
-reported as `degraded_dense` or `degraded_bm25`; ranking policy and RRF weights
-remain unchanged.
+Each Dense and BM25 channel is independently bounded by
+`RETRIEVAL_TIMEOUT_SECONDS`, and the agent remains bounded to two retrieval
+executions. These are engineering safety/latency policies. A timed-out channel
+does not discard evidence already returned by the other channel. Failure to
+obtain provenance-complete evidence results in explicit abstention. One failed
+Dense or BM25 channel is reported as `degraded_dense` or `degraded_bm25`;
+ranking policy and RRF weights remain unchanged.
 
 ## Bounded Agent Decision
 

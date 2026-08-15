@@ -67,14 +67,23 @@ class EvidenceRetriever:
         context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 6000, 512, 20000)
 
         timeout_seconds = _bounded_float_env("RETRIEVAL_TIMEOUT_SECONDS", 20.0, 0.1, 120.0)
-        async with asyncio.timeout(timeout_seconds):
-            dense_task = asyncio.create_task(self._dense_search(clean_query, candidate_limit))
-            bm25_task = asyncio.create_task(self._vector_store.search_sparse(clean_query, top_k=candidate_limit))
-            dense_result, bm25_result = await asyncio.gather(
-                dense_task,
-                bm25_task,
-                return_exceptions=True,
+        dense_task = asyncio.create_task(
+            _run_channel_with_timeout(
+                self._dense_search(clean_query, candidate_limit),
+                timeout_seconds,
             )
+        )
+        bm25_task = asyncio.create_task(
+            _run_channel_with_timeout(
+                self._vector_store.search_sparse(clean_query, top_k=candidate_limit),
+                timeout_seconds,
+            )
+        )
+        dense_result, bm25_result = await asyncio.gather(
+            dense_task,
+            bm25_task,
+            return_exceptions=True,
+        )
 
         warnings: list[str] = []
         dense_results = _channel_or_warning("dense", dense_result, warnings)
@@ -202,6 +211,12 @@ def _channel_or_warning(name: str, value: Any, warnings: list[str]) -> list[dict
         logger.warning("%s retrieval channel unavailable: %s", name, sanitize_fallback_reason(value))
         return []
     return list(value or [])
+
+
+async def _run_channel_with_timeout(channel: Any, timeout_seconds: float) -> Any:
+    """Give one retrieval channel an independent finite outcome."""
+
+    return await asyncio.wait_for(channel, timeout=timeout_seconds)
 
 
 def _error_name(value: Any) -> str | None:
