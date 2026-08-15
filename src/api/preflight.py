@@ -26,7 +26,7 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 PREFLIGHT_CHECK_TIMEOUT_SECONDS = float(os.getenv("PREFLIGHT_CHECK_TIMEOUT_SECONDS", "4.0"))
-REQUIRED_CORE_CHECKS = ("postgres", "qdrant", "neo4j", "redis")
+REQUIRED_CORE_CHECKS = ("qdrant", "embedding", "generation")
 
 
 def _safe_dependency_error(service: str, exc: Exception) -> str:
@@ -149,6 +149,31 @@ def check_generation_provider(
         "unavailable",
         f"Unsupported configured runtime provider: {provider}",
         {"provider": provider, "connectivity_probed": False},
+    )
+
+
+def check_embedding_provider() -> CheckResult:
+    """Validate query-embedding configuration without spending provider quota."""
+
+    model = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
+    if not os.getenv("GOOGLE_API_KEY", "").strip():
+        return CheckResult(
+            "unavailable",
+            "GOOGLE_API_KEY is not configured for query embedding.",
+            {"model": model, "connectivity_probed": False},
+        )
+    try:
+        importlib.import_module("src.integrations.google_genai")
+    except Exception as exc:
+        return CheckResult("unavailable", _safe_dependency_error("Embedding adapter", exc))
+    return CheckResult(
+        "ok",
+        "Query embedding is configured; external connectivity is not probed by health.",
+        {
+            "model": model,
+            "dimensions": EMBEDDING_DIMENSIONS,
+            "connectivity_probed": False,
+        },
     )
 
 
@@ -308,6 +333,7 @@ async def run_phase2_preflight() -> dict[str, Any]:
     )
     requirements = get_runtime_provider_requirements()
     generation = check_generation_provider(requirements, ollama)
+    embedding = check_embedding_provider()
     ollama_data = ollama.to_dict()
     ollama_data.update(
         {
@@ -317,20 +343,20 @@ async def run_phase2_preflight() -> dict[str, Any]:
         }
     )
     checks = {
-        "postgres": postgres.to_dict(),
-        "qdrant": qdrant.to_dict(),
-        "neo4j": neo4j.to_dict(),
-        "redis": redis.to_dict(),
+        "postgres": {**postgres.to_dict(), "required": False, "optional": True},
+        "qdrant": {**qdrant.to_dict(), "required": True, "optional": False},
+        "neo4j": {**neo4j.to_dict(), "required": False, "optional": True},
+        "redis": {**redis.to_dict(), "required": False, "optional": True},
         "ollama": ollama_data,
-        "generation": generation.to_dict(),
+        "embedding": {**embedding.to_dict(), "required": True, "optional": False},
+        "generation": {**generation.to_dict(), "required": True, "optional": False},
     }
     check_results = {
-        "postgres": postgres,
         "qdrant": qdrant,
-        "neo4j": neo4j,
-        "redis": redis,
+        "embedding": embedding,
+        "generation": generation,
     }
-    required = [check_results[name] for name in REQUIRED_CORE_CHECKS] + [generation]
+    required = [check_results[name] for name in REQUIRED_CORE_CHECKS]
     if requirements["ollama_required"]:
         required.append(ollama)
     overall = "ok" if all(check.status == "ok" for check in required) else "degraded"

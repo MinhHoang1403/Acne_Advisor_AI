@@ -64,7 +64,6 @@ def pack_context(
         selected.append(
             ContextItem(
                 item_id=candidate_id,
-                source="chunk",
                 role="medical_evidence",
                 text=text,
                 payload=_provenance_payload(candidate.payload),
@@ -87,10 +86,8 @@ def pack_context(
 
     return PackedContext(
         original_query=normalized_query.original_query,
-        intent=normalized_query.intent,
         items=selected,
         context_text=context_text,
-        entity_items_count=0,
         chunk_items_count=len(selected),
         warnings=warnings,
         debug={
@@ -128,7 +125,6 @@ def packed_context_to_response_contexts(packed_context: PackedContext) -> list[d
 def _render_block(candidate: RetrievedCandidate, index: int) -> str:
     item = ContextItem(
         item_id=candidate.candidate_id,
-        source="chunk",
         role="medical_evidence",
         text=candidate.text.strip(),
         payload=_provenance_payload(candidate.payload),

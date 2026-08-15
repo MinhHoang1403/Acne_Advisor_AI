@@ -31,7 +31,6 @@ from src.agent.text_encoding import repair_mojibake
 from src.observability.versioning import get_answer_cache_version
 from src.resilience.exceptions import (
     AgentTimeoutError,
-    CircuitOpenError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     RetryExhaustedError,
@@ -41,8 +40,6 @@ from src.resilience.exceptions import (
 
 # Input Control Config
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", 500))
-MAX_MESSAGE_WORDS = int(os.getenv("MAX_MESSAGE_WORDS", 120))
-MAX_QUESTION_MARKS = int(os.getenv("MAX_QUESTION_MARKS", 3))
 MAX_CONVERSATION_HISTORY_MESSAGES = int(os.getenv("MAX_CONVERSATION_HISTORY_MESSAGES", 10))
 MAX_HISTORY_MESSAGE_CHARS = int(os.getenv("MAX_HISTORY_MESSAGE_CHARS", 1000))
 CACHE_ANSWER_VERSION = get_answer_cache_version()
@@ -81,7 +78,7 @@ active_requests = set()
 def _http_status_for_resilience_error(exc: RuntimeResilienceError) -> int:
     if isinstance(exc, (AgentTimeoutError, StageTimeoutError, ProviderTimeoutError)):
         return 504
-    if isinstance(exc, (CircuitOpenError, ProviderUnavailableError, RetryExhaustedError)):
+    if isinstance(exc, (ProviderUnavailableError, RetryExhaustedError)):
         return 503
     return 503
 
@@ -95,8 +92,6 @@ def _safe_resilience_detail(exc: RuntimeResilienceError) -> dict[str, Any]:
         message = "Một bước xử lý mất quá nhiều thời gian. Vui lòng thử lại sau."
     elif isinstance(exc, ProviderTimeoutError):
         message = "Dịch vụ tạo câu trả lời phản hồi quá chậm. Vui lòng thử lại."
-    elif isinstance(exc, CircuitOpenError):
-        message = "Dịch vụ tạo câu trả lời đang tạm ngưng do lỗi lặp lại. Vui lòng thử lại sau."
     else:
         message = "Dịch vụ tạo câu trả lời hiện chưa khả dụng. Vui lòng thử lại sau."
     return {
@@ -126,7 +121,7 @@ async def _run_release_readiness_agent_override(request: "ChatRequest", session_
 
     message = request.message.strip()
     pipeline_manifest = {
-        "phase": "s4b",
+        "phase": "production",
         "answer_cache_version": CACHE_ANSWER_VERSION,
         "end_to_end_release_readiness_version": os.getenv(
             "END_TO_END_RELEASE_READINESS_VERSION",
@@ -152,16 +147,12 @@ async def _run_release_readiness_agent_override(request: "ChatRequest", session_
         "answer": answer,
         "session_id": session_id,
         "sources": [] if fallback_applied else ["release_readiness_fixture"],
-        "symptoms": [],
-        "safety_flags": [],
-        "graph_facts": [],
         "retrieval_status": "no_evidence" if fallback_applied else "release_readiness_double",
         "fallback_applied": fallback_applied,
         "fallback_type": "no_retrieval_evidence" if fallback_applied else "none",
         "fallback_reason": "release readiness no evidence" if fallback_applied else None,
         "fallback_cache_eligible": False if fallback_applied else True,
         "is_in_domain": True,
-        "guardrail": "in_domain",
         "cache_checked": True,
         "cache_hit": False,
         "cache_reason": "safe_fallback_no_retrieval_evidence" if fallback_applied else "bypassed",
@@ -231,7 +222,6 @@ class ChatCacheMetadata(BaseModel):
     checked: bool
     hit: bool
     reason: Optional[str] = None
-    similarity: Optional[float] = None
     answer_version: Optional[str] = None
     quality_checked: Optional[bool] = None
     quality_passed: Optional[bool] = None
@@ -249,11 +239,7 @@ class ChatMetadata(BaseModel):
     fallback_chain: Optional[list[dict[str, Any]]] = None
     retrieval: str
     is_in_domain: Optional[bool] = None
-    guardrail: Optional[str] = None
-    ignored_out_of_domain_part: Optional[bool] = None
     used_retrieval: Optional[bool] = None
-    domain_reason: Optional[str] = None
-    llm_fallback: Optional[bool] = None
     fallback_reason: Optional[str] = None
     retrieval_status: Optional[str] = None
     fallback_applied: Optional[bool] = None
@@ -265,19 +251,15 @@ class ChatMetadata(BaseModel):
     cached_at: Optional[str] = None
     phase2_debug: Optional[dict[str, Any]] = None
     response_origin: Optional[str] = None
-    guardrail_applied: Optional[bool] = None
-    medical_severity: Optional[str] = None
-    severity_guard: Optional[dict[str, Any]] = None
-    severity_guard_modified: Optional[bool] = None
+    safety_severity: Optional[str] = None
+    safety_decision: Optional[dict[str, Any]] = None
+    agent_decision: Optional[dict[str, Any]] = None
 
 class ChatResponse(BaseModel):
     answer: str
     session_id: Optional[str] = None
     sources: list[str] = Field(default_factory=list)
     source_metadata: list[dict[str, Any]] = Field(default_factory=list)
-    symptoms: list[str] = Field(default_factory=list)
-    safety_flags: list[str] = Field(default_factory=list)
-    graph_facts: list[dict[str, Any]] = Field(default_factory=list)
     metadata: ChatMetadata
 
 
@@ -295,28 +277,13 @@ def _chat_metadata_identity(
 def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> str:
     if result.get("cache_hit"):
         return "cache"
-    # The severity guard may replace a prior guardrail response with the
-    # deterministic emergency contract. Attribute that final response to the
-    # safety fallback so provenance reflects what the user actually received.
-    if str(result.get("fallback_type") or "").startswith("severity_"):
-        return "safe_fallback"
-    if _guardrail_applied(result, is_in_domain):
-        return "guardrail"
+    if result.get("safety_override") or result.get("safety_decision"):
+        return "deterministic_safety"
     if result.get("fallback_applied"):
         return "safe_fallback"
-    if result.get("severity_guard_modified"):
-        return "safety_augmented_llm"
     if result.get("actual_provider") == "system":
         return "deterministic"
     return "llm"
-
-
-def _guardrail_applied(result: dict[str, Any], is_in_domain: Optional[bool]) -> bool:
-    guardrail = result.get("guardrail")
-    if is_in_domain is False:
-        return True
-    return bool(guardrail and guardrail not in {"in_domain", "in_domain_rule", "in_domain_followup_rule"})
-
 
 def _used_retrieval(result: dict[str, Any], is_in_domain: Optional[bool]) -> bool:
     """Report retrieval only when this request actually entered that runtime path."""
@@ -338,7 +305,6 @@ def _log_error_type(message: str, exc: Exception, *args: Any) -> None:
 class RetrieveResponse(BaseModel):
     query: str
     vector_contexts: list[dict[str, Any]] = Field(default_factory=list)
-    graph_facts: list[dict[str, Any]] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -375,9 +341,6 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     sources: Optional[list] = None
-    symptoms: Optional[list] = None
-    safety_flags: Optional[list] = None
-    graph_facts: Optional[list] = None
     metadata: Optional[dict] = None
     created_at: Optional[str] = None
 
@@ -401,9 +364,6 @@ class SyncMessagePayload(BaseModel):
     role: str
     content: str
     sources: Optional[list] = None
-    symptoms: Optional[list] = None
-    safety_flags: Optional[list] = None
-    graph_facts: Optional[list] = None
     metadata: Optional[dict] = None
     created_at: Optional[float] = None  # JS timestamp (milliseconds)
 
@@ -564,7 +524,6 @@ async def retrieve_endpoint(q: str, top_k: int = 5):
         return RetrieveResponse(
             query=query,
             vector_contexts=result.vector_contexts,
-            graph_facts=result.graph_facts,
             sources=result.sources,
             metadata=result.metadata,
         )
@@ -686,18 +645,6 @@ async def chat_endpoint(request: ChatRequest):
             detail={"code": "message_too_long", "message": f"Câu hỏi của bạn hơi dài. Vui lòng rút gọn dưới {MAX_MESSAGE_CHARS} ký tự hoặc tách thành nhiều câu hỏi nhỏ."}
         )
         
-    if len(message_trimmed.split()) > MAX_MESSAGE_WORDS:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "too_many_words", "message": f"Câu hỏi của bạn chứa quá nhiều từ. Vui lòng rút gọn dưới {MAX_MESSAGE_WORDS} từ."}
-        )
-        
-    if message_trimmed.count('?') > MAX_QUESTION_MARKS:
-        raise HTTPException(
-            status_code=400,
-            detail={"code": "too_many_questions", "message": "Bạn đang hỏi quá nhiều ý cùng lúc. Vui lòng tách thành các câu hỏi riêng biệt để được tư vấn tốt nhất."}
-        )
-        
     # Determine session_id — use frontend's if provided, else generate one
     session_id = request.session_id or str(uuid.uuid4())[:12]
     
@@ -746,9 +693,6 @@ async def chat_endpoint(request: ChatRequest):
         if model_name == "gemini-1.5-flash":
             model_name = "gemini-3.5-flash"
             
-        # graph_facts remains in the public/history contract for compatibility.
-        # The frozen S4B runtime does not perform Graph retrieval or ranking.
-        safe_graph_facts: list[dict[str, Any]] = []
         is_in_domain = result.get("is_in_domain")
         used_retrieval = _used_retrieval(result, is_in_domain)
         
@@ -759,8 +703,6 @@ async def chat_endpoint(request: ChatRequest):
             result.get("vector_contexts", []),
         )
         sources_list = display_names_for_sources(raw_sources_list, result.get("vector_contexts", []))
-        symptoms_list = result.get("symptoms", [])
-        safety_flags_list = result.get("safety_flags", [])
         answer_quality_report = result.get("answer_quality_report") or {}
         pipeline_fingerprint = result.get("pipeline_fingerprint")
         pipeline_manifest = result.get("pipeline_manifest") or {}
@@ -791,7 +733,6 @@ async def chat_endpoint(request: ChatRequest):
             model_name,
         )
         response_origin = _response_origin(result, is_in_domain)
-        guardrail_applied = _guardrail_applied(result, is_in_domain)
 
         # Build safe metadata dict for DB storage (no API keys, no raw exceptions)
         safe_db_metadata = {
@@ -810,9 +751,9 @@ async def chat_endpoint(request: ChatRequest):
                 else "skipped"
             ),
             "is_in_domain": is_in_domain,
-            "guardrail": result.get("guardrail"),
             "response_origin": response_origin,
-            "guardrail_applied": guardrail_applied,
+            "agent_decision": result.get("agent_decision"),
+            "safety_decision": result.get("safety_decision"),
             "source_metadata": source_metadata,
             "used_retrieval": used_retrieval,
             "pipeline_fingerprint": pipeline_fingerprint,
@@ -820,7 +761,6 @@ async def chat_endpoint(request: ChatRequest):
                 "phase": pipeline_manifest.get("phase") if isinstance(pipeline_manifest, dict) else None,
                 "answer_cache_version": pipeline_manifest.get("answer_cache_version") if isinstance(pipeline_manifest, dict) else None,
                 "retrieval_architecture": pipeline_manifest.get("retrieval_architecture") if isinstance(pipeline_manifest, dict) else None,
-                "answer_guard_mode": pipeline_manifest.get("answer_guard_mode") if isinstance(pipeline_manifest, dict) else None,
             },
             "observability_exported": result.get("observability_exported"),
             "answer_quality": {
@@ -836,8 +776,6 @@ async def chat_endpoint(request: ChatRequest):
                     if isinstance(answer_quality_report, dict)
                     else 0
                 ),
-                "guard_modified": result.get("answer_guard_modified"),
-                "guard_mode": result.get("answer_guard_mode"),
             },
             "safe_fallback": {
                 "retrieval_status": result.get("retrieval_status"),
@@ -859,9 +797,7 @@ async def chat_endpoint(request: ChatRequest):
                 "quality_reason": result.get("cache_metadata", {}).get("quality_reason") if result.get("cache_hit") else None
             },
             "runtime_resilience": result.get("runtime_resilience"),
-            "medical_severity": result.get("medical_severity"),
-            "severity_guard": result.get("severity_guard"),
-            "severity_guard_modified": result.get("severity_guard_modified"),
+            "safety_severity": result.get("safety_severity"),
         }
         
         # If cache hit, retrieve original model info
@@ -885,9 +821,6 @@ async def chat_endpoint(request: ChatRequest):
                     user_message=request.message,
                     assistant_answer=answer_text,
                     sources=sources_list,
-                    symptoms=symptoms_list,
-                    safety_flags=safety_flags_list,
-                    graph_facts=safe_graph_facts,
                     db_metadata=safe_db_metadata,
                 )
                 logger.debug("Chat exchange persisted for session %s", session_id)
@@ -903,9 +836,6 @@ async def chat_endpoint(request: ChatRequest):
             session_id=session_id,
             sources=sources_list,
             source_metadata=source_metadata,
-            symptoms=symptoms_list,
-            safety_flags=safety_flags_list,
-            graph_facts=safe_graph_facts,
             metadata=ChatMetadata(
                 provider=response_provider,
                 model=response_model,
@@ -921,11 +851,7 @@ async def chat_endpoint(request: ChatRequest):
                     else "skipped"
                 ),
                 is_in_domain=is_in_domain,
-                guardrail=result.get("guardrail"),
-                ignored_out_of_domain_part=result.get("ignored_out_of_domain_part"),
                 used_retrieval=used_retrieval,
-                domain_reason=result.get("domain_reason"),
-                llm_fallback=result.get("llm_fallback"),
                 fallback_reason=result.get("fallback_reason"),
                 retrieval_status=result.get("retrieval_status"),
                 fallback_applied=result.get("fallback_applied"),
@@ -947,10 +873,9 @@ async def chat_endpoint(request: ChatRequest):
                 cached_at=cached_at,
                 phase2_debug=phase2_debug,
                 response_origin=response_origin,
-                guardrail_applied=guardrail_applied,
-                medical_severity=result.get("medical_severity"),
-                severity_guard=result.get("severity_guard"),
-                severity_guard_modified=result.get("severity_guard_modified"),
+                safety_severity=result.get("safety_severity"),
+                safety_decision=result.get("safety_decision"),
+                agent_decision=result.get("agent_decision"),
             )
         )
         
@@ -979,9 +904,6 @@ async def _persist_chat_to_db(
     user_message: str,
     assistant_answer: str,
     sources: list,
-    symptoms: list,
-    safety_flags: list,
-    graph_facts: list,
     db_metadata: dict,
 ):
     """
@@ -1023,9 +945,6 @@ async def _persist_chat_to_db(
                 role="assistant",
                 content=assistant_answer,
                 sources=sources,
-                symptoms=symptoms,
-                safety_flags=safety_flags,
-                graph_facts=graph_facts,
                 metadata=db_metadata,
             )
             
@@ -1143,9 +1062,6 @@ async def get_chat_messages(session_id: str, limit: int = 50):
                 role=m["role"],
                 content=m["content"],
                 sources=m.get("sources"),
-                symptoms=m.get("symptoms"),
-                safety_flags=m.get("safety_flags"),
-                graph_facts=m.get("graph_facts"),
                 metadata=m.get("metadata"),
                 created_at=m["created_at"].isoformat() if m.get("created_at") else None,
             )
@@ -1297,9 +1213,6 @@ async def sync_sessions(body: SyncRequest):
                             content=msg.content,
                             message_id=msg_id,
                             sources=msg.sources,
-                            symptoms=msg.symptoms,
-                            safety_flags=msg.safety_flags,
-                            graph_facts=msg.graph_facts,
                             metadata=msg.metadata,
                             created_at=created_at,
                         )

@@ -14,10 +14,8 @@ from src.agent.text_encoding import repair_mojibake
 from src.integrations.google_genai import generate_text_async, generate_text_sync
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.resilience.budget import DeadlineBudget
-from src.resilience.circuit_breaker import CircuitBreaker, InMemoryCircuitStateStore
 from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilience_settings_from_env
 from src.resilience.exceptions import (
-    CircuitOpenError,
     PermanentProviderError,
     RuntimeResilienceError,
 )
@@ -29,16 +27,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
 DEFAULT_GEMINI_FALLBACK_MODELS = ("gemini-3.1-flash-lite",)
 DEFAULT_OLLAMA_MODEL = "qwen3:8b"
-
-_CIRCUIT_STORE = InMemoryCircuitStateStore()
-_CIRCUIT_BREAKER = CircuitBreaker(runtime_resilience_settings_from_env(), store=_CIRCUIT_STORE)
-
-
-def _refresh_circuit_breaker(settings: RuntimeResilienceSettings) -> CircuitBreaker:
-    global _CIRCUIT_BREAKER
-    _CIRCUIT_BREAKER = CircuitBreaker(settings, store=_CIRCUIT_STORE)
-    return _CIRCUIT_BREAKER
-
 
 def _retry_policy(settings: RuntimeResilienceSettings) -> RetryPolicy:
     return RetryPolicy(
@@ -107,8 +95,6 @@ def _fallback_reason_from_error(exc: BaseException) -> str:
         return "rate_limited"
     if error_code == "provider_timeout" or "timed out" in text or "timeout" in text:
         return "provider_timeout"
-    if error_code == "circuit_open":
-        return "circuit_open"
     if error_code == "retry_exhausted":
         return "retry_exhausted"
     if error_code == "provider_unavailable" or "503" in text or "unavailable" in text:
@@ -228,7 +214,6 @@ async def _call_provider_resilient(
         budget=budget,
         timeout_seconds=timeout_seconds,
         retry_policy=_retry_policy(settings),
-        circuit_breaker=_refresh_circuit_breaker(settings),
     )
 
 async def generate_llm_response(
@@ -307,13 +292,6 @@ async def generate_llm_response(
         logger.warning("Primary LLM (%s/%s) failed permanently: %s", provider, model, error_text)
         result["error"] = error_text
         raise
-    except CircuitOpenError as e:
-        error_text = _safe_error_text(e)
-        logger.warning("Primary LLM circuit is open (%s/%s): %s", provider, model, error_text)
-        if not allow_fallback:
-            result["error"] = error_text
-            raise
-        primary_error = e
     except RuntimeResilienceError as e:
         error_text = _safe_error_text(e)
         logger.warning("Primary LLM (%s/%s) failed: %s", provider, model, error_text)

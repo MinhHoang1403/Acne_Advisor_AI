@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import ssl
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,7 +12,6 @@ import httpx
 
 from src.resilience.budget import DeadlineBudget
 from src.resilience.exceptions import (
-    CircuitOpenError,
     PermanentProviderError,
     ProviderTimeoutError,
     ProviderUnavailableError,
@@ -45,8 +45,6 @@ class RetryPolicy:
 def is_retryable_exception(exc: BaseException) -> bool:
     if isinstance(exc, asyncio.CancelledError):
         return False
-    if isinstance(exc, CircuitOpenError):
-        return False
     if isinstance(exc, (ProviderTimeoutError, ProviderUnavailableError)):
         return True
     if isinstance(exc, PermanentProviderError):
@@ -54,6 +52,8 @@ def is_retryable_exception(exc: BaseException) -> bool:
     if isinstance(exc, httpx.TimeoutException):
         return True
     if isinstance(exc, (httpx.ConnectError, httpx.NetworkError)):
+        return True
+    if isinstance(exc, (ssl.SSLError, OSError)):
         return True
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in RETRYABLE_HTTP_STATUS
@@ -98,6 +98,8 @@ def classify_provider_exception(exc: BaseException, *, provider_name: str) -> Ru
         return ProviderTimeoutError(f"{provider_name} provider timed out.")
     if isinstance(exc, (httpx.ConnectError, httpx.NetworkError)):
         return ProviderUnavailableError(f"{provider_name} provider is temporarily unavailable.")
+    if isinstance(exc, (ssl.SSLError, OSError)):
+        return ProviderUnavailableError(f"{provider_name} provider transport is temporarily unavailable.")
     if isinstance(exc, httpx.HTTPStatusError):
         status = exc.response.status_code
         if status in RETRYABLE_HTTP_STATUS:

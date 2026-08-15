@@ -64,9 +64,6 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     role            TEXT        NOT NULL CHECK (role IN ('user', 'assistant')),
     content         TEXT        NOT NULL,
     sources         JSONB,
-    symptoms        JSONB,
-    safety_flags    JSONB,
-    graph_facts     JSONB,
     metadata        JSONB,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );

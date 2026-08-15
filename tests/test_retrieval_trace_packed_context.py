@@ -7,11 +7,9 @@ def test_retrieval_trace_and_packed_context_have_one_obvious_contract() -> None:
     query = NormalizedQuery(
         original_query="Mụn đầu đen là gì?",
         normalized_text="Mụn đầu đen là gì?",
-        intent="medical_question",
     )
     candidate = RetrievedCandidate(
         candidate_id="chunk-1",
-        source="chunk",
         collection="acne_knowledge",
         text="Source-backed acne evidence.",
         fused_score=0.03,

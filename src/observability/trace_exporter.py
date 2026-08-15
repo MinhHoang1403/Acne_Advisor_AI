@@ -117,7 +117,7 @@ def build_observability_event(
                 "evidence_assessment": assessment,
                 "fallback_applied": result.get("fallback_applied", state.get("fallback_applied")),
                 "fallback_type": result.get("fallback_type", state.get("fallback_type")),
-                "medical_severity": result.get("medical_severity", state.get("medical_severity")),
+                "safety_severity": result.get("safety_severity", state.get("safety_severity")),
                 "pipeline_manifest": pipeline_manifest_summary(manifest),
                 "runtime_resilience": result.get("runtime_resilience", state.get("runtime_resilience")),
             },

@@ -1,8 +1,4 @@
-"""
-src/agent/nodes/reason.py
-=========================
-LangGraph nodes for safety checks and reasoning (generating answers).
-"""
+"""Evidence-grounded answer generation node."""
 
 import logging
 import os
@@ -42,20 +38,14 @@ def _select_answer_contexts(contexts: list[dict[str, Any]], limit: int = 5, quer
     return [dict(context) for context in contexts[:limit]]
 
 async def generate_answer_node(state: ClinicalState) -> dict:
-    """Generate the answer based on vector contexts and graph facts using LLM."""
-    question = state.get("standalone_question") or state.get("user_question", "")
+    """Generate an answer to the current question from retrieved chunk evidence."""
+    question = state.get("normalized_question") or state.get("user_question", "")
     contexts = state.get("vector_contexts", [])
-    safety_flags = state.get("safety_flags", [])
-    symptoms = state.get("symptoms", [])
-    conversation_history = state.get("conversation_history", [])
+    conversation_context = state.get("conversation_context") or {}
+    conversation_history = list(conversation_context.get("messages") or [])
     source_allowlist = state.get("source_allowlist", [])
-    prompt_history = conversation_history if state.get("use_history_context") else []
-    ignored_out_of_domain_part = state.get("ignored_out_of_domain_part", False)
-    
-    if state.get("is_in_domain") is False:
-        logger.debug("Domain guardrail triggered. Skipping LLM generation.")
-        return {}
-        
+    prompt_history = conversation_history
+
     try:
         from src.agent.prompts.medical_answer import (
             build_medical_prompt,
@@ -64,27 +54,18 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         )
 
         answer_contexts = _select_answer_contexts(contexts, limit=5, query=question)
-        prompt_graph_facts: list[dict[str, Any]] = []
-        retrieval_diagnostics = state.get("retrieval_diagnostics")
         packed_context = state.get("packed_context") or {}
         packed_context_text = str(packed_context.get("context_text") or "")
         
         prompt_started = time.perf_counter()
         prompt = build_medical_prompt(
             question=question,
-            symptoms=symptoms,
-            safety_flags=safety_flags,
             contexts=answer_contexts,
-            graph_facts=prompt_graph_facts,
             conversation_history=prompt_history,
-            ignored_out_of_domain_part=ignored_out_of_domain_part,
             available_sources=source_allowlist,
             packed_context_text=packed_context_text,
         )
-        system_prompt = build_medical_system_instruction(
-            question,
-            ignored_out_of_domain_part=ignored_out_of_domain_part,
-        )
+        system_prompt = build_medical_system_instruction(question)
         prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         
@@ -133,7 +114,6 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "fallback_model": response_data["fallback_model"],
             "fallback_reason": response_data.get("fallback_reason"),
             "fallback_chain": response_data.get("fallback_chain"),
-            "retrieval_diagnostics": retrieval_diagnostics,
             "prompt_budget": prompt_budget.model_dump(mode="json"),
             "runtime_resilience": {
                 **(state.get("runtime_resilience") or {}),

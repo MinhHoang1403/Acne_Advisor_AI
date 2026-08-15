@@ -6,14 +6,12 @@ def _query() -> NormalizedQuery:
     return NormalizedQuery(
         original_query="Adapalene và benzoyl peroxide khác nhau thế nào?",
         normalized_text="Adapalene và benzoyl peroxide khác nhau thế nào?",
-        intent="medical_question",
     )
 
 
 def _candidate(candidate_id: str, text: str, rank: int, source: str = "source-a") -> RetrievedCandidate:
     return RetrievedCandidate(
         candidate_id=candidate_id,
-        source="chunk",
         collection="acne_knowledge",
         text=text,
         score=1.0 / rank,
@@ -38,7 +36,6 @@ def test_packer_preserves_fused_order_and_provenance() -> None:
 
     assert [item.item_id for item in packed.items] == ["chunk-1", "chunk-2"]
     assert all(item.reason == "rrf_rank" for item in packed.items)
-    assert packed.entity_items_count == 0
     assert packed.chunk_items_count == 2
     assert "source=source-a" in packed.context_text
     assert "chunk=chunk-1" in packed.context_text

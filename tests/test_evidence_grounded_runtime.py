@@ -20,10 +20,9 @@ def _state(draft: str) -> dict:
         "user_question": "Câu hỏi kiểm soát?",
         "standalone_question": "Câu hỏi kiểm soát?",
         "is_in_domain": True,
-        "guardrail": "in_domain_rule",
         "fallback_applied": False,
         "fallback_type": "none",
-        "medical_severity": "routine",
+        "safety_severity": None,
         "source_allowlist": [{"source_id": "source-a", "display_name": "Source A"}],
         "sources": ["source-a"],
         "vector_contexts": [{"text": "Evidence A", "source_id": "source-a"}],
@@ -51,35 +50,19 @@ async def test_different_drafts_with_same_query_and_evidence_remain_different() 
 
 @pytest.mark.asyncio
 async def test_emergency_override_clears_retrieved_attribution_and_cache_eligibility() -> None:
-    state = {
-        **_state("Draft should be replaced."),
-        "user_question": "Sau khi bôi thuốc tôi khó thở và sưng môi.",
-        "standalone_question": "Sau khi bôi thuốc tôi khó thở và sưng môi.",
-        "final_answer": "Draft should be replaced.",
-    }
-    result = await answer_quality_node(state)
+    result = await workflow.guard_node(
+        {"normalized_question": "Sau khi bôi thuốc tôi khó thở và sưng môi."}
+    )
     assert result["actual_provider"] == "system"
     assert result["sources"] == []
-    assert result["vector_contexts"] == []
     assert result["fallback_cache_eligible"] is False
-    assert _response_origin(result, True) == "safe_fallback"
+    assert _response_origin(result, True) == "deterministic_safety"
 
 
 @pytest.mark.asyncio
-async def test_deterministic_guardrail_reports_system_without_a_model() -> None:
-    result = await finalize_response_node(
-        {
-            "user_question": "Hãy kê đơn isotretinoin cho tôi.",
-            "standalone_question": "Hãy kê đơn isotretinoin cho tôi.",
-            "is_in_domain": False,
-            "guardrail": "unsafe_prescription_request",
-            "refusal_message": "Tôi không thể kê đơn.",
-            "fallback_applied": False,
-            "fallback_type": "none",
-            "sources": [],
-            "vector_contexts": [],
-            "performance_timings": {},
-        }
+async def test_deterministic_prescription_boundary_reports_system_without_model() -> None:
+    result = await workflow.guard_node(
+        {"normalized_question": "Hãy kê đơn isotretinoin cho tôi."}
     )
     assert result["actual_provider"] == "system"
     assert result["actual_model"] is None
@@ -135,11 +118,10 @@ async def test_generation_uses_true_system_instruction_and_canonical_packed_evid
 
 def test_packed_item_and_rendered_evidence_obey_actual_character_limit() -> None:
     packed = pack_context(
-        NormalizedQuery(original_query="q", normalized_text="q", intent="medical_question"),
+        NormalizedQuery(original_query="q", normalized_text="q"),
         [
             RetrievedCandidate(
                 candidate_id="chunk-1",
-                source="chunk",
                 collection="acne_knowledge",
                 text="x" * 5000,
                 payload={
@@ -178,23 +160,8 @@ async def test_fallback_requires_global_enable_and_request_opt_in(monkeypatch) -
 
 @pytest.mark.asyncio
 async def test_retry_is_bounded_and_has_concrete_reason() -> None:
-    transient = {
-        "user_question": "original",
-        "standalone_question": "standalone",
-        "retrieval_attempt": 1,
-        "retrieval_status": "failed",
-        "evidence_assessment": {"usable": False},
-    }
-    distinct = {**transient, "retrieval_status": "no_evidence"}
-    assert workflow._next_retrieval_query(transient) == (
-        "standalone",
-        "retry_transient_retrieval_failure",
-    )
-    assert workflow._next_retrieval_query(distinct) == (
-        "original",
-        "retry_with_materially_distinct_original_query",
-    )
-    assert workflow._next_retrieval_query({**transient, "retrieval_attempt": 2}) is None
+    assert workflow.MAX_RETRIEVAL_ATTEMPTS == 2
+    assert not hasattr(workflow, "_next_retrieval_query")
 
 
 @pytest.mark.asyncio
@@ -211,7 +178,6 @@ async def test_operator_can_explicitly_enable_diagnostic_retrieve(monkeypatch) -
         async def retrieve(self, query, top_k):
             class Result:
                 vector_contexts = []
-                graph_facts = []
                 sources = []
                 metadata = {"retrieval_status": "no_evidence"}
 
@@ -228,11 +194,11 @@ async def test_operator_can_explicitly_enable_diagnostic_retrieve(monkeypatch) -
     assert result.metadata["retrieval_status"] == "no_evidence"
 
 
-def test_normal_response_origin_is_llm_and_augmented_response_is_explicit() -> None:
+def test_response_origin_distinguishes_llm_and_deterministic_safety() -> None:
     assert _response_origin({"actual_provider": "gemini"}, True) == "llm"
-    assert _response_origin(
-        {"actual_provider": "gemini", "severity_guard_modified": True}, True
-    ) == "safety_augmented_llm"
+    assert _response_origin({"safety_decision": {"rule_id": "test"}}, True) == (
+        "deterministic_safety"
+    )
 
 
 def test_removed_medical_engines_cannot_reenter_normal_runtime() -> None:

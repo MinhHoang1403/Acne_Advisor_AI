@@ -9,14 +9,6 @@ from pathlib import Path
 from typing import Any
 
 
-ENTITY_SOURCE_DISPLAY_NAMES = {
-    "entity:active_ingredient": "Cơ sở tri thức hoạt chất",
-    "entity:drug_product": "Cơ sở tri thức sản phẩm thuốc",
-    "entity:drug_class": "Cơ sở tri thức nhóm thuốc",
-    "entity:condition": "Cơ sở tri thức tình trạng da",
-    "entity:entity": "Cơ sở tri thức nội bộ",
-}
-
 FILE_SOURCE_DISPLAY_NAMES = {
     "web_raw_dataset.json": "Bộ dữ liệu kiến thức mụn",
     "PIIS0190962223033893.pdf": "Tài liệu chuyên môn về điều trị mụn",
@@ -25,7 +17,6 @@ FILE_SOURCE_DISPLAY_NAMES = {
 }
 
 SOURCE_TYPE_ORDER = {
-    "entity": 0,
     "document": 1,
     "dataset": 1,
     "other": 2,
@@ -34,7 +25,7 @@ SOURCE_TYPE_ORDER = {
 SOURCE_NORMALIZATION_VERSION = "source_normalization_v1"
 _KNOWN_SOURCE_IDS = {
     source_id.casefold(): source_id
-    for source_id in (*ENTITY_SOURCE_DISPLAY_NAMES, *FILE_SOURCE_DISPLAY_NAMES)
+    for source_id in FILE_SOURCE_DISPLAY_NAMES
 }
 _SOURCE_FILENAME_RE = re.compile(r"(?<![\w-])([\wÀ-ỹ][\wÀ-ỹ_()\-]{0,180}\.(?:pdf|json))(?![\w-])", re.IGNORECASE)
 _GENERIC_SOURCE_LABEL_RE = re.compile(r"\b(?:tài\s+liệu|tai\s+lieu|document)\s+\d+\b", re.IGNORECASE)
@@ -108,9 +99,6 @@ def normalize_source_identifier(value: Any) -> str:
     if not raw:
         return ""
     normalized = unicodedata.normalize("NFC", raw.strip().strip("`'\""))
-    if normalized.casefold().startswith("entity:"):
-        prefix, _, suffix = normalized.partition(":")
-        return f"{prefix.casefold()}:{suffix.strip().casefold()}"
     path_like = normalized.replace("\\", "/")
     filename = path_like.rsplit("/", 1)[-1].strip()
     if not filename:
@@ -141,14 +129,8 @@ def build_grounded_source_answer(question: str, allowlist: list[dict[str, Any]] 
         return "Tài liệu hiện được truy hồi chưa cung cấp nguồn phù hợp để trả lời câu hỏi này."
 
     labels = [str(entry.get("display_name") or entry["source_id"]).strip() for entry in entries]
-    subject = "thông tin này"
-    folded = _fold_source_text(question)
-    if "benzoyl peroxide" in folded or re.search(r"\bbp\b", folded):
-        subject = "thông tin về benzoyl peroxide dạng bôi"
-    elif "retinoid" in folded:
-        subject = "thông tin về điều trị mụn bằng retinoid"
     return (
-        f"Các nguồn đang được truy hồi có thể hỗ trợ {subject}:\n"
+        "Các nguồn đang được truy hồi cho câu hỏi này:\n"
         + "\n".join(f"- {label}" for label in labels)
     )
 
@@ -245,8 +227,6 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
 
 
 def _display_name(source_id: str, *, document_title: str | None, source_type: str) -> str:
-    if source_id in ENTITY_SOURCE_DISPLAY_NAMES:
-        return ENTITY_SOURCE_DISPLAY_NAMES[source_id]
     filename = Path(source_id.replace("\\", "/")).name
     if filename in FILE_SOURCE_DISPLAY_NAMES:
         return FILE_SOURCE_DISPLAY_NAMES[filename]
@@ -258,8 +238,6 @@ def _display_name(source_id: str, *, document_title: str | None, source_type: st
         label = re.sub(r"\s+", " ", label)
         if label:
             return label.title()
-    if source_type == "entity":
-        return "Cơ sở tri thức nội bộ"
     return "Nguồn kiến thức nội bộ"
 
 
@@ -287,10 +265,8 @@ def _source_type(source_id: str, context: dict[str, Any]) -> str:
     if explicit:
         if explicit == "web_json":
             return "dataset"
-        if explicit in {"entity", "document", "dataset", "other"}:
+        if explicit in {"document", "dataset", "other"}:
             return explicit
-    if source_id.startswith("entity:"):
-        return "entity"
     if source_id.casefold().endswith(".json"):
         return "dataset"
     if Path(source_id.replace("\\", "/")).suffix:

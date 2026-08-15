@@ -161,7 +161,7 @@ def _architecture_check() -> dict[str, Any]:
         "removed_paths_present": [path for path in removed_paths if (PROJECT_ROOT / path).exists()],
     }
     return {
-        "name": "s4b_architecture",
+        "name": "minimal_agentic_rag_architecture",
         "passed": len(nodes) == 8 and len(ClinicalState.__annotations__) < 97 and not details["removed_paths_present"],
         "details": details,
     }

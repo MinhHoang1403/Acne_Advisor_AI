@@ -33,10 +33,7 @@ def test_system_instruction_contains_policy_and_shape_not_user_evidence() -> Non
 def test_user_prompt_delimits_question_history_sources_and_evidence_as_data() -> None:
     prompt = build_medical_prompt(
         question="Câu hỏi hiện tại",
-        symptoms=["triệu chứng"],
-        safety_flags=[],
         contexts=[],
-        graph_facts=[],
         conversation_history=[{"role": "user", "content": "lịch sử"}],
         available_sources=[{"source_id": "source-a", "display_name": "Source A"}],
         packed_context_text="canonical evidence",
@@ -49,13 +46,10 @@ def test_user_prompt_delimits_question_history_sources_and_evidence_as_data() ->
     assert MEDICAL_RAG_SYSTEM_PROMPT not in prompt
 
 
-def test_graph_facts_are_not_rendered_into_normal_generation_prompt() -> None:
+def test_prompt_contract_has_no_graph_fact_input_channel() -> None:
     prompt = build_medical_prompt(
         question="q",
-        symptoms=[],
-        safety_flags=[],
         contexts=[],
-        graph_facts=[{"entity": "hidden graph fact"}],
         packed_context_text="source evidence",
     )
-    assert "hidden graph fact" not in prompt
+    assert "graph_facts" not in prompt

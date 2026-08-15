@@ -34,7 +34,7 @@ def test_release_readiness_version_changes_fingerprint_without_cache_bump() -> N
 
     assert new_manifest["end_to_end_release_readiness_version"] == "end_to_end_release_readiness_v1"
     assert compute_pipeline_fingerprint(old_manifest) != compute_pipeline_fingerprint(new_manifest)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v7"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v8"
 
 
 @pytest.mark.asyncio

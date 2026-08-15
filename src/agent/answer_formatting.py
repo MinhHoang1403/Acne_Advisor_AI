@@ -12,11 +12,8 @@ from src.agent.requested_structure import parse_requested_structure
 ResponseProfile = Literal[
     "routine",
     "comparison",
-    "drug_identity",
-    "treatment",
-    "safety",
     "urgent",
-    "out_of_domain_emergency",
+    "emergency",
     "safe_fallback",
 ]
 
@@ -61,14 +58,8 @@ def answer_format_instruction_for_question(question: str) -> str:
             hints.append(f"Dùng bảng Markdown GFM và giữ đủ các cột người dùng yêu cầu: {columns}.")
         else:
             hints.append("Dùng bảng Markdown GFM hợp lệ.")
-        if structure.required_rows:
-            hints.append(
-                "Giữ đủ các hàng/đối tượng người dùng nêu: " + ", ".join(structure.required_rows) + "."
-            )
     if structure.exact_item_count:
         hints.append(f"Trả đúng {structure.exact_item_count} mục chính như người dùng yêu cầu.")
-    if structure.semantic_intent == "signs_symptoms":
-        hints.append("Chỉ nêu dấu hiệu/triệu chứng quan sát được; không thay bằng nguyên nhân hoặc xử trí.")
     if "bold_headings" in structure.style_constraints:
         hints.append("Dùng Markdown **Tiêu đề** cho các heading ngắn được yêu cầu.")
 
@@ -80,8 +71,6 @@ def answer_format_instruction_for_question(question: str) -> str:
         )
     elif _is_direct_question(folded):
         hints.append("Câu đầu phải trả lời trực tiếp; không dùng template nhiều mục khi một câu ngắn đã đủ.")
-    elif _is_high_safety_question(folded):
-        hints.append("Ưu tiên hành động an toàn và mức độ khẩn cấp trước phần giải thích.")
     else:
         hints.append("Trả lời gọn theo đúng intent bằng đoạn ngắn hoặc bullet phù hợp.")
     return " ".join(hints)
@@ -91,7 +80,6 @@ def infer_response_profile(
     question: str,
     *,
     severity: str | None = None,
-    guardrail: str | None = None,
     fallback_type: str | None = None,
 ) -> ResponseProfile:
     """Infer presentation shape from request and already-decided safety state."""
@@ -99,20 +87,12 @@ def infer_response_profile(
     text = _fold(question)
     if fallback_type and fallback_type != "none":
         return "safe_fallback"
-    if guardrail in {"medical_emergency_out_of_scope", "medical_emergency_allergy"}:
-        return "out_of_domain_emergency"
     if severity == "emergency":
-        return "out_of_domain_emergency"
+        return "emergency"
     if severity == "urgent":
         return "urgent"
-    if _is_high_safety_question(text):
-        return "safety"
     if _is_comparison_question(text):
         return "comparison"
-    if _is_identity_or_composition_question(text):
-        return "drug_identity"
-    if any(marker in text for marker in ("cham soc", "routine", "dieu tri", "tri mun")):
-        return "treatment"
     return "routine"
 
 
@@ -122,7 +102,6 @@ def finalize_answer_presentation(
     user_question: str = "",
     response_profile: ResponseProfile | None = None,
     severity: str | None = None,
-    guardrail: str | None = None,
     fallback_type: str | None = None,
     add_disclaimer: bool | None = None,
 ) -> str:
@@ -131,7 +110,6 @@ def finalize_answer_presentation(
     profile = response_profile or infer_response_profile(
         user_question,
         severity=severity,
-        guardrail=guardrail,
         fallback_type=fallback_type,
     )
     draft = _remove_known_disclaimers(_normalize_newlines(answer))
@@ -148,7 +126,7 @@ def finalize_answer_presentation(
         draft = "Tài liệu hiện có chưa đủ thông tin để trả lời chắc chắn."
 
     should_add = False if add_disclaimer is None else add_disclaimer
-    if should_add and profile not in {"out_of_domain_emergency", "safe_fallback"}:
+    if should_add and profile not in {"emergency", "safe_fallback"}:
         draft = _append_disclaimer_once(draft, CANONICAL_DISCLAIMER)
     return draft.strip()
 
@@ -425,14 +403,6 @@ def _is_comparison_question(text: str) -> bool:
 
 def _is_direct_question(text: str) -> bool:
     return any(marker in text for marker in ("co phai", "co nen", "phai la", "la gi", "thuoc nhom", "duoc khong"))
-
-
-def _is_identity_or_composition_question(text: str) -> bool:
-    return any(marker in text for marker in ("la gi", "thuoc nhom", "hoat chat", "thanh phan", "chua gi", "gom gi"))
-
-
-def _is_high_safety_question(text: str) -> bool:
-    return any(marker in text for marker in ("kho tho", "cap cuu", "tu lam hai", "tu hai", "mang thai", "co thai", "sot cao"))
 
 
 def _question_tail_candidates(question: str) -> set[str]:

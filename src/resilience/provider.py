@@ -1,4 +1,4 @@
-"""Provider call wrapper with deadline, retry and circuit breaker support."""
+"""Provider call wrapper with bounded deadline-aware retry."""
 
 from __future__ import annotations
 
@@ -6,9 +6,7 @@ import asyncio
 from typing import Awaitable, Callable, TypeVar
 
 from src.resilience.budget import DeadlineBudget
-from src.resilience.circuit_breaker import CircuitBreaker
 from src.resilience.exceptions import (
-    CircuitOpenError,
     ProviderTimeoutError,
     RetryExhaustedError,
 )
@@ -24,10 +22,9 @@ async def call_provider_with_resilience(
     budget: DeadlineBudget,
     timeout_seconds: float,
     retry_policy: RetryPolicy,
-    circuit_breaker: CircuitBreaker,
     sleep=asyncio.sleep,
 ) -> tuple[T, dict[str, object]]:
-    """Call a provider with budget-aware timeout, retry and circuit breaker."""
+    """Call a provider with one shared budget-aware retry contract."""
 
     attempts: list[dict[str, object]] = []
     last_error: BaseException | None = None
@@ -37,8 +34,6 @@ async def call_provider_with_resilience(
         if budget.expired():
             raise ProviderTimeoutError(f"No remaining budget before calling provider {provider_name}.")
 
-        permit = circuit_breaker.before_call(provider_name)
-        state_before = permit.state_before
         effective_timeout = budget.cap_timeout(timeout_seconds)
         if effective_timeout <= 0:
             raise ProviderTimeoutError(f"No remaining timeout for provider {provider_name}.")
@@ -48,35 +43,26 @@ async def call_provider_with_resilience(
             "attempt_number": attempt_number,
             "max_attempts": max_attempts,
             "stage_timeout_seconds": round(effective_timeout, 3),
-            "circuit_state_before": state_before.value,
             "retry_scheduled": False,
         }
 
         try:
             async with asyncio.timeout(effective_timeout):
                 result = await operation(effective_timeout)
-            state_after = circuit_breaker.record_success(provider_name)
-            attempt_meta["circuit_state_after"] = state_after.value
             attempts.append(attempt_meta)
             return result, {
                 "provider_name": provider_name,
                 "attempt_number": attempt_number,
                 "max_attempts": max_attempts,
-                "circuit_state_before": state_before.value,
-                "circuit_state_after": state_after.value,
                 "attempts": attempts,
             }
         except asyncio.CancelledError:
             raise
-        except CircuitOpenError:
-            raise
         except Exception as exc:
             classified = classify_provider_exception(exc, provider_name=provider_name)
             retryable = is_retryable_exception(classified)
-            state_after = circuit_breaker.record_failure(provider_name, transient=retryable)
             attempt_meta.update(
                 {
-                    "circuit_state_after": state_after.value,
                     "failure_class": classified.__class__.__name__,
                     "error_code": getattr(classified, "error_code", "provider_error"),
                 }

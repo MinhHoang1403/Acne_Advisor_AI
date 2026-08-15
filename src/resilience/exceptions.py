@@ -26,10 +26,6 @@ class ProviderUnavailableError(RuntimeResilienceError):
     error_code = "provider_unavailable"
 
 
-class CircuitOpenError(RuntimeResilienceError):
-    error_code = "circuit_open"
-
-
 class RetryExhaustedError(RuntimeResilienceError):
     error_code = "retry_exhausted"
 
@@ -41,7 +37,6 @@ class PermanentProviderError(RuntimeResilienceError):
 
 __all__ = [
     "AgentTimeoutError",
-    "CircuitOpenError",
     "PermanentProviderError",
     "ProviderTimeoutError",
     "ProviderUnavailableError",

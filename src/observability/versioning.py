@@ -7,13 +7,13 @@ import json
 import os
 from typing import Any, Mapping
 
-DEFAULT_ANSWER_CACHE_VERSION = "v7"
+DEFAULT_ANSWER_CACHE_VERSION = "v8"
 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v12"
-LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4", "v5", "v6"}
+LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4", "v5", "v6", "v7"}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
     f"answer_formatting_contract_v{version}" for version in range(1, 12)
 }
-ARCHITECTURE_VERSION = "s4b_final_agentic_rag_v1"
+ARCHITECTURE_VERSION = "minimal_agentic_rag_v1"
 ARCHITECTURE_FROZEN = True
 
 _SECRET_KEY_MARKERS = ("api_key", "token", "password", "secret", "authorization", "bearer", "cookie")
@@ -28,7 +28,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         return settings[name] if name in settings else os.getenv(name, default)
 
     manifest = {
-        "phase": "s4b",
+        "phase": "production",
         "architecture_version": ARCHITECTURE_VERSION,
         "architecture_frozen": ARCHITECTURE_FROZEN,
         "orchestrator": "langgraph",
@@ -43,26 +43,26 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
+        "agent_decision_version": "minimal_agent_decision_v1",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": value(
             "EVIDENCE_GROUNDING_VERSION", "evidence_grounded_runtime_v1"
         ),
-        "answer_verifier_version": value("ANSWER_VERIFIER_VERSION", "answer_verifier_v3"),
+        "answer_validation_version": "structural_provenance_validation_v1",
         "answer_formatting_contract_version": _effective_answer_formatting_contract_version(
             value(
                 "ANSWER_FORMATTING_CONTRACT_VERSION",
                 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION,
             )
         ),
-        "severity_guard_version": value("SEVERITY_GUARD_VERSION", "severity_aware_answer_guard_v1"),
+        "safety_policy_version": "source_mapped_safety_policy_v1",
         "safe_fallback_flow_version": value("SAFE_FALLBACK_FLOW_VERSION", "safe_fallback_flow_v1"),
-        "runtime_resilience_version": value("RUNTIME_RESILIENCE_VERSION", "runtime_resilience_v1"),
+        "runtime_resilience_version": "bounded_retry_runtime_v1",
         "llm_fallback_policy_version": value("LLM_FALLBACK_POLICY_VERSION", "llm_fallback_policy_v3"),
         "google_genai_sdk_version": value("GOOGLE_GENAI_SDK_VERSION", "google_genai_sdk_v1"),
         "google_model": value("GOOGLE_MODEL", "gemini-3.5-flash") or "gemini-3.5-flash",
         "google_fallback_models": _csv_list(value("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")),
         "ollama_model": value("OLLAMA_MODEL", "qwen3:8b") or "qwen3:8b",
-        "answer_guard_mode": value("ANSWER_GUARD_MODE", "metadata_only") or "metadata_only",
         "answer_cache_version": _effective_answer_cache_version(value("CACHE_ANSWER_VERSION", None)),
         "cache_schema_version": value("CACHE_SCHEMA_VERSION", "v3"),
         "embedding_model": value("EMBEDDING_MODEL", "models/gemini-embedding-2"),
@@ -73,7 +73,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "taxonomy_version": value("TAXONOMY_VERSION", "acne_taxonomy_2026_08"),
         "neo4j_schema_version": value("NEO4J_SCHEMA_VERSION", "neo4j_schema_v1"),
         "source_normalization_version": value("SOURCE_NORMALIZATION_VERSION", "source_normalization_v1"),
-        "conversation_context_version": value("CONVERSATION_CONTEXT_VERSION", "conversation_context_v1"),
+        "conversation_context_version": "bounded_conversation_context_v1",
         "performance_instrumentation_version": value(
             "PERFORMANCE_INSTRUMENTATION_VERSION", "performance_instrumentation_v1"
         ),
@@ -118,9 +118,10 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
         "max_retrieval_attempts",
         "evidence_contract_version",
         "evidence_grounding_version",
-        "answer_verifier_version",
+        "answer_validation_version",
         "answer_formatting_contract_version",
-        "severity_guard_version",
+        "agent_decision_version",
+        "safety_policy_version",
         "safe_fallback_flow_version",
         "runtime_resilience_version",
         "end_to_end_release_readiness_version",

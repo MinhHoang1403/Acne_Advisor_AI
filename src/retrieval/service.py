@@ -30,7 +30,6 @@ class RetrievalResult:
     """Source-backed retrieval output consumed by the agent and `/retrieve`."""
 
     vector_contexts: list[dict[str, Any]]
-    graph_facts: list[dict[str, Any]]
     sources: list[str]
     query: str
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -61,7 +60,7 @@ class EvidenceRetriever:
         started = time.perf_counter()
         clean_query = " ".join(query.split())
         if not clean_query:
-            return RetrievalResult([], [], [], query, {"status": "empty_query"})
+            return RetrievalResult([], [], query, {"status": "empty_query"})
 
         candidate_limit = _bounded_env("RETRIEVAL_CANDIDATE_LIMIT", 16, 1, 50)
         context_items = min(top_k, _bounded_env("RETRIEVAL_CONTEXT_MAX_ITEMS", 8, 1, 20))
@@ -95,9 +94,6 @@ class EvidenceRetriever:
         normalized = NormalizedQuery(
             original_query=query,
             normalized_text=clean_query,
-            intent="medical_question",
-            confidence=1.0,
-            metadata={"normalization": "whitespace_only"},
         )
         packed = pack_context(
             normalized,
@@ -142,7 +138,6 @@ class EvidenceRetriever:
         }
         return RetrievalResult(
             vector_contexts=contexts,
-            graph_facts=[],
             sources=sources,
             query=query,
             metadata={
@@ -173,7 +168,6 @@ async def retrieve_evidence(query: str, top_k: int = 8) -> dict[str, Any]:
         result = await retriever.retrieve(query, top_k=top_k)
         return {
             "vector_contexts": result.vector_contexts,
-            "graph_facts": [],
             "sources": result.sources,
             "metadata": result.metadata,
         }
@@ -187,7 +181,6 @@ def _to_candidate(item: dict[str, Any], rank: int) -> RetrievedCandidate:
     payload = {key: value for key, value in item.items() if key not in {"score", "rrf_score"}}
     return RetrievedCandidate(
         candidate_id=candidate_id,
-        source="chunk",
         collection=os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge"),
         text=text,
         score=float(item.get("rrf_score") or item.get("score") or 0.0),
