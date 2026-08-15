@@ -205,17 +205,12 @@ test('health, models, and chat use the same canonical API base', async (t) => {
   ]);
 });
 
-test('frontend model selector and badge support Flash-Lite fallback metadata', () => {
+test('frontend model selector keeps Flash-Lite fallback selection metadata internal', () => {
   const selectorSource = fs.readFileSync(new URL('../components/ModelSelector.jsx', import.meta.url), 'utf8');
   const messageSource = fs.readFileSync(new URL('../components/ChatMessage.jsx', import.meta.url), 'utf8');
-  const presentationSource = fs.readFileSync(new URL('../utils/presentationMetadata.js', import.meta.url), 'utf8');
 
   assert.match(selectorSource, /acneAdvisorSelectedModel/);
   assert.match(selectorSource, /data\.default_provider/);
   assert.match(selectorSource, /m\.is_default/);
-  assert.match(messageSource, /responseBadgeLabel/);
-  assert.match(presentationSource, /Gemini 3\.1 Flash-Lite/);
-  assert.match(presentationSource, /requested_provider/);
-  assert.match(presentationSource, /requested_model/);
-  assert.match(presentationSource, /dự phòng từ/);
+  assert.doesNotMatch(messageSource, /responseBadgeLabel|requested_provider|requested_model|dự phòng từ/);
 });

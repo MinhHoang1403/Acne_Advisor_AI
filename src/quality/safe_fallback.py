@@ -112,39 +112,27 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
 
     if fallback_type == "empty_query":
         return (
-            "**Tóm tắt ngắn**\n"
-            "Mình chưa nhận được câu hỏi đủ rõ để xử lý.\n\n"
-            "**Bạn có thể bổ sung**\n"
-            "Hãy nêu rõ đối tượng và thông tin bạn muốn tìm trong tài liệu."
+            "Mình chưa nhận được câu hỏi đủ rõ. "
+            "Bạn hãy nêu cụ thể điều muốn biết về mụn hoặc chăm sóc da."
         )
     if fallback_type == "retrieval_error":
         return (
-            "**Tóm tắt ngắn**\n"
-            "Hệ thống tạm thời không truy xuất được nguồn kiến thức cần thiết để trả lời đáng tin cậy.\n\n"
-            "**Bạn có thể làm gì tiếp theo**\n"
-            "Vui lòng thử lại sau ít phút hoặc viết câu hỏi cụ thể hơn."
+            "Mình chưa thể lấy đủ thông tin đáng tin cậy để trả lời lúc này. "
+            "Bạn vui lòng thử lại sau ít phút hoặc viết câu hỏi cụ thể hơn."
         )
     if fallback_type == "insufficient_context":
         return (
-            "**Tóm tắt ngắn**\n"
-            "Tài liệu hiện có chưa đủ bằng chứng được chọn để trả lời chính xác câu hỏi này.\n\n"
-            "**Bạn có thể bổ sung**\n"
-            "Hãy nêu rõ đối tượng và thông tin bạn muốn tìm trong tài liệu.\n\n"
-            "**Lưu ý**\n"
-            "Mình sẽ không suy đoán hoặc bịa nguồn khi context chưa đủ."
+            "Mình chưa có đủ thông tin đáng tin cậy để trả lời chắc chắn câu hỏi này. "
+            "Bạn có thể nêu cụ thể hơn điều muốn biết."
         )
     if fallback_type in {"empty_generation", "invalid_generation"}:
         return (
-            "**Tóm tắt ngắn**\n"
-            "Mình chưa thể tạo câu trả lời đáng tin cậy từ thông tin hiện có.\n\n"
-            "**Bạn có thể làm gì tiếp theo**\n"
-            "Vui lòng thử lại hoặc viết câu hỏi cụ thể hơn."
+            "Mình chưa thể đưa ra câu trả lời đáng tin cậy từ thông tin hiện có. "
+            "Bạn vui lòng thử lại hoặc viết câu hỏi cụ thể hơn."
         )
     return (
-        "**Tóm tắt ngắn**\n"
-        "Hệ thống chưa có đủ thông tin đáng tin cậy để trả lời chính xác câu hỏi này.\n\n"
-        "**Bạn có thể bổ sung**\n"
-        "Hãy nêu rõ đối tượng và thông tin bạn muốn tìm trong tài liệu."
+        "Mình chưa có đủ thông tin đáng tin cậy để trả lời chính xác câu hỏi này. "
+        "Bạn có thể nêu cụ thể hơn điều muốn biết."
     )
 
 

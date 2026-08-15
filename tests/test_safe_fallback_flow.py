@@ -62,6 +62,9 @@ def test_safe_fallback_answers_are_generic_infrastructure_messages() -> None:
         assert answer
         assert "isotretinoin" not in answer.casefold()
         assert "benzoyl peroxide" not in answer.casefold()
+        assert "retrieval" not in answer.casefold()
+        assert "truy xuất" not in answer.casefold()
+        assert "context" not in answer.casefold()
 
 
 def test_graph_routes_all_bounded_actions_and_compiles() -> None:
@@ -78,4 +81,4 @@ def test_safe_fallback_version_partitions_pipeline_fingerprint() -> None:
     )
     assert new["safe_fallback_flow_version"] == SAFE_FALLBACK_FLOW_VERSION
     assert compute_pipeline_fingerprint(old) != compute_pipeline_fingerprint(new)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v8"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v9"
