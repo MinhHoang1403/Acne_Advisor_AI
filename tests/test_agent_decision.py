@@ -30,6 +30,7 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
     assert result["next_action"] == "retrieve"
     assert result["standalone_question"] == "benzoyl peroxide acne"
     assert result["agent_decision"]["provider"] == "test"
+    assert result["performance_timings"]["agent_decision_1"] >= 0
 
 
 @pytest.mark.asyncio
@@ -44,9 +45,12 @@ async def test_agent_chooses_generation_after_evidence(monkeypatch: pytest.Monke
             "retrieval_attempt": 1,
             "evidence_assessment": {"usable": True},
             "vector_contexts": [{"text": "source text", "source_file": "source.pdf"}],
+            "performance_timings": {"agent_decision_1": 1.25},
         }
     )
     assert result["next_action"] == "generate"
+    assert result["performance_timings"]["agent_decision_1"] == 1.25
+    assert result["performance_timings"]["agent_decision_2"] >= 0
 
 
 @pytest.mark.asyncio

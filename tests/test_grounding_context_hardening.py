@@ -29,6 +29,39 @@ def test_source_alias_keeps_canonical_identity_and_page() -> None:
     assert metadata[0]["page"] == 3
 
 
+def test_source_metadata_deduplicates_filename_and_stable_source_id() -> None:
+    metadata = build_source_metadata(
+        [
+            "nice_ng198_2026-08-03.md",
+            "nice_ng198_2026_08",
+            "qd_4416_cut.pdf",
+            "vn_moh_dermatology_4416_2023_acne",
+        ],
+        contexts=[
+            {
+                "source_file": "nice_ng198_2026-08-03.md",
+                "document_title": "Acne vulgaris: management (NG198)",
+                "chunk_id": "nice-chunk",
+            },
+            {
+                "source_file": "qd_4416_cut.pdf",
+                "document_title": "Huong dan chan doan va dieu tri cac benh da lieu",
+                "chunk_id": "moh-chunk",
+            },
+        ],
+    )
+
+    assert {entry["source_id"] for entry in metadata} == {
+        "nice_ng198_2026-08-03.md",
+        "qd_4416_cut.pdf",
+    }
+    assert {entry["display_name"] for entry in metadata} == {
+        "Acne vulgaris: management (NG198)",
+        "Tài liệu tiếng Việt về mụn trứng cá",
+    }
+    assert all(entry["chunk_id"] for entry in metadata)
+
+
 def test_source_validation_removes_only_unretrieved_names() -> None:
     result = validate_answer_source_mentions(
         "Theo invented-guide.pdf, hãy xem qd_4416_cut.pdf ở trang 3.",

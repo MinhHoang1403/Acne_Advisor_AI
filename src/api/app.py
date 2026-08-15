@@ -8,6 +8,7 @@ module owner phía dưới; file này không tự chấm evidence hay sinh answe
 import asyncio
 import logging
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional
@@ -631,6 +632,7 @@ async def chat_endpoint(request: ChatRequest):
     After the agent responds, awaits persistence of the user message and
     assistant response to PostgreSQL. Persistence errors remain non-fatal.
     """
+    request_started = time.perf_counter()
     request.message = repair_mojibake(request.message)
     request.conversation_history = _repair_history_messages(request.conversation_history)
 
@@ -706,6 +708,7 @@ async def chat_endpoint(request: ChatRequest):
         )
         sources_list = display_names_for_sources(raw_sources_list, result.get("vector_contexts", []))
         answer_quality_report = result.get("answer_quality_report") or {}
+        performance_timings = dict(result.get("performance_timings") or {})
         pipeline_fingerprint = result.get("pipeline_fingerprint")
         pipeline_manifest = result.get("pipeline_manifest") or {}
         phase2_debug_enabled = os.getenv("PHASE2_DEBUG_METADATA", "false").strip().lower() in {
@@ -722,6 +725,7 @@ async def chat_endpoint(request: ChatRequest):
                 "observability_exported": result.get("observability_exported"),
                 "runtime_resilience": result.get("runtime_resilience"),
                 "prompt_budget": result.get("prompt_budget"),
+                "performance_timings": performance_timings,
                 "evidence_assessment": result.get("evidence_assessment"),
                 "answer_quality": {
                     "passed": answer_quality_report.get("passed") if isinstance(answer_quality_report, dict) else None,
@@ -816,6 +820,7 @@ async def chat_endpoint(request: ChatRequest):
         if _release_readiness_test_mode_enabled():
             logger.info("Skipping DB persistence in release-readiness test mode.")
         else:
+            persistence_started = time.perf_counter()
             try:
                 logger.debug("Persisting chat exchange for session %s", session_id)
                 # Persistence được await nhưng lỗi DB bị giữ ở nhánh best-effort,
@@ -835,6 +840,16 @@ async def chat_endpoint(request: ChatRequest):
                     session_id,
                     db_err.__class__.__name__,
                 )
+            finally:
+                performance_timings["persistence"] = round(
+                    (time.perf_counter() - persistence_started) * 1000,
+                    3,
+                )
+
+        performance_timings["total_request"] = round(
+            (time.perf_counter() - request_started) * 1000,
+            3,
+        )
         
         return ChatResponse(
             answer=answer_text,

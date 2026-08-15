@@ -84,6 +84,9 @@ test('source details and markdown table presentation remain accessible', () => {
   assert.match(chatMessage, /aria-expanded=\{detailsOpen\}/);
   assert.match(chatMessage, /Chi tiết/);
   assert.match(chatMessage, /detailsOpen &&/);
+  assert.match(chatMessage, /Nguồn đã truy hồi:/);
+  assert.match(chatMessage, /chat-meta-source-list/);
+  assert.doesNotMatch(chatMessage, /sourceLabels\.join\(', '\)/);
   assert.match(markdown, /className: 'chat-markdown-table'/);
   assert.match(styles, /\.chat-table-wrapper/);
   assert.match(styles, /\.answer-details-panel/);

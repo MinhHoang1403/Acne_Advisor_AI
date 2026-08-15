@@ -50,6 +50,14 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _duration_ms(value: Any) -> float | None:
+    """Đổi duration nano-giây của Ollama sang mili-giây để log dễ đọc."""
+
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    return round(float(value) / 1_000_000, 3)
+
+
 def build_ollama_chat_payload(
     *,
     model: str,
@@ -121,13 +129,19 @@ async def generate_ollama_response(
                 num_predict = payload.get("options", {}).get("num_predict")
                 truncated = str(done_reason or "").lower() in {"length", "num_predict", "context_length"}
                 logger.info(
-                    "Ollama generation completed: model=%s attempt=%s done_reason=%s eval_count=%s num_predict=%s truncated=%s",
+                    "Ollama generation completed: model=%s attempt=%s done_reason=%s "
+                    "eval_count=%s num_predict=%s truncated=%s total_duration_ms=%s "
+                    "load_duration_ms=%s prompt_eval_duration_ms=%s eval_duration_ms=%s",
                     model,
                     attempt + 1,
                     done_reason,
                     eval_count,
                     num_predict,
                     truncated,
+                    _duration_ms(data.get("total_duration")),
+                    _duration_ms(data.get("load_duration")),
+                    _duration_ms(data.get("prompt_eval_duration")),
+                    _duration_ms(data.get("eval_duration")),
                 )
                 content = data.get("message", {}).get("content", "")
                 if not truncated:

@@ -20,6 +20,26 @@ async def test_agent_decision_is_bounded_and_meaningful() -> None:
     assert (await workflow.decide_node({"cache_hit": True}))["next_action"] == "finalize"
 
 
+@pytest.mark.asyncio
+async def test_prepare_and_guard_record_only_executed_stage_timings() -> None:
+    prepared = await workflow.prepare_node(
+        {"user_question": "Mụn là gì?", "conversation_history": [], "performance_timings": {}}
+    )
+    guarded = await workflow.guard_node(
+        {
+            **prepared,
+            "user_question": "Mụn là gì?",
+            "bypass_cache": True,
+        }
+    )
+    skipped_decision = await workflow.decide_node({"cache_hit": True})
+
+    assert prepared["performance_timings"]["prepare"] >= 0
+    assert guarded["performance_timings"]["prepare"] >= 0
+    assert guarded["performance_timings"]["guard"] >= 0
+    assert "performance_timings" not in skipped_decision
+
+
 def test_route_reads_only_explicit_agent_action() -> None:
     assert route_agent_action({"next_action": "retrieve"}) == "retrieve"
     assert route_agent_action({}) == "abstain"
@@ -50,6 +70,8 @@ async def test_run_clinical_agent_returns_prompt_budget(monkeypatch: pytest.Monk
     assert "answerability" not in result
     assert "errors" not in result
     assert "graph_relation_found" not in result
+    assert result["performance_timings"]["agent_total"] >= 0
+    assert "agent_decision_1" not in result["performance_timings"]
 
 
 @pytest.mark.asyncio
@@ -188,3 +210,7 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
     assert retrieve_calls == 2
     assert result["retrieval_attempt"] == 2
     assert result["agent_decision"]["action"] == "abstain"
+    assert result["performance_timings"]["agent_decision_1"] >= 0
+    assert result["performance_timings"]["agent_decision_2"] >= 0
+    assert result["performance_timings"]["agent_decision_3"] >= 0
+    assert result["performance_timings"]["finalize"] >= 0

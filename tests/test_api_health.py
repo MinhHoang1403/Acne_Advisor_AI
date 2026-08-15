@@ -239,6 +239,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
             "pipeline_manifest": {"phase": "production", "answer_cache_version": "v8"},
             "pipeline_fingerprint": "fixture-fingerprint",
             "answer_quality_report": {"passed": True, "issues": []},
+            "performance_timings": {"agent_total": 1.25},
         }
 
     async def fake_persist_chat_to_db(**kwargs):
@@ -246,6 +247,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
 
     monkeypatch.setattr("src.api.app.run_clinical_agent", fake_run_clinical_agent)
     monkeypatch.setenv("RELEASE_READINESS_TEST_MODE", "")
+    monkeypatch.setenv("PHASE2_DEBUG_METADATA", "true")
     monkeypatch.setattr("src.api.app._persist_chat_to_db", fake_persist_chat_to_db)
 
     async with AsyncClient(
@@ -277,6 +279,10 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     assert body["source_metadata"][0]["source_id"] == "fixture.pdf"
     assert metadata["used_retrieval"] is True
     assert metadata["retrieval"] == "dense_bm25_rrf"
+    timings = metadata["phase2_debug"]["performance_timings"]
+    assert timings["agent_total"] == 1.25
+    assert timings["persistence"] >= 0
+    assert timings["total_request"] >= timings["persistence"]
 
 
 @pytest.mark.asyncio

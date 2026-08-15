@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -116,6 +117,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
     ``abstain``; nó không tự suy diễn một action thay thế từ keyword.
     """
 
+    started = time.perf_counter()
     system_prompt, prompt = build_agent_decision_prompt(state)
     try:
         settings = _runtime_settings(state)
@@ -154,6 +156,13 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             **provider_metadata,
         },
         "is_in_domain": validated.reason_code != "out_of_scope",
+        "performance_timings": {
+            **(state.get("performance_timings") or {}),
+            f"agent_decision_{int(state.get('retrieval_attempt', 0) or 0) + 1}": round(
+                (time.perf_counter() - started) * 1000,
+                3,
+            ),
+        },
     }
     if effective_query:
         updates["standalone_question"] = effective_query

@@ -49,8 +49,12 @@ export default function ChatMessage({ msg }) {
                         <div id={detailPanelId} className="answer-details-panel">
                           {sourceLabels.length > 0 && (
                             <div className="chat-meta-sources">
-                              <span className="chat-meta-label">Nguồn: </span>
-                              {sourceLabels.join(', ')}
+                              <span className="chat-meta-label">Nguồn đã truy hồi:</span>
+                              <ul className="chat-meta-source-list">
+                                {sourceLabels.map((label) => (
+                                  <li key={label}>{label}</li>
+                                ))}
+                              </ul>
                             </div>
                           )}
                           {hasMetadata && (

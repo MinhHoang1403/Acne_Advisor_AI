@@ -2234,6 +2234,13 @@ summary:focus-visible {
   padding: 0 0 8px;
 }
 
+.chat-meta-source-list {
+  display: grid;
+  gap: 3px;
+  margin: 5px 0 0;
+  padding-left: 18px;
+}
+
 .answer-details-panel .chat-meta-info {
   margin-bottom: 8px;
 }
