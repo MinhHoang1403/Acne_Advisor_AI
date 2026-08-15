@@ -7,7 +7,7 @@ export default function ChatInput({ message, setMessage, isLoading, onSubmit }) 
   const textareaRef = useRef(null);
   const [modelConfig, setModelConfig] = useState(null);
 
-  // Auto-resize textarea
+  // Resize chỉ ảnh hưởng presentation và bị chặn ở 200px để composer ổn định.
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';

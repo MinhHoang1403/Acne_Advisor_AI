@@ -1,4 +1,15 @@
-"""Qdrant retrieval and Gemini query-embedding adapter."""
+"""Adapter nối runtime retrieval với Gemini embedding và Qdrant.
+
+Project gửi query text cho Gemini và nhận Dense vector 3072 chiều; project không
+tự chạy neural embedding model. Qdrant dùng vector đó để thực thi cosine search.
+Với BM25, project gửi ``Document`` cùng contract từ ``src/ingestion/bm25.py``;
+Qdrant tạo sparse representation và thực thi search theo collection IDF.
+
+Adapter này chỉ đọc collection kiến thức trong request path. EntityCards và
+Neo4j không được truy vấn tại đây. Muốn đổi provider/model embedding hãy đọc
+``_embed_sync``/``embed_query``; muốn đổi search call hãy đọc hai method của
+``QdrantVectorStore``.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -35,7 +46,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
 
 
 def qdrant_client_kwargs() -> dict[str, Any]:
-    """Return AsyncQdrantClient kwargs without breaking unauthenticated local Qdrant."""
+    """Tạo kwargs cho Qdrant, chỉ gửi API key khi cấu hình thực sự có giá trị."""
     kwargs: dict[str, Any] = {"url": QDRANT_URL}
     if QDRANT_API_KEY:
         kwargs["api_key"] = QDRANT_API_KEY
@@ -47,7 +58,7 @@ def qdrant_client_kwargs() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _embed_sync(text: str) -> list[float]:
-    """Synchronous Gemini embedding call for a single query string.
+    """Gửi một query tới Gemini embedding provider theo lời gọi đồng bộ.
 
     Gemini Embedding 2 does not accept a task type. Documents and queries share
     the same versioned model and index contract.
@@ -72,7 +83,7 @@ def _embed_sync(text: str) -> list[float]:
 
 
 async def embed_query(text: str) -> list[float]:
-    """Embed a query string asynchronously using Gemini.
+    """Nhận Dense query vector từ Gemini mà không chặn event loop.
 
     Transient transport failures are retried locally because an unavailable
     query embedding would otherwise force a safe fallback despite an intact
@@ -123,9 +134,9 @@ def _positive_float_env(name: str, default: float) -> float:
 
 
 class QdrantVectorStore:
-    """Read-only Qdrant runtime adapter with named vector support.
+    """Adapter Qdrant read-only dùng chung trong process runtime.
 
-    The Pha 1 collection uses:
+    Collection kiến thức dùng:
     - Named dense vector: ``"dense"`` (3072-dim, COSINE)
     - Named sparse vector: ``"bm25"`` (Qdrant-native BM25 with collection IDF)
     """
@@ -144,7 +155,11 @@ class QdrantVectorStore:
     async def search(
         self, query_vector: list[float], top_k: int = 5, filter: dict | None = None
     ) -> list[dict[str, Any]]:
-        """Semantic search using named dense vector ``"dense"``."""
+        """Yêu cầu Qdrant tìm candidate bằng named Dense vector ``"dense"``.
+
+        Collection khai báo cosine distance; Qdrant, không phải method Python
+        này, thực hiện vector search và tính score.
+        """
         query_filter = None
         if filter is not None:
             from qdrant_client import models  # type: ignore[import]
@@ -170,7 +185,7 @@ class QdrantVectorStore:
     async def search_sparse(
         self, text: str, top_k: int = 5,
     ) -> list[dict[str, Any]]:
-        """Search the Qdrant-native true BM25 channel."""
+        """Yêu cầu Qdrant thực thi BM25 search trên named vector ``"bm25"``."""
 
         if not text.strip():
             logger.warning("Empty BM25 query, returning empty results.")
@@ -185,13 +200,13 @@ class QdrantVectorStore:
         return [{"id": r.id, "score": r.score, **(r.payload or {})} for r in response.points]
 
     async def close(self) -> None:
-        """Keep the shared read client alive for the process lifetime."""
+        """Giữ shared read client sống hết process; method này không đóng nó."""
 
         return None
 
     @classmethod
     async def close_shared_client(cls) -> None:
-        """Close the shared client explicitly during controlled process shutdown."""
+        """Đóng shared client khi application shutdown có kiểm soát."""
 
         if cls._shared_client is not None:
             await cls._shared_client.close()

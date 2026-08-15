@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
-"""
-init_schema.py
-==============
-Acne Advisor AI – Database Schema Initialisation Script
+"""Khởi tạo schema PostgreSQL mà không quản lý knowledge-index lifecycle.
 
-Responsibilities
-----------------
-1. Load environment variables from .env.
-2. Create patient_records table in PostgreSQL with JSONB profile.
-3. Enable PostgreSQL extensions.
-4. Create SQLAlchemy model tables if src.database.models exists.
-5. Leave knowledge-index lifecycle operations to ``scripts/phase1.py``.
+Script tạo table/extension theo kiểu idempotent và kiểm kết nối Qdrant, nhưng
+không build, re-embed hoặc chuyển knowledge collections. Những operation đó chỉ
+thuộc ``scripts/phase1.py``.
 """
 
 from __future__ import annotations

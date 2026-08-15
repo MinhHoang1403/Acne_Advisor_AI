@@ -1,7 +1,8 @@
-"""Small adapter around the Google GenAI SDK.
+"""Adapter duy nhất giữa project và Google GenAI SDK.
 
-The rest of the application should use this module instead of importing the
-legacy Gemini SDK or configuring process-global SDK state.
+Project chuẩn bị request, kiểm shape/dimension và chuẩn hóa exception tại đây;
+Google provider mới thực thi model inference/embedding. Các module khác nên gọi
+adapter thay vì cấu hình SDK global để timeout và error contract nhất quán.
 """
 
 from __future__ import annotations
@@ -36,7 +37,7 @@ def build_google_genai_client(
     api_key: str | None = None,
     timeout_seconds: float | None = None,
 ) -> genai.Client:
-    """Create an explicit Google GenAI client with SDK-level retry disabled."""
+    """Tạo client tường minh và để retry cho resilience layer của project."""
 
     retry_options = types.HttpRetryOptions(attempts=1)
     timeout_ms = None
@@ -145,7 +146,11 @@ def embed_texts_sync(
     api_key: str | None = None,
     client: Any | None = None,
 ) -> list[list[float]]:
-    """Embed one or more texts and validate every returned vector."""
+    """Yêu cầu provider embed một batch rồi kiểm count/dimension từng vector.
+
+    Một ``Content`` được tạo cho mỗi text để giữ đúng batch contract của SDK;
+    project không tự tính embedding vector trong hàm này.
+    """
 
     if not texts:
         return []
@@ -158,8 +163,8 @@ def embed_texts_sync(
             config_kwargs["task_type"] = task_type
         response = active_client.models.embed_content(
             model=model_name,
-            # google-genai groups a list of consecutive strings into one Content
-            # with multiple Parts. Batch embeddings require one Content per text.
+            # SDK gom list[str] thành một Content có nhiều Parts; batch embedding
+            # cần một Content độc lập cho mỗi text để output count khớp input.
             contents=[types.Content(parts=[types.Part(text=text)]) for text in texts],
             config=types.EmbedContentConfig(**config_kwargs),
         )
@@ -178,7 +183,7 @@ def embed_texts_sync(
 def extract_embedding_vectors(response: Any, *, expected_count: int) -> list[list[float]]:
     embeddings = _get_field(response, "embeddings")
     if embeddings is None:
-        # Some tests may still use the old dict shape at this boundary.
+        # Test double có thể dùng dict shape tương đương tại adapter boundary.
         legacy = _get_field(response, "embedding")
         if legacy is not None:
             embeddings = legacy

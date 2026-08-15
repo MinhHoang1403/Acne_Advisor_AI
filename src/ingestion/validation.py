@@ -1,4 +1,10 @@
-"""Layered validation for compiled and indexed knowledge builds."""
+"""Kiểm tra từng lớp của compiled knowledge và indexed datastores.
+
+Các check xác nhận identity, schema, counts, provenance presence và một BM25
+smoke query. Chúng là integrity checks của build, không đo retrieval quality và
+không xác minh clinical truth. Chỉ ``validate_qdrant_collection`` gọi Qdrant;
+các validator còn lại làm việc trên records trong bộ nhớ.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +26,8 @@ def validate_compiled_knowledge(
     compiled: CompiledKnowledge,
     sources: tuple[CanonicalSource, ...],
 ) -> dict[str, Any]:
+    """Kiểm source coverage, identity, size cap và provenance của compiled records."""
+
     errors: list[str] = []
     warnings: list[str] = []
     source_ids = {source.source_id for source in sources}
@@ -103,6 +111,8 @@ async def validate_qdrant_collection(
     expected_points: int,
     smoke_query: str = "benzoyl peroxide",
 ) -> dict[str, Any]:
+    """Đối chiếu Qdrant schema/count và chạy một BM25 integrity query."""
+
     errors: list[str] = []
     info = await client.get_collection(collection_name)
     params = info.config.params

@@ -1,16 +1,9 @@
-"""
-src/database/repositories/chat_history.py
-==========================================
-Repository for chat session and message persistence in PostgreSQL.
+"""Repository lưu chat session/message trong PostgreSQL.
 
-All functions accept an AsyncSession (dependency injection) and use raw SQL
-via sqlalchemy.text() for maximum clarity and control.
-
-Safety:
-- hide_session only sets hidden=true, never DELETEs.
-- save_message uses INSERT ... ON CONFLICT DO NOTHING to prevent duplicates.
-- create_or_update_session uses UPSERT (ON CONFLICT DO UPDATE).
-- No API keys, raw exceptions, or sensitive data is stored.
+Caller cấp ``AsyncSession`` và sở hữu transaction boundary. Raw SQL được bind
+parameter; message ID làm idempotency key qua ``ON CONFLICT DO NOTHING``. Hide
+chỉ đặt cờ, còn delete toàn bộ là operation tách biệt. Metadata đi qua allow-by-
+exclusion sanitizer để tránh lưu credential/raw error phổ biến.
 """
 
 from __future__ import annotations
@@ -78,7 +71,7 @@ async def save_message(
     if message_id is None:
         message_id = str(uuid.uuid4())
 
-    # Sanitize metadata — strip any sensitive fields
+    # Metadata được lọc trước khi JSON serialization; message content giữ nguyên.
     safe_metadata = _sanitize_metadata(metadata) if metadata else None
 
     ts = created_at or datetime.now(timezone.utc)
@@ -259,7 +252,7 @@ async def delete_all_chat_history(session: AsyncSession) -> dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers tại SQLAlchemy/asyncpg JSONB boundary.
 # ---------------------------------------------------------------------------
 
 def _json_or_none(value: Any) -> Any:
@@ -268,11 +261,11 @@ def _json_or_none(value: Any) -> Any:
         return None
     if isinstance(value, (list, dict)) and len(value) == 0:
         return None
-    # For asyncpg + sqlalchemy.text(), we must serialize dicts/lists to JSON strings
+    # sqlalchemy.text + asyncpg cần JSON string rõ ràng cho dict/list parameters.
     return json.dumps(value, ensure_ascii=False)
 
 
-# Keys that must NEVER be stored in metadata
+# Các key nhạy cảm bị loại trước khi metadata được ghi.
 _SENSITIVE_KEYS = frozenset({
     "api_key", "apikey", "api_secret", "secret", "token",
     "password", "credential", "authorization", "auth",

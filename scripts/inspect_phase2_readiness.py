@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Inspect the validated knowledge build and Agentic RAG runtime readiness."""
+"""Đọc manifest/services để mô tả knowledge build và runtime capabilities.
+
+Các check Qdrant/Neo4j chỉ đọc count/schema. Capability flags phản ánh kiến trúc
+thực tế: normal retrieval là Dense + BM25 + RRF; entity/graph không tham gia
+runtime answer grounding.
+"""
 
 from __future__ import annotations
 

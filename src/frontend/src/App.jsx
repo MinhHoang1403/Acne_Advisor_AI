@@ -33,8 +33,10 @@ import {
   shouldGenerateSessionTitle,
 } from './utils/chatTitle.js';
 
+// App sở hữu session state, request lifecycle và đồng bộ localStorage/backend.
+// Component con chỉ nhận dữ liệu/handler để render; HTTP contract thuộc chatApi.
 export default function App() {
-  // ── State ──────────────────────────────────────────────
+  // State dùng chung của shell chat.
   const [sessions, setSessions] = useState(() => loadSessions());
   const [activeSessionId, setActiveSessionId] = useState(() => loadActiveSessionId());
   const [message, setMessage] = useState('');
@@ -57,12 +59,12 @@ export default function App() {
   const healthSequenceRef = useRef(0);
   const healthAttemptRef = useRef(0);
 
-  // ── Derived ────────────────────────────────────────────
+  // Derived state không được persist riêng để tránh hai nguồn sự thật.
   const activeSession = sessions.find((s) => s.id === activeSessionId) || null;
   const chatHistory = activeSession ? activeSession.messages : [];
   const backendOnline = isBackendReachable(connectionStatus);
 
-  // ── Persistence to localStorage ────────────────────────
+  // localStorage giữ trải nghiệm khi backend chưa reachable.
   useEffect(() => {
     saveSessions(sessions);
   }, [sessions]);
@@ -75,7 +77,8 @@ export default function App() {
     saveHistoryHiddenAt(historyHiddenAt);
   }, [historyHiddenAt]);
 
-  // ── Backend health loop: startup order, restart, degraded state ────────
+  // Health loop dùng một timer và hủy request cũ để response đến muộn không
+  // ghi đè trạng thái của lần check mới hơn.
   useEffect(() => {
     let cancelled = false;
 
@@ -146,7 +149,7 @@ export default function App() {
     };
   }, []);
 
-  // ── Load persisted sessions once backend is reachable ────────
+  // Chỉ load danh sách PostgreSQL một lần sau khi backend reachable.
   useEffect(() => {
     if (!backendOnline || backendSessionsLoaded.current) return;
     backendSessionsLoaded.current = true;
@@ -184,7 +187,7 @@ export default function App() {
     })();
   }, [activeSessionId, backendOnline]);
 
-  // ── Load messages from backend when selecting a session ─
+  // Message bodies được load lười khi người dùng chọn session.
   const _loadMessagesFromBackend = useCallback(async (sessionId) => {
     if (!backendOnline) return;
 
@@ -220,7 +223,7 @@ export default function App() {
     }
   }, [backendOnline]);
 
-  // ── Handlers ───────────────────────────────────────────
+  // Event handlers cập nhật local state trước, rồi đồng bộ backend nếu có thể.
   const handleNewChat = useCallback(() => {
     setActiveSessionId(null);
     setError(null);
@@ -235,13 +238,12 @@ export default function App() {
         setSidebarOpen(false);
       }
 
-      // Load messages from backend if this session came from backend
-      // and doesn't have messages loaded yet
+      // Session từ backend chỉ mang summary nên cần tải message khi được chọn.
       const session = sessions.find((s) => s.id === id);
       if (session && session._fromBackend && (!session.messages || session.messages.length === 0)) {
         _loadMessagesFromBackend(id);
       } else if (backendOnline && session) {
-        // Even if we have local messages, refresh from backend to get latest
+        // Refresh session local để nhận bản PostgreSQL mới nhất.
         _loadMessagesFromBackend(id);
       }
     },
@@ -249,12 +251,12 @@ export default function App() {
   );
 
   const handleRenameSession = useCallback(async (id, newTitle) => {
-    // Always update local state first
+    // Optimistic local update giữ UI phản hồi ngay cả khi backend gián đoạn.
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, title: newTitle, updatedAt: Date.now() } : s))
     );
 
-    // Then sync to backend if online
+    // Backend sync là best-effort; local title vẫn được giữ nếu request lỗi.
     if (backendOnline) {
       try {
         await apiRenameSession(id, newTitle);
@@ -266,12 +268,12 @@ export default function App() {
 
   const handleHideSession = useCallback(
     async (id) => {
-      // Update local state — only set hidden, never delete
+      // Hide chỉ đặt flag local, không xóa session/message.
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, hidden: true, updatedAt: Date.now() } : s))
       );
 
-      // If the hidden session was the active one, switch to the most recent visible session
+      // Chuyển sang session visible gần nhất nếu session đang mở bị ẩn.
       if (activeSessionId === id) {
         const remaining = sessions
           .filter((s) => s.id !== id && !s.hidden)
@@ -279,7 +281,7 @@ export default function App() {
         setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
       }
 
-      // Sync to backend if online
+      // Đồng bộ flag với PostgreSQL khi backend reachable.
       if (backendOnline) {
         try {
           await apiHideSession(id);
@@ -354,7 +356,7 @@ export default function App() {
       let currentSessionId = activeSessionId;
       let generatedSessionTitle = null;
 
-      // Create a new session if none is active
+      // Tạo session local trước để user message xuất hiện ngay.
       if (!currentSessionId) {
         currentSessionId = generateId();
         generatedSessionTitle = deriveChatTitleFromFirstUserMessage(trimmedMessage);
@@ -375,7 +377,7 @@ export default function App() {
         }
       }
 
-      // Add user message to session
+      // Append user message bằng functional update để không mutate React state.
       const userMsgObj = { role: 'user', content: trimmedMessage };
       setSessions((prev) =>
         prev.map((s) => {
@@ -390,7 +392,7 @@ export default function App() {
         })
       );
 
-      // Compile conversation history (max 6 recent messages, role+content only)
+      // Chỉ gửi sáu message gần nhất và hai field role/content để giới hạn payload.
       const currentSessionObj = sessions.find((s) => s.id === currentSessionId) || {
         messages: [],
       };
@@ -408,10 +410,9 @@ export default function App() {
           allowModelFallback: modelConfig?.allowModelFallback,
         });
 
-        // Update session_id from backend response if different
+        // Backend có thể canonicalize session ID; cập nhật cả state và active ID.
         const responseSessionId = data.session_id || currentSessionId;
         if (responseSessionId !== currentSessionId) {
-          // Backend assigned a different session ID — update
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === currentSessionId) {
@@ -431,7 +432,7 @@ export default function App() {
           }
         }
 
-        // Add assistant message
+        // Giữ toàn bộ response data để ChatMessage render source/metadata.
         const assistantMsgObj = { role: 'assistant', content: data.answer, data };
         setSessions((prev) =>
           prev.map((s) => {
@@ -477,7 +478,7 @@ export default function App() {
     }
   }, [sendQuestion]);
 
-  // ── Render ─────────────────────────────────────────────
+  // Sidebar và ChatWindow dùng cùng state owner để session selection nhất quán.
   return (
     <div className="app-layout">
       <Sidebar

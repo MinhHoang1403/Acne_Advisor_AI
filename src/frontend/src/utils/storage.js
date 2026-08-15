@@ -1,6 +1,6 @@
 /**
- * LocalStorage utilities for chat sessions.
- * Uses the same keys as the legacy frontend to preserve existing chat history.
+ * Tiện ích localStorage cho session state của frontend.
+ * Các key là compatibility contract để lịch sử hiện có tiếp tục đọc được.
  *
  * Key: 'acneAdvisorSessions' — JSON array of session objects.
  * Key: 'acneAdvisorActiveSession' — string ID of the active session.
@@ -11,7 +11,7 @@ const ACTIVE_SESSION_KEY = 'acneAdvisorActiveSession';
 const HISTORY_HIDDEN_KEY = 'acneAdvisorHistoryHidden';
 
 /**
- * Load all sessions from localStorage, applying migration for older schemas.
+ * Load sessions và điền các field tùy chọn còn thiếu.
  * @returns {Array} Array of session objects.
  */
 export function loadSessions() {
@@ -19,7 +19,7 @@ export function loadSessions() {
     const saved = localStorage.getItem(SESSIONS_KEY);
     if (!saved) return [];
     const parsed = JSON.parse(saved);
-    // Migrate old sessions: ensure hidden and updatedAt fields exist
+    // Default field được bổ sung khi đọc, không rewrite storage ngay tại đây.
     return parsed.map((s) => ({
       ...s,
       hidden: s.hidden || false,
@@ -62,7 +62,7 @@ export function loadHistoryHiddenAt() {
   const rawValue = localStorage.getItem(HISTORY_HIDDEN_KEY);
   if (!rawValue) return null;
 
-  // Backward compatibility for the previous boolean flag.
+  // Boolean flag vẫn được hiểu như thời điểm ẩn hiện tại để giữ compatibility.
   if (rawValue === 'true') return Date.now();
 
   const parsed = Number(rawValue);

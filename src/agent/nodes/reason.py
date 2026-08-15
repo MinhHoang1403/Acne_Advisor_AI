@@ -1,4 +1,10 @@
-"""Evidence-grounded answer generation node."""
+"""Tạo answer draft từ packed evidence bằng LLM provider đã cấu hình.
+
+Node bảo toàn thứ tự context do RRF/context packer tạo, xây prompt qua owner tại
+``agent/prompts/medical_answer.py`` rồi gọi provider abstraction. Nó không search
+lại, rerank context hoặc tự kiểm chứng clinical truth. Provider thực sự thực thi
+model inference; Python chịu trách nhiệm input contract, deadline và metadata.
+"""
 
 import logging
 import os
@@ -32,13 +38,18 @@ def _runtime_budget(state: ClinicalState, settings: RuntimeResilienceSettings) -
 
 
 def _select_answer_contexts(contexts: list[dict[str, Any]], limit: int = 5, query: str = "") -> list[dict[str, Any]]:
-    """Preserve the canonical packer's fused order for answer generation."""
+    """Giữ nguyên fused order của context packer khi lấy tối đa ``limit`` item."""
 
     del query
     return [dict(context) for context in contexts[:limit]]
 
 async def generate_answer_node(state: ClinicalState) -> dict:
-    """Generate an answer to the current question from retrieved chunk evidence."""
+    """Sinh draft cho câu hỏi hiện tại từ chunk evidence đã retrieval.
+
+    Side effect duy nhất đáng kể là lời gọi LLM provider. Prompt, system
+    instruction và source allowlist là runtime-consumed strings/data nên owner
+    nội dung của chúng nằm ở prompt/source-presentation modules.
+    """
     question = state.get("normalized_question") or state.get("user_question", "")
     contexts = state.get("vector_contexts", [])
     conversation_context = state.get("conversation_context") or {}

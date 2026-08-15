@@ -1,4 +1,10 @@
-"""Deadline budget helpers for runtime timeout propagation."""
+"""Truyền một deadline chung xuyên suốt các bước của một request.
+
+Budget dùng monotonic clock để không bị ảnh hưởng bởi thay đổi system time.
+``remaining = max(0, deadline_at - now)`` và timeout của mỗi stage là
+``min(configured_timeout, remaining)``. Vì các stage dùng cùng object, retry hoặc
+provider fallback không được cấp lại toàn bộ thời gian từ đầu.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +15,7 @@ from typing import Callable
 
 @dataclass(frozen=True)
 class DeadlineBudget:
+    """Mốc bắt đầu/deadline bất biến cùng clock có thể thay bằng test double."""
     started_at: float
     deadline_at: float
     clock: Callable[[], float] = field(default=monotonic, compare=False, repr=False)
@@ -20,6 +27,7 @@ class DeadlineBudget:
         *,
         clock: Callable[[], float] = monotonic,
     ) -> "DeadlineBudget":
+        """Tạo deadline tại ``clock() + timeout_seconds``."""
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be > 0")
         started_at = clock()
@@ -32,6 +40,7 @@ class DeadlineBudget:
         return max(0.0, self.deadline_at - self.clock())
 
     def cap_timeout(self, configured_timeout: float) -> float:
+        """Giới hạn timeout của stage theo phần ngân sách còn lại."""
         if configured_timeout <= 0:
             raise ValueError("configured_timeout must be > 0")
         remaining = self.remaining_seconds()

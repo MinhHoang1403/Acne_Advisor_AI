@@ -1,7 +1,9 @@
-"""
-src/agent/llm/ollama_client.py
-==============================
-Client for local Ollama instance.
+"""HTTP client cho Ollama local với payload và retry do truncation có giới hạn.
+
+Ollama thực thi model inference. Module chỉ đóng gói messages/options, đặt timeout
+và thử lại tối đa một lần khi provider báo output bị cắt. Truncation retry này
+khác provider retry trong resilience layer: nó dùng instruction rút gọn để lấy
+một câu hoàn chỉnh, không retry lỗi network/status.
 """
 
 import logging
@@ -54,7 +56,7 @@ def build_ollama_chat_payload(
     messages: list[dict[str, str]],
     temperature: float = 0.2,
 ) -> dict[str, Any]:
-    """Build the bounded Ollama chat payload without logging prompt content."""
+    """Tạo payload Ollama hữu hạn mà không log nội dung prompt."""
 
     payload: dict[str, Any] = {
         "model": model,
@@ -73,7 +75,7 @@ def build_ollama_chat_payload(
     return payload
 
 async def list_ollama_models(timeout_seconds: float | None = None) -> list[str]:
-    """Fetch the list of available models from local Ollama."""
+    """Lấy tên model local; lỗi kết nối trả list rỗng để fallback bỏ qua Ollama."""
     try:
         timeout = timeout_seconds if timeout_seconds and timeout_seconds > 0 else 5.0
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -93,7 +95,7 @@ async def generate_ollama_response(
     temperature: float = 0.2,
     request_timeout: float | None = None,
 ) -> str:
-    """Generate response from local Ollama model."""
+    """Yêu cầu Ollama sinh text và thử rút gọn một lần nếu output bị cắt."""
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -101,8 +103,7 @@ async def generate_ollama_response(
 
     try:
         timeout = request_timeout or float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))
-        # A single compact retry is enough to recover from occasional verbose
-        # generations without turning truncation into an unbounded request loop.
+        # Chặn ở một compact retry để output dài không tạo vòng request vô hạn.
         retry_attempts = max(0, min(_env_int("OLLAMA_TRUNCATION_RETRY_ATTEMPTS", 1), 1))
         attempt_messages = messages
         async with httpx.AsyncClient(timeout=timeout) as client:

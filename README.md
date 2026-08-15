@@ -426,6 +426,7 @@ review.
 - [Agent Workflow](docs/AGENT_WORKFLOW.md)
 - [Data Pipeline](docs/DATA_PIPELINE.md)
 - [Methods and Formulas](docs/METHODS_AND_FORMULAS.md)
+- [Vietnamese Source Code Guide](docs/CODE_GUIDE_VI.md)
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
 - [References](docs/REFERENCES.md)

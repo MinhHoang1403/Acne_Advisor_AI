@@ -1,4 +1,13 @@
-"""Final minimal LangGraph orchestrator for Acne Advisor AI."""
+"""Ghép các node thành workflow LangGraph có retrieval loop hữu hạn.
+
+Luồng chính là ``prepare -> guard -> decide``. Action ``retrieve`` và ``retry``
+đều chạy node ``retrieve`` rồi ``assess`` và quay lại ``decide``; action
+``generate`` hoặc ``abstain`` đi tới ``finalize``. Model chọn action trong
+``action_decision.py``, còn file này sở hữu topology và thực thi transition.
+
+Workflow không trực tiếp search Qdrant hoặc gọi LLM sinh câu trả lời; các side
+effect đó thuộc retrieval service và generation node tương ứng.
+"""
 
 from __future__ import annotations
 
@@ -28,13 +37,13 @@ logger = logging.getLogger(__name__)
 
 
 def route_agent_action(state: ClinicalState) -> AgentAction:
-    """Return the action selected by the explicit decision node."""
+    """Trả action đã được decision node chọn và Python validation."""
 
     return state.get("next_action", "abstain")
 
 
 def build_clinical_graph():
-    """Build the eight-node bounded agent workflow."""
+    """Tạo workflow tám node; ``retry`` tái sử dụng đúng node ``retrieve``."""
 
     builder = StateGraph(ClinicalState)
     builder.add_node("prepare", prepare_node)
@@ -81,7 +90,12 @@ async def run_clinical_agent(
     allow_model_fallback: bool = False,
     bypass_cache: bool = False,
 ) -> dict[str, Any]:
-    """Run one bounded LangGraph request and return the stable API contract."""
+    """Chạy một request trong deadline chung và trả contract ổn định cho API.
+
+    State khởi tạo ở đây là dữ liệu trao đổi giữa các node. ``DeadlineBudget``
+    dùng cùng một mốc thời gian cho toàn request, nên timeout con không làm mới
+    tổng ngân sách. Hàm chỉ chọn các field public sau khi graph hoàn tất.
+    """
 
     manifest = build_pipeline_version_manifest()
     fingerprint = compute_pipeline_fingerprint(manifest)

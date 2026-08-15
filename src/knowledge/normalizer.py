@@ -1,4 +1,10 @@
-"""Rule-based drug and acne entity normalizer."""
+"""Chuẩn hóa alias taxonomy để tạo knowledge assets deterministic.
+
+Normalizer đọc YAML, tạo EntityCards và mở rộng mentions phục vụ domain metadata
+trong knowledge preparation. Nó không nằm trong normal chat answer formatter hay
+Qdrant retrieval path. Vì vậy match taxonomy là structural normalization, không
+phải bằng chứng rằng một claim y khoa đúng.
+"""
 
 from __future__ import annotations
 
@@ -12,8 +18,8 @@ import yaml
 from src.knowledge.schemas import EntityCard, EntityType, canonical_text_key
 
 
-# This YAML is the only active source-backed taxonomy for runtime normalization,
-# EntityCards, and the deterministic structural graph.
+# YAML này là taxonomy source-backed duy nhất cho EntityCards, domain metadata và
+# deterministic structural graph; normal answer runtime không dùng nó làm evidence.
 DEFAULT_TAXONOMY_PATH = Path(__file__).resolve().parents[2] / "data" / "taxonomy" / "drug_aliases.yaml"
 ACTIVE_TAXONOMY_CONTRACT = "data/taxonomy/drug_aliases.yaml"
 
@@ -72,7 +78,7 @@ def _dedupe(values: list[str]) -> list[str]:
 
 
 class DrugEntityNormalizer:
-    """Load drug taxonomy and map mentions/queries to canonical entity cards."""
+    """Load taxonomy và map mention/query sang canonical EntityCards."""
 
     def __init__(self, taxonomy_path: str | Path | None = None) -> None:
         self.taxonomy_path = Path(taxonomy_path) if taxonomy_path else DEFAULT_TAXONOMY_PATH

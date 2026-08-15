@@ -1,4 +1,8 @@
-"""Read-only checks for reproducible local and CI environments."""
+"""Kiểm tra read-only về lock file, image pinning, env template và imports.
+
+Script so sánh contract cấu hình chứ không cài package hoặc sửa môi trường. Các
+pattern local path/secret ngăn artifact phụ thuộc máy cá nhân hay lộ credential.
+"""
 
 from __future__ import annotations
 

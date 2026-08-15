@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
-"""
-scripts/init_chat_schema.py
-============================
-Creates the chat_sessions and chat_messages tables in PostgreSQL.
+"""Tạo chat tables/indexes trong PostgreSQL theo cách idempotent.
 
-Safety:
-- Uses CREATE TABLE IF NOT EXISTS — will NOT drop or overwrite existing tables.
-- Does NOT delete any existing data.
-- Safe to run multiple times (idempotent).
+Mọi statement dùng ``IF NOT EXISTS``; script không drop table hay xóa row. Đây là
+schema initializer có side effect, không phải readiness check read-only.
 """
 
 from __future__ import annotations

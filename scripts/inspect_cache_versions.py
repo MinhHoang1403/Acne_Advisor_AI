@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Inspect the runtime answer-cache version and pipeline fingerprint."""
+"""Đọc runtime cache version/fingerprint và thống kê entry thiếu identity.
+
+Redis SCAN bị giới hạn bởi ``max_scan`` và không xóa/sửa key. Entry cũ chỉ được
+đếm để operator quyết định xử lý, không bị invalidation tự động tại đây.
+"""
 
 from __future__ import annotations
 

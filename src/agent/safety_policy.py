@@ -1,4 +1,14 @@
-"""Narrow, source-mapped deterministic safety overrides."""
+"""Các safety override deterministic, hẹp và gắn với nguồn cụ thể.
+
+Module chuẩn hóa câu hỏi để so khớp một inventory hữu hạn các tình huống cần
+phản hồi cố định. Nó không phải bộ phân loại y khoa tổng quát, không chẩn đoán và
+không thay thế retrieval/LLM cho câu hỏi thông thường. Rule đầu tiên khớp sẽ được
+áp dụng; response và source IDs là contract runtime nên không dịch hoặc sửa khi
+chỉ bảo trì comment.
+
+Muốn thêm safety case phải bắt đầu từ ``SAFETY_RULES`` và test cả khẳng định lẫn
+phủ định để tránh false positive từ phrase matching.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +22,7 @@ SafetySeverity = Literal["policy", "urgent", "emergency"]
 
 @dataclass(frozen=True)
 class SafetyRule:
+    """Một rule bất biến gồm trigger, action, response và provenance cố định."""
     rule_id: str
     severity: SafetySeverity
     trigger: Callable[[str], bool]
@@ -23,6 +34,7 @@ class SafetyRule:
 
 @dataclass(frozen=True)
 class SafetyDecision:
+    """Kết quả public của rule đầu tiên khớp câu hỏi đã chuẩn hóa."""
     rule_id: str
     severity: SafetySeverity
     action: str
@@ -32,7 +44,7 @@ class SafetyDecision:
 
 
 def evaluate_safety(query: str) -> SafetyDecision | None:
-    """Return one narrow override; ordinary semantics remain with the agent."""
+    """Trả một override hẹp; semantics thông thường vẫn thuộc Agent."""
 
     text = _fold(query)
     for rule in SAFETY_RULES:
@@ -160,6 +172,8 @@ def _has(text: str, *phrases: str) -> bool:
 
 
 def _has_unnegated(text: str, *phrases: str) -> bool:
+    # Chỉ nhìn tối đa hai token trước phrase. Đây là guard chống phủ định trực
+    # tiếp, không phải parser ngữ nghĩa hay mô hình nhận diện negation tổng quát.
     for phrase in phrases:
         for match in re.finditer(rf"(?:^|\s){re.escape(phrase)}(?:\s|$)", text):
             prefix_tokens = text[: match.start()].split()[-2:]
@@ -169,6 +183,8 @@ def _has_unnegated(text: str, *phrases: str) -> bool:
 
 
 def _fold(value: str) -> str:
+    # Accent/case folding làm phrase matching ổn định hơn nhưng cố ý không giữ
+    # ngữ nghĩa đầy đủ của câu; vì vậy inventory rule phải luôn hẹp.
     normalized = unicodedata.normalize(
         "NFD", str(value or "").casefold().replace("đ", "d")
     )

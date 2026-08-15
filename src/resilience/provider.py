@@ -1,4 +1,10 @@
-"""Provider call wrapper with bounded deadline-aware retry."""
+"""Bọc lời gọi provider bằng timeout, retry và deadline dùng chung.
+
+``operation`` nhận effective timeout của từng attempt. Wrapper không biết nội
+dung prompt hay API cụ thể; nó chỉ thực thi policy, giữ cancellation semantics và
+trả metadata. Tổng số attempt là ``1 + max_retries`` nhưng vẫn bị chặn bởi phần
+deadline còn lại, kể cả trước backoff sleep.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +30,7 @@ async def call_provider_with_resilience(
     retry_policy: RetryPolicy,
     sleep=asyncio.sleep,
 ) -> tuple[T, dict[str, object]]:
-    """Call a provider with one shared budget-aware retry contract."""
+    """Gọi provider theo retry contract có chung deadline cho toàn request."""
 
     attempts: list[dict[str, object]] = []
     last_error: BaseException | None = None
@@ -34,6 +40,8 @@ async def call_provider_with_resilience(
         if budget.expired():
             raise ProviderTimeoutError(f"No remaining budget before calling provider {provider_name}.")
 
+        # effective = min(stage timeout, phần deadline còn lại), nên retry không
+        # thể kéo dài request vượt tổng ngân sách đã cấp.
         effective_timeout = budget.cap_timeout(timeout_seconds)
         if effective_timeout <= 0:
             raise ProviderTimeoutError(f"No remaining timeout for provider {provider_name}.")

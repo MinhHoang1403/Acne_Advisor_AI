@@ -2,6 +2,8 @@ import { API_BASE_URL, buildApiUrl } from '../config/api.js';
 
 export { API_BASE_URL };
 
+// Module này sở hữu HTTP timeout, JSON contract và error mapping. Nó không giữ
+// React/session state; App quyết định cách hiển thị và phục hồi sau lỗi.
 const STATUS_MESSAGES = {
   429: 'Hệ thống đang nhận quá nhiều yêu cầu. Vui lòng thử lại sau.',
   500: 'Backend không thể xử lý yêu cầu. Vui lòng thử lại.',
@@ -13,6 +15,7 @@ const API_TIMEOUT_MS = 10000;
 const CHAT_TIMEOUT_MS = 225000;
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+  // Signal nội bộ áp deadline; parent signal vẫn có thể hủy khi component unmount.
   const controller = new AbortController();
   const parentSignal = options.signal;
   const timeoutId = setTimeout(() => controller.abort('timeout'), timeoutMs);
@@ -70,7 +73,7 @@ function normalizeListResponse(data) {
 }
 
 /**
- * Send a chat message to the backend.
+ * Gửi một chat request có timeout dài hơn health/session operations.
  * @param {Object} params
  * @param {string} params.message - The user's message text.
  * @param {string|null} params.sessionId - Current session ID.
@@ -125,7 +128,7 @@ export async function sendChatMessage({
 }
 
 /**
- * Check if the backend is reachable and classify dependency state.
+ * Kiểm tra backend reachable và trả raw health state cho connectivity classifier.
  * @returns {Promise<{state: string, reachable: boolean, health: Object|null, reason: string|null}>}
  */
 export async function checkBackendHealth({ timeoutMs = 4000, signal } = {}) {
@@ -181,7 +184,7 @@ export async function checkBackendHealth({ timeoutMs = 4000, signal } = {}) {
 }
 
 /**
- * Fetch available models from backend.
+ * Lấy danh sách model được backend công bố.
  * @returns {Promise<Object>}
  */
 export async function fetchModels() {
@@ -191,7 +194,7 @@ export async function fetchModels() {
 }
 
 /**
- * Fetch chat sessions from the backend.
+ * Lấy chat session summaries từ backend.
  * @param {string|null} userId
  * @param {boolean} includeHidden
  * @returns {Promise<Array>}
@@ -208,7 +211,7 @@ export async function fetchSessions(userId = null, includeHidden = false) {
 }
 
 /**
- * Fetch messages for a specific session.
+ * Lấy messages của một session cụ thể.
  * @param {string} sessionId
  * @returns {Promise<Array>}
  */
@@ -220,7 +223,7 @@ export async function fetchMessages(sessionId) {
 }
 
 /**
- * Rename a chat session on the backend.
+ * Đổi tên session ở backend.
  * @param {string} sessionId
  * @param {string} title
  * @returns {Promise<Object>}
@@ -236,7 +239,7 @@ export async function renameSession(sessionId, title) {
 }
 
 /**
- * Hide a chat session on the backend (sets hidden=true, does NOT delete).
+ * Ẩn session bằng flag ở backend, không xóa dữ liệu.
  * @param {string} sessionId
  * @returns {Promise<Object>}
  */
@@ -249,7 +252,7 @@ export async function hideSession(sessionId) {
 }
 
 /**
- * Delete all persisted chat history and app-owned answer cache.
+ * Xóa chat history persisted và answer cache do ứng dụng sở hữu.
  * @returns {Promise<Object>} deletion counts
  */
 export async function deleteAllChatSessions() {

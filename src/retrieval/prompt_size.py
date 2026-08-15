@@ -1,4 +1,9 @@
-"""Character-count observations for rendered generation prompts."""
+"""Đếm chính xác số Unicode characters trong prompt đã render.
+
+Observation tách ``evidence`` và ``non_evidence`` bằng phép cộng độ dài component:
+``total = sum(len(component))`` và ``non_evidence = total - evidence``. Đây là
+resource telemetry, không ước lượng token, cost hay semantic quality.
+"""
 
 from __future__ import annotations
 
@@ -26,6 +31,7 @@ class PromptSizeObservation(_FrozenModel):
 def observe_prompt_components(
     components: Iterable[tuple[str, str]],
 ) -> PromptSizeObservation:
+    """Tổng hợp character count mà không cắt hoặc thay đổi prompt."""
     observations = tuple(
         PromptComponentSize(name=name, characters=len(text)) for name, text in components
     )

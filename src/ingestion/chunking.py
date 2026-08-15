@@ -1,4 +1,14 @@
-"""Deterministic structure-aware chunking for the indexed corpus."""
+"""Chia normalized Markdown thành chunk theo cấu trúc tài liệu.
+
+Thứ tự ưu tiên boundary là heading, paragraph, sentence rồi word boundary khi
+một đơn vị vẫn quá dài. ``section_path`` được giữ để provenance biết chunk thuộc
+phần nào. Giới hạn 2400 ký tự và overlap 0 là engineering contract của build,
+không phải kích thước được tuyên bố tối ưu về mặt khoa học.
+
+Module không embed, không lọc theo semantic quality và không gọi provider.
+Muốn đổi boundary hoặc resource limit bắt đầu tại ``structural_chunks()`` và các
+hằng số ``CHUNK_*``; thay đổi này làm đổi build contract.
+"""
 
 from __future__ import annotations
 
@@ -16,12 +26,14 @@ _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+(?=[^\s])")
 
 @dataclass(frozen=True)
 class StructuralChunk:
+    """Text chunk cùng đường dẫn heading dùng cho provenance."""
+
     text: str
     section_path: tuple[str, ...]
 
 
 def structural_chunks(text: str, *, max_chars: int = CHUNK_MAX_CHARS) -> list[StructuralChunk]:
-    """Split normalized Markdown at headings, paragraphs and sentence boundaries."""
+    """Chia Markdown theo heading, paragraph và sentence mà không tạo overlap."""
 
     if max_chars <= 0:
         raise ValueError("max_chars must be positive")
@@ -91,7 +103,7 @@ def _split_with_boundaries(text: str, *, max_chars: int) -> list[str]:
 
 
 def _hard_split(text: str, *, max_chars: int) -> list[str]:
-    """Last-resort word-boundary split for one overlong sentence/table row."""
+    """Fallback theo word boundary cho sentence hoặc table row quá dài."""
 
     parts: list[str] = []
     remaining = text.strip()
@@ -107,7 +119,7 @@ def _hard_split(text: str, *, max_chars: int) -> list[str]:
 
 
 def naive_split(text: str, size: int, overlap: int) -> list[str]:
-    """Deprecated test helper; the canonical build uses :func:`structural_chunks`."""
+    """Helper tương thích cho test; build thật dùng ``structural_chunks``."""
 
     parts: list[str] = []
     start = 0

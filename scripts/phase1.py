@@ -1,4 +1,10 @@
-"""Canonical operator CLI for knowledge compilation and validation."""
+"""Operator CLI cho build, validate, activate và xem knowledge status.
+
+``status`` và ``validate --offline`` không ghi datastore. ``build`` tạo candidate
+collections/cache/manifest; ``--activate`` còn chuyển Qdrant aliases và thay entity
+graph nên bắt buộc có rollback artifacts. Chi tiết side effect thuộc
+``src.ingestion.pipeline``.
+"""
 
 from __future__ import annotations
 

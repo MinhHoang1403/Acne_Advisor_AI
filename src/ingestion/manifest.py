@@ -1,4 +1,9 @@
-"""Content-derived knowledge-build manifest."""
+"""Tạo và lưu manifest mô tả một knowledge build đã được validation.
+
+Manifest gom source hashes, contract IDs, collection names, counts và structural
+hash để operator kiểm tra compatibility. File được ghi qua temporary path rồi
+replace; module không tự build, activate hoặc mutate datastore.
+"""
 
 from __future__ import annotations
 
@@ -44,6 +49,8 @@ def build_manifest(
     validation: dict[str, Any],
     phase1_frozen: bool = False,
 ) -> dict[str, Any]:
+    """Tổng hợp identity, contracts, counts và validation thành manifest."""
+
     return {
         "schema": BUILD_MANIFEST_SCHEMA,
         "status": "completed" if validation.get("passed") else "failed",
@@ -110,6 +117,8 @@ def build_manifest(
 
 
 def save_build_manifest(path: Path, manifest: dict[str, Any]) -> None:
+    """Ghi manifest atomically qua file tạm trong cùng thư mục."""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(

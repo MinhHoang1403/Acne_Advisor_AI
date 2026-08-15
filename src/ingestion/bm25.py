@@ -1,4 +1,18 @@
-"""Qdrant-native true BM25 contract shared by indexing and querying."""
+"""Khai báo contract BM25 dùng chung khi indexing và truy vấn Qdrant.
+
+Project chỉ chuẩn bị cấu hình preprocessing, tham số BM25 và ``Document`` mà
+Qdrant hiểu được. Qdrant mới là component tạo sparse representation, lưu vector
+``bm25``, áp dụng collection IDF và thực thi BM25 search.
+
+``reference_bm25_score()`` là phép tính Python minh bạch cho unit test đối
+chiếu công thức. Hàm đó không nằm trong request path và không phải BM25 search
+engine của ứng dụng.
+
+Điểm thường cần chỉnh sửa:
+- ``BM25_K1`` và ``BM25_B``: TF saturation và document-length normalization.
+- ``bm25_config()``: contract preprocessing gửi cho Qdrant.
+- Không chỉnh ``reference_bm25_score()`` để tune runtime retrieval.
+"""
 
 from __future__ import annotations
 
@@ -11,15 +25,19 @@ from qdrant_client import models
 BM25_CONTRACT_ID = "qdrant_native_bm25_word_language_none"
 BM25_MODEL = "qdrant/bm25"
 BM25_VECTOR_NAME = "bm25"
+# ``k1`` điều khiển mức bão hòa của term frequency; ``b`` điều khiển mức
+# normalization theo độ dài document. Đây là engineering parameters của index,
+# không phải ngưỡng chất lượng y khoa hay các giá trị được tuyên bố là tối ưu.
 BM25_K1 = 1.2
 BM25_B = 0.75
+# Giá trị avg document length được gửi cho Qdrant trong cùng contract.
 BM25_AVG_LEN = 256.0
 BM25_TOKENIZER = models.TokenizerType.WORD
 BM25_LANGUAGE = "none"
 
 
 def bm25_config() -> models.Bm25Config:
-    """Return the one immutable document/query preprocessing configuration."""
+    """Tạo một cấu hình document/query thống nhất để Qdrant thực thi BM25."""
 
     return models.Bm25Config(
         k=BM25_K1,
@@ -33,13 +51,13 @@ def bm25_config() -> models.Bm25Config:
 
 
 def bm25_document(text: str) -> models.Document:
-    """Create a provider-side BM25 inference document for indexing or search."""
+    """Bọc text và BM25 contract thành ``Document`` cho Qdrant inference."""
 
     return models.Document(text=text, model=BM25_MODEL, options=bm25_config())
 
 
 def bm25_sparse_vector_config() -> models.SparseVectorParams:
-    """Require collection-aware IDF at query time."""
+    """Yêu cầu Qdrant dùng IDF được tính từ collection khi truy vấn."""
 
     return models.SparseVectorParams(modifier=models.Modifier.IDF)
 
@@ -54,7 +72,20 @@ def reference_bm25_score(
     k1: float = BM25_K1,
     b: float = BM25_B,
 ) -> float:
-    """Transparent BM25 reference formula used only for hand-calculated tests."""
+    """Tính BM25 tham chiếu để unit test đối chiếu, không chạy trong runtime.
+
+    Với term ``t`` và document ``D``:
+
+    ``IDF(t) = ln(1 + (N - df(t) + 0.5) / (df(t) + 0.5))``
+
+    contribution của term là ``IDF(t) * tf(t,D) * (k1 + 1)`` chia cho
+    ``tf(t,D) + k1 * (1 - b + b * |D| / avgdl)``.
+
+    Mapping trong code: ``document_count`` là ``N``; ``document_frequencies``
+    cung cấp ``df(t)``; ``frequencies[term]`` là ``tf(t,D)``; và
+    ``length_ratio`` là ``|D| / avgdl``. Qdrant thực hiện phép tính tương ứng
+    trong production search; hàm này chỉ cung cấp kết quả kiểm tra độc lập.
+    """
 
     if document_count <= 0 or average_document_length <= 0:
         raise ValueError("Corpus size and average document length must be positive")

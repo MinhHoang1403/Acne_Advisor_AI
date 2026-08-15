@@ -1,13 +1,9 @@
-"""
-domain_metadata.py
-==================
-Rule-based dermatology metadata extractor.
+"""Trích xuất dermatology metadata deterministic bằng keyword/regex.
 
-Provides :func:`extract_dermatology_metadata` which scans a chunk's text
-(and optional header path) for domain-specific keywords and returns a
-structured metadata dict suitable for enriching ``SemanticChunk.metadata``.
-
-No LLM calls – pure keyword / regex matching.
+Module enrich ``SemanticChunk.metadata`` trong knowledge preparation và có thể
+dùng taxonomy normalizer để map alias. Nó không gọi LLM, không tham gia runtime
+reranking và confidence ở đây chỉ đo số nhóm metadata được điền, không phải xác
+suất đúng hay độ tin cậy y khoa.
 """
 
 from __future__ import annotations
@@ -117,14 +113,11 @@ def _detect_evidence_type(text_lower: str) -> str | None:
 
 
 def _compute_confidence(meta: DermatologyChunkMetadata) -> float:
-    """
-    Compute a confidence score based on how many metadata fields were populated.
+    """Tính coverage indicator từ số nhóm metadata có giá trị.
 
-    Strategy:
-    - 0.0 if nothing matched at all.
-    - 0.3 base if at least one field matched.
-    - +0.1 for each additional populated field (up to 7 fields).
-    - Capped at 1.0.
+    Nếu ``n=0`` thì kết quả bằng 0; ngược lại
+    ``confidence = min(0.3 + 0.1*n, 1.0)`` với tối đa bảy field được đếm. Tên
+    field được giữ vì compatibility; giá trị không phải calibrated probability.
     """
     populated_fields = 0
     for field_name in (
@@ -143,7 +136,7 @@ def _compute_confidence(meta: DermatologyChunkMetadata) -> float:
     if populated_fields == 0:
         return 0.0
 
-    # Base 0.3 + 0.1 per populated field
+    # Engineering coverage heuristic, không tham gia retrieval score.
     confidence = 0.3 + (populated_fields * 0.1)
     return min(confidence, 1.0)
 

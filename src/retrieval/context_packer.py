@@ -1,4 +1,13 @@
-"""Bounded, provenance-preserving packing for fused source evidence."""
+"""Đóng gói evidence đã qua RRF trong resource budget hữu hạn.
+
+Input đã được ``src/retrieval/service.py`` sắp theo fused rank. Packer giữ thứ
+tự đó, loại candidate thiếu identity/text hoặc trùng identity, giới hạn số item
+và tổng ký tự, đồng thời giữ provenance cần cho citation và source allowlist.
+
+Module này không rerank, không chọn treatment và không xác minh medical truth.
+Muốn đổi item/character budget hãy bắt đầu từ cấu hình trong retrieval service;
+muốn đổi quy tắc đóng gói hoặc truncation hãy đọc ``pack_context()``.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +22,7 @@ def pack_context(
     max_items: int = 8,
     max_chars: int = 6000,
 ) -> PackedContext:
-    """Pack candidates in fused-rank order without changing relevance.
+    """Đóng gói candidate theo fused rank mà không đổi thứ tự relevance.
 
     ``max_items`` and ``max_chars`` are resource limits, not relevance
     heuristics. Every selected item retains its point, chunk, document, and
@@ -28,6 +37,8 @@ def pack_context(
     seen_ids: set[str] = set()
     rendered_chars = 0
 
+    # Duyệt đúng thứ tự RRF. Candidate đầu tiên có thể được cắt để vẫn cung cấp
+    # ít nhất một evidence block; candidate sau không vừa budget sẽ bị bỏ.
     for candidate in candidates:
         candidate_id = candidate.candidate_id.strip()
         text = candidate.text.strip()
@@ -100,7 +111,7 @@ def pack_context(
 
 
 def packed_context_to_response_contexts(packed_context: PackedContext) -> list[dict[str, Any]]:
-    """Expose packed evidence in the existing API/prompt context shape."""
+    """Chuyển packed evidence sang shape dùng chung bởi API và prompt builder."""
 
     contexts: list[dict[str, Any]] = []
     for item in packed_context.items:
@@ -157,7 +168,7 @@ def _source_id(payload: dict[str, Any]) -> str:
 
 
 def _provenance_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Keep provenance/metadata without duplicate unbounded document bodies."""
+    """Giữ provenance/metadata nhưng không nhân đôi document body không giới hạn."""
 
     body_keys = {"text", "content", "page_content"}
     return {key: value for key, value in payload.items() if key not in body_keys}

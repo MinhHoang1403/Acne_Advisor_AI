@@ -1,4 +1,10 @@
-"""Exact normalized Redis answer cache with versioned provenance identity."""
+"""Exact Redis answer cache được phân vùng theo version và runtime identity.
+
+Question chỉ được chuẩn hóa case, dấu câu và whitespace rồi so khớp chính xác;
+module không tính embedding/similarity nên không phải semantic cache. Redis là
+component lưu TTL payload, còn file này sở hữu normalization, key identity và
+JSON serialization.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +30,7 @@ CACHE_SCHEMA_VERSION = os.getenv("CACHE_SCHEMA_VERSION", "v3")
 
 
 def normalize_question(text: str) -> str:
-    """Normalize case, punctuation, and whitespace for exact matching."""
+    """Chuẩn hóa case, dấu câu và whitespace để exact matching ổn định."""
 
     normalized = re.sub(r"[?!.,:;]+", " ", str(text or "").casefold())
     return " ".join(normalized.split())
@@ -37,7 +43,12 @@ def make_cache_key(
     model: str,
     pipeline_fingerprint: str | None = None,
 ) -> str:
-    """Build a key partitioned by exact question and runtime identity."""
+    """Tạo key phân vùng theo exact question và toàn bộ runtime identity.
+
+    ``digest = SHA256(schema | answer version | fingerprint | question |
+    provider | model)``. Hash chỉ tạo key độ dài cố định; nó không đo semantic
+    similarity và không che giấu secret vì payload không chứa credential.
+    """
 
     fingerprint = pipeline_fingerprint or compute_pipeline_fingerprint(
         build_pipeline_version_manifest()
