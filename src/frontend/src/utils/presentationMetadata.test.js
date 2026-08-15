@@ -1,7 +1,64 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { sourceDisplayLabels } from './presentationMetadata.js';
+import { answerModelDisplayName, sourceDisplayLabels } from './presentationMetadata.js';
+
+test('answerModelDisplayName uses the actual answering model without routing details', () => {
+  assert.equal(
+    answerModelDisplayName({ metadata: { provider: 'gemini', model: 'gemini-3.5-flash' } }),
+    'Gemini 3.5 Flash',
+  );
+  assert.equal(
+    answerModelDisplayName({ metadata: { provider: 'ollama', model: 'qwen3:8b' } }),
+    'Qwen3 8B Local',
+  );
+  assert.equal(
+    answerModelDisplayName({
+      metadata: {
+        provider: 'gemini',
+        model: 'gemini-3.5-flash',
+        cache: { hit: true },
+        cached_from_provider: 'ollama',
+        cached_from_model: 'qwen3:8b',
+      },
+    }),
+    'Qwen3 8B Local',
+  );
+});
+
+test('answerModelDisplayName omits deterministic safety and missing model identities', () => {
+  assert.equal(
+    answerModelDisplayName({
+      metadata: {
+        provider: 'system',
+        model: null,
+        requested_provider: 'gemini',
+        requested_model: 'gemini-3.5-flash',
+        response_origin: 'deterministic_safety',
+      },
+    }),
+    '',
+  );
+  assert.equal(answerModelDisplayName({ metadata: {} }), '');
+  assert.equal(answerModelDisplayName(null), '');
+});
+
+test('answer details support sources with model, either one alone, or neither', () => {
+  const modelData = { metadata: { provider: 'gemini', model: 'gemini-3.5-flash' } };
+  const sourceData = {
+    source_metadata: [{ source_id: 'source-1', display_name: 'Tài liệu tiếng Việt về mụn trứng cá' }],
+  };
+  const combinedData = { ...modelData, ...sourceData };
+
+  assert.deepEqual(sourceDisplayLabels(combinedData), ['Tài liệu tiếng Việt về mụn trứng cá']);
+  assert.equal(answerModelDisplayName(combinedData), 'Gemini 3.5 Flash');
+  assert.deepEqual(sourceDisplayLabels(modelData), []);
+  assert.equal(answerModelDisplayName(modelData), 'Gemini 3.5 Flash');
+  assert.deepEqual(sourceDisplayLabels(sourceData), ['Tài liệu tiếng Việt về mụn trứng cá']);
+  assert.equal(answerModelDisplayName(sourceData), '');
+  assert.deepEqual(sourceDisplayLabels(null), []);
+  assert.equal(answerModelDisplayName(null), '');
+});
 
 test('sourceDisplayLabels prefers friendly metadata and hides raw technical ids', () => {
   const labels = sourceDisplayLabels({

@@ -77,6 +77,75 @@ def _anaphylaxis(text: str) -> bool:
     )
 
 
+def _breathing_after_medication(text: str) -> bool:
+    personal = bool(re.search(r"(?:^|\s)(?:toi|minh|em|tui)(?:\s|$)", text))
+    medication_timing = _has(
+        text,
+        "sau khi uong thuoc",
+        "uong thuoc xong",
+        "sau khi dung thuoc",
+        "dung thuoc xong",
+    )
+    current_symptom = _has(
+        text,
+        "dang kho tho",
+        "dang bi kho tho",
+        "thay kho tho",
+        "bi kho tho",
+        "dang hut hoi",
+        "dang bi hut hoi",
+        "thay hut hoi",
+        "bi hut hoi",
+    )
+    resolved_or_reported = _has(
+        text,
+        "tung doc",
+        "khong con kho tho",
+        "da het kho tho",
+        "gio het kho tho",
+        "khong lien quan thuoc",
+    )
+    return (
+        personal
+        and medication_timing
+        and current_symptom
+        and not resolved_or_reported
+        and _has_unnegated(text, "kho tho", "hut hoi")
+    )
+
+
+def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
+    manipulation = _has(text, "nan mun", "bop mun", "choc mun")
+    personal_or_current = bool(
+        re.search(r"(?:^|\s)(?:toi|minh|em|tui)(?:\s|$)", text)
+    ) or _has(text, "cho nan mun dang", "vua nan mun", "mau van chay")
+    significant = _has(
+        text,
+        "chay mau nhieu",
+        "mau chay nhieu",
+        "van chay nhieu",
+        "khong cam duoc",
+        "khong cam mau duoc",
+        "chay mai",
+        "chay khong dung",
+        "chay lien tuc",
+    )
+    resolved = _has(
+        text,
+        "da cam",
+        "da ngung chay",
+        "het chay mau",
+        "khong con chay mau",
+    )
+    return (
+        manipulation
+        and personal_or_current
+        and significant
+        and not resolved
+        and _has_unnegated(text, "chay mau", "mau chay", "mau van chay")
+    )
+
+
 def _chest_breathing_emergency(text: str) -> bool:
     return _has_unnegated(text, "dau nguc", "tuc nguc", "nguc bi ep chat") and _has_unnegated(
         text, "kho tho", "hut hoi", "tho khong ra hoi"
@@ -201,6 +270,27 @@ SAFETY_RULES: tuple[SafetyRule, ...] = (
         "**Hành động ngay**\nKhó thở kèm sưng môi, miệng, lưỡi hoặc họng, hoặc nổi mề đay lan nhanh, có thể là phản ứng phản vệ. Hãy gọi cấp cứu địa phương ngay và không tự lái xe. Nếu có bút tiêm adrenaline đã được kê cho bạn, hãy dùng theo hướng dẫn đã được cấp.",
         ("NHS_ANAPHYLAXIS",),
         ("https://www.nhs.uk/conditions/anaphylaxis/",),
+    ),
+    SafetyRule(
+        "breathing_difficulty_after_medication",
+        "emergency",
+        _breathing_after_medication,
+        "seek_emergency_help_now",
+        "**Hành động ngay**\nKhó thở đang xảy ra sau khi dùng thuốc có thể là phản ứng nghiêm trọng. Hãy gọi cấp cứu địa phương ngay và không tự lái xe. Mang theo thuốc hoặc bao bì thuốc để nhân viên y tế kiểm tra; không chờ tự xử lý tại nhà khi bạn vẫn khó thở.",
+        ("NHS_ANAPHYLAXIS_MEDICINE_TRIGGER", "NHS_SHORTNESS_OF_BREATH"),
+        (
+            "https://www.nhs.uk/conditions/anaphylaxis/",
+            "https://www.nhs.uk/symptoms/shortness-of-breath/",
+        ),
+    ),
+    SafetyRule(
+        "significant_bleeding_after_acne_manipulation",
+        "emergency",
+        _significant_bleeding_after_acne_manipulation,
+        "control_bleeding_and_seek_emergency_help",
+        "**Hành động ngay**\nNgừng nặn hoặc chạm vào vùng da. Dùng gạc hay khăn sạch ép chắc và liên tục lên chỗ chảy máu; không nhấc miếng đang ép chỉ để kiểm tra. Nếu máu thấm qua, đặt thêm một miếng sạch lên trên và tiếp tục ép. Vì bạn mô tả máu chảy nhiều hoặc không cầm, hãy gọi cấp cứu địa phương ngay.",
+        ("NHS_FIRST_AID_HEAVY_BLEEDING",),
+        ("https://www.nhs.uk/tests-and-treatments/first-aid/",),
     ),
     SafetyRule(
         "chest_pain_with_breathlessness",
