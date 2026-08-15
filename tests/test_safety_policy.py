@@ -12,6 +12,8 @@ from src.agent.safety_policy import evaluate_safety, safety_rule_inventory
         ("Sau thuốc tôi khó thở, sưng môi và nổi mề đay", "anaphylaxis_like_emergency"),
         ("Tôi đau ngực và khó thở", "chest_pain_with_breathlessness"),
         ("Tôi muốn tự làm hại bản thân ngay", "self_harm_immediate_risk"),
+        ("Tôi đang nghĩ đến việc tự sát", "self_harm_immediate_risk"),
+        ("I am thinking about suicide", "self_harm_immediate_risk"),
         ("Mụn nang bùng phát rất nhanh, loét, sốt và đau khớp", "acne_fulminans_systemic_features"),
         ("Tôi đang mang thai và dùng isotretinoin", "isotretinoin_pregnancy"),
         ("Đang dùng isotretinoin, đau đầu dữ dội và nhìn mờ", "isotretinoin_severe_headache_visual_symptoms"),
@@ -35,6 +37,11 @@ def test_each_retained_rule_has_positive_trigger_and_source(query: str, rule_id:
         "Mụn nang nhưng không sốt, không đau khớp",
         "Tôi dùng isotretinoin và hơi đau đầu",
         "Isotretinoin có dùng khi mang thai không? Tôi không đang mang thai",
+        "Isotretinoin có liên quan đến suicide không?",
+        "Các nghiên cứu nói gì về self harm?",
+        "Tôi không muốn tự sát.",
+        "Tôi chưa bao giờ muốn tự tử.",
+        "Tôi từng đọc về suicide.",
     ],
 )
 def test_nearby_negative_boundaries_do_not_trigger(query: str) -> None:

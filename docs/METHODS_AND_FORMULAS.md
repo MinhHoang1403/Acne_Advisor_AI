@@ -62,7 +62,10 @@ Python enforces the transition contract and `MAX_RETRIEVAL_ATTEMPTS = 2`.
 Schema-invalid output, a model-selected impossible transition, a repeated
 non-recoverable query, or an exhausted attempt budget becomes abstention. The
 model owns semantic action choice; deterministic code owns finite execution and
-fail-closed behavior.
+fail-closed behavior. This is an engineering policy: `retrieve` means the first
+evidence acquisition, `retry` means the later acquisition, and the retrieval
+tool can execute no more than two times. The model cannot bypass the budget by
+selecting `retrieve` after the first execution.
 
 ## Exact Cache Identity
 

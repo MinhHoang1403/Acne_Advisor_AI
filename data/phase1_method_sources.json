@@ -81,16 +81,16 @@
       "source_id": "nice_ng198_2026_08",
       "title": "Acne vulgaris: management (NG198)",
       "authors_or_organization": "National Institute for Health and Care Excellence",
-      "publication_date": "2021-06-25; updated 2026-08-03",
+      "publication_date": "Official guideline published 2021-06-25; official metadata last updated 2026-04-30; local snapshot represented 2026-08-03",
       "venue_or_publisher": "NICE",
       "doi": null,
       "url": "https://www.nice.org.uk/guidance/ng198",
       "source_type": "clinical_guideline",
-      "role": "current_canonical_corpus",
-      "claim_supported": "Current acne management, antibiotic stewardship, pregnancy and isotretinoin safety guidance.",
-      "project_method": "Canonical medical evidence corpus",
+      "role": "frozen_project_corpus_snapshot",
+      "claim_supported": "Frozen project evidence snapshot covering acne management, antibiotic stewardship, pregnancy and isotretinoin safety guidance.",
+      "project_method": "Frozen medical evidence corpus snapshot",
       "date_verified": "2026-08-14",
-      "limitations": "Local frozen Markdown was acquired from the official PDF URL through a text-rendering transport because direct PDF access returned 403."
+      "limitations": "The local frozen Markdown was acquired through a text-rendering transport and carries a represented date of 2026-08-03. It has not been independently verified as the complete current official version last updated 2026-04-30; current official-version provenance remains unresolved."
     },
     {
       "source_id": "aad_acne_guideline_2024",

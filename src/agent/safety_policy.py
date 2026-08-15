@@ -72,15 +72,40 @@ def _chest_breathing_emergency(text: str) -> bool:
 
 
 def _self_harm(text: str) -> bool:
+    if _has(
+        text,
+        "toi khong muon tu sat",
+        "toi khong muon tu tu",
+        "toi khong muon lam hai ban than",
+        "toi chua bao gio muon tu sat",
+        "toi chua bao gio muon tu tu",
+        "i do not want to kill myself",
+        "i don t want to kill myself",
+        "i do not want to harm myself",
+        "i don t want to harm myself",
+    ):
+        return False
     return _has(
         text,
-        "tu sat",
-        "tu tu",
-        "tu lam hai",
-        "lam hai ban than",
-        "ket lieu doi minh",
-        "self harm",
-        "suicide",
+        "toi muon tu sat",
+        "toi muon tu tu",
+        "toi dang nghi den viec tu sat",
+        "toi dang nghi den viec tu tu",
+        "toi dang nghi den tu sat",
+        "toi dang nghi den tu tu",
+        "toi muon tu lam hai ban than",
+        "toi muon lam hai ban than",
+        "toi sap lam hai ban than",
+        "toi se tu sat",
+        "toi se tu tu",
+        "toi sap tu sat",
+        "toi sap tu tu",
+        "i want to kill myself",
+        "i want to harm myself",
+        "i am going to kill myself",
+        "i m going to kill myself",
+        "i am thinking about suicide",
+        "i m thinking about suicide",
     )
 
 

@@ -28,7 +28,7 @@ quality or external validity.
 |---|---|---|
 | anaphylaxis-like emergency | breathing difficulty with swelling of the lips/mouth/tongue/throat or rapidly spreading hives | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) |
 | chest pain with breathlessness | unnegated chest pain/tightness plus breathlessness | [NHS Chest pain](https://www.nhs.uk/symptoms/chest-pain/) |
-| immediate self-harm safety | explicit self-harm/suicide intent | [WHO Suicide Q&A](https://www.who.int/news-room/questions-and-answers/item/suicide) |
+| immediate self-harm safety | explicit personal/current self-harm or suicide intent; informational topic mentions do not trigger | [WHO Suicide Q&A](https://www.who.int/news-room/questions-and-answers/item/suicide) |
 | suspected acne fulminans | acne plus fever/joint pain and severe nodular, cystic, ulcerative, or rapidly erupting lesions | [NICE NG198 recommendation 1.4.1](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) |
 | isotretinoin and pregnancy | pregnancy context plus isotretinoin/oral retinoid | [NICE NG198 recommendation 1.5.22](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) and [MHRA oral-retinoid pregnancy prevention](https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk) |
 | isotretinoin with severe headache and visual/GI symptoms | isotretinoin plus severe headache and blurred vision or nausea/vomiting | [DailyMed isotretinoin medication guide](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72867c88-070f-4608-bfef-cc5225ebce6d) |
@@ -37,6 +37,10 @@ quality or external validity.
 These rules are action-oriented safety boundaries, not a general medical answer
 engine. A full deterministic replacement is attributed to provider `system`,
 clears retrieved-source display attribution, and is never answer-cache eligible.
+The exact self-harm phrase detector is a narrow engineering policy mapped to a
+clinical safety action source; it is not a clinically validated suicide-risk
+classifier. Ambiguous or informational mentions continue through the grounded
+agent path rather than being classified in Python.
 
 The two NICE-mapped rules use the official recommendation URL as the current
 safety cross-check. The frozen NICE-derived retrieval snapshot has the accepted
