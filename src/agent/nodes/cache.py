@@ -1,4 +1,10 @@
-"""LangGraph nodes for exact normalized answer caching."""
+"""Các LangGraph node đọc/ghi exact answer cache trong Redis.
+
+Cache chỉ hit khi normalized question và toàn bộ runtime identity khớp; đây không
+phải semantic cache và không tìm câu hỏi gần nghĩa. Conversation có history,
+safety override, fallback, provider fallback hoặc evidence/quality không đạt
+contract đều không được lưu để tránh tái sử dụng answer sai ngữ cảnh.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +23,7 @@ from src.observability.versioning import (
 
 
 def _resolve_cache_model_key(state: ClinicalState) -> tuple[str, str]:
+    """Resolve cùng provider/model key cho cả lookup và store."""
     provider = (state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")).lower()
     model = state.get("llm_model")
     if provider == "gemini":
@@ -28,6 +35,7 @@ def _resolve_cache_model_key(state: ClinicalState) -> tuple[str, str]:
 
 
 async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
+    """Đọc exact cache nếu request độc lập và metadata version còn hợp lệ."""
     question = state.get("normalized_question") or state.get("user_question") or ""
     normalized = normalize_question(question)
     base = {"normalized_question": normalized, "cache_hit": False}
@@ -78,6 +86,7 @@ async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def cache_store_node(state: ClinicalState) -> dict[str, Any]:
+    """Chỉ lưu answer có evidence identity và qua các cache eligibility gates."""
     if state.get("cache_hit") or state.get("bypass_cache") or state.get("safety_override"):
         return {}
     if (state.get("conversation_context") or {}).get("message_count"):

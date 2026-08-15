@@ -1,9 +1,8 @@
-"""
-src/api/app.py
-==============
-FastAPI application for the Acne Advisor AI.
-Exposes the LangGraph Agent via REST endpoints.
-Includes chat history persistence to PostgreSQL.
+"""FastAPI boundary cho Agent, health/model endpoints và chat persistence.
+
+API validate request, gọi ``run_clinical_agent``, map lỗi resilience sang HTTP và
+đóng gói metadata/source cho frontend. Retrieval/generation/safety thuộc các
+module owner phía dưới; file này không tự chấm evidence hay sinh answer.
 """
 
 import asyncio
@@ -18,10 +17,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# Load environment variables
+# Nạp .env trước khi khởi tạo config/module phụ thuộc environment.
 load_dotenv()
 
-# Setup logging
+# API process sở hữu cấu hình logging cơ bản; payload/secret không được log.
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ from src.resilience.exceptions import (
     StageTimeoutError,
 )
 
-# Input Control Config
+# Đây là input/resource limits, không phải ngưỡng confidence y khoa.
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", 500))
 MAX_CONVERSATION_HISTORY_MESSAGES = int(os.getenv("MAX_CONVERSATION_HISTORY_MESSAGES", 10))
 MAX_HISTORY_MESSAGE_CHARS = int(os.getenv("MAX_HISTORY_MESSAGE_CHARS", 1000))
@@ -71,7 +70,7 @@ def parse_cors_origins(raw_value: str | None = None) -> list[str]:
     return origins or list(DEFAULT_CORS_ORIGINS)
 RELEASE_READINESS_TEST_MODES = {"http_double", "deterministic"}
 
-# In-memory lock for session requests
+# Lock chỉ có phạm vi một process; API_WORKERS phải được cân nhắc nếu cần khóa phân tán.
 active_requests = set()
 
 
@@ -815,6 +814,8 @@ async def chat_endpoint(request: ChatRequest):
         else:
             try:
                 logger.debug("Persisting chat exchange for session %s", session_id)
+                # Persistence được await nhưng lỗi DB bị giữ ở nhánh best-effort,
+                # nên response Agent vẫn trả được khi PostgreSQL tạm thời lỗi.
                 await _persist_chat_to_db(
                     session_id=session_id,
                     user_id=request.user_id,

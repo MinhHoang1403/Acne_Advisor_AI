@@ -1,4 +1,10 @@
-"""Proof-based artifact filtering for the indexed medical corpus."""
+"""Loại artifact chỉ khi pattern deterministic chứng minh được loại nội dung.
+
+Filter bỏ text rỗng, page-number-only, một số standalone artifact chính xác và
+dot leaders trong mục lục. Text ngắn không bị loại chỉ vì ngắn; module không dùng
+LLM và không đánh giá medical quality. Exact deduplication giữ lần xuất hiện đầu.
+Muốn đổi quy tắc lọc bắt đầu tại ``is_noisy_chunk()`` và các pattern trong file.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +23,7 @@ _EXACT_STANDALONE_ARTIFACTS = frozenset(
 
 
 def is_noisy_chunk(text: str, header: str | None = None) -> tuple[bool, str]:
-    """Reject only text whose artifact status is deterministically established."""
+    """Chỉ reject khi text khớp chính xác một artifact rule đã khai báo."""
 
     stripped = text.strip()
     if not stripped:
@@ -35,14 +41,14 @@ def is_noisy_chunk(text: str, header: str | None = None) -> tuple[bool, str]:
 
 
 def is_short_medical_safety_statement(text: str, header: str | None = None) -> bool:
-    """Compatibility helper: short text is retained, so classification is unnecessary."""
+    """Helper tương thích: mọi text ngắn không rỗng đều được giữ lại."""
 
     del header
     return bool(text.strip())
 
 
 def deduplicate_chunks(texts: list[str]) -> tuple[list[str], list[int]]:
-    """Keep the first exact normalized chunk and return removed input indexes."""
+    """Giữ exact normalized chunk đầu tiên và trả index của bản trùng bị bỏ."""
 
     seen: set[str] = set()
     kept: list[str] = []

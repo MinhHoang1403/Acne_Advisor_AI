@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Run the full offline/read-only runtime implementation contract suite."""
+"""Chạy nhóm runtime contract checks offline/read-only bằng subprocess hữu hạn.
+
+Mỗi child process có timeout riêng; stdout JSON được parse để tạo một report duy
+nhất. Script không sửa kết quả child check hay bỏ qua exit code.
+"""
 
 from __future__ import annotations
 

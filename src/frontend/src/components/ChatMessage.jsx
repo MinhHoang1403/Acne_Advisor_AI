@@ -14,7 +14,7 @@ export default function ChatMessage({ msg }) {
   return (
     <div className={`chat-message ${isUser ? 'chat-message-user' : 'chat-message-assistant'}`}>
       <div className="chat-message-inner">
-        {/* Content */}
+        {/* Raw user text và formatted assistant text có presentation owner riêng. */}
         <div className="chat-message-content">
           {isUser ? (
             <div className="chat-user-text">{msg.content}</div>
@@ -22,6 +22,7 @@ export default function ChatMessage({ msg }) {
             <div className="chat-assistant-text">
               <div className="chat-formatted-text">{formatText(msg.content)}</div>
 
+              {/* Source label dùng display metadata; raw source IDs vẫn ở response data. */}
               {data && (
                 <div className="chat-message-extras">
                   {hasAnswerDetails && (

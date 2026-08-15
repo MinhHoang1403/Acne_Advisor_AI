@@ -1,4 +1,10 @@
-"""Deterministic identities for indexed EntityCard points."""
+"""Tạo canonical identity và deterministic Qdrant UUID cho EntityCards.
+
+Identity dùng ``entity_type`` cùng taxonomy key/canonical name đã normalize.
+Point ID là UUIDv5 trong URL namespace trên chuỗi ``acne_entity:<identity>``;
+cùng input luôn cho cùng UUID. ``kb_version`` không tham gia để entity không đổi
+point identity chỉ vì build version thay đổi.
+"""
 
 from __future__ import annotations
 
@@ -31,10 +37,10 @@ def entity_identity_key(card_or_payload: EntityCard | dict[str, Any]) -> str:
 
 
 def entity_point_id(card: EntityCard, kb_version: str = "frozen_phase1_build") -> str:
-    """Return the stable Qdrant UUID for an EntityCard identity.
+    """Trả Qdrant UUID ổn định cho EntityCard identity.
 
-    ``kb_version`` remains accepted for compatibility, but it is intentionally
-    excluded from the canonical identity.
+    ``kb_version`` vẫn được nhận để giữ compatibility nhưng cố ý không tham gia
+    canonical identity.
     """
 
     _ = kb_version

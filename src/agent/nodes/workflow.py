@@ -1,4 +1,9 @@
-"""Nodes for the final bounded LangGraph agent workflow."""
+"""Các node điều phối workflow Agent từ request đến response.
+
+Module nối các owner chuyên biệt: preparation, safety/exact cache, action model,
+retrieval, evidence presence, generation, fallback, presentation, verifier và
+observability. Nó không tự triển khai Dense/BM25 hay nội dung prompt y khoa.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +32,7 @@ async def prepare_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def guard_node(state: ClinicalState) -> dict[str, Any]:
-    """Apply narrow safety overrides, otherwise consult the exact cache."""
+    """Áp dụng safety override hẹp; nếu không khớp mới đọc exact cache."""
 
     question = state.get("normalized_question") or state.get("user_question") or ""
     safety = evaluate_safety(question)
@@ -54,7 +59,7 @@ async def guard_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def decide_node(state: ClinicalState) -> dict[str, Any]:
-    """Use one semantic decision owner for every bounded agent transition."""
+    """Dùng một semantic decision owner cho mọi transition có lựa chọn."""
 
     if state.get("safety_override") or state.get("cache_hit"):
         return {"next_action": "finalize"}
@@ -62,7 +67,12 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
-    """Invoke the one source-evidence tool and preserve its typed trace."""
+    """Gọi evidence tool duy nhất và bảo toàn typed trace của lần retrieval.
+
+    Cả ``retrieve`` và ``retry`` đi qua hàm này. Số lần thử được tăng trước khi
+    gọi service và lưu cùng query/status/selected IDs để decision node kiểm soát
+    vòng lặp, kể cả khi provider hoặc Qdrant trả lỗi.
+    """
 
     attempt = state.get("retrieval_attempt", 0) + 1
     decision = state.get("agent_decision") or {}
@@ -126,7 +136,12 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
-    """Apply provenance and presence contracts; do not invent semantic scores."""
+    """Kiểm tra evidence có text + source identity, không chấm semantic quality.
+
+    ``usable=True`` chỉ có nghĩa item có nội dung và provenance tối thiểu. Nó
+    không chứng minh source trả lời đủ câu hỏi, không xác nhận claim và không
+    đánh giá medical truth; model action selector xử lý mức liên quan ngữ nghĩa.
+    """
 
     usable: list[dict[str, Any]] = []
     source_ids: list[str] = []
@@ -159,7 +174,7 @@ async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def generate_node(state: ClinicalState) -> dict[str, Any]:
-    """Generate once from packed source evidence, then validate provider output."""
+    """Sinh một lần từ packed evidence rồi quyết định fallback cho provider output."""
 
     generated = await generate_answer_node(state)
     merged = {**state, **generated}
@@ -171,7 +186,7 @@ async def generate_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def abstain_node(state: ClinicalState) -> dict[str, Any]:
-    """Produce an explicit safe abstention after the bounded retrieval budget."""
+    """Tạo safe abstention rõ ràng khi retrieval budget không cho đủ evidence."""
 
     retrieval_error = state.get("retrieval_error")
     reason = retrieval_error or "No provenance-complete source evidence after bounded retrieval."
@@ -186,7 +201,7 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def finalize_node(state: ClinicalState) -> dict[str, Any]:
-    """Apply presentation, final safety/quality, cache, and observability contracts."""
+    """Áp dụng presentation, verifier, exact cache và observability theo thứ tự."""
 
     updates = await finalize_response_node(state)
     quality = await answer_quality_node({**state, **updates})

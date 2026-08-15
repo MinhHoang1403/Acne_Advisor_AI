@@ -1,4 +1,14 @@
-"""Deterministic path-independent knowledge provenance identities."""
+"""Tạo provenance identity ổn định, không phụ thuộc absolute filesystem path.
+
+``document_id`` gắn source ID với source-content hash; ``record_id`` thêm portable
+locator; ``chunk_id`` dùng UUIDv5 từ document, record, section, index và content
+hash. Vì vậy thay content hoặc cấu trúc liên quan sẽ tạo identity mới, còn đổi
+thư mục checkout không làm đổi identity.
+
+Provenance hỗ trợ traceability, reproducibility và citation/source tracking; nó
+không tự chứng minh medical truth. Muốn đổi identity contract bắt đầu tại ba hàm
+``document_id``, ``record_id`` và ``chunk_id``.
+"""
 
 from __future__ import annotations
 
@@ -29,10 +39,14 @@ def sha256_text(text: str) -> str:
 
 
 def document_id(source_id: str, source_content_hash: str) -> str:
+    """Hash source identity và bytes identity thành document identity."""
+
     return f"doc_{sha256_text(source_id + chr(0) + source_content_hash)[:32]}"
 
 
 def record_id(document_identity: str, portable_locator: str) -> str:
+    """Gắn locator portable của parser vào document identity."""
+
     return f"rec_{sha256_text(document_identity + chr(0) + portable_locator)[:32]}"
 
 
@@ -43,6 +57,8 @@ def chunk_id(
     chunk_index: int,
     content_hash: str,
 ) -> str:
+    """Tạo UUIDv5 deterministic từ toàn bộ identity chain của chunk."""
+
     raw = "\0".join(
         [document_identity, record_identity, "/".join(section_path), str(chunk_index), content_hash]
     )
@@ -63,6 +79,8 @@ def base_source_provenance(source: CanonicalSource) -> dict[str, Any]:
 
 
 def validate_provenance(payload: dict[str, Any]) -> list[str]:
+    """Báo field thiếu/null; không xác minh nội dung y khoa của payload."""
+
     missing = sorted(field for field in REQUIRED_PROVENANCE_FIELDS if field not in payload)
     empty = sorted(
         field for field in REQUIRED_PROVENANCE_FIELDS

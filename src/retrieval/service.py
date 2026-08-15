@@ -1,4 +1,19 @@
-"""Canonical Dense + native BM25 + RRF evidence retrieval service."""
+"""Điều phối retrieval evidence bằng Dense, Qdrant-native BM25 và RRF.
+
+Data flow của một lần retrieval:
+``query -> Dense và BM25 song song -> RRF -> context packer -> evidence + trace``.
+Project gửi query tới Gemini để nhận Dense vector; Qdrant thực thi cosine search
+và BM25 search; Python hợp nhất rank và áp resource budget cho context.
+
+Hai channel có timeout độc lập. Lỗi của một channel không làm mất evidence đã
+nhận từ channel còn lại. Service không generate answer, không xác minh clinical
+truth và không dùng EntityCards hay Neo4j để grounding câu trả lời thông thường.
+
+Điểm thường cần chỉnh sửa:
+- RRF defaults: các hằng số ``RRF_*`` trong module này.
+- Candidate/context/timeout budgets: các biến môi trường đọc trong ``retrieve``.
+- Packing/truncation: ``src/retrieval/context_packer.py``.
+"""
 
 from __future__ import annotations
 
@@ -23,6 +38,7 @@ logger = logging.getLogger(__name__)
 RRF_K = 60
 RRF_DENSE_WEIGHT = 1.0
 RRF_BM25_WEIGHT = 1.0
+# Đây là engineering parameters cho rank fusion, không phải confidence threshold.
 
 
 @dataclass
@@ -41,7 +57,12 @@ class RetrieveEvidenceInput(BaseModel):
 
 
 class EvidenceRetriever:
-    """Retrieve medical source chunks using only Dense, BM25, and RRF."""
+    """Owner của request-time Dense + BM25 + RRF evidence retrieval.
+
+    Instance dùng adapter Qdrant để chạy hai search channel, sau đó trả
+    ``RetrievalResult`` có packed evidence và trace. Class không generate answer,
+    không đánh giá medical truth và không có post-RRF reranker.
+    """
 
     def __init__(self, vector_store: QdrantVectorStore | None = None) -> None:
         self._vector_store = vector_store or QdrantVectorStore()
@@ -55,7 +76,12 @@ class EvidenceRetriever:
         rrf_k: int = RRF_K,
         **_: Any,
     ) -> RetrievalResult:
-        """Run independent channels, fuse their ranks, and pack source evidence."""
+        """Chạy hai channel độc lập, hợp nhất rank và đóng gói source evidence.
+
+        ``top_k`` giới hạn số item context cuối cùng; nó không phải relevance
+        threshold. Empty list là kết quả channel hợp lệ, còn exception/timeout
+        được ghi nhận là channel failure để có thể trả degraded evidence.
+        """
 
         started = time.perf_counter()
         clean_query = " ".join(query.split())
@@ -67,6 +93,9 @@ class EvidenceRetriever:
         context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 6000, 512, 20000)
 
         timeout_seconds = _bounded_float_env("RETRIEVAL_TIMEOUT_SECONDS", 20.0, 0.1, 120.0)
+        # Dense và BM25 độc lập nên chạy đồng thời. Mỗi coroutine được bọc bằng
+        # timeout riêng; ``return_exceptions=True`` giữ outcome riêng của từng
+        # channel thay vì hủy toàn bộ retrieval khi một phía thất bại.
         dense_task = asyncio.create_task(
             _run_channel_with_timeout(
                 self._dense_search(clean_query, candidate_limit),
@@ -115,6 +144,8 @@ class EvidenceRetriever:
         elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
         dense_failed = isinstance(dense_result, BaseException)
         bm25_failed = isinstance(bm25_result, BaseException)
+        # Status phân biệt evidence đầy đủ, degraded theo channel, không có
+        # candidate hợp lệ, và lỗi có thể retry khi không channel nào sống sót.
         if contexts and dense_failed:
             retrieval_status = "degraded_dense"
         elif contexts and bm25_failed:
@@ -158,6 +189,8 @@ class EvidenceRetriever:
         )
 
     async def _dense_search(self, query: str, limit: int) -> list[dict[str, Any]]:
+        """Nhận vector từ Gemini rồi yêu cầu Qdrant thực thi cosine search."""
+
         vector = await embed_query(query)
         return await self._vector_store.search(vector, top_k=limit)
 
@@ -168,6 +201,8 @@ class EvidenceRetriever:
             logger.warning("Failed to close retrieval vector store: %s", sanitize_fallback_reason(exc))
 
 
+# Đây là evidence tool duy nhất mà Agent gọi. LangChain dùng docstring bên dưới
+# làm tool description, vì vậy nội dung tiếng Anh của docstring được giữ nguyên.
 @tool(args_schema=RetrieveEvidenceInput)
 async def retrieve_evidence(query: str, top_k: int = 8) -> dict[str, Any]:
     """Retrieve bounded medical source evidence with Dense + BM25 + RRF."""

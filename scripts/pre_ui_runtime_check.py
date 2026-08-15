@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Read-only backend readiness check used before starting the UI."""
+"""Kiểm tra read-only backend/config trước khi khởi động frontend.
+
+Endpoint URL được redact credential trước khi in. Script không khởi động service,
+không gọi chat provider và không thay knowledge/cache.
+"""
 
 from __future__ import annotations
 

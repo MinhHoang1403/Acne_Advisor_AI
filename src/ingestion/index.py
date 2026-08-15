@@ -1,4 +1,17 @@
-"""Candidate Qdrant indexing for Dense and native-BM25 knowledge records."""
+"""Tạo candidate collections Qdrant cho knowledge records và EntityCards.
+
+Module nhận Dense vectors đã được Gemini tạo, gửi chúng cùng BM25 ``Document``
+cho Qdrant và kiểm số point sau upsert. Qdrant thực thi cosine/BM25 indexing;
+Python không tự tính sparse representation hay search score tại đây.
+
+Physical collection gắn ``build_id`` để có thể kiểm tra trước khi chuyển logical
+alias. Entity collection là structural asset và các payload của nó được đánh dấu
+không đủ điều kiện làm medical evidence trong normal answer path.
+
+Điểm thường cần chỉnh sửa: batch/provider reuse trong ``resolve_embeddings``;
+Qdrant schema/upsert trong hai hàm ``build_*_candidate``; alias activation trong
+``switch_alias``. Đây là knowledge-preparation code, không chạy cho mỗi chat request.
+"""
 
 from __future__ import annotations
 
@@ -40,7 +53,7 @@ async def seed_embedding_cache_from_collection(
     point_ids: list[str],
     cache: EmbeddingCache,
 ) -> dict[str, int]:
-    """Reuse exact dense vectors while isolating unreadable legacy sparse points."""
+    """Nạp lại exact Dense vectors và cô lập từng point không đọc được."""
 
     loaded = 0
     failed = 0
@@ -64,6 +77,8 @@ async def _retrieve_dense_resilient(
     collection_name: str,
     point_ids: list[str],
 ) -> tuple[list[Any], int]:
+    """Chia đôi batch lỗi để giữ lại các vector cũ vẫn đọc được."""
+
     if not point_ids:
         return [], 0
     try:
@@ -97,7 +112,12 @@ async def resolve_embeddings(
     batch_delay_seconds: float | None = None,
     max_retries: int = 4,
 ) -> tuple[list[list[float]], dict[str, int]]:
-    """Resolve exact-cache hits and persist every successful provider batch."""
+    """Ghép cache hit với vector mới và lưu ngay mỗi provider batch thành công.
+
+    Gemini tạo vector cho cache miss. ``batch_size``, delay và retry là giới hạn
+    vận hành/quota, không phải quality threshold. Hàm giữ đúng thứ tự input để
+    vector tiếp tục khớp với compiled records khi upsert.
+    """
 
     vectors: list[list[float] | None] = [cache.get(text) for text in texts]
     misses = [index for index, vector in enumerate(vectors) if vector is None]
@@ -106,8 +126,8 @@ async def resolve_embeddings(
     delay = batch_delay_seconds
     if delay is None:
         configured_delay = float(os.getenv("EMBEDDING_BATCH_DELAY", "10") or "10")
-        # Free-tier quota is counted per input, so 16 inputs need at least 9.6s
-        # to stay below 100 inputs/minute. Keep a small deterministic margin.
+        # Quota được tính theo từng input; delay hữu hạn giữ tốc độ batch trong
+        # giới hạn cấu hình provider và không ảnh hưởng nội dung vector.
         delay = max(configured_delay, 10.0)
     for start in range(0, len(misses), batch_size):
         indexes = misses[start:start + batch_size]
@@ -156,6 +176,8 @@ async def build_knowledge_candidate(
     client: AsyncQdrantClient | None = None,
     replace_candidate: bool = False,
 ) -> dict[str, Any]:
+    """Tạo physical knowledge collection và upsert Dense + BM25 records."""
+
     if len(vectors) != len(compiled.records):
         raise ValueError("Dense vector count does not match compiled records")
     owns_client = client is None
@@ -214,7 +236,7 @@ async def build_entity_candidate(
     client: AsyncQdrantClient | None = None,
     replace_candidate: bool = False,
 ) -> dict[str, Any]:
-    """Build the narrow EntityCard discovery index for one immutable build."""
+    """Tạo EntityCard index cho structural lookup, không cho runtime grounding."""
 
     if len(vectors) != len(cards):
         raise ValueError("Dense vector count does not match EntityCard count")
@@ -274,6 +296,8 @@ async def switch_alias(
     alias_name: str,
     target_collection: str,
 ) -> None:
+    """Chuyển logical alias sang physical collection đã được validation."""
+
     aliases = {item.alias_name for item in (await client.get_aliases()).aliases}
     operations: list[Any] = []
     if alias_name in aliases:

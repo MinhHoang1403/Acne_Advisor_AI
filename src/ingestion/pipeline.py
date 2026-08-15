@@ -1,4 +1,12 @@
-"""Canonical knowledge-build orchestration used by the operator CLI."""
+"""Điều phối knowledge build được operator CLI sử dụng.
+
+``prepare_phase1`` parse/compile/validate offline; ``build_phase1`` tạo physical
+Qdrant candidates và manifest; ``activate_phase1`` chỉ cut over sau khi có
+rollback artifacts và validation live. Neo4j graph/EntityCards ở đây là tài sản
+cấu trúc của knowledge build, không phải evidence source trong normal answer
+runtime. Muốn đổi thuật toán parse/chunk/embed/index nên sửa owner tương ứng thay
+vì thêm logic vào orchestrator này.
+"""
 
 from __future__ import annotations
 
@@ -53,6 +61,7 @@ async def prepare_phase1(
     taxonomy_path: Path = DEFAULT_TAXONOMY,
     parsed_cache: Path = DEFAULT_PARSED_CACHE,
 ) -> dict[str, Any]:
+    """Tạo artifacts deterministic và chạy validation không ghi datastore live."""
     sources = load_source_manifest(source_manifest_path)
     verify_source_files(sources, source_dir)
     artifacts = {}
@@ -99,6 +108,11 @@ async def build_phase1(
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     replace_candidate: bool = False,
 ) -> dict[str, Any]:
+    """Embed dữ liệu thiếu, tạo candidate collections và lưu build manifest.
+
+    Hàm ghi Qdrant candidates/cache/manifest nhưng chưa đổi logical aliases và
+    chưa thay graph live; cutover thuộc ``activate_phase1``.
+    """
     prepared = await prepare_phase1(source_dir=source_dir)
     compiled = prepared["compiled"]
     cards = prepared["cards"]
@@ -188,6 +202,7 @@ async def validate_phase1(
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     live: bool = True,
 ) -> dict[str, Any]:
+    """So build identity offline và tùy chọn kiểm candidate collections live."""
     prepared = await prepare_phase1()
     manifest = load_build_manifest(manifest_path) if manifest_path.is_file() else None
     layers = list(prepared["offline_validation"]["layers"])
@@ -224,7 +239,12 @@ async def activate_phase1(
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     rollback_root: Path,
 ) -> dict[str, Any]:
-    """Activate a validated candidate after proving local rollback artifacts exist."""
+    """Activate candidate đã validate sau khi chứng minh rollback artifacts tồn tại.
+
+    Side effects gồm thay Neo4j entity graph theo build ID và chuyển hai Qdrant
+    logical aliases sang physical candidates. Đây là operator operation có chủ ý,
+    không chạy trong API request path.
+    """
 
     _verify_rollback_artifacts(rollback_root)
     validation = await validate_phase1(manifest_path=manifest_path, live=True)
@@ -255,8 +275,8 @@ async def activate_phase1(
         if missing:
             raise RuntimeError(f"Candidate collection missing before cutover: {missing}")
 
-        # The historical knowledge store used the logical name as a physical
-        # collection. Its verified native snapshot is the rollback boundary.
+        # Logical name có thể đang là physical collection. Chỉ xóa nó tại cutover
+        # sau khi rollback snapshot đã được kiểm tra ở đầu hàm.
         if KNOWLEDGE_LOGICAL_COLLECTION in collections:
             await client.delete_collection(KNOWLEDGE_LOGICAL_COLLECTION)
         if ENTITY_LOGICAL_COLLECTION in collections:
@@ -307,6 +327,7 @@ async def activate_phase1(
 
 
 async def phase1_status(manifest_path: Path = DEFAULT_BUILD_MANIFEST) -> dict[str, Any]:
+    """Tính expected build từ source hiện tại và đối chiếu manifest, không index."""
     prepared = await prepare_phase1()
     manifest = load_build_manifest(manifest_path) if manifest_path.is_file() else None
     return {

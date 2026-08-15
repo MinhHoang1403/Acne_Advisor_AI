@@ -1,4 +1,9 @@
-"""Deterministic structural and provenance verification for finalized answers."""
+"""Node chạy verifier kỹ thuật sau khi answer đã qua presentation.
+
+Safety có owner riêng; verifier ở đây chỉ kiểm tra cấu trúc và provenance
+identity. Khi verifier lỗi runtime, report fail closed nhưng answer không được
+gắn nhãn là đã xác minh đúng về mặt lâm sàng.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
-    """Verify structure/provenance only; medical safety has a separate owner."""
+    """Chỉ kiểm structure/provenance; medical safety thuộc owner riêng."""
 
     query = state.get("normalized_question") or state.get("user_question", "")
     answer = state.get("final_answer", "")

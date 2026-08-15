@@ -1,4 +1,13 @@
-"""Central Gemini Embedding 2 contract and content-addressed cache."""
+"""Giữ Gemini Embedding 2 contract và cache vector theo content identity.
+
+Project chuẩn bị request và kiểm tra shape của vector; Gemini là component thực
+sự chạy embedding model. Cùng model/dimension contract được dùng cho document
+khi indexing và query trong runtime. ``EmbeddingCache`` tránh gọi lại provider
+khi text và toàn bộ contract không đổi; cache không thực hiện similarity search.
+
+Muốn đổi embedding model/dimension/distance bắt đầu ở các hằng số ``EMBEDDING_*``
+và phải xem đồng thời schema Qdrant trong ``src/ingestion/index.py``.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +29,8 @@ EMBEDDING_DISTANCE = "cosine"
 
 @dataclass(frozen=True)
 class EmbeddingContract:
+    """Các thuộc tính phải cùng nhau xác định một vector tương thích."""
+
     provider: str = EMBEDDING_PROVIDER
     model: str = EMBEDDING_MODEL
     dimensions: int = EMBEDDING_DIMENSIONS
@@ -27,6 +38,8 @@ class EmbeddingContract:
     task_type: None = None
 
     def identity(self, text: str) -> str:
+        """Hash canonical JSON của contract và text để định danh cache chính xác."""
+
         payload = {
             "provider": self.provider,
             "model": self.model,
@@ -40,7 +53,7 @@ class EmbeddingContract:
 
 
 def embed_documents(texts: list[str], *, api_key: str) -> list[list[float]]:
-    """Embed knowledge texts under the versioned Gemini Embedding 2 contract."""
+    """Gửi knowledge texts cho Gemini và nhận Dense vectors đúng contract."""
 
     return embed_texts_sync(
         texts,
@@ -53,7 +66,11 @@ def embed_documents(texts: list[str], *, api_key: str) -> list[list[float]]:
 
 
 class EmbeddingCache:
-    """Small JSON-per-vector cache with strict identity and dimension checks."""
+    """Cache một JSON cho mỗi vector, kiểm identity và dimension trước khi reuse.
+
+    Cache chỉ thuộc knowledge preparation và có side effect trên filesystem.
+    Ghi file tạm rồi replace để tránh để lại record dở dang khi process ngắt.
+    """
 
     def __init__(self, root: Path, contract: EmbeddingContract | None = None) -> None:
         self.root = root

@@ -14,6 +14,8 @@ export const HEALTH_TIMING = Object.freeze({
   hiddenTabPollMs: 60000,
 });
 
+// ``degraded`` vẫn reachable: UI có thể tải history và để backend tự trả lỗi
+// dependency cụ thể; chỉ network failure mới là disconnected.
 export function isBackendReachable(connectionState) {
   return ['connected', 'degraded'].includes(connectionState?.state);
 }
@@ -46,6 +48,8 @@ export function classifyHealthResult(result) {
 }
 
 export function nextHealthDelayMs(connectionState, attempt, documentVisibility = 'visible') {
+  // Startup dùng backoff theo attempt; trạng thái ổn định và tab ẩn poll thưa hơn
+  // để tránh tạo request nền không cần thiết.
   if (documentVisibility === 'hidden') {
     return HEALTH_TIMING.hiddenTabPollMs;
   }

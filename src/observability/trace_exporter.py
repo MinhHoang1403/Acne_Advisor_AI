@@ -1,4 +1,9 @@
-"""Sanitized observability for the final bounded agent workflow."""
+"""Tạo và tùy chọn ghi trace đã giới hạn, loại bỏ dữ liệu giống secret.
+
+Raw query không được đưa vào summary; event chỉ giữ số ký tự và SHA-256 prefix để
+correlate cùng input trong phạm vi quan sát. Export là best-effort JSONL và tắt
+mặc định, nên lỗi ghi log không được làm hỏng response path.
+"""
 
 from __future__ import annotations
 
@@ -33,7 +38,7 @@ SECRET_KEY_MARKERS = (
 
 
 def sanitize_for_observability(data: Any, max_text_chars: int = 500) -> Any:
-    """Redact secret-like keys and bound text without changing value meaning."""
+    """Redact key giống secret và giới hạn text trước khi đưa vào telemetry."""
 
     if isinstance(data, dict):
         output: dict[str, Any] = {}
@@ -69,7 +74,7 @@ def build_observability_event(
     safe_payload: dict[str, Any] | None = None,
     max_text_chars: int | None = None,
 ) -> ObservabilityEvent:
-    """Build a compact event around the current versioned contracts."""
+    """Tạo event gọn từ state/result và runtime contract hiện tại."""
 
     state = state or {}
     result = result or {}
@@ -150,7 +155,7 @@ def export_observability_event(
     *,
     enabled: bool | None = None,
 ) -> bool:
-    """Append one JSONL event only when explicitly enabled."""
+    """Append một event JSONL chỉ khi observability được bật rõ ràng."""
 
     if enabled is None:
         enabled = os.getenv("OBSERVABILITY_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}

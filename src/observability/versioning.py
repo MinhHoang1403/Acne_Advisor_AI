@@ -1,4 +1,10 @@
-"""Deterministic, secret-free manifest for the current runtime contracts."""
+"""Tạo manifest deterministic, không chứa secret cho các runtime contract.
+
+Manifest là identity đầu vào của exact cache và observability. Fingerprint được
+tính từ canonical JSON (sort key, separator cố định), SHA-256 rồi lấy 24 ký tự
+hex đầu. Nó phát hiện thay đổi contract để phân vùng cache; không phải chữ ký bảo
+mật và không đo compatibility ngữ nghĩa.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +26,7 @@ _SECRET_KEY_MARKERS = ("api_key", "token", "password", "secret", "authorization"
 
 
 def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Build the stable production contract that participates in cache identity."""
+    """Tạo runtime contract ổn định tham gia vào cache identity."""
 
     settings = settings or {}
 
@@ -88,6 +94,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
 
 
 def compute_pipeline_fingerprint(manifest: dict[str, Any]) -> str:
+    """Hash canonical secret-free manifest thành fingerprint 96-bit dạng hex."""
     safe = _strip_secret_keys(manifest)
     payload = json.dumps(safe, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
@@ -106,6 +113,7 @@ def get_answer_cache_version(settings: Mapping[str, Any] | None = None) -> str:
 
 
 def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Chọn tập field ngắn gọn để hiển thị/debug mà không đổi fingerprint."""
     manifest = manifest or build_pipeline_version_manifest()
     keys = (
         "phase",

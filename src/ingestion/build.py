@@ -1,4 +1,14 @@
-"""Pure deterministic compilation of source snapshots into knowledge records."""
+"""Biên dịch parsed source snapshots thành knowledge records deterministic.
+
+Module nối parser output với chunking, filtering, provenance và domain metadata.
+Nó chưa gọi embedding provider hay Qdrant; hai side effect đó thuộc
+``src/ingestion/index.py``. Build identity là SHA-256 rút gọn của source-manifest
+hash, taxonomy hash và serialized contract hash.
+
+Muốn đổi record payload hoặc thứ tự compilation bắt đầu tại ``compile_knowledge``;
+muốn đổi identity đọc ``compute_build_identity``. Mọi thay đổi contract hợp lệ
+sẽ tạo build ID khác thay vì ghi đè identity cũ.
+"""
 
 from __future__ import annotations
 
@@ -50,6 +60,8 @@ class CompiledKnowledge:
 
 
 def compute_build_identity(source_manifest_path: Path, taxonomy_path: Path) -> BuildIdentity:
+    """Tính build ID từ source, taxonomy và toàn bộ compilation contracts."""
+
     source_hash = source_manifest_hash(source_manifest_path)
     taxonomy_bytes = (
         taxonomy_path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
@@ -80,7 +92,7 @@ def compile_knowledge(
     *,
     ingested_at: str | None = None,
 ) -> CompiledKnowledge:
-    """Compile parser artifacts into deterministic Qdrant payload records."""
+    """Chuyển parsed units thành ordered payload records cho bước indexing."""
 
     timestamp = ingested_at or datetime.now(UTC).isoformat()
     records: list[dict[str, Any]] = []
@@ -163,6 +175,8 @@ def compile_knowledge(
 
 
 def structural_records_hash(records: list[dict[str, Any]] | tuple[dict[str, Any], ...]) -> str:
+    """Hash canonical records, bỏ timestamp để cùng content cho cùng kết quả."""
+
     stable_records = []
     for record in records:
         stable = {key: value for key, value in record.items() if key != "ingested_at"}

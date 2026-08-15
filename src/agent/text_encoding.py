@@ -1,5 +1,9 @@
-"""
-Text encoding helpers for repairing common UTF-8 mojibake.
+"""Phát hiện và sửa một tập mojibake UTF-8 phổ biến.
+
+Heuristic đếm số marker trước/sau mỗi phép latin1/cp1252 -> UTF-8 conversion và
+chỉ nhận bản sửa khi marker count giảm. Count này chỉ chọn chuỗi ít dấu hiệu lỗi
+hơn, không phải quality/confidence score. Nếu round-trip không được, module dùng
+một mapping nhỏ đã biết thay vì ``errors=ignore`` làm mất ký tự âm thầm.
 """
 
 from __future__ import annotations
@@ -19,12 +23,12 @@ LOSSY_MOJIBAKE_REPLACEMENTS = {
 
 
 def looks_like_mojibake(value: str) -> bool:
-    """Return True when a string contains common UTF-8-as-latin/cp1252 markers."""
+    """Báo chuỗi có marker UTF-8 bị đọc nhầm latin1/cp1252 hay không."""
     return isinstance(value, str) and any(marker in value for marker in MOJIBAKE_MARKERS)
 
 
 def repair_mojibake(value: str) -> str:
-    """Repair UTF-8 text that was accidentally decoded as latin-1/cp1252."""
+    """Sửa mojibake khi conversion làm số marker giảm; nếu không giữ nguyên."""
     if not isinstance(value, str) or not value or not looks_like_mojibake(value):
         return value
 

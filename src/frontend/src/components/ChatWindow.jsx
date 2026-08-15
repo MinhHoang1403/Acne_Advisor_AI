@@ -16,7 +16,7 @@ export default function ChatWindow({
 }) {
   const messagesEndRef = useRef(null);
 
-  // Scroll to bottom on new messages or loading state change
+  // Auto-scroll khi message/loading đổi; message state vẫn do App sở hữu.
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -44,7 +44,7 @@ export default function ChatWindow({
         </button>
       )}
 
-      {/* Chat Scrollable Area */}
+      {/* Vùng scroll chỉ render history; không tự tải hoặc mutate session. */}
       <div className={`chat-scroll-area ${chatHistory.length === 0 ? 'chat-scroll-area-empty' : ''}`}>
         {chatHistory.length === 0 ? (
           <EmptyState onSendQuestion={onSendQuestion} />
@@ -54,7 +54,7 @@ export default function ChatWindow({
               <ChatMessage key={index} msg={msg} />
             ))}
 
-            {/* Loading indicator */}
+            {/* Loading indicator không được lưu vào history. */}
             {isLoading && (
               <div className="chat-message chat-message-assistant">
                 <div className="chat-message-inner">
@@ -69,7 +69,7 @@ export default function ChatWindow({
               </div>
             )}
 
-            {/* Error message */}
+            {/* Error thuộc request hiện tại, không phải assistant message persisted. */}
             {error && (
               <div className="chat-message chat-message-assistant">
                 <div className="chat-message-inner">
@@ -100,7 +100,7 @@ export default function ChatWindow({
         )}
       </div>
 
-      {/* Input Area */}
+      {/* Composer nhận controlled value và submit handler từ App. */}
       <ChatInput message={message} setMessage={setMessage} isLoading={isLoading} onSubmit={onSubmit} />
     </div>
   );

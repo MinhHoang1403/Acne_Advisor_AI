@@ -1,4 +1,13 @@
-"""Bounded semantic action selection for the LangGraph agent."""
+"""Chọn bước tiếp theo cho Agent trong một vòng lặp retrieval có giới hạn.
+
+Model chỉ chọn một trong bốn action ``retrieve``, ``retry``, ``generate`` hoặc
+``abstain`` và có thể đề xuất search query. Python mới là lớp kiểm tra schema,
+trạng thái hiện tại, sự hiện diện của evidence và giới hạn số lần retrieval.
+Vì vậy output của model không thể tự mở rộng graph hay bỏ qua resource budget.
+
+Muốn đổi tập action hoặc luật chuyển trạng thái, bắt đầu từ ``AgentDecision`` và
+``validate_agent_decision()``; muốn đổi topology thực thi, đọc ``agent/graph.py``.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 MAX_RETRIEVAL_ATTEMPTS = 2
 AGENT_DECISION_VERSION = "minimal_agent_decision_v1"
+
+# Đây là engineering limit cho số lần gọi retrieval trong một request, không phải
+# ngưỡng confidence hay đánh giá mức độ đúng y khoa của evidence.
 
 DecisionAction = Literal["retrieve", "retry", "generate", "abstain"]
 DecisionReason = Literal[
@@ -41,7 +53,7 @@ class AgentDecision(BaseModel):
 
 
 def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
-    """Build bounded system/data prompts for semantic action selection."""
+    """Đóng gói state tối thiểu để model chọn action, không yêu cầu model trả lời."""
 
     attempt = int(state.get("retrieval_attempt", 0) or 0)
     history = _bounded_history(state)
@@ -59,6 +71,9 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
         if text and source_id:
             evidence_items.append({"source_id": source_id, "text": text[:1200]})
 
+    # Chuỗi này là instruction được gửi trực tiếp tới model nên phải giữ nguyên.
+    # Dữ liệu không tin cậy được đặt trong JSON payload riêng để giảm khả năng
+    # question/history/evidence thay đổi contract chọn action.
     system_prompt = (
         "You are the action selector for a bounded acne-information RAG agent. "
         "Return exactly one JSON object with keys action, retrieval_query, and reason_code. "
@@ -95,7 +110,11 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
 
 
 async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
-    """Ask the configured model for one action, then enforce deterministic bounds."""
+    """Hỏi model một action rồi áp dụng các giới hạn deterministic bằng Python.
+
+    Nếu provider, JSON parsing hoặc validation lỗi, hàm fail closed sang
+    ``abstain``; nó không tự suy diễn một action thay thế từ keyword.
+    """
 
     system_prompt, prompt = build_agent_decision_prompt(state)
     try:
@@ -142,7 +161,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
 
 
 def parse_agent_decision(value: Any) -> AgentDecision:
-    """Parse strict JSON, accepting only optional Markdown fence wrappers."""
+    """Parse JSON nghiêm ngặt, chỉ nới lỏng lớp Markdown fence bao ngoài."""
 
     if not isinstance(value, str):
         raise ValueError("Agent decision output must be a JSON string.")
@@ -158,7 +177,13 @@ def parse_agent_decision(value: Any) -> AgentDecision:
 
 
 def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> AgentDecision:
-    """Reject unsafe or impossible model actions without semantic Python fallback."""
+    """Loại action bất khả thi mà không thay model bằng heuristic ngữ nghĩa.
+
+    ``retrieve`` chỉ hợp lệ ở lần đầu; các lần lấy evidence tiếp theo phải là
+    ``retry`` với query khác. ``generate`` cần evidence đã qua kiểm tra hiện diện
+    và provenance. Điều này không khẳng định evidence đủ về mặt y khoa: model vẫn
+    chịu trách nhiệm đánh giá mức liên quan trước khi chọn ``generate``.
+    """
 
     attempt = int(state.get("retrieval_attempt", 0) or 0)
     has_evidence = bool((state.get("evidence_assessment") or {}).get("usable"))

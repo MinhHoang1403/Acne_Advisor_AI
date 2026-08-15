@@ -1,4 +1,10 @@
-"""Typed query, chunk-candidate, and context-packing contracts."""
+"""Typed contracts nối query, retrieval candidates và packed context.
+
+``score`` giữ raw channel score, ``fused_score`` giữ RRF score và ``rank`` là vị
+trí sau fusion. Các field này có semantics khác nhau và không được dùng thay thế
+lẫn nhau. Pydantic model descriptions được giữ ngắn vì schema có thể xuất hiện ở
+runtime boundaries.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# Các model là data contracts; thuật toán normalize/fuse/pack thuộc module owner.
 class NormalizedQuery(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

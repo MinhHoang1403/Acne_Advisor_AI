@@ -1,4 +1,13 @@
-"""Content-addressed intermediate representation for knowledge preparation."""
+"""Parse source thành intermediate representation có content identity.
+
+Markdown/JSON được đọc trực tiếp; PDF được gửi tới LlamaParse khi verified cache
+không còn hợp lệ. Output được normalize rồi lưu theo source hash và parser
+contract, nên cache chỉ được reuse khi source và contract cùng khớp.
+
+Module không chunk, embed hay index. Muốn đổi provider/config PDF bắt đầu tại
+``PARSER_CONFIGURATION`` và ``_parse_pdf``; muốn đổi normalization đọc
+``src/ingestion/normalization.py``.
+"""
 
 from __future__ import annotations
 
@@ -47,6 +56,8 @@ class ParsedArtifact:
 
 
 def artifact_path(cache_root: Path, source: CanonicalSource) -> Path:
+    """Tạo cache path từ source hash và parser-configuration hash."""
+
     contract_hash = sha256_text(
         json.dumps(PARSER_CONFIGURATION, sort_keys=True, separators=(",", ":"))
     )[:16]
@@ -54,6 +65,8 @@ def artifact_path(cache_root: Path, source: CanonicalSource) -> Path:
 
 
 def load_parsed_artifact(path: Path, source: CanonicalSource) -> ParsedArtifact | None:
+    """Chỉ trả cache khi identity, contract và normalized-output hash đều hợp lệ."""
+
     if not path.is_file():
         return None
     try:
@@ -102,7 +115,7 @@ async def load_or_parse_source(
     cache_root: Path,
     llama_cloud_api_key: str = "",
 ) -> tuple[ParsedArtifact, bool]:
-    """Return a verified parsed artifact and whether it was a cache hit."""
+    """Trả parsed artifact đã kiểm tra cùng cờ cho biết có cache hit hay không."""
 
     cache_path = artifact_path(cache_root, source)
     cached = load_parsed_artifact(cache_path, source)

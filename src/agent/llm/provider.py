@@ -1,7 +1,9 @@
-"""
-src/agent/llm/provider.py
-=========================
-Abstraction for LLM providers (Gemini, Ollama) with fallback support.
+"""Chọn Gemini/Ollama và thực thi provider fallback trong deadline chung.
+
+Module resolve provider/model, gọi adapter tương ứng, áp dụng retry contract và
+ghi nhận chuỗi fallback. Gemini/Ollama mới thực thi inference; Python không sinh
+nội dung model. Permanent error dừng ngay, còn fallback chỉ chạy khi caller và
+runtime settings cho phép, sử dụng phần ``DeadlineBudget`` còn lại.
 """
 
 import asyncio
@@ -59,7 +61,7 @@ def parse_google_fallback_models(
     *,
     primary_model: str | None = None,
 ) -> list[str]:
-    """Parse comma-separated Gemini fallback models while preserving order."""
+    """Parse danh sách Gemini fallback, giữ thứ tự và loại primary/trùng lặp."""
 
     raw = os.getenv("GOOGLE_FALLBACK_MODELS") if value is None else value
     if raw is None:
@@ -113,7 +115,7 @@ async def _call_gemini(
     temperature: float,
     request_timeout: float | None = None,
 ) -> str:
-    """Helper to call Gemini API using the Google GenAI SDK."""
+    """Gọi Gemini qua Google GenAI adapter bất đồng bộ."""
     return await generate_text_async(
         prompt=prompt,
         system_prompt=system_prompt,
@@ -129,7 +131,7 @@ async def _call_gemini_sync(
     temperature: float,
     request_timeout: float | None = None,
 ) -> str:
-    """Helper to call Gemini API synchronously through the Google GenAI SDK."""
+    """Đưa lời gọi Google GenAI đồng bộ sang worker thread có timeout."""
     def _generate_sync() -> str:
         return generate_text_sync(
             prompt=prompt,
@@ -227,18 +229,11 @@ async def generate_llm_response(
     budget: DeadlineBudget | None = None,
     resilience_settings: RuntimeResilienceSettings | None = None,
 ) -> dict:
-    """
-    Generate LLM response with automatic fallback logic.
-    Returns:
-        dict: {
-            "text": str,
-            "provider": str,
-            "model": str,
-            "fallback_used": bool,
-            "fallback_provider": str | None,
-            "fallback_model": str | None,
-            "error": str | None
-        }
+    """Sinh text qua primary provider và chuỗi fallback hữu hạn nếu được phép.
+
+    Kết quả giữ cả requested và actual provider/model để API, cache và telemetry
+    không nhầm output fallback với primary. Mỗi target có retry riêng nhưng tất
+    cả cùng chia sẻ ``budget`` của request.
     """
     settings = resilience_settings or runtime_resilience_settings_from_env()
     budget = budget or DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
@@ -269,7 +264,7 @@ async def generate_llm_response(
     }
     
     try:
-        # 1. Try primary provider
+        # Primary target luôn được thử trước và được ghi ở đầu fallback_chain.
         text, resilience_meta = await _call_provider_resilient(
             provider=provider,
             model=model,
@@ -303,7 +298,7 @@ async def generate_llm_response(
         error_text = _safe_error_text(e)
         logger.warning("Primary LLM (%s/%s) failed: %s", provider, model, error_text)
         
-        # 2. Try Fallback
+        # Chỉ chuẩn bị fallback khi caller bật; lỗi permanent không đi vào nhánh này.
         if not allow_fallback:
             logger.error("Fallback is disabled. Failing.")
             result["error"] = error_text

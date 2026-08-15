@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""End-to-end release readiness checks with offline, local-services, and live modes."""
+"""Kiểm tra runtime contracts theo ba mode offline, local-services và live.
+
+Script gom kết quả thành JSON đã sanitize và đặt timeout hữu hạn cho subprocess,
+HTTP/provider checks. Offline không gọi provider; live có thể gọi dịch vụ ngoài
+theo mode người vận hành chọn. Đây là diagnostic runner, không sửa datastore.
+"""
 
 from __future__ import annotations
 
@@ -98,6 +103,7 @@ def finalize(mode: str, checks: list[dict[str, Any]], blocked: bool = False) -> 
 
 
 def run_command(command: list[str], *, timeout: float = 60.0, cwd: Path = PROJECT_ROOT) -> dict[str, Any]:
+    """Chạy subprocess với timeout hữu hạn và chỉ trả output đã sanitize."""
     try:
         completed = subprocess.run(
             command,

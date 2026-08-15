@@ -1,4 +1,10 @@
-"""Neo4j upsert helpers for deterministic taxonomy/entity graph records."""
+"""Ghi và đối chiếu taxonomy/entity graph deterministic trong Neo4j.
+
+Graph mô tả quan hệ cấu trúc giữa product, active ingredient và drug class. Normal
+chat retrieval không query graph này để grounding answer; evidence runtime đến từ
+Qdrant knowledge chunks. Module chỉ phục vụ build/activation/validation và có
+side effect lên Neo4j khi operator gọi rõ ràng.
+"""
 
 from __future__ import annotations
 
@@ -50,7 +56,7 @@ async def apply_entity_graph_schema(driver: Any) -> None:
 
 
 async def upsert_entity_graph(driver: Any, records: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
-    """MERGE deterministic entity graph nodes and relationships into Neo4j."""
+    """MERGE node/relationship deterministic sau khi flatten Neo4j properties."""
 
     node_count = 0
     relationship_count = 0
@@ -129,7 +135,7 @@ async def replace_entity_graph(
     *,
     build_id: str,
 ) -> dict[str, Any]:
-    """Materialize one build and remove stale canonical relationships and nodes."""
+    """Materialize một build rồi xóa canonical records thuộc build ID khác."""
 
     await apply_entity_graph_schema(driver)
     materialized = await upsert_entity_graph(driver, records)
@@ -260,7 +266,7 @@ async def validate_entity_graph_records(
     driver: Any,
     records: dict[str, list[dict[str, Any]]],
 ) -> dict[str, Any]:
-    """Strictly reconcile the deterministic graph records expected for a clean build."""
+    """Đối chiếu từng record và count với graph deterministic mong đợi."""
 
     expected_nodes = records.get("nodes", [])
     expected_relationships = records.get("relationships", [])
@@ -387,11 +393,11 @@ def _record_count(record: Any, key: str) -> int:
 
 
 def sanitize_neo4j_properties(properties: dict[str, Any]) -> dict[str, Any]:
-    """Return Neo4j-safe flat properties.
+    """Chuyển properties thành dạng phẳng mà Neo4j chấp nhận.
 
-    Neo4j properties may only be primitive values or arrays of primitive values.
-    Nested maps/lists are preserved as deterministic JSON strings using a
-    ``*_json`` property, e.g. ``metadata`` becomes ``metadata_json``.
+    Primitive và list primitive giữ nguyên; ``None`` bị bỏ. Map, nested list hoặc
+    object phức tạp được serialize thành deterministic JSON ở key ``*_json``
+    (ví dụ ``metadata`` thành ``metadata_json``), tránh gửi nested map vào Cypher.
     """
 
     sanitized: dict[str, Any] = {}

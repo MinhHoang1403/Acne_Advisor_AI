@@ -1,4 +1,9 @@
-"""Retry policy and transient/permanent provider error classification."""
+"""Retry hữu hạn và phân loại lỗi provider thành transient/permanent.
+
+Retry chỉ áp dụng cho lỗi có khả năng hồi phục và luôn dùng chung
+``DeadlineBudget`` của request. Permanent error không được retry. Module này sở
+hữu công thức backoff; provider wrapper sở hữu vòng gọi và telemetry từng lần.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +29,7 @@ PERMANENT_HTTP_STATUS = {400, 401, 403, 404, 422}
 
 @dataclass(frozen=True)
 class RetryPolicy:
+    """Cấu hình số retry và exponential backoff có cap/jitter."""
     max_retries: int = 1
     base_delay_seconds: float = 1.0
     max_delay_seconds: float = 4.0
@@ -34,6 +40,12 @@ class RetryPolicy:
         return 1 + max(0, self.max_retries)
 
     def delay_for_retry(self, retry_index: int) -> float:
+        """Tính ``min(base * 2^(retry_index-1) + jitter, max_delay)``.
+
+        ``retry_index`` bắt đầu từ 1 sau lần gọi đầu tiên. Jitter được lấy trong
+        ``[0, capped_delay * jitter_ratio]`` để các client không retry cùng lúc.
+        Các giá trị này là resource-control parameters, không liên quan confidence.
+        """
         delay = self.base_delay_seconds * (2 ** max(0, retry_index - 1))
         capped = min(delay, self.max_delay_seconds)
         if capped <= 0 or self.jitter_ratio <= 0:
@@ -43,6 +55,7 @@ class RetryPolicy:
 
 
 def is_retryable_exception(exc: BaseException) -> bool:
+    """Phân biệt lỗi có thể retry; cancellation luôn được truyền ra ngoài."""
     if isinstance(exc, asyncio.CancelledError):
         return False
     if isinstance(exc, (ProviderTimeoutError, ProviderUnavailableError)):
@@ -92,6 +105,7 @@ def is_retryable_exception(exc: BaseException) -> bool:
 
 
 def classify_provider_exception(exc: BaseException, *, provider_name: str) -> RuntimeResilienceError:
+    """Chuẩn hóa exception SDK/transport thành contract resilience của project."""
     if isinstance(exc, RuntimeResilienceError):
         return exc
     if isinstance(exc, (asyncio.TimeoutError, TimeoutError, httpx.TimeoutException)):
@@ -116,6 +130,7 @@ async def sleep_with_budget(
     budget: DeadlineBudget,
     sleep: Any = asyncio.sleep,
 ) -> bool:
+    """Sleep không vượt quá deadline và báo budget còn hiệu lực hay không."""
     if delay_seconds <= 0:
         return True
     effective = min(delay_seconds, budget.remaining_seconds())

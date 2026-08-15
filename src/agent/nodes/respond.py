@@ -1,7 +1,8 @@
-"""
-src/agent/nodes/respond.py
-==========================
-LangGraph node for final answer presentation.
+"""Chuẩn hóa presentation và source mention cho mọi đường trả lời.
+
+Generated, cached và fallback drafts đều đi qua cùng presentation policy. Source
+allowlist giới hạn tên nguồn có thể hiển thị; validation này kiểm identity, không
+đánh giá nội dung nguồn có đủ để chứng minh từng claim hay không.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ def _question_for_presentation(state: ClinicalState) -> str:
 
 
 async def finalize_response_node(state: ClinicalState) -> dict:
-    """Finalize every answer path through the unified presentation policy."""
+    """Đưa mọi answer path qua cùng presentation và source policy."""
 
     query = _question_for_presentation(state)
     fallback_type = state.get("fallback_type")

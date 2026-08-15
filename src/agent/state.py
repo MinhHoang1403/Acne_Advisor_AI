@@ -1,4 +1,9 @@
-"""Small shared state contract for the production LangGraph agent."""
+"""Contract state dùng chung giữa các node của LangGraph Agent.
+
+Mỗi node chỉ đọc/ghi các field cần truyền sang node kế tiếp; dữ liệu tạm nên ở
+local variable hoặc trace nhỏ. File này định nghĩa hình dạng dữ liệu, không chứa
+routing, retrieval, safety hay generation logic.
+"""
 
 from __future__ import annotations
 
@@ -9,13 +14,9 @@ AgentAction = Literal["retrieve", "retry", "generate", "abstain", "finalize"]
 
 
 class ClinicalState(TypedDict, total=False):
-    """Fields that cross a production graph-node boundary.
+    """Các field có thể đi qua ranh giới giữa các graph node."""
 
-    Node-local calculations belong in local variables or compact trace objects;
-    retired experiment-specific fields are intentionally excluded.
-    """
-
-    # Request and conversation
+    # Input request và conversation context đã được giới hạn kích thước.
     user_question: str
     user_id: str | None
     session_id: str | None
@@ -24,7 +25,7 @@ class ClinicalState(TypedDict, total=False):
     normalized_question: str
     conversation_context: dict[str, Any] | None
 
-    # Deterministic guard and agent decision
+    # Kết quả safety deterministic và action đã qua Python validation.
     is_in_domain: bool | None
     safety_severity: str | None
     safety_decision: dict[str, Any] | None
@@ -32,7 +33,7 @@ class ClinicalState(TypedDict, total=False):
     agent_decision: dict[str, Any] | None
     safety_override: bool
 
-    # Source evidence
+    # Evidence, provenance và trace từ retrieval; không đồng nghĩa clinical truth.
     vector_contexts: list[dict[str, Any]]
     sources: list[str]
     source_allowlist: list[dict[str, Any]]
@@ -45,7 +46,7 @@ class ClinicalState(TypedDict, total=False):
     retrieval_attempt: int
     retry_history: list[dict[str, Any]]
 
-    # Answer, safety and fallback
+    # Bản nháp, câu trả lời trình bày cuối cùng và trạng thái fallback.
     draft_answer: str
     final_answer: str
     answer_quality_report: dict[str, Any] | None
@@ -55,7 +56,7 @@ class ClinicalState(TypedDict, total=False):
     fallback_answer: str | None
     fallback_cache_eligible: bool | None
 
-    # Cache and provider identity
+    # Exact cache identity và provider/model thực tế đã phục vụ request.
     cache_checked: bool | None
     cache_hit: bool | None
     cache_reason: str | None
@@ -74,7 +75,7 @@ class ClinicalState(TypedDict, total=False):
     fallback_model: str | None
     fallback_chain: list[dict[str, Any]] | None
 
-    # Bounded runtime and observability
+    # Deadline dùng chung, version identity và telemetry có giới hạn.
     pipeline_manifest: dict[str, Any]
     pipeline_fingerprint: str
     runtime_budget: Any

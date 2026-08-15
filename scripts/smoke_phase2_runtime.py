@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Provider-free structural smoke test for the Agentic RAG runtime."""
+"""Smoke test cấu trúc Agent/RRF/context packing không gọi provider/datastore.
+
+Fixture scores chỉ chứng minh contract rank/packing và graph shape; chúng không
+đo retrieval quality hay answer correctness trên corpus thật.
+"""
 
 from __future__ import annotations
 

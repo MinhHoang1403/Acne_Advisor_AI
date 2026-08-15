@@ -1,4 +1,10 @@
-"""Deterministic structural and provenance answer verification."""
+"""Kiểm tra deterministic về presentation, cấu trúc và provenance identity.
+
+Verifier phát hiện lỗi format và packed evidence thiếu ``item_id``/text/source.
+Nó không thực hiện entailment, không so claim với nguồn và không xác minh clinical
+truth. Vì vậy ``passed=True`` chỉ nói answer đạt các contract kỹ thuật được liệt
+kê trong report, không phải chứng nhận nội dung đúng y khoa.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +25,7 @@ def verify_answer_quality(
     packed_context: PackedContext | None = None,
     retrieval_trace: Any | None = None,
 ) -> AnswerVerificationReport:
-    """Check answer shape and evidence identity without judging medical truth."""
+    """Kiểm tra shape và evidence identity mà không phán xét medical truth."""
 
     issues = [
         _issue(

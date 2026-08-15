@@ -1,8 +1,9 @@
-"""
-src/database/connection.py – Database Engine & Session Factory
-=============================================================
-12-Factor App: Backing Services – treat database as an attached resource.
-Connection URL comes entirely from the DATABASE_URL environment variable.
+"""Khởi tạo SQLAlchemy engine và factory cho PostgreSQL sessions.
+
+Connection URL đến từ ``DATABASE_URL``. Long-running API dùng connection pool;
+test/script có thể bật ``DB_USE_NULL_POOL``. ``get_session`` sở hữu transaction:
+commit khi dependency hoàn tất, rollback khi exception và đóng session khi thoát.
+Module không chứa query nghiệp vụ; query chat nằm trong repositories.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ DATABASE_URL: str = os.environ.get(
 )
 
 # ---------------------------------------------------------------------------
-# Engine – use NullPool in tests/scripts, pool in long-running services
+# NullPool dành cho process ngắn/test; service dài hạn tái sử dụng connection pool.
 # ---------------------------------------------------------------------------
 _use_null_pool = os.getenv("DB_USE_NULL_POOL", "false").lower() == "true"
 
@@ -42,7 +43,7 @@ engine = create_async_engine(
 )
 
 # ---------------------------------------------------------------------------
-# Session factory
+# Session không expire object sau commit để API vẫn đọc được dữ liệu đã ghi.
 # ---------------------------------------------------------------------------
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -54,7 +55,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Async context manager / FastAPI dependency that yields a DB session."""
+    """Yield một session và sở hữu commit/rollback cho FastAPI dependency."""
     async with AsyncSessionLocal() as session:
         try:
             yield session

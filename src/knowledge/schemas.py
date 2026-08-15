@@ -189,6 +189,8 @@ class EntityCard(BaseModel):
         return self.model_dump(mode="json")
 
     def stable_id(self, kb_version: str = "frozen_phase1_build") -> str:
+        # Stable ID hash gồm build/taxonomy/schema/type/canonical name rồi lấy 24
+        # hex characters. Đây là deterministic identity, không phải security token.
         raw = "|".join(
             [
                 kb_version,
