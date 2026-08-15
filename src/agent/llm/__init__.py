@@ -1,8 +1,4 @@
-"""
-src/agent/llm/__init__.py
-=========================
-LLM provider abstraction module.
-"""
+"""Abstraction layer cho các LLM provider."""
 
 from src.agent.llm.provider import generate_llm_response
 from src.agent.llm.ollama_client import list_ollama_models

@@ -28,10 +28,10 @@ async def create_or_update_session(
     hidden: bool = False,
     metadata: Optional[dict] = None,
 ) -> dict:
-    """
-    UPSERT a chat session.
-    If session_id already exists, update title only if the DB title is the default.
-    Always updates updated_at.
+    """UPSERT chat session và luôn cập nhật ``updated_at``.
+
+    Khi ``session_id`` đã tồn tại, câu lệnh chỉ bổ sung ``user_id`` còn thiếu;
+    title hiện có không bị ghi đè tại repository boundary này.
     """
     result = await session.execute(
         text("""
@@ -64,9 +64,10 @@ async def save_message(
     metadata: Optional[dict] = None,
     created_at: Optional[datetime] = None,
 ) -> dict:
-    """
-    Insert a chat message. Uses ON CONFLICT DO NOTHING on the primary key
-    to prevent duplicates when the same message_id is sent again (retry/refresh).
+    """Ghi chat message theo idempotency key là primary key ``message_id``.
+
+    ``ON CONFLICT DO NOTHING`` ngăn tạo bản sao khi client gửi lại cùng message
+    do retry hoặc refresh.
     """
     if message_id is None:
         message_id = str(uuid.uuid4())
@@ -104,10 +105,7 @@ async def get_sessions(
     user_id: Optional[str] = None,
     include_hidden: bool = False,
 ) -> list[dict]:
-    """
-    Get chat sessions sorted by updated_at DESC.
-    By default, only returns non-hidden sessions.
-    """
+    """Đọc chat sessions theo ``updated_at`` giảm dần, mặc định bỏ session ẩn."""
     conditions = []
     params: dict[str, Any] = {}
 
@@ -137,9 +135,7 @@ async def get_messages(
     session_id: str,
     limit: int = 50,
 ) -> list[dict]:
-    """
-    Get messages for a session, sorted by created_at ASC.
-    """
+    """Đọc messages của một session theo ``created_at`` tăng dần."""
     result = await session.execute(
         text("""
             SELECT id, session_id, role, content, sources, metadata, created_at
@@ -158,7 +154,7 @@ async def rename_session(
     session_id: str,
     title: str,
 ) -> bool:
-    """Rename a session. Returns True if updated, False if not found."""
+    """Đổi tên session; trả ``False`` khi không tìm thấy ID."""
     result = await session.execute(
         text("""
             UPDATE chat_sessions
@@ -175,10 +171,7 @@ async def hide_session(
     session: AsyncSession,
     session_id: str,
 ) -> bool:
-    """
-    Hide a session by setting hidden=true. Does NOT delete any data.
-    Returns True if updated, False if not found.
-    """
+    """Đặt ``hidden=true`` mà không xóa dữ liệu; trả ``False`` nếu thiếu ID."""
     result = await session.execute(
         text("""
             UPDATE chat_sessions
@@ -195,7 +188,7 @@ async def touch_session(
     session: AsyncSession,
     session_id: str,
 ) -> bool:
-    """Update the updated_at timestamp of a session."""
+    """Cập nhật timestamp ``updated_at`` của session."""
     result = await session.execute(
         text("""
             UPDATE chat_sessions
@@ -212,7 +205,7 @@ async def session_exists(
     session: AsyncSession,
     session_id: str,
 ) -> bool:
-    """Check if a session exists in the database."""
+    """Kiểm tra session ID có tồn tại trong PostgreSQL hay không."""
     result = await session.execute(
         text("SELECT 1 FROM chat_sessions WHERE id = :id"),
         {"id": session_id},
@@ -224,7 +217,7 @@ async def get_message_ids_for_session(
     session: AsyncSession,
     session_id: str,
 ) -> set[str]:
-    """Get all message IDs for a session (used for dedup during sync)."""
+    """Đọc toàn bộ message ID để loại trùng khi đồng bộ một session."""
     result = await session.execute(
         text("SELECT id FROM chat_messages WHERE session_id = :session_id"),
         {"session_id": session_id},
@@ -233,11 +226,10 @@ async def get_message_ids_for_session(
 
 
 async def delete_all_chat_history(session: AsyncSession) -> dict[str, int]:
-    """
-    Delete persisted chat history only.
+    """Chỉ xóa lịch sử chat đã persist.
 
-    This removes rows from chat_messages and chat_sessions, but does not touch
-    any schema objects or indexed knowledge stores.
+    Hàm xóa rows trong ``chat_messages`` và ``chat_sessions`` nhưng không chạm
+    schema object hay knowledge store đã index.
     """
     messages_result = await session.execute(
         text("DELETE FROM chat_messages")
@@ -256,7 +248,7 @@ async def delete_all_chat_history(session: AsyncSession) -> dict[str, int]:
 # ---------------------------------------------------------------------------
 
 def _json_or_none(value: Any) -> Any:
-    """Return the value as a JSON string if truthy, else None (for JSONB columns)."""
+    """Đổi dict/list khác rỗng thành JSON string phù hợp JSONB, còn lại giữ nguyên."""
     if value is None:
         return None
     if isinstance(value, (list, dict)) and len(value) == 0:
@@ -275,7 +267,7 @@ _SENSITIVE_KEYS = frozenset({
 
 
 def _sanitize_metadata(meta: dict) -> dict:
-    """Remove sensitive fields from metadata before storing."""
+    """Loại field nhạy cảm khỏi metadata trước khi lưu."""
     if not isinstance(meta, dict):
         return {}
     return {

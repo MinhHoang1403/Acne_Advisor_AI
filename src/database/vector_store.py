@@ -60,8 +60,10 @@ def qdrant_client_kwargs() -> dict[str, Any]:
 def _embed_sync(text: str) -> list[float]:
     """Gửi một query tới Gemini embedding provider theo lời gọi đồng bộ.
 
-    Gemini Embedding 2 does not accept a task type. Documents and queries share
-    the same versioned model and index contract.
+    Gemini Embedding 2 không nhận ``task_type`` qua API. Document và query hiện
+    dùng chung model/index contract, không thêm retrieval-specific instruction
+    vào text; đây là cấu hình hiện tại chứ không phải lựa chọn đã chứng minh tối
+    ưu cho corpus.
     """
     from src.integrations.google_genai import embed_texts_sync
 
@@ -85,11 +87,11 @@ def _embed_sync(text: str) -> list[float]:
 async def embed_query(text: str) -> list[float]:
     """Nhận Dense query vector từ Gemini mà không chặn event loop.
 
-    Transient transport failures are retried locally because an unavailable
-    query embedding would otherwise force a safe fallback despite an intact
-    knowledge base. Permanent provider/configuration errors are never retried.
+    Lỗi transport tạm thời được retry cục bộ vì thiếu query embedding sẽ buộc
+    runtime fallback dù knowledge base vẫn dùng được. Lỗi provider/configuration
+    vĩnh viễn không được retry.
 
-    Returns a dense vector of EMBEDDING_DIMENSIONS floats.
+    Kết quả phải là Dense vector gồm ``EMBEDDING_DIMENSIONS`` số thực.
     """
     settings = runtime_resilience_settings_from_env()
     max_attempts = _positive_int_env("EMBEDDING_QUERY_MAX_ATTEMPTS", 3)

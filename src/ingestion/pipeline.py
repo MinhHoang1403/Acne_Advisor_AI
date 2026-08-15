@@ -241,7 +241,7 @@ async def activate_phase1(
 ) -> dict[str, Any]:
     """Activate candidate đã validate sau khi chứng minh rollback artifacts tồn tại.
 
-    Side effects gồm thay Neo4j entity graph theo build ID và chuyển hai Qdrant
+    Tác động ghi gồm thay Neo4j entity graph theo build ID và chuyển hai Qdrant
     logical aliases sang physical candidates. Đây là operator operation có chủ ý,
     không chạy trong API request path.
     """

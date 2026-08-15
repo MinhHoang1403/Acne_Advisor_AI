@@ -117,7 +117,7 @@ test('message hierarchy keeps user text light and assistant markdown prominent',
   assert.match(finalPolish, /\.chat-assistant-text\s*{[^}]*color: #0f172a;[^}]*line-height: 1\.74;/s);
 });
 
-test('white neutral polish and Acne Advisor favicon are active', () => {
+test('white neutral polish and Acne Advisor AI favicon are active', () => {
   const styles = readSource('../styles.css');
   const indexHtml = readSource('../../index.html');
   const favicon = readSource('../../public/favicon.svg');
@@ -195,8 +195,7 @@ test('main top header is removed and stable status text lives in sidebar', () =>
   assert.match(sidebar, /connectionState === 'connected'\) return 'Đang hoạt động'/);
   assert.match(sidebar, /return 'Đang chờ kết nối'/);
   assert.match(sidebar, /!isConnectionPending/);
-  assert.match(sidebar, /Acne Advisor/);
-  assert.doesNotMatch(sidebar, /Acne Advisor AI/);
+  assert.match(sidebar, /Acne Advisor AI/);
   assert.doesNotMatch(sidebar, /sidebar-brand-mark/);
   assert.doesNotMatch(sidebar, /Thông tin tham khảo/);
   assert.match(styles, /\.chat-header\s*{[^}]*display: none;/s);

@@ -1,4 +1,4 @@
-"""LangGraph nodes for deterministic safe fallback flow."""
+"""LangGraph nodes chuyển generation lỗi sang deterministic safe fallback."""
 
 from __future__ import annotations
 
@@ -16,12 +16,12 @@ from src.quality.safe_fallback import (
 
 
 async def generation_fallback_decision_node(state: ClinicalState) -> dict[str, Any]:
-    """Validate generated draft answer before finalize_response_node."""
+    """Kiểm draft answer trước khi ``finalize_response_node`` xử lý."""
 
     draft_answer = state.get("draft_answer")
     if isinstance(draft_answer, str):
-        # Reuse the deterministic presentation cleanup before treating a
-        # dangling Markdown heading as an invalid medical generation.
+        # Dùng presentation cleanup deterministic trước khi coi Markdown heading
+        # bị treo là generation không hợp lệ.
         draft_answer = normalize_answer_markdown(draft_answer)
         draft_answer = repair_terminal_punctuation(draft_answer)
     decision = decide_generation_fallback(draft_answer)
@@ -45,7 +45,7 @@ async def generation_fallback_decision_node(state: ClinicalState) -> dict[str, A
 
 
 async def safe_fallback_node(state: ClinicalState) -> dict[str, Any]:
-    """Convert a safe fallback decision into the draft answer used by finalize."""
+    """Chuyển safe-fallback decision thành draft answer cho bước finalize."""
 
     fallback_type = state.get("fallback_type") or "no_retrieval_evidence"
     fallback_reason = state.get("fallback_reason")

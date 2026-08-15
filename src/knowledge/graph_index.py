@@ -32,7 +32,7 @@ PrimitiveNeo4jValue = str | int | float | bool
 
 
 def get_neo4j_driver() -> Any:
-    """Create an async Neo4j driver using the project's env config."""
+    """Tạo async Neo4j driver từ cấu hình môi trường của project."""
 
     try:
         from neo4j import AsyncGraphDatabase  # type: ignore[import]
@@ -46,7 +46,7 @@ def get_neo4j_driver() -> Any:
 
 
 async def apply_entity_graph_schema(driver: Any) -> None:
-    """Apply deterministic entity graph constraints and indexes."""
+    """Áp dụng constraint và index deterministic cho entity graph."""
 
     async with driver.session() as session:
         for statement in get_entity_graph_constraints():
@@ -190,7 +190,7 @@ async def replace_entity_graph(
 
 
 async def validate_entity_graph(driver: Any) -> dict[str, Any]:
-    """Validate minimal deterministic relationships in Neo4j."""
+    """Kiểm các quan hệ deterministic tối thiểu trong Neo4j."""
 
     required_checks = {
         "clindamycin_topical_antibiotic": (

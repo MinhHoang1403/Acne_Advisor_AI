@@ -1,4 +1,4 @@
-"""Deterministic Neo4j schema and record builder for taxonomy entity graphs."""
+"""Neo4j schema và record builder deterministic cho taxonomy entity graph."""
 
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ CANONICAL_RELATIONSHIP_SCHEMAS: dict[str, RelationshipSchema] = {
 
 
 def get_entity_graph_constraints() -> list[str]:
-    """Return idempotent Neo4j uniqueness constraints for entity graph labels."""
+    """Trả uniqueness constraints idempotent cho Neo4j entity labels."""
 
     return [
         (
@@ -148,7 +148,7 @@ def get_entity_graph_constraints() -> list[str]:
 
 
 def get_entity_graph_indexes() -> list[str]:
-    """Return minimal lookup indexes for deterministic entity graph nodes."""
+    """Trả lookup indexes tối thiểu cho deterministic entity graph nodes."""
 
     indexes: list[str] = []
     for label in ENTITY_GRAPH_LABELS:
@@ -167,7 +167,7 @@ def build_entity_graph_records(
     cards: list[EntityCard],
     kb_version: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    """Build deterministic Neo4j node/relationship records from entity cards."""
+    """Tạo Neo4j node/relationship records deterministic từ entity cards."""
 
     versions = get_knowledge_versions()
     resolved_kb_version = kb_version or versions["kb_version"]
@@ -317,7 +317,7 @@ def build_entity_graph_records(
 
 
 def summarize_graph_records(records: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, int]]:
-    """Return count summaries for dry-run output."""
+    """Trả count summary cho dry-run output."""
 
     return {
         "nodes_by_label": dict(
@@ -348,7 +348,7 @@ def _relationship_source_ids(
     source_card: EntityCard | None,
     target_card: EntityCard | None,
 ) -> list[str]:
-    """Keep deterministic edge provenance traceable to curated endpoints."""
+    """Giữ provenance của deterministic edge truy ngược được tới curated endpoints."""
 
     source_ids = [
         *(source_card.source_ids if source_card else []),

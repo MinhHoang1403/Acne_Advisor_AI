@@ -70,7 +70,7 @@ async def generate_text_async(
     request_timeout: float | None = None,
     client: Any | None = None,
 ) -> str | None:
-    """Generate text with the async Google GenAI client."""
+    """Sinh text qua async Google GenAI client và chuẩn hóa lỗi provider."""
 
     async def _call() -> Any:
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
@@ -105,7 +105,7 @@ def generate_text_sync(
     request_timeout: float | None = None,
     client: Any | None = None,
 ) -> str | None:
-    """Generate text with the sync Google GenAI client."""
+    """Sinh text qua synchronous Google GenAI client và chuẩn hóa lỗi provider."""
 
     try:
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
@@ -125,7 +125,7 @@ def generate_text_sync(
 
 
 def extract_response_text(response: Any) -> str | None:
-    """Extract text defensively from a Google GenAI response or test double."""
+    """Đọc text an toàn từ Google GenAI response hoặc test double tương đương."""
 
     try:
         text = getattr(response, "text")
@@ -228,7 +228,7 @@ def validate_embedding_vectors(
 
 
 def normalize_google_genai_exception(exc: Exception) -> Exception:
-    """Map Google GenAI SDK exceptions into runtime resilience exceptions."""
+    """Map Google GenAI SDK exception sang exception contract của resilience layer."""
 
     if isinstance(exc, (PermanentProviderError, ProviderTimeoutError, ProviderUnavailableError)):
         return exc

@@ -30,7 +30,8 @@ BM25_VECTOR_NAME = "bm25"
 # không phải ngưỡng chất lượng y khoa hay các giá trị được tuyên bố là tối ưu.
 BM25_K1 = 1.2
 BM25_B = 0.75
-# Giá trị avg document length được gửi cho Qdrant trong cùng contract.
+# Đây là configured provider/index baseline gửi cho Qdrant, không phải average
+# length đã đo từ corpus và cũng chưa được chứng minh là tối ưu.
 BM25_AVG_LEN = 256.0
 BM25_TOKENIZER = models.TokenizerType.WORD
 BM25_LANGUAGE = "none"

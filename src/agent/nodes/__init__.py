@@ -1,1 +1,1 @@
-"""src/agent/nodes package – individual LangGraph node functions."""
+"""Các LangGraph node function riêng lẻ của Agent."""

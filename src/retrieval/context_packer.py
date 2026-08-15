@@ -24,9 +24,9 @@ def pack_context(
 ) -> PackedContext:
     """Đóng gói candidate theo fused rank mà không đổi thứ tự relevance.
 
-    ``max_items`` and ``max_chars`` are resource limits, not relevance
-    heuristics. Every selected item retains its point, chunk, document, and
-    source identifiers in the payload.
+    ``max_items`` và ``max_chars`` là giới hạn tài nguyên, không phải relevance
+    heuristic. Mỗi item được chọn vẫn giữ point, chunk, document và source
+    identifiers trong payload.
     """
 
     item_limit = max(1, max_items)

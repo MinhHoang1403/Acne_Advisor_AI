@@ -1,7 +1,7 @@
 """
 dermatology_taxonomy.py
 =======================
-Dermatology domain vocabulary for acne-agent-system.
+Từ vựng dermatology domain dùng bởi Acne Advisor AI.
 
 Defines canonical categories, keyword dictionaries, and Vietnamese → English
 mappings used by the rule-based metadata extractor in ``domain_metadata.py``.
@@ -12,7 +12,7 @@ All canonical values are lowercase snake_case strings.
 from __future__ import annotations
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Domain Topics
+# Chủ đề domain
 # ─────────────────────────────────────────────────────────────────────────────
 
 DOMAIN_TOPICS: list[str] = [
@@ -30,7 +30,7 @@ DOMAIN_TOPICS: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Content Types
+# Loại nội dung
 # ─────────────────────────────────────────────────────────────────────────────
 
 CONTENT_TYPES: list[str] = [
@@ -49,7 +49,7 @@ CONTENT_TYPES: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Ingredients
+# Hoạt chất
 # ─────────────────────────────────────────────────────────────────────────────
 
 INGREDIENTS: list[str] = [
@@ -67,7 +67,7 @@ INGREDIENTS: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Skin Types
+# Loại da
 # ─────────────────────────────────────────────────────────────────────────────
 
 SKIN_TYPES: list[str] = [
@@ -79,7 +79,7 @@ SKIN_TYPES: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Concerns
+# Vấn đề da
 # ─────────────────────────────────────────────────────────────────────────────
 
 CONCERNS: list[str] = [
@@ -95,7 +95,7 @@ CONCERNS: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Body Areas
+# Vùng cơ thể
 # ─────────────────────────────────────────────────────────────────────────────
 
 BODY_AREAS: list[str] = [
@@ -109,7 +109,7 @@ BODY_AREAS: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Safety Contexts
+# Bối cảnh an toàn
 # ─────────────────────────────────────────────────────────────────────────────
 
 SAFETY_CONTEXTS: list[str] = [
@@ -126,12 +126,12 @@ SAFETY_CONTEXTS: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Keyword dictionaries for rule-based matching
+# Từ điển keyword cho rule-based matching
 # ─────────────────────────────────────────────────────────────────────────────
-# Each dict maps a canonical value → list of keyword patterns (lowercased).
-# Both English and Vietnamese keywords are included.
+# Mỗi dict map canonical value sang danh sách keyword pattern chữ thường.
+# Danh sách gồm cả keyword tiếng Anh và tiếng Việt.
 #
-# The extractor converts the input text to lowercase and checks for substring
+# Extractor chuyển input text về chữ thường rồi kiểm substring
 # matches, so these should be reasonably specific to avoid false positives.
 
 DOMAIN_TOPIC_KEYWORDS: dict[str, list[str]] = {

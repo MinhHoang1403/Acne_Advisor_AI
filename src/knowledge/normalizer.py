@@ -43,7 +43,7 @@ SECTION_TO_ENTITY_TYPE: dict[str, EntityType] = {
 
 
 def normalize_text_key(text: str) -> str:
-    """Normalize free text while preserving Vietnamese characters."""
+    """Chuẩn hóa free text nhưng giữ nguyên ký tự tiếng Việt."""
 
     normalized = unicodedata.normalize("NFKC", text or "")
     normalized = normalized.replace("‐", "-").replace("‑", "-")
@@ -156,7 +156,7 @@ class DrugEntityNormalizer:
         return EntityCard(**payload)
 
     def match_alias(self, text: str) -> list[EntityCard]:
-        """Find entity aliases inside text using normalized token boundaries."""
+        """Tìm entity aliases trong text theo normalized token boundaries."""
 
         normalized_text = normalize_text_key(text)
         ascii_text = _ascii_text_key(text)
@@ -170,13 +170,13 @@ class DrugEntityNormalizer:
         return self._dedupe_cards(matches)
 
     def normalize_mention(self, mention: str) -> list[EntityCard]:
-        """Normalize a short mention such as 'Dalacin T' or 'Epiduo'."""
+        """Chuẩn hóa mention ngắn như ``Dalacin T`` hoặc ``Epiduo``."""
 
         key = normalize_text_key(mention)
         return self._dedupe_cards(self.alias_index.get(key, []))
 
     def incompatible_alias_collisions(self) -> dict[str, list[str]]:
-        """Return aliases resolving to more than one runtime entity identity."""
+        """Trả aliases đang resolve tới nhiều hơn một runtime entity identity."""
 
         collisions: dict[str, list[str]] = {}
         for alias, cards in sorted(self.alias_index.items()):

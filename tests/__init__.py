@@ -1,1 +1,1 @@
-"""tests package – Acne Agent System test suite."""
+"""Test suite của Acne Advisor AI."""

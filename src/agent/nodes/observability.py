@@ -1,4 +1,4 @@
-"""LangGraph node for optional runtime observability export."""
+"""LangGraph node tùy chọn để export runtime observability."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 async def observability_export_node(state: ClinicalState) -> dict[str, Any]:
-    """Export a sanitized trace when observability is explicitly enabled."""
+    """Export trace đã sanitize khi observability được bật tường minh."""
 
     enabled = os.getenv("OBSERVABILITY_ENABLED", "false").strip().lower() in {
         "1",

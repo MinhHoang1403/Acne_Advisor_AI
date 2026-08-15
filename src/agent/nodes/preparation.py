@@ -1,4 +1,4 @@
-"""Lossless request and bounded conversation preparation."""
+"""Chuẩn bị request không làm mất nghĩa và conversation có giới hạn."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from src.agent.state import ClinicalState
 
 
 async def prepare_request_node(state: ClinicalState) -> dict[str, object]:
-    """Normalize whitespace and expose one bounded history representation."""
+    """Chuẩn hóa whitespace và tạo một biểu diễn history có giới hạn."""
 
     question = " ".join(str(state.get("user_question") or "").split())
     max_messages = _bounded_int("MAX_CONVERSATION_HISTORY_MESSAGES", 10, 0, 20)

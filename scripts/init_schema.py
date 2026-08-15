@@ -141,7 +141,7 @@ async def _setup_postgres() -> None:
 
 
 async def _setup_qdrant() -> None:
-    """Refuse to create or recreate the validated knowledge collection here."""
+    """Giữ ownership của knowledge collection ngoài schema initialization."""
 
     logger.info(
         "Qdrant ownership belongs to scripts/phase1.py; init_schema does not mutate %s.",
@@ -179,7 +179,7 @@ async def main() -> int:
 
 
 def cli() -> int:
-    """Synchronous console-script wrapper."""
+    """Wrapper đồng bộ cho console script."""
 
     return asyncio.run(main())
 

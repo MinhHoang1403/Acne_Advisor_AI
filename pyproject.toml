@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "acne-agent-system"
+name = "acne-advisor-ai"
 version = "0.1.0"
 description = "Vietnamese acne information assistant with evidence-grounded Agentic RAG"
 requires-python = ">=3.11,<3.12"

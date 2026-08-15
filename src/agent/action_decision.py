@@ -43,7 +43,7 @@ DecisionReason = Literal[
 
 
 class AgentDecision(BaseModel):
-    """Small action-only contract; it cannot carry medical facts or free reasoning."""
+    """Contract nhỏ chỉ chứa action, không mang medical fact hay free reasoning."""
 
     model_config = ConfigDict(extra="forbid")
 

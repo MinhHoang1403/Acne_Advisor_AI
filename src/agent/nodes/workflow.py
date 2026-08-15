@@ -26,7 +26,7 @@ from src.quality.safe_fallback import sanitize_fallback_reason
 from src.retrieval.service import retrieve_evidence
 
 async def prepare_node(state: ClinicalState) -> dict[str, Any]:
-    """Normalize the request and expose bounded conversation context."""
+    """Chuẩn hóa request và chỉ đưa conversation context hữu hạn vào state."""
 
     return await prepare_request_node(state)
 

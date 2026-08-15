@@ -1,4 +1,4 @@
-"""Deterministic safe fallback helpers for the Agentic RAG chat flow."""
+"""Helper safe fallback deterministic cho Agentic RAG chat flow."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ class SafeFallbackDecision(BaseModel):
 
 
 def sanitize_fallback_reason(value: Any, *, max_chars: int = 160) -> str:
-    """Return a short, secret-safe reason string."""
+    """Trả reason ngắn và không làm lộ secret."""
 
     text = str(value or "").strip()
     if not text:
@@ -106,7 +106,7 @@ def decide_generation_fallback(value: Any) -> SafeFallbackDecision:
 
 
 def build_safe_fallback_answer(fallback_type: str, query: str | None = None, reason: str | None = None) -> str:
-    """Build an infrastructure fallback without embedding medical fact rules."""
+    """Tạo infrastructure fallback mà không nhúng medical fact rules."""
 
     del query, reason
 

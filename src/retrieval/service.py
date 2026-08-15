@@ -43,7 +43,7 @@ RRF_BM25_WEIGHT = 1.0
 
 @dataclass
 class RetrievalResult:
-    """Source-backed retrieval output consumed by the agent and `/retrieve`."""
+    """Retrieval output có source identity cho Agent và endpoint ``/retrieve``."""
 
     vector_contexts: list[dict[str, Any]]
     sources: list[str]

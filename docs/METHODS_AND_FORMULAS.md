@@ -6,11 +6,23 @@ The current indexed knowledge collection uses `models/gemini-embedding-2`, 3072
 dimensions, and cosine distance. Runtime query embeddings use the same model
 contract. Runtime retrieval does not rebuild or alter stored vectors.
 
+Google owns vector generation; the project sends text and validates output count
+and dimension; Qdrant owns cosine search over stored vectors. Official Gemini
+Embedding 2 documentation does not accept `task_type` and recommends embedding
+task instructions as text prefixes for text-only retrieval. The current build and
+runtime query path use unprefixed text. Whether query/document prefixes improve
+Vietnamese acne retrieval is an unmeasured evaluation question that would require
+a controlled re-embedding experiment; this documentation does not change the
+current vectors or index.
+
 ## Native BM25
 
-The sparse channel is Qdrant-native BM25 with collection-side IDF and the
-validated build configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer `word`,
-lowercase enabled, language `none`, no stemming, and no stopword list.
+The sparse channel is Qdrant-native BM25 with collection-side IDF and the current
+build configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer `word`, lowercase
+enabled, language `none`, no stemming, and no stopword list. Here `avg_len=256` is
+a configured provider/index baseline. It is not asserted to be the measured true
+average of the current corpus. Neither the BM25 literature nor Qdrant provider
+documentation proves these values optimal for Acne Advisor AI.
 
 For term `t`, document `d`, corpus size `N`, document frequency `n(t)`, document
 length `|d|`, and average length `avgdl`:
@@ -29,15 +41,19 @@ Dense and BM25 results are fused only by rank in `src/retrieval/rrf.py`:
 RRF(d) = sum_r w_r / (k + rank_r(d))
 ```
 
-The runtime uses `k=60`, `w_dense=1.0`, and `w_bm25=1.0`. Equal weights are an explicit
-engineering policy, not a clinical constant. No post-fusion relevance
-adjustment or structural-store score changes the fused ranking.
+The runtime uses `k=60`, `w_dense=1.0`, and `w_bm25=1.0`. The RRF paper supports
+rank-based reciprocal fusion; it does not establish those project constants as
+optimal. Equal weights are an explicit engineering policy, not a clinical
+constant. No post-fusion relevance adjustment or structural-store score changes
+the fused ranking.
 
 ## Context and Evidence Contracts
 
 `src/retrieval/context_packer.py` preserves fused order, deduplicates only by
 stable item identity, retains provenance, and enforces finite item/character
-budgets. Evidence is marked usable only when at least one packed item has both
+budgets. The defaults are 8 packed items and 6000 characters from an initial
+candidate pool of 16. These are resource policies, not relevance thresholds.
+Evidence is marked usable only when at least one packed item has both
 text and a source identifier. This is a deterministic presence/provenance check,
 not a semantic sufficiency or entailment claim. The exact bounded
 `PackedContext.context_text` is the evidence sent to generation; full candidate
@@ -81,7 +97,15 @@ cache_schema_version | answer_cache_version | pipeline_fingerprint
 ```
 
 This is an engineering cache policy. It does not compute embedding similarity
-and makes no semantic-equivalence claim.
+and makes no semantic-equivalence claim. SHA-256 follows NIST FIPS 180-4, but
+that standard does not validate the chosen fields or normalization policy.
+
+The pipeline fingerprint uses the first 24 hexadecimal characters of SHA-256
+over a canonical, secret-free JSON manifest. It is a deterministic cache/version
+partition, not an authentication signature. EntityCard Qdrant point IDs use
+UUIDv5 from RFC 9562 with `uuid.NAMESPACE_URL` and the canonical project entity
+identity. The standard defines deterministic UUID construction, not the
+project's canonical-name semantics or provenance quality.
 
 ## Runtime Resilience
 
@@ -99,6 +123,17 @@ timeouts, and transport failures are transient; HTTP 400/401/403/404/422 and
 validation/configuration failures are permanent. These classifications are an
 engineering resilience policy, not a medical or research result.
 
+All stages share one finite deadline. For configured stage timeout `T` and
+remaining request budget `R`, the effective timeout is:
+
+```text
+effective_timeout = min(T, R)
+```
+
+Retry and provider fallback consume the same remaining budget. AWS engineering
+guidance supports finite timeout, retry, exponential backoff, and jitter as a
+pattern; it does not prescribe this project's exact retry count or timing values.
+
 ## Safety and Verification
 
 `src/agent/safety_policy.py` owns seven narrow deterministic overrides mapped to
@@ -115,6 +150,22 @@ entailment, or evidence completeness.
 Structure-aware chunking is capped at 2400 Unicode characters with zero overlap.
 Filtering, provenance, embedding, BM25, taxonomy, EntityCard, and Neo4j settings
 are versioned parts of the current validated build.
+
+Chunk boundaries prefer headings, paragraphs, and sentences. Segmentation
+literature supports the claim that segmentation can affect RAG, but the project
+does not implement PIC and has not established the 2400-character cap or zero
+overlap as optimal.
+
+Domain metadata retains a compatibility field named `confidence`, calculated
+only as a coverage heuristic over `n` populated metadata groups:
+
+```text
+metadata_coverage(n) = 0                              if n = 0
+metadata_coverage(n) = min(0.3 + 0.1 * n, 1.0)       otherwise
+```
+
+This value does not enter retrieval scoring and is not a calibrated probability,
+medical confidence, source reliability score, or scientific formula.
 
 ## Parameter Classification
 
@@ -141,8 +192,10 @@ are versioned parts of the current validated build.
 | source allowlist | evidence source IDs only | provenance engineering contract |
 | core preflight | Qdrant, query embedding, generation provider | architecture dependency contract |
 
-These values are not clinical constants. Their definitions and method sources
-are mapped in `data/phase1_method_sources.json` and [References](REFERENCES.md).
+These values are not clinical constants. Their definitions, code owners, sources,
+adaptations, and limitations are mapped in
+[Method Traceability](METHOD_TRACEABILITY.md),
+`data/phase1_method_sources.json`, and [References](REFERENCES.md).
 
 ## Source Classification
 

@@ -1,4 +1,4 @@
-"""Provider-neutral presentation and structural answer contracts."""
+"""Presentation và structural answer contract không phụ thuộc provider."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ ANSWER PRESENTATION CONTRACT V12:
 
 
 def answer_format_instruction_for_question(question: str) -> str:
-    """Return shape-only instructions without embedding medical facts."""
+    """Trả instruction chỉ về hình thức, không nhúng medical facts."""
 
     structure = parse_requested_structure(question)
     hints: list[str] = []
@@ -82,7 +82,7 @@ def infer_response_profile(
     severity: str | None = None,
     fallback_type: str | None = None,
 ) -> ResponseProfile:
-    """Infer presentation shape from request and already-decided safety state."""
+    """Suy ra presentation shape từ request và safety state đã được quyết định."""
 
     text = _fold(question)
     if fallback_type and fallback_type != "none":
@@ -105,7 +105,7 @@ def finalize_answer_presentation(
     fallback_type: str | None = None,
     add_disclaimer: bool | None = None,
 ) -> str:
-    """Apply non-semantic cleanup while preserving the provider draft."""
+    """Dọn hình thức mà không đổi semantics của provider draft."""
 
     profile = response_profile or infer_response_profile(
         user_question,
@@ -132,7 +132,7 @@ def finalize_answer_presentation(
 
 
 def normalize_answer_markdown(text: str, *, disclaimer: str | None = None) -> str:
-    """Normalize Markdown without changing medical meaning."""
+    """Chuẩn hóa Markdown mà không thay đổi ý nghĩa y khoa."""
 
     answer = _remove_greetings(_normalize_newlines(text))
     answer = _normalize_table_spacing(answer)
@@ -146,7 +146,7 @@ def normalize_answer_markdown(text: str, *, disclaimer: str | None = None) -> st
 
 
 def strip_leading_question_echo(answer: str, user_question: str) -> str:
-    """Remove only a high-confidence question echo from the opening."""
+    """Chỉ bỏ question echo ở đầu khi phép so khớp có độ chắc chắn cao."""
 
     if not answer or not user_question:
         return answer
@@ -169,7 +169,7 @@ def assess_structural_quality(
     user_question: str = "",
     response_profile: ResponseProfile | None = None,
 ) -> list[dict[str, Any]]:
-    """Report presentation/shape violations without evaluating medical truth."""
+    """Báo presentation/shape violation mà không đánh giá medical truth."""
 
     text = _normalize_newlines(answer)
     profile = response_profile or infer_response_profile(user_question)
@@ -229,7 +229,7 @@ def assess_structural_quality(
 
 
 def repair_terminal_punctuation(text: str) -> str:
-    """Add punctuation only when a complete-looking final sentence lacks it."""
+    """Chỉ thêm dấu câu khi câu cuối có vẻ hoàn chỉnh nhưng thiếu dấu kết thúc."""
 
     if not _has_incomplete_terminal_sentence(text):
         return text

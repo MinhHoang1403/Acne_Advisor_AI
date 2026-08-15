@@ -16,7 +16,7 @@ _EXACT_FOOTER_PATTERNS = (
 
 
 def normalize_parsed_text(text: str) -> str:
-    """Normalize Unicode/newlines/spacing and remove exact repeated PDF footers."""
+    """Chuẩn hóa Unicode/newline/spacing và bỏ PDF footer lặp chính xác."""
 
     normalized = unicodedata.normalize("NFC", text or "")
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")

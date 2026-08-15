@@ -11,23 +11,28 @@ clinical sources are deliberately separated.
   Framework: BM25 and Beyond*. Foundations and Trends in Information
   Retrieval, 3(4), 333-389. DOI: 10.1561/1500000019. Supports the BM25 family,
   term-frequency saturation, inverse document frequency, and length
-  normalization.
+  normalization. It does not specify Qdrant implementation details or prove the
+  project's `k1`, `b`, `avg_len`, tokenizer, or language settings optimal.
 - Cormack, G. V., Clarke, C. L. A., and Buettcher, S. (2009). *Reciprocal Rank
   Fusion Outperforms Condorcet and Individual Rank Learning Methods*. SIGIR.
   DOI: 10.1145/1571941.1572114. Supports rank-only fusion at the runtime
-  boundary; it is not part of knowledge indexing.
+  boundary; it is not part of knowledge indexing. It does not prove `k=60` or
+  equal Dense/BM25 weights optimal for this corpus.
 - Lewis, P. et al. (2020). *Retrieval-Augmented Generation for
   Knowledge-Intensive NLP Tasks*. NeurIPS. Establishes retrieval-grounded
   generation as a distinct model/evidence architecture.
 - Yao, S. et al. (2023). *ReAct: Synergizing Reasoning and Acting in Language
   Models*. ICLR. Supports explicit interleaving of model decisions and bounded
-  actions/tools.
+  actions/tools. Acne Advisor AI uses a strict bounded action object and does not
+  reproduce the paper's prompt setup or expose free-form chain of thought.
 - Jiang, Z. et al. (2023). *Active Retrieval Augmented Generation*. EMNLP.
   Supports retrieval decisions driven by evidence need rather than an
-  unconditionally fixed sequence.
+  unconditionally fixed sequence. The project does not implement FLARE's
+  token-level mechanism, and the source does not validate the two-attempt limit.
 - Jeong, S. et al. (2024). *Adaptive-RAG: Learning to Adapt Retrieval-Augmented
   Large Language Models through Question Complexity*. NAACL. Supports bounded
-  adaptation of retrieval behavior to the request.
+  adaptation of retrieval behavior to the request. The project does not
+  implement the paper's complexity classifier or strategy set.
 
 ## Framework Contracts
 
@@ -39,7 +44,8 @@ clinical sources are deliberately separated.
   https://docs.langchain.com/oss/python/langgraph/agentic-rag
 - Karpukhin, V. et al. (2020). *Dense Passage Retrieval for Open-Domain
   Question Answering*. EMNLP. DOI: 10.18653/v1/2020.emnlp-main.550. Supports
-  dense retrieval as a semantic channel.
+  dense retrieval as a semantic channel. It does not validate Gemini Embedding
+  2, Vietnamese cross-lingual retrieval, or this medical corpus.
 - Wang, Z. et al. (2025). *Document Segmentation Matters for
   Retrieval-Augmented Generation*. Findings of the Association for
   Computational Linguistics: ACL 2025, 8063-8075.
@@ -52,11 +58,44 @@ clinical sources are deliberately separated.
 - Qdrant, *Full-text search* and *BM25 inference*. Verified 2026-08-14.
   https://qdrant.tech/documentation/search/text-search/full-text-search/
   https://qdrant.tech/documentation/inference/inference-bm25/
+  These pages define provider behavior/configuration, not retrieval quality or
+  parameter optimality for Acne Advisor AI.
+- Qdrant, *Collections and distance metrics*. Verified 2026-08-14.
+  https://qdrant.tech/documentation/manage-data/collections/
+  This defines the cosine-distance provider contract; it does not validate the
+  semantic quality of vectors or ranked results.
 - Google AI for Developers, *Gemini Embedding 2* and *Embeddings*. Verified
   2026-08-14. https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2
   https://ai.google.dev/gemini-api/docs/embeddings
+  The documentation supports the model/dimension contract, notes that Gemini
+  Embedding 2 does not accept `task_type`, and recommends text-prefix retrieval
+  instructions for text-only use cases. It does not validate Vietnamese acne
+  retrieval quality or whether such prefixes improve this corpus. The current
+  index remains unprefixed pending a controlled evaluation.
 - LlamaIndex, `llama-parse` 0.6.94 package contract. Verified 2026-08-14.
   https://pypi.org/project/llama-parse/0.6.94/
+
+## Technical Standards
+
+- National Institute of Standards and Technology. *Secure Hash Standard (SHS),
+  FIPS PUB 180-4*. Updated August 2015. DOI: 10.6028/NIST.FIPS.180-4.
+  https://csrc.nist.gov/pubs/fips/180-4/upd1/final
+  This standard defines SHA-256. It does not validate project field selection,
+  input normalization, digest truncation, cache semantics, or authenticity.
+- Davis, K., Peabody, B., and Leach, P. *Universally Unique IDentifiers
+  (UUIDs), RFC 9562*. May 2024. DOI: 10.17487/RFC9562.
+  https://www.rfc-editor.org/info/rfc9562/
+  This standard defines UUIDv5 construction. It does not validate project entity
+  canonicalization, source provenance, or identity semantics.
+
+## Resilience Engineering
+
+- Brooker, M.; Amazon Web Services. *Timeouts, retries, and backoff with jitter*.
+  Amazon Builders' Library, 2019.
+  https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+  This supports finite timeout, bounded retry, exponential backoff, and jitter as
+  engineering patterns. It does not prescribe the project's exact timeout,
+  retry count, delay cap, or jitter ratio.
 
 ## Canonical Clinical Corpus
 

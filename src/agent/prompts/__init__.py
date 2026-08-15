@@ -1,1 +1,1 @@
-"""src/agent/prompts package – prompt templates and system instructions."""
+"""Prompt templates và system instructions của Agent."""

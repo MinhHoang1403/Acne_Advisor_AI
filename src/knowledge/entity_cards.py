@@ -1,4 +1,4 @@
-"""Build entity-centric knowledge cards from the acne drug taxonomy."""
+"""Tạo knowledge card tập trung theo entity từ acne drug taxonomy."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _dedupe_cards(cards: Iterable[EntityCard]) -> list[EntityCard]:
 def build_entity_cards_from_taxonomy(
     normalizer: DrugEntityNormalizer | None = None,
 ) -> list[EntityCard]:
-    """Build one stable ``EntityCard`` for every taxonomy entry."""
+    """Tạo một ``EntityCard`` ổn định cho mỗi taxonomy entry."""
 
     normalizer = normalizer or DrugEntityNormalizer()
     cards: list[EntityCard] = []
@@ -53,7 +53,7 @@ def build_entity_cards_from_taxonomy(
 
 
 def entity_card_to_text(card: EntityCard) -> str:
-    """Create a concise embedding/search representation for an entity card."""
+    """Tạo biểu diễn text ngắn gọn để embedding/search một entity card."""
 
     lines = [
         f"Entity type: {card.entity_type}",
