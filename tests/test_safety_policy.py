@@ -48,6 +48,73 @@ def test_nearby_negative_boundaries_do_not_trigger(query: str) -> None:
     assert evaluate_safety(query) is None
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi đang khó thở sau khi uống thuốc trị mụn.",
+        "Uống thuốc xong tôi thấy khó thở.",
+        "Sau khi dùng thuốc tôi đang bị hụt hơi.",
+    ],
+)
+def test_current_breathing_difficulty_after_medication_triggers_emergency(query: str) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+    assert decision.severity == "emergency"
+    assert decision.source_ids == (
+        "NHS_ANAPHYLAXIS_MEDICINE_TRIGGER",
+        "NHS_SHORTNESS_OF_BREATH",
+    )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Thuốc trị mụn có gây khó thở không?",
+        "Tôi không bị khó thở sau khi uống thuốc.",
+        "Tôi từng đọc rằng thuốc này có thể gây khó thở.",
+        "Tôi khó thở sau khi chạy bộ.",
+    ],
+)
+def test_breathing_after_medication_rule_rejects_non_current_or_unrelated_queries(
+    query: str,
+) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Sau khi nặn mụn tôi bị chảy máu nhiều.",
+        "Tôi vừa nặn mụn và máu vẫn chảy nhiều.",
+        "Chỗ nặn mụn đang chảy máu không cầm được.",
+    ],
+)
+def test_significant_bleeding_after_acne_manipulation_triggers_emergency(query: str) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == "significant_bleeding_after_acne_manipulation"
+    assert decision.severity == "emergency"
+    assert decision.source_ids == ("NHS_FIRST_AID_HEAVY_BLEEDING",)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Nặn mụn có thể chảy máu không?",
+        "Tôi nặn mụn và có một chấm máu nhỏ nhưng đã cầm.",
+        "Tôi không bị chảy máu sau khi nặn mụn.",
+        "Mụn đỏ có phải là máu không?",
+    ],
+)
+def test_bleeding_rule_rejects_minor_resolved_hypothetical_or_negated_queries(
+    query: str,
+) -> None:
+    assert evaluate_safety(query) is None
+
+
 def test_rule_inventory_has_unique_ids_and_specific_source_mapping() -> None:
     rules = safety_rule_inventory()
     assert len({rule.rule_id for rule in rules}) == len(rules)
@@ -70,6 +137,23 @@ async def test_safety_override_precedes_agent_and_is_not_cacheable() -> None:
     guarded = await guard_node(
         {"normalized_question": "Sau thuốc tôi khó thở và sưng lưỡi", "bypass_cache": False}
     )
+    assert guarded["safety_override"] is True
+    assert guarded["fallback_cache_eligible"] is False
+    assert guarded["sources"] == []
+    assert (await decide_node(guarded))["next_action"] == "finalize"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi đang khó thở sau khi uống thuốc trị mụn.",
+        "Sau khi nặn mụn tôi bị chảy máu nhiều và máu vẫn không cầm.",
+    ],
+)
+async def test_new_safety_gaps_bypass_agent_retrieval_and_cache(query: str) -> None:
+    guarded = await guard_node({"normalized_question": query, "bypass_cache": False})
+
     assert guarded["safety_override"] is True
     assert guarded["fallback_cache_eligible"] is False
     assert guarded["sources"] == []

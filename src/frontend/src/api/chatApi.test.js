@@ -205,12 +205,13 @@ test('health, models, and chat use the same canonical API base', async (t) => {
   ]);
 });
 
-test('frontend model selector keeps Flash-Lite fallback selection metadata internal', () => {
+test('frontend model selector keeps fallback routing details internal', () => {
   const selectorSource = fs.readFileSync(new URL('../components/ModelSelector.jsx', import.meta.url), 'utf8');
   const messageSource = fs.readFileSync(new URL('../components/ChatMessage.jsx', import.meta.url), 'utf8');
 
   assert.match(selectorSource, /acneAdvisorSelectedModel/);
   assert.match(selectorSource, /data\.default_provider/);
   assert.match(selectorSource, /m\.is_default/);
+  assert.match(messageSource, /answerModelDisplayName/);
   assert.doesNotMatch(messageSource, /responseBadgeLabel|requested_provider|requested_model|dự phòng từ/);
 });

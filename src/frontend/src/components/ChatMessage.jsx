@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { formatText } from '../utils/markdown.js';
-import { sourceDisplayLabels } from '../utils/presentationMetadata.js';
+import { answerModelDisplayName, sourceDisplayLabels } from '../utils/presentationMetadata.js';
 
 export default function ChatMessage({ msg }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -8,7 +8,8 @@ export default function ChatMessage({ msg }) {
   const isUser = msg.role === 'user';
   const data = msg.data || null;
   const sourceLabels = sourceDisplayLabels(data);
-  const hasAnswerDetails = sourceLabels.length > 0;
+  const answerModelName = answerModelDisplayName(data);
+  const hasAnswerDetails = sourceLabels.length > 0 || Boolean(answerModelName);
 
   return (
     <div className={`chat-message ${isUser ? 'chat-message-user' : 'chat-message-assistant'}`}>
@@ -54,6 +55,11 @@ export default function ChatMessage({ msg }) {
                                   <li key={label}>{label}</li>
                                 ))}
                               </ul>
+                            </div>
+                          )}
+                          {answerModelName && (
+                            <div className="chat-meta-info">
+                              <span title="Mô hình trả lời">✨ {answerModelName}</span>
                             </div>
                           )}
                         </div>
