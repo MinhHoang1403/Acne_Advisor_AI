@@ -11,6 +11,7 @@ from src.agent.llm import provider as llm_provider
 from src.integrations import google_genai
 from src.resilience.exceptions import (
     PermanentProviderError,
+    ProviderQuotaError,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
@@ -263,6 +264,35 @@ def test_google_genai_api_errors_are_normalized(code: int, expected_type: type[E
     exc = errors.APIError(code, {"error": {"message": "redacted"}})
 
     assert isinstance(google_genai.normalize_google_genai_exception(exc), expected_type)
+
+
+def test_daily_google_quota_is_normalized_as_non_retryable() -> None:
+    exc = errors.ClientError(
+        429,
+        {
+            "error": {
+                "status": "RESOURCE_EXHAUSTED",
+                "details": [
+                    {
+                        "violations": [
+                            {
+                                "quotaId": (
+                                    "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+                                )
+                            }
+                        ]
+                    }
+                ],
+            }
+        },
+    )
+
+    normalized = google_genai.normalize_google_genai_exception(exc)
+
+    assert isinstance(normalized, ProviderQuotaError)
+    assert normalized.error_code == "provider_quota_exhausted"
+    assert normalized.retryable is False
+    assert "HTTP 429" in str(normalized)
 
 
 @pytest.mark.asyncio

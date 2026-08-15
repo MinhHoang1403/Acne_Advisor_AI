@@ -62,6 +62,8 @@ def is_retryable_exception(exc: BaseException) -> bool:
         return True
     if isinstance(exc, PermanentProviderError):
         return False
+    if isinstance(exc, RuntimeResilienceError):
+        return bool(exc.retryable)
     if isinstance(exc, httpx.TimeoutException):
         return True
     if isinstance(exc, (httpx.ConnectError, httpx.NetworkError)):

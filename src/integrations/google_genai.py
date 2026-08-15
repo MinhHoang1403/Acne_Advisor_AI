@@ -18,6 +18,7 @@ from google.genai import errors, types
 
 from src.resilience.exceptions import (
     PermanentProviderError,
+    ProviderQuotaError,
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
@@ -230,7 +231,10 @@ def validate_embedding_vectors(
 def normalize_google_genai_exception(exc: Exception) -> Exception:
     """Map Google GenAI SDK exception sang exception contract của resilience layer."""
 
-    if isinstance(exc, (PermanentProviderError, ProviderTimeoutError, ProviderUnavailableError)):
+    if isinstance(
+        exc,
+        (PermanentProviderError, ProviderQuotaError, ProviderTimeoutError, ProviderUnavailableError),
+    ):
         return exc
     if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
         return ProviderTimeoutError("Google GenAI request timed out.")
@@ -238,6 +242,10 @@ def normalize_google_genai_exception(exc: Exception) -> Exception:
         code = int(getattr(exc, "code", 0) or 0)
         if code in {408, 504}:
             return ProviderTimeoutError(f"Google GenAI request timed out with HTTP {code}.")
+        if code == 429 and _has_non_retryable_quota(exc):
+            return ProviderQuotaError(
+                "Google GenAI daily project quota is exhausted (HTTP 429)."
+            )
         if code == 429 or code >= 500:
             return ProviderUnavailableError(
                 f"Google GenAI provider returned retryable HTTP {code}."
@@ -247,6 +255,32 @@ def normalize_google_genai_exception(exc: Exception) -> Exception:
                 f"Google GenAI provider returned non-retryable HTTP {code}."
             )
     return exc
+
+
+def _has_non_retryable_quota(exc: errors.APIError) -> bool:
+    """Nhận diện quota dài hạn từ metadata, không phụ thuộc raw error text."""
+
+    quota_ids = _collect_values_for_key(getattr(exc, "details", None), "quotaId")
+    return any(
+        "perday" in quota_id.lower() or "daily" in quota_id.lower()
+        for quota_id in quota_ids
+    )
+
+
+def _collect_values_for_key(value: Any, key: str) -> list[str]:
+    """Thu thập field đã chọn trong metadata lồng nhau của SDK."""
+
+    if isinstance(value, Mapping):
+        collected = [str(value[key])] if key in value and value[key] is not None else []
+        for child in value.values():
+            collected.extend(_collect_values_for_key(child, key))
+        return collected
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        collected: list[str] = []
+        for child in value:
+            collected.extend(_collect_values_for_key(child, key))
+        return collected
+    return []
 
 
 def _get_field(value: Any, name: str) -> Any:

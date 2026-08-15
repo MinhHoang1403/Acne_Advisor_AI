@@ -5,6 +5,7 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 from src.resilience.exceptions import (
     AgentTimeoutError,
     PermanentProviderError,
+    ProviderQuotaError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     RetryExhaustedError,
@@ -17,6 +18,7 @@ __all__ = [
     "AgentTimeoutError",
     "DeadlineBudget",
     "PermanentProviderError",
+    "ProviderQuotaError",
     "ProviderTimeoutError",
     "ProviderUnavailableError",
     "RetryExhaustedError",
