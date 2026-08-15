@@ -157,7 +157,8 @@ weight `1.0`. Definitions and formulas are in
 5. `src/api/app.py::chat_endpoint` loads bounded history and invokes
    `src/agent/graph.py::run_clinical_agent`.
 6. LangGraph prepares, guards, decides, retrieves, assesses, and then generates
-   or abstains. The retrieval loop can execute at most twice.
+   or abstains. `retrieve` is the first acquisition, `retry` is the later one,
+   and the retrieval tool can execute at most twice.
 7. `src/agent/nodes/reason.py::generate_answer_node` calls
    `src/agent/prompts/medical_answer.py::build_medical_prompt` with the user
    question and packed source evidence.

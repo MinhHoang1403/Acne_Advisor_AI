@@ -21,10 +21,12 @@ whitespace normalization are not agent actions.
 
 `retrieve` calls the typed `retrieve_evidence` tool. `assess` proves only that at
 least one item has non-empty text and source identity. It does not prove medical
-relevance, completeness, or claim entailment. A request may make at most two
-retrieval attempts. A second attempt occurs only after a transient retrieval
-failure or with a materially distinct original query after a rewrite returned
-no evidence. Otherwise the agent abstains immediately.
+relevance, completeness, or claim entailment. `retrieve` is legal only for the
+first evidence acquisition at attempt zero; `retry` is legal only after one
+retrieval and requires a materially different query unless the prior failure is
+recoverable. A request may execute the retrieval tool at most twice. Once the
+counter reaches two, both `retrieve` and `retry` fail closed to abstention;
+generation remains legal only with provenance-complete evidence.
 
 Safety remains deterministic and outside optional tool choice. Generation may
 use provider fallback, but the final node still applies structural/provenance

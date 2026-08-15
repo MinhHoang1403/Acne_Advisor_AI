@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from src.agent import graph as graph_module
+from src.agent import action_decision as decision_module
 from src.agent.graph import clinical_graph, route_agent_action
 from src.agent.state import ClinicalState
 from src.agent.nodes import workflow
@@ -96,3 +99,92 @@ async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: py
     assert "graph_facts" not in result
     assert "graph_relation_found" not in result
     assert result["source_allowlist"][0]["source_id"] == "guideline"
+
+
+@pytest.mark.asyncio
+async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.MonkeyPatch) -> None:
+    retrieve_calls = 0
+
+    async def fake_generate(**kwargs: object) -> dict:
+        attempt = json.loads(str(kwargs["prompt"]))["retrieval_attempt"]
+        if attempt == 0:
+            payload = {
+                "action": "retrieve",
+                "retrieval_query": "initial acne query",
+                "reason_code": "needs_evidence",
+            }
+        elif attempt == 1:
+            payload = {
+                "action": "retry",
+                "retrieval_query": "changed acne evidence query",
+                "reason_code": "evidence_gap",
+            }
+        else:
+            payload = {
+                "action": "retrieve",
+                "retrieval_query": "attempt to bypass retry budget",
+                "reason_code": "needs_evidence",
+            }
+        return {
+            "text": json.dumps(payload),
+            "provider": "test",
+            "model": "decision-model",
+            "fallback_used": False,
+        }
+
+    async def fake_prepare(state: ClinicalState) -> dict:
+        return {
+            "normalized_question": state["user_question"],
+            "standalone_question": state["user_question"],
+            "conversation_context": {"messages": []},
+        }
+
+    async def fake_cache_lookup(_state: ClinicalState) -> dict:
+        return {"cache_checked": True, "cache_hit": False}
+
+    async def fake_retrieve(_payload: dict) -> dict:
+        nonlocal retrieve_calls
+        retrieve_calls += 1
+        return {
+            "vector_contexts": [],
+            "sources": [],
+            "metadata": {"retrieval_status": "no_evidence", "retrieval_trace": {}},
+        }
+
+    async def fake_fallback(_state: ClinicalState) -> dict:
+        return {"draft_answer": "Không đủ bằng chứng nguồn.", "fallback_applied": True}
+
+    async def fake_finalize(state: ClinicalState) -> dict:
+        return {"final_answer": state.get("draft_answer", "")}
+
+    async def no_updates(_state: ClinicalState) -> dict:
+        return {}
+
+    class FakeTool:
+        ainvoke = staticmethod(fake_retrieve)
+
+    monkeypatch.setattr(decision_module, "generate_llm_response", fake_generate)
+    monkeypatch.setattr(workflow, "prepare_request_node", fake_prepare)
+    monkeypatch.setattr(workflow, "cache_lookup_node", fake_cache_lookup)
+    monkeypatch.setattr(workflow, "retrieve_evidence", FakeTool())
+    monkeypatch.setattr(workflow, "safe_fallback_node", fake_fallback)
+    monkeypatch.setattr(workflow, "finalize_response_node", fake_finalize)
+    monkeypatch.setattr(workflow, "answer_quality_node", no_updates)
+    monkeypatch.setattr(workflow, "cache_store_node", no_updates)
+    monkeypatch.setattr(workflow, "observability_export_node", no_updates)
+
+    bounded_graph = graph_module.build_clinical_graph()
+    result = await bounded_graph.ainvoke(
+        {
+            "user_question": "What evidence is available?",
+            "retrieval_attempt": 0,
+            "retry_history": [],
+            "vector_contexts": [],
+            "sources": [],
+            "performance_timings": {},
+        }
+    )
+
+    assert retrieve_calls == 2
+    assert result["retrieval_attempt"] == 2
+    assert result["agent_decision"]["action"] == "abstain"
