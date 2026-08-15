@@ -26,6 +26,13 @@ class ProviderUnavailableError(RuntimeResilienceError):
     error_code = "provider_unavailable"
 
 
+class ProviderQuotaError(RuntimeResilienceError):
+    """Quota dài hạn không nên retry trong cùng một request."""
+
+    error_code = "provider_quota_exhausted"
+    retryable = False
+
+
 class RetryExhaustedError(RuntimeResilienceError):
     error_code = "retry_exhausted"
 
@@ -38,6 +45,7 @@ class PermanentProviderError(RuntimeResilienceError):
 __all__ = [
     "AgentTimeoutError",
     "PermanentProviderError",
+    "ProviderQuotaError",
     "ProviderTimeoutError",
     "ProviderUnavailableError",
     "RetryExhaustedError",

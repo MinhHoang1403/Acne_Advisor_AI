@@ -4,7 +4,11 @@ import pytest
 
 from src.agent.llm import provider as llm_provider
 from src.resilience.contracts import RuntimeResilienceSettings
-from src.resilience.exceptions import PermanentProviderError, ProviderUnavailableError
+from src.resilience.exceptions import (
+    PermanentProviderError,
+    ProviderQuotaError,
+    ProviderUnavailableError,
+)
 
 
 def _settings() -> RuntimeResilienceSettings:
@@ -62,7 +66,7 @@ async def test_gemini_429_falls_back_to_flash_lite(monkeypatch):
     async def fake_call(**kwargs):
         calls.append((kwargs["provider"], kwargs["model"]))
         if kwargs["model"] == "gemini-3.5-flash":
-            raise ProviderUnavailableError("gemini returned retryable HTTP 429 RESOURCE_EXHAUSTED")
+            raise ProviderQuotaError("Gemini daily project quota is exhausted (HTTP 429).")
         return "flash-lite ok", {"provider_name": f'{kwargs["provider"]}:{kwargs["model"]}'}
 
     monkeypatch.setenv("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")

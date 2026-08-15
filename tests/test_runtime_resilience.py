@@ -13,6 +13,7 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 from src.resilience.exceptions import (
     AgentTimeoutError,
     PermanentProviderError,
+    ProviderQuotaError,
     ProviderUnavailableError,
     RetryExhaustedError,
 )
@@ -96,6 +97,29 @@ def test_retry_classification_is_narrow():
     assert is_retryable_exception(PermanentProviderError("invalid api key")) is False
     assert is_retryable_exception(asyncio.CancelledError()) is False
     assert is_retryable_exception(ProviderUnavailableError("temporary")) is True
+    assert is_retryable_exception(ProviderQuotaError("daily quota")) is False
+
+
+@pytest.mark.asyncio
+async def test_daily_provider_quota_is_not_retried():
+    attempts = 0
+
+    async def operation(_: float) -> str:
+        nonlocal attempts
+        attempts += 1
+        raise ProviderQuotaError("daily quota")
+
+    with pytest.raises(ProviderQuotaError):
+        await call_provider_with_resilience(
+            provider_name="gemini:test",
+            operation=operation,
+            budget=DeadlineBudget.from_timeout(2),
+            timeout_seconds=1,
+            retry_policy=RetryPolicy(max_retries=3, base_delay_seconds=0, max_delay_seconds=0),
+            sleep=lambda _: asyncio.sleep(0),
+        )
+
+    assert attempts == 1
 
 
 def test_ollama_model_default_matches_runtime_baseline(monkeypatch):
