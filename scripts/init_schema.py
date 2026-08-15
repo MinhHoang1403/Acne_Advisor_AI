@@ -3,7 +3,7 @@
 
 Script tạo table/extension theo kiểu idempotent và kiểm kết nối Qdrant, nhưng
 không build, re-embed hoặc chuyển knowledge collections. Những operation đó chỉ
-thuộc ``scripts/phase1.py``.
+thuộc ``scripts/knowledge_build.py``.
 """
 
 from __future__ import annotations
@@ -144,7 +144,7 @@ async def _setup_qdrant() -> None:
     """Giữ ownership của knowledge collection ngoài schema initialization."""
 
     logger.info(
-        "Qdrant ownership belongs to scripts/phase1.py; init_schema does not mutate %s.",
+        "Qdrant ownership belongs to scripts/knowledge_build.py; init_schema does not mutate %s.",
         QDRANT_COLLECTION_NAME,
     )
 

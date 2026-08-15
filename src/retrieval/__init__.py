@@ -1,4 +1,4 @@
-"""Final source-evidence retrieval API."""
+"""Public source-evidence retrieval API."""
 
 from src.retrieval.contracts import (
     NormalizedQuery,

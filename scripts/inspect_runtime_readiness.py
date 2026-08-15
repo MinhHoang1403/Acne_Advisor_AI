@@ -30,11 +30,11 @@ EXPECTED_BUILD = "ec0a6de32d58ac181af6"
 
 
 def inspect_readiness() -> dict[str, Any]:
-    phase1 = _phase1_manifest_check()
+    knowledge = _knowledge_manifest_check()
     qdrant = _qdrant_check()
     neo4j = _neo4j_check()
     architecture = _architecture_check()
-    checks = [phase1, qdrant, neo4j, architecture]
+    checks = [knowledge, qdrant, neo4j, architecture]
     manifest = build_pipeline_version_manifest()
     return {
         "passed": all(check["passed"] for check in checks),
@@ -68,8 +68,8 @@ def inspect_readiness() -> dict[str, Any]:
     }
 
 
-def _phase1_manifest_check() -> dict[str, Any]:
-    path = PROJECT_ROOT / "data" / "phase1_build_manifest.json"
+def _knowledge_manifest_check() -> dict[str, Any]:
+    path = PROJECT_ROOT / "data" / "knowledge_build_manifest.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         counts = data.get("counts") or {}

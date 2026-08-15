@@ -77,12 +77,12 @@ proof-based artifact filtering, exact deduplication, and complete provenance.
 The deterministic graph is built from source-backed taxonomy data; no LLM graph
 extraction runs in the current pipeline.
 
-The supported operator interface remains
-[`scripts/phase1.py`](scripts/phase1.py):
+The supported operator interface is
+[`scripts/knowledge_build.py`](scripts/knowledge_build.py):
 
 ```powershell
-.\venv\Scripts\python.exe scripts\phase1.py status
-.\venv\Scripts\python.exe scripts\phase1.py validate
+.\venv\Scripts\python.exe scripts\knowledge_build.py status
+.\venv\Scripts\python.exe scripts\knowledge_build.py validate
 ```
 
 Normal application development uses the existing indexed build. A controlled
@@ -286,7 +286,7 @@ hardening.
 
 | Location | Responsibility |
 |---|---|
-| `scripts/phase1.py` | knowledge build, validation, and status interface |
+| `scripts/knowledge_build.py` | knowledge build, validation, and status interface |
 | `src/ingestion/` | parsing, chunking, provenance, validation, and indexing |
 | `src/knowledge/` | taxonomy, EntityCards, and deterministic graph assets |
 | `src/retrieval/` | Dense + native BM25 + RRF evidence retrieval |
@@ -340,7 +340,7 @@ docker compose ps
 
 These commands initialize application infrastructure but do not create the
 indexed medical knowledge. An existing development environment can verify its
-current build with `scripts/phase1.py status`. A new environment must provision
+current build with `scripts/knowledge_build.py status`. A new environment must provision
 the validated indexes through the controlled knowledge-build procedure in
 [Operations](docs/OPERATIONS.md).
 
@@ -372,7 +372,7 @@ Backend and runtime contracts:
 .\venv\Scripts\python.exe -m compileall -q src scripts tests
 .\venv\Scripts\python.exe -m ruff check src scripts tests
 .\venv\Scripts\python.exe -m pytest -q
-.\venv\Scripts\python.exe scripts\check_phase2_contracts.py
+.\venv\Scripts\python.exe scripts\check_runtime_contracts.py
 .\venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
 .\venv\Scripts\python.exe scripts\check_reproducible_environment.py
 .\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
@@ -381,8 +381,8 @@ Backend and runtime contracts:
 Knowledge build validation:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\phase1.py status
-.\venv\Scripts\python.exe scripts\phase1.py validate
+.\venv\Scripts\python.exe scripts\knowledge_build.py status
+.\venv\Scripts\python.exe scripts\knowledge_build.py validate
 ```
 
 Frontend:
@@ -431,7 +431,7 @@ review.
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
 - [References](docs/REFERENCES.md)
-- [Method and source registry](data/phase1_method_sources.json)
+- [Method and source registry](data/method_sources.json)
 - [Source manifest](data/sources/manifest.yaml)
 
 Project metadata declares the MIT license in `pyproject.toml`. No standalone

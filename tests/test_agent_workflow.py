@@ -9,7 +9,7 @@ from src.agent.state import ClinicalState
 from src.agent.nodes import workflow
 
 
-def test_final_graph_has_eight_semantic_nodes() -> None:
+def test_graph_has_eight_semantic_nodes() -> None:
     nodes = set(clinical_graph.get_graph().nodes) - {"__start__", "__end__"}
     assert nodes == {"prepare", "guard", "decide", "retrieve", "assess", "generate", "abstain", "finalize"}
 

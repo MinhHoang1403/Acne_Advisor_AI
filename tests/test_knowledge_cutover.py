@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.phase1 import parse_args
+from scripts.knowledge_build import parse_args
 from src.ingestion.pipeline import _verify_rollback_artifacts
 
 

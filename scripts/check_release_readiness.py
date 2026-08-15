@@ -189,7 +189,7 @@ async def run_local_services() -> dict[str, Any]:
     compose_ps = run_command(["docker", "compose", "ps"], timeout=30)
     checks.append(check("docker_compose_ps", compose_ps["passed"], {"stdout": compose_ps["stdout"]}))
 
-    readiness = run_json_script(["scripts/inspect_phase2_readiness.py"], timeout=120)
+    readiness = run_json_script(["scripts/inspect_runtime_readiness.py"], timeout=120)
     checks.append(check("phase2_readiness", readiness["passed"], readiness["summary"]))
     counts = extract_data_counts(readiness["summary"])
     checks.append(check("data_counts", counts["passed"], counts))

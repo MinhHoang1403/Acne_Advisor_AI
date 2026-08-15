@@ -27,7 +27,7 @@ User -> FastAPI -> LangGraph
 
 | Responsibility | Canonical location |
 |---|---|
-| Knowledge compilation and activation | `src/ingestion/`, `scripts/phase1.py` |
+| Knowledge compilation and activation | `src/ingestion/`, `scripts/knowledge_build.py` |
 | Dense + BM25 + RRF retrieval | `src/retrieval/service.py`, `src/retrieval/rrf.py` |
 | Bounded context packing | `src/retrieval/context_packer.py` |
 | LangGraph orchestration and decisions | `src/agent/graph.py`, `src/agent/nodes/workflow.py` |

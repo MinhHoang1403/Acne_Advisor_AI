@@ -57,9 +57,6 @@ CANONICAL_ENTITY_GRAPH_RELATIONSHIPS = (
     "HAS_ACTIVE_INGREDIENT",
 )
 
-LEGACY_GRAPH_PROPERTIES = ("name", "description", "evidence")
-
-
 @dataclass(frozen=True)
 class NodeSchema:
     label: str
@@ -376,7 +373,6 @@ __all__ = [
     "CANONICAL_ENTITY_GRAPH_RELATIONSHIPS",
     "CANONICAL_NODE_SCHEMAS",
     "CANONICAL_RELATIONSHIP_SCHEMAS",
-    "LEGACY_GRAPH_PROPERTIES",
     "NEO4J_SCHEMA_VERSION",
     "NodeSchema",
     "RelationshipSchema",

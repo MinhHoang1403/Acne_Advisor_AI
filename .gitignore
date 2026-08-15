@@ -6,9 +6,7 @@
 # Environment & Secrets  (12-Factor: config in environment)
 # ---------------------------------------------------------------------------
 .env
-.env.hardening02_backup
-.env.phase2_audit_backup
-.env.pre_ui_audit_backup
+.env.*_backup
 .env.local
 .env.*.local
 .envrc
@@ -108,8 +106,8 @@ data/raw/
 data/processed/
 data/embeddings/
 data/cache/
-!data/phase1_method_sources.json
-!data/phase1_build_manifest.json
+!data/method_sources.json
+!data/knowledge_build_manifest.json
 !data/sources/
 data/sources/*
 !data/sources/manifest.yaml

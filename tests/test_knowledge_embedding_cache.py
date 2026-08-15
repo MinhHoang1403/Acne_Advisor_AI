@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from src.ingestion.embedding import EMBEDDING_DIMENSIONS, EmbeddingCache
-from src.ingestion import index as phase1_index
+from src.ingestion import index as ingestion_index
 from src.resilience.exceptions import ProviderUnavailableError
 
 
@@ -25,11 +25,11 @@ async def test_embedding_resolution_retries_finitely_and_checkpoints_success(
     async def fake_sleep(seconds: float) -> None:
         sleeps.append(seconds)
 
-    monkeypatch.setattr(phase1_index, "embed_documents", fake_embed)
-    monkeypatch.setattr(phase1_index.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(ingestion_index, "embed_documents", fake_embed)
+    monkeypatch.setattr(ingestion_index.asyncio, "sleep", fake_sleep)
     cache = EmbeddingCache(tmp_path)
 
-    vectors, stats = await phase1_index.resolve_embeddings(
+    vectors, stats = await ingestion_index.resolve_embeddings(
         ["one", "two"],
         cache=cache,
         api_key="redacted-test-key",
@@ -60,11 +60,11 @@ async def test_embedding_resolution_stops_after_retry_limit(
     async def no_wait(seconds: float) -> None:
         return None
 
-    monkeypatch.setattr(phase1_index, "embed_documents", always_rate_limited)
-    monkeypatch.setattr(phase1_index.asyncio, "sleep", no_wait)
+    monkeypatch.setattr(ingestion_index, "embed_documents", always_rate_limited)
+    monkeypatch.setattr(ingestion_index.asyncio, "sleep", no_wait)
 
     with pytest.raises(ProviderUnavailableError):
-        await phase1_index.resolve_embeddings(
+        await ingestion_index.resolve_embeddings(
             ["one"],
             cache=EmbeddingCache(tmp_path),
             api_key="redacted-test-key",

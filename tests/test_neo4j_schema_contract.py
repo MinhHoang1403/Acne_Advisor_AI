@@ -5,7 +5,6 @@ from src.knowledge.graph_schema import (
     CANONICAL_ENTITY_GRAPH_RELATIONSHIPS,
     CANONICAL_NODE_SCHEMAS,
     CANONICAL_RELATIONSHIP_SCHEMAS,
-    LEGACY_GRAPH_PROPERTIES,
 )
 
 
@@ -20,7 +19,6 @@ def test_node_schema_required_optional_do_not_overlap() -> None:
         assert schema.required_properties
         assert not (schema.required_properties & schema.optional_properties)
         assert "canonical_name" in schema.required_properties
-        assert not (set(LEGACY_GRAPH_PROPERTIES) & schema.required_properties)
 
 
 def test_relationship_schema_endpoints_are_canonical() -> None:

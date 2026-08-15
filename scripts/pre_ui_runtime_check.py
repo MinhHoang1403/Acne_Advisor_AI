@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
-from scripts.inspect_phase2_readiness import inspect_readiness  # noqa: E402
+from scripts.inspect_runtime_readiness import inspect_readiness  # noqa: E402
 from src.observability.versioning import get_answer_cache_version  # noqa: E402
 
 

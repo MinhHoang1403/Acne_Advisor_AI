@@ -490,9 +490,9 @@ async def health_check():
             checks=checks,
         )
 
-    from src.api.preflight import run_phase2_preflight
+    from src.api.preflight import run_runtime_preflight
 
-    preflight = await run_phase2_preflight()
+    preflight = await run_runtime_preflight()
     checks = preflight["checks"]
     cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
     

@@ -41,14 +41,14 @@ test('advanced fallback toggle keeps existing localStorage and submit contract',
 
 test('advanced fallback panel is a compact popover and does not expand the composer', () => {
   const styles = readSource('../styles.css');
-  const finalPolish = styles.slice(styles.indexOf('Round 4 hero, brand, fallback popover, and title polish'));
+  const popoverStyles = styles.slice(styles.indexOf('Empty state, brand, fallback popover, and title'));
 
-  assert.match(finalPolish, /\.model-selector-container\s*{[^}]*position: relative;[^}]*flex-wrap: nowrap;/s);
-  assert.match(finalPolish, /\.model-options-panel\s*{[^}]*position: absolute;/s);
-  assert.match(finalPolish, /\.model-options-panel\s*{[^}]*bottom: calc\(100% \+ 12px\);/s);
-  assert.match(finalPolish, /\.model-options-panel\s*{[^}]*width: min\(260px, calc\(100vw - 36px\)\);/s);
-  assert.match(finalPolish, /\.chat-input-form,[\s\S]*?\.model-selector-container\s*{[^}]*overflow: visible;/s);
-  assert.match(finalPolish, /\.model-options-panel\s*{[^}]*z-index: 140;/s);
+  assert.match(popoverStyles, /\.model-selector-container\s*{[^}]*position: relative;[^}]*flex-wrap: nowrap;/s);
+  assert.match(popoverStyles, /\.model-options-panel\s*{[^}]*position: absolute;/s);
+  assert.match(popoverStyles, /\.model-options-panel\s*{[^}]*bottom: calc\(100% \+ 12px\);/s);
+  assert.match(popoverStyles, /\.model-options-panel\s*{[^}]*width: min\(260px, calc\(100vw - 36px\)\);/s);
+  assert.match(popoverStyles, /\.chat-input-form,[\s\S]*?\.model-selector-container\s*{[^}]*overflow: visible;/s);
+  assert.match(popoverStyles, /\.model-options-panel\s*{[^}]*z-index: 140;/s);
 });
 
 test('model selector still renders catalog models from the backend', () => {
@@ -98,51 +98,51 @@ test('source details and markdown table presentation remain accessible', () => {
 test('composer focus stays on the container without native textarea rectangle', () => {
   const chatInput = readSource('./ChatInput.jsx');
   const styles = readSource('../styles.css');
-  const finalPolish = styles.slice(styles.indexOf('Round 5 composer focus and message hierarchy polish'));
+  const interactionStyles = styles.slice(styles.indexOf('Composer focus and message hierarchy'));
 
   assert.match(chatInput, /<textarea/);
   assert.match(chatInput, /className=\{`chat-textarea/);
   assert.match(chatInput, /aria-label="Nhập câu hỏi về tình trạng mụn"/);
   assert.match(chatInput, /aria-label="Gửi câu hỏi"/);
-  assert.match(finalPolish, /\.chat-textarea,[\s\S]*?\.chat-textarea:focus-visible\s*{[^}]*outline: none;[^}]*box-shadow: none;/s);
-  assert.match(finalPolish, /\.chat-input-form:focus-within\s*{[^}]*box-shadow:/s);
+  assert.match(interactionStyles, /\.chat-textarea,[\s\S]*?\.chat-textarea:focus-visible\s*{[^}]*outline: none;[^}]*box-shadow: none;/s);
+  assert.match(interactionStyles, /\.chat-input-form:focus-within\s*{[^}]*box-shadow:/s);
 });
 
 test('message hierarchy keeps user text light and assistant markdown prominent', () => {
   const chatMessage = readSource('./ChatMessage.jsx');
   const markdown = readSource('../utils/markdown.js');
   const styles = readSource('../styles.css');
-  const finalPolish = styles.slice(styles.indexOf('Round 5 composer focus and message hierarchy polish'));
+  const messageStyles = styles.slice(styles.indexOf('Composer focus and message hierarchy'));
 
   assert.match(chatMessage, /<div className="chat-user-text">\{msg\.content\}<\/div>/);
   assert.doesNotMatch(chatMessage, /<strong>\{msg\.content\}<\/strong>/);
   assert.match(chatMessage, /formatText\(msg\.content\)/);
   assert.match(markdown, /React\.createElement\(\s*'strong'/);
-  assert.match(finalPolish, /\.chat-user-text\s*{[^}]*background: #f7f7f8;/s);
-  assert.match(finalPolish, /\.chat-user-text\s*{[^}]*font-weight: 400;/s);
-  assert.match(finalPolish, /\.chat-assistant-text\s*{[^}]*color: #0f172a;[^}]*line-height: 1\.74;/s);
+  assert.match(messageStyles, /\.chat-user-text\s*{[^}]*background: #f7f7f8;/s);
+  assert.match(messageStyles, /\.chat-user-text\s*{[^}]*font-weight: 400;/s);
+  assert.match(messageStyles, /\.chat-assistant-text\s*{[^}]*color: #0f172a;[^}]*line-height: 1\.74;/s);
 });
 
-test('white neutral polish and Acne Advisor AI favicon are active', () => {
+test('white neutral theme and Acne Advisor AI favicon are active', () => {
   const styles = readSource('../styles.css');
   const indexHtml = readSource('../../index.html');
   const favicon = readSource('../../public/favicon.svg');
-  const finalPolish = styles.slice(styles.indexOf('Final white/neutral polish'));
+  const themeStyles = styles.slice(styles.indexOf('White/neutral theme overrides'));
 
-  assert.match(finalPolish, /--app-bg: #ffffff/);
-  assert.match(finalPolish, /\.app-layout,[\s\S]*?background: #ffffff;/);
-  assert.match(finalPolish, /\.chat-user-text\s*{[^}]*background: #f3f4f6;/s);
+  assert.match(themeStyles, /--app-bg: #ffffff/);
+  assert.match(themeStyles, /\.app-layout,[\s\S]*?background: #ffffff;/);
+  assert.match(themeStyles, /\.chat-user-text\s*{[^}]*background: #f3f4f6;/s);
   assert.match(indexHtml, /href="\/favicon\.svg"/);
   assert.match(favicon, /Acne Advisor AI/);
   assert.match(favicon, /<rect[^>]+fill="#111827"/);
   assert.doesNotMatch(favicon, /863bff|7e14ff|lightning|bolt/);
 });
 
-test('empty state renders four redesigned suggestion cards', () => {
+test('empty state renders four suggestion cards', () => {
   const emptyState = readSource('./EmptyState.jsx');
   const chatWindow = readSource('./ChatWindow.jsx');
   const styles = readSource('../styles.css');
-  const finalPolish = styles.slice(styles.indexOf('Round 4 hero, brand, fallback popover, and title polish'));
+  const emptyStateStyles = styles.slice(styles.indexOf('Empty state, brand, fallback popover, and title'));
 
   assert.match(emptyState, /Tôi có thể tư vấn gì liên quan đến mụn cho bạn\?/);
   assert.match(emptyState, /Hỏi về triệu chứng, hoạt chất, routine hoặc dấu hiệu cần đi khám\./);
@@ -152,8 +152,8 @@ test('empty state renders four redesigned suggestion cards', () => {
   assert.match(emptyState, /So sánh thuốc\/routine/);
   assert.match(emptyState, /onSendQuestion\(q\.prompt\)/);
   assert.match(chatWindow, /chat-scroll-area-empty/);
-  assert.match(finalPolish, /\.chat-scroll-area-empty \.empty-state\s*{[^}]*justify-content: center;/s);
-  assert.match(finalPolish, /\.chat-scroll-area-empty \.empty-state\s*{[^}]*transform: translateY\(18px\);/s);
+  assert.match(emptyStateStyles, /\.chat-scroll-area-empty \.empty-state\s*{[^}]*justify-content: center;/s);
+  assert.match(emptyStateStyles, /\.chat-scroll-area-empty \.empty-state\s*{[^}]*transform: translateY\(18px\);/s);
 });
 
 test('sidebar chat history and accessibility labels are preserved', () => {
@@ -187,8 +187,8 @@ test('main top header is removed and stable status text lives in sidebar', () =>
   const sidebar = readSource('./Sidebar.jsx');
   const app = readSource('../App.jsx');
   const styles = readSource('../styles.css');
-  const finalPolish = styles.slice(styles.indexOf('Round 4 hero, brand, fallback popover, and title polish'));
-  const roundFivePolish = styles.slice(styles.indexOf('Round 5 composer focus and message hierarchy polish'));
+  const layoutStyles = styles.slice(styles.indexOf('Empty state, brand, fallback popover, and title'));
+  const messageStyles = styles.slice(styles.indexOf('Composer focus and message hierarchy'));
 
   assert.doesNotMatch(chatWindow, /<header className="chat-header">/);
   assert.doesNotMatch(sidebar, /Backend sẵn sàng/);
@@ -205,9 +205,9 @@ test('main top header is removed and stable status text lives in sidebar', () =>
   assert.doesNotMatch(sidebar, /sidebar-brand-mark/);
   assert.doesNotMatch(sidebar, /Thông tin tham khảo/);
   assert.match(styles, /\.chat-header\s*{[^}]*display: none;/s);
-  assert.match(finalPolish, /\.sidebar-inline-toggle-btn/);
-  assert.match(finalPolish, /\.sidebar-title\s*{[^}]*font-size: 20px;[^}]*font-weight: 800;/s);
+  assert.match(layoutStyles, /\.sidebar-inline-toggle-btn/);
+  assert.match(layoutStyles, /\.sidebar-title\s*{[^}]*font-size: 20px;[^}]*font-weight: 800;/s);
   assert.match(styles, /\.sidebar-reopen-btn/);
   assert.match(styles, /\.sidebar-brand-mark,[\s\S]*?display: none;/);
-  assert.match(roundFivePolish, /\.sidebar-offline-banner-checking,[\s\S]*?display: none;/);
+  assert.match(messageStyles, /\.sidebar-offline-banner-checking,[\s\S]*?display: none;/);
 });

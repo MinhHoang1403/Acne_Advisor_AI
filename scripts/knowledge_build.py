@@ -19,10 +19,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.ingestion.pipeline import (  # noqa: E402
-    activate_phase1,
-    build_phase1,
-    phase1_status,
-    validate_phase1,
+    activate_knowledge,
+    build_knowledge,
+    knowledge_status,
+    validate_knowledge,
 )
 
 
@@ -53,13 +53,13 @@ async def async_main(argv: list[str] | None = None) -> int:
     if args.command == "build":
         if args.activate and args.rollback_root is None:
             raise SystemExit("--activate requires --rollback-root")
-        result = await build_phase1(source_dir=args.source, replace_candidate=args.replace_candidate)
+        result = await build_knowledge(source_dir=args.source, replace_candidate=args.replace_candidate)
         if args.activate:
-            result = await activate_phase1(rollback_root=args.rollback_root)
+            result = await activate_knowledge(rollback_root=args.rollback_root)
     elif args.command == "validate":
-        result = await validate_phase1(live=not args.offline)
+        result = await validate_knowledge(live=not args.offline)
     else:
-        result = await phase1_status()
+        result = await knowledge_status()
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return 0 if result.get("passed", result.get("offline_validation", True)) else 1
 

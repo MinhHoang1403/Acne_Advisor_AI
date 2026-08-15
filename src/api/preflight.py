@@ -320,7 +320,7 @@ async def _bounded_check(name: str, check_coro: Any) -> CheckResult:
         return CheckResult("timeout", f"{name} health check exceeded {PREFLIGHT_CHECK_TIMEOUT_SECONDS:.1f}s")
 
 
-async def run_phase2_preflight() -> dict[str, Any]:
+async def run_runtime_preflight() -> dict[str, Any]:
     _preload_check_dependencies()
     postgres, qdrant, neo4j, redis, ollama = await asyncio.gather(
         _bounded_check("postgres", check_postgres()),

@@ -27,7 +27,7 @@ dùng tên tiếng Anh như trong code.
 |---|---|---|---|
 | Knowledge preparation | `src/ingestion/parser.py`, `chunking.py`, `filtering.py`, `provenance.py` | Parse source, chia chunk, lọc proof và tạo identity | Không search khi user hỏi |
 | Embedding/indexing | `src/ingestion/embedding.py`, `index.py`, `bm25.py` | Gọi embedding provider, cấu hình/tạo Qdrant candidates | Không tự chạy cosine/BM25 search engine |
-| Build orchestration | `src/ingestion/pipeline.py`, `scripts/phase1.py` | Prepare, validate, build và activate có kiểm soát | Không thuộc normal API request path |
+| Build orchestration | `src/ingestion/pipeline.py`, `scripts/knowledge_build.py` | Prepare, validate, build và activate có kiểm soát | Không thuộc normal API request path |
 | Retrieval | `src/database/vector_store.py`, `src/retrieval/service.py` | Gọi Dense/BM25 search, quản lý timeout/degraded status | Không sinh answer hoặc xác minh y khoa |
 | Fusion/context | `src/retrieval/rrf.py`, `context_packer.py` | Fuse rank, dedupe identity và áp resource budget | Không rerank theo truth/confidence |
 | Agent | `src/agent/graph.py`, `action_decision.py`, `state.py` | Topology, semantic action và state contract | Model không tự thực thi transition |

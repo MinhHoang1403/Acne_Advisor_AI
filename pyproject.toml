@@ -13,7 +13,7 @@ authors = [{ name = "Minh Hoang" }]
 
 [project.scripts]
 init-schema = "scripts.init_schema:cli"
-phase1 = "scripts.phase1:cli"
+phase1 = "scripts.knowledge_build:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
