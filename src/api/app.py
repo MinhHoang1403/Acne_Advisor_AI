@@ -52,7 +52,7 @@ DEFAULT_CORS_ORIGINS = (
 
 
 def parse_cors_origins(raw_value: str | None = None) -> list[str]:
-    """Parse explicit CORS origins without falling back to unsafe wildcard."""
+    """Parse CORS origins tường minh mà không fallback sang wildcard thiếu an toàn."""
 
     raw = raw_value if raw_value is not None else os.getenv("CORS_ALLOW_ORIGINS", "")
     candidates = raw.split(",") if raw.strip() else list(DEFAULT_CORS_ORIGINS)
@@ -113,7 +113,7 @@ def _env_enabled(name: str, default: bool = False) -> bool:
 
 
 async def _run_release_readiness_agent_override(request: "ChatRequest", session_id: str) -> dict[str, Any]:
-    """Deterministic HTTP-boundary doubles for release-readiness checks only."""
+    """HTTP-boundary test double deterministic chỉ dành cho readiness check."""
 
     if not _release_readiness_test_mode_enabled():
         raise RuntimeError("Release readiness test mode is not enabled.")
@@ -174,8 +174,11 @@ def _repair_history_messages(messages: list["ChatHistoryMessage"]) -> list["Chat
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Acne Advisor API",
-    description="REST API for the Acne Advisor AI System",
+    title="Acne Advisor AI API",
+    description=(
+        "REST API for Acne Advisor AI, a Vietnamese evidence-grounded acne "
+        "information and advisory assistant using bounded Agentic RAG"
+    ),
     version="0.1.0"
 )
 
@@ -285,7 +288,7 @@ def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> st
     return "llm"
 
 def _used_retrieval(result: dict[str, Any], is_in_domain: Optional[bool]) -> bool:
-    """Report retrieval only when this request actually entered that runtime path."""
+    """Chỉ báo retrieval khi request thực sự đi vào runtime path đó."""
 
     if is_in_domain is not True or result.get("cache_hit"):
         return False
@@ -296,7 +299,7 @@ def _used_retrieval(result: dict[str, Any], is_in_domain: Optional[bool]) -> boo
 
 
 def _log_error_type(message: str, exc: Exception, *args: Any) -> None:
-    """Log operation context and exception class without raw exception text."""
+    """Log operation context và exception class, không log raw exception text."""
 
     logger.error(message + " error_type=%s", *args, exc.__class__.__name__)
 
@@ -393,7 +396,7 @@ class ClearChatHistoryResponse(BaseModel):
 # --- DB Helper ---
 
 async def _get_db_session():
-    """Get an async DB session. Returns None if DB is unavailable."""
+    """Tạo async DB session; trả ``None`` khi database chưa available."""
     try:
         from src.database.connection import AsyncSessionLocal
         return AsyncSessionLocal()
@@ -403,7 +406,7 @@ async def _get_db_session():
 
 
 async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
-    """Load recent chat history for a session when the client does not send it."""
+    """Nạp history gần nhất khi client không gửi history của session."""
     from src.database.repositories import chat_history as repo
 
     db_session = await _get_db_session()
@@ -437,7 +440,7 @@ async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
 
 
 async def _delete_app_redis_cache_keys() -> tuple[int, list[str]]:
-    """Delete only Acne Advisor answer-cache keys; never FLUSHALL."""
+    """Delete only Acne Advisor AI answer-cache keys; never FLUSHALL."""
     from src.cache.redis_cache import get_redis
 
     patterns = ["cache:answer:*"]
@@ -625,8 +628,8 @@ def _display_name_for_model(model_id: str) -> str:
 async def chat_endpoint(request: ChatRequest):
     """
     Main chat endpoint to interact with the LangGraph Agent.
-    After the agent responds, persists user message + assistant response
-    to PostgreSQL (fire-and-forget: DB errors don't break the response).
+    After the agent responds, awaits persistence of the user message and
+    assistant response to PostgreSQL. Persistence errors remain non-fatal.
     """
     request.message = repair_mojibake(request.message)
     request.conversation_history = _repair_history_messages(request.conversation_history)
@@ -808,7 +811,8 @@ async def chat_endpoint(request: ChatRequest):
             cached_from_model = result["cache_metadata"].get("model")
             cached_at = result["cache_metadata"].get("created_at")
         
-        # --- Fire-and-forget: persist to PostgreSQL ---
+        # Persistence hoàn tất trước khi trả response, nhưng lỗi PostgreSQL là
+        # non-fatal để không làm mất answer đã được Agent tạo thành công.
         if _release_readiness_test_mode_enabled():
             logger.info("Skipping DB persistence in release-readiness test mode.")
         else:
@@ -908,8 +912,10 @@ async def _persist_chat_to_db(
     db_metadata: dict,
 ):
     """
-    Persist a chat exchange (user msg + assistant response) to PostgreSQL.
-    This is called fire-and-forget from the chat endpoint.
+    Lưu user message và assistant response vào PostgreSQL.
+
+    Chat endpoint ``await`` hàm này; lỗi persistence được caller giữ ở nhánh
+    non-fatal nên không thay thế answer đã tạo thành HTTP error.
     """
     from src.database.repositories import chat_history as repo
     

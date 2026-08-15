@@ -20,7 +20,7 @@ EntityType = Literal[
 
 
 def canonical_text_key(text: str) -> str:
-    """Return a deterministic, lowercase key for schema IDs and lookups."""
+    """Trả key chữ thường deterministic cho schema ID và lookup."""
 
     normalized = unicodedata.normalize("NFKC", text or "")
     normalized = normalized.replace("-", " ").replace("_", " ")

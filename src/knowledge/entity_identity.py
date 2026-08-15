@@ -16,7 +16,7 @@ from src.knowledge.schemas import EntityCard
 
 
 def entity_identity_key(card_or_payload: EntityCard | dict[str, Any]) -> str:
-    """Return the version-independent canonical identity for an entity card."""
+    """Trả canonical identity không phụ thuộc knowledge build version."""
 
     if isinstance(card_or_payload, EntityCard):
         entity_type = card_or_payload.entity_type

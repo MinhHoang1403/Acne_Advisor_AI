@@ -1,8 +1,4 @@
-"""
-src/database/models/__init__.py
-================================
-Export the shared SQLAlchemy metadata used by init_schema.py.
-"""
+"""Export SQLAlchemy metadata dùng chung cho ``init_schema.py``."""
 
 from src.database.models.base import Base, metadata
 

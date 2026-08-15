@@ -43,7 +43,7 @@ NEW_DOMAIN_METADATA_LIST_FIELDS = (
 
 @dataclass
 class DermatologyChunkMetadata:
-    """Structured metadata for a single dermatology content chunk."""
+    """Các nhóm metadata rule-based của một dermatology content chunk."""
 
     domain_topic: list[str] = field(default_factory=list)
     content_type: list[str] = field(default_factory=list)
@@ -57,7 +57,7 @@ class DermatologyChunkMetadata:
     extraction_method: str = "rule_based"
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serialisable dict."""
+        """Chuyển dataclass thành dictionary có thể serialize sang JSON."""
         return asdict(self)
 
 
@@ -69,7 +69,7 @@ def _match_keywords(
     text_lower: str,
     keyword_dict: dict[str, list[str]],
 ) -> list[str]:
-    """Return deduplicated, stable-ordered list of canonical values matched."""
+    """Trả canonical values đã match, loại trùng nhưng giữ thứ tự ổn định."""
     matched: list[str] = []
     for canonical, keywords in keyword_dict.items():
         for kw in keywords:
@@ -81,7 +81,7 @@ def _match_keywords(
 
 
 def _detect_evidence_type(text_lower: str) -> str | None:
-    """Heuristic detection of evidence type from text keywords."""
+    """Suy ra evidence type bằng keyword heuristic, không phân loại bằng model."""
     evidence_patterns: list[tuple[str, list[str]]] = [
         ("clinical_study", [
             "clinical trial", "thử nghiệm lâm sàng",
@@ -142,7 +142,7 @@ def _compute_confidence(meta: DermatologyChunkMetadata) -> float:
 
 
 def _dedupe(values: list[Any]) -> list[str]:
-    """Return stable ordered string values with empty items removed."""
+    """Loại item rỗng/trùng và giữ thứ tự xuất hiện của string values."""
     seen: set[str] = set()
     output: list[str] = []
     for value in values:
@@ -300,10 +300,10 @@ def enrich_domain_metadata(
     text: str,
     existing_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Merge existing chunk metadata with taxonomy-backed entity metadata.
+    """Gộp chunk metadata hiện có với entity metadata dựa trên taxonomy.
 
-    This function is intentionally rule-based and safe for ingestion: taxonomy
-    loading failures are logged as warnings and do not abort the pipeline.
+    Hàm chủ ý dùng rule deterministic và giữ ingestion tiếp tục khi taxonomy
+    loading lỗi; lỗi đó chỉ được ghi warning.
     """
     enriched = dict(existing_metadata or {})
     taxonomy_metadata = _empty_taxonomy_metadata()
@@ -322,7 +322,7 @@ def enrich_domain_metadata(
     condition = list(expanded.get("condition") or [])
     safety_context = list(expanded.get("safety_context") or [])
 
-    # Preserve old ingredient metadata by mapping only known active ingredients.
+    # Giữ ingredient metadata cũ nhưng chỉ map active ingredient đã biết.
     try:
         normalizer = _get_drug_entity_normalizer()
         for old_ingredient in enriched.get("ingredient", []) or []:
@@ -332,8 +332,8 @@ def enrich_domain_metadata(
     except Exception:
         pass
 
-    # The previous extractor already used safety_context for irritation/dryness.
-    # Keep those values and add taxonomy contexts such as pregnancy/breastfeeding.
+    # Extractor trước đã dùng safety_context cho irritation/dryness; giữ metadata
+    # đó và bổ sung taxonomy context như pregnancy/breastfeeding.
     safety_context.extend(enriched.get("safety_context", []) or [])
 
     taxonomy_metadata["drug_product"] = _dedupe(drug_product)
@@ -359,32 +359,20 @@ def extract_dermatology_metadata(
     text: str,
     header_path: str | list[str] = "",
 ) -> dict[str, Any]:
-    """
-    Extract dermatology-specific metadata from *text* using rule-based
-    keyword matching.
+    """Trích xuất dermatology metadata bằng rule-based keyword matching.
 
-    Parameters
-    ----------
-    text : str
-        The chunk text to analyse.
-    header_path : str | list[str]
-        Optional Markdown header path (e.g. ``"Acne Treatment > Retinoids"``
-        or ``["Acne Treatment", "Retinoids"]``). Will be concatenated and
-        matched alongside *text*.
-
-    Returns
-    -------
-    dict[str, Any]
-        A flat dictionary matching the ``DermatologyChunkMetadata`` fields.
-        All list values are deduplicated, stable-ordered, lowercase snake_case.
+    ``header_path`` có thể là Markdown path dạng string hoặc danh sách heading;
+    nó được ghép với ``text`` trước khi match. Kết quả là dictionary phẳng theo
+    ``DermatologyChunkMetadata``; list values được loại trùng, giữ thứ tự và dùng
+    lowercase snake_case. Hàm không gọi model và không tạo relevance score.
     """
-    # Normalise header_path to a string
+    # Chuẩn hóa header_path thành string trước khi match.
     if isinstance(header_path, list):
         header_str = " ".join(header_path)
     else:
         header_str = header_path or ""
 
-    # Combine text and header for matching (lowercased)
+    # Header và body cùng tham gia rule matching sau khi lowercase.
     combined = f"{header_str} {text}".lower()
 
     meta = DermatologyChunkMetadata(

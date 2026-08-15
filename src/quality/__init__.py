@@ -1,4 +1,4 @@
-"""Deterministic answer quality checks for Acne Advisor AI."""
+"""Các answer-quality check deterministic của Acne Advisor AI."""
 
 from src.quality.answer_verifier import verify_answer_quality
 from src.quality.contracts import (

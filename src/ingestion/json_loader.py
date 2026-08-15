@@ -1,4 +1,4 @@
-"""Load crawled web-page JSON datasets for offline ingestion."""
+"""Nạp dataset web-page JSON đã crawl cho offline ingestion."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ WRAPPER_RECORD_KEYS = ("records", "data", "items", "documents", "pages")
 
 
 def load_web_json_documents(path: str | Path) -> list[dict[str, Any]]:
-    """Load valid web JSON records as ingestion documents."""
+    """Nạp các web JSON record hợp lệ thành ingestion documents."""
 
     documents, _summary = load_web_json_documents_with_stats(path)
     return documents
@@ -25,7 +25,7 @@ def load_web_json_documents_with_stats(
     *,
     min_raw_text_chars: int = DEFAULT_MIN_RAW_TEXT_CHARS,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Load web JSON records and return documents plus total/skipped counts."""
+    """Nạp web JSON records và trả documents cùng số record tổng/bị bỏ qua."""
 
     json_path = Path(path)
     try:

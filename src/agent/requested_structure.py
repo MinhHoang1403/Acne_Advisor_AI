@@ -1,4 +1,4 @@
-"""Parse user-requested answer structure without calling an LLM."""
+"""Parse cấu trúc answer do user yêu cầu mà không gọi LLM."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ _NUMBER_WORDS = {
 }
 
 def parse_requested_structure(question: str) -> RequestedStructure:
-    """Infer table/list/style constraints from a Vietnamese or English question."""
+    """Suy ra table/list/style constraints từ câu hỏi tiếng Việt hoặc tiếng Anh."""
 
     raw = question or ""
     text = _accentless(raw)

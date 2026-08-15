@@ -7,8 +7,6 @@ deterministic boundaries for a small set of safety-critical situations.
 
 The system is not a diagnostic model, an autonomous physician, a prescription
 service, an image-analysis system, or a clinically validated medical product.
-The repository name contains the historical word `diagnose`, but the current
-application provides information and advisory support rather than diagnosis.
 
 ## Overview
 
@@ -316,8 +314,8 @@ hardening.
 ### Installation
 
 ```powershell
-git clone https://github.com/MinhHoang1403/RAG-system-for-acne-diagnose.git
-Set-Location RAG-system-for-acne-diagnose
+git clone https://github.com/MinhHoang1403/Acne_Advisor_AI.git
+Set-Location Acne_Advisor_AI
 
 py -3.11 -m venv venv
 .\venv\Scripts\Activate.ps1
@@ -417,7 +415,9 @@ review.
 - End-to-end medical quality and clinical safety effectiveness have not been
   clinically validated.
 - Dense query embedding uses the external Gemini Embedding 2 provider under the
-  current configuration.
+  current configuration. The current query/document contract does not prepend
+  Google's retrieval-specific task instructions; their effect on this corpus
+  remains an evaluation question that would require controlled re-embedding.
 - Deployment assumptions target trusted, local, single-user use.
 
 ## References and Technical Documentation
@@ -426,6 +426,7 @@ review.
 - [Agent Workflow](docs/AGENT_WORKFLOW.md)
 - [Data Pipeline](docs/DATA_PIPELINE.md)
 - [Methods and Formulas](docs/METHODS_AND_FORMULAS.md)
+- [Method Traceability](docs/METHOD_TRACEABILITY.md)
 - [Vietnamese Source Code Guide](docs/CODE_GUIDE_VI.md)
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)

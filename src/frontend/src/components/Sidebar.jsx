@@ -96,7 +96,7 @@ export default function Sidebar({
       <div className="sidebar-header">
         <div className="sidebar-brand-row">
           <div className="sidebar-brand-copy">
-            <h1 className="sidebar-title">Acne Advisor</h1>
+            <h1 className="sidebar-title">Acne Advisor AI</h1>
           </div>
           <button
             type="button"

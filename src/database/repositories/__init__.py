@@ -1,1 +1,1 @@
-"""src/database/repositories package – thin data-access wrappers."""
+"""Các data-access wrapper mỏng cho database repositories."""

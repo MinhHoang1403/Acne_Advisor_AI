@@ -1,7 +1,7 @@
-"""
-src/cache/redis_cache.py
-========================
-Redis client wrapper with fail-open logic.
+"""Quản lý shared async Redis client với cache fail-open.
+
+Không kết nối khi cache bị tắt hoặc dependency không có. Lỗi Redis trả ``None``
+để caller tiếp tục không cache; module không tự xóa key hay thay cache identity.
 """
 import os
 import logging
@@ -17,13 +17,11 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Global Redis client instance
+# Một shared client cho process; application shutdown gọi ``close_redis``.
 _redis_client: Optional['redis.Redis'] = None
 
 async def get_redis() -> Optional['redis.Redis']:
-    """
-    Returns the async Redis client if available and enabled.
-    """
+    """Trả async Redis client khi cache được bật và kết nối thành công."""
     global _redis_client
     
     if not REDIS_AVAILABLE:
@@ -37,7 +35,7 @@ async def get_redis() -> Optional['redis.Redis']:
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         try:
             _redis_client = redis.from_url(redis_url, decode_responses=True)
-            # Ping to verify connection
+            # Ping ngay khi tạo để không phát tán client chưa usable cho caller.
             await _redis_client.ping()
         except Exception as e:
             logger.warning(
@@ -49,7 +47,7 @@ async def get_redis() -> Optional['redis.Redis']:
     return _redis_client
 
 async def close_redis():
-    """Close the Redis connection if it exists."""
+    """Đóng shared Redis connection nếu đã được tạo."""
     global _redis_client
     if _redis_client is not None:
         try:
@@ -59,7 +57,7 @@ async def close_redis():
         _redis_client = None
 
 async def ping_redis() -> bool:
-    """Check if Redis is up."""
+    """Kiểm Redis reachable mà không thay đổi dữ liệu."""
     client = await get_redis()
     if client is None:
         return False

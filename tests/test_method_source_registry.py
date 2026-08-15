@@ -43,3 +43,40 @@ def test_method_registry_correction_does_not_change_validated_build_identity() -
     )
 
     assert identity.build_id == "ec0a6de32d58ac181af6"
+
+
+def test_method_traceability_covers_methods_and_technical_standards() -> None:
+    registry = json.loads(
+        Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
+    )
+    records = {record["source_id"]: record for record in registry["sources"]}
+    traceability = Path("docs/METHOD_TRACEABILITY.md").read_text(encoding="utf-8")
+    required = {
+        "qdrant_cosine_search_2026",
+        "cormack_clarke_buettcher_rrf_2009",
+        "yao_react_2023",
+        "jiang_active_rag_2023",
+        "jeong_adaptive_rag_2024",
+        "aws_timeouts_retries_backoff_jitter_2019",
+        "nist_fips_180_4_sha256",
+        "ietf_rfc9562_uuidv5",
+    }
+
+    assert registry["verified_through"] == "2026-08-14"
+    assert required <= records.keys()
+    for source_id in required:
+        assert source_id in traceability
+        assert records[source_id]["limitations"]
+
+
+def test_gemini_retrieval_instruction_is_an_evaluation_question_only() -> None:
+    registry = json.loads(
+        Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
+    )
+    records = {record["source_id"]: record for record in registry["sources"]}
+    methods = Path("docs/METHODS_AND_FORMULAS.md").read_text(encoding="utf-8")
+
+    google = records["google_gemini_embedding2_2026"]
+    assert "does not accept task_type" in google["claim_supported"]
+    assert "unprefixed" in google["limitations"]
+    assert "unmeasured evaluation question" in methods

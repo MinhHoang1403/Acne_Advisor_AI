@@ -41,7 +41,7 @@ def frontend_config_status(root: Path = PROJECT_ROOT) -> dict[str, Any]:
 
 
 def environment_summary() -> dict[str, Any]:
-    """Return non-secret endpoint/config identities only."""
+    """Chỉ trả endpoint/config identity không chứa secret."""
 
     return {
         "qdrant_url": _redact_url(os.getenv("QDRANT_URL", "http://localhost:6333")),

@@ -74,6 +74,10 @@ query text -> Gemini embedding provider -> 3072-D vector
 
 Qdrant mới thực thi cosine search trên vectors đã index. Muốn đổi model/dimension
 phải xem đồng thời embedding/index compatibility; không chỉ sửa một constant.
+Gemini Embedding 2 không nhận `task_type`; tài liệu provider khuyến nghị prefix
+instruction vào text cho text-only retrieval. Build hiện tại dùng text không có
+prefix. Đây là câu hỏi cần A/B test trước khi thay đổi vì format document mới sẽ
+yêu cầu re-embed/reindex; không được suy ra chất lượng chỉ từ provider contract.
 
 ### BM25
 
@@ -100,6 +104,9 @@ score(t,D) = IDF(t) * tf(t,D) * (k1 + 1)
 - `|D|`, `avgdl`: độ dài document và độ dài trung bình.
 - `k1`: điều khiển TF saturation.
 - `b`: điều khiển document-length normalization.
+
+Trong build hiện tại, `avg_len=256` là configured provider/index baseline, không
+phải phép đo được tuyên bố là true corpus average hay giá trị đã chứng minh tối ưu.
 
 ## Retrieval runtime
 
@@ -168,6 +175,11 @@ Mỗi stage dùng `effective_timeout = min(configured_timeout, remaining_deadlin
 Retry và provider fallback tiếp tục dùng phần deadline còn lại, không khởi tạo lại
 tổng thời gian request. Đây là resource policy, không phải confidence formula.
 
+Metadata ingestion có field compatibility tên `confidence`, nhưng giá trị chỉ là
+coverage heuristic: bằng 0 khi không có nhóm metadata nào, nếu không thì bằng
+`min(0.3 + 0.1*n, 1.0)` với `n` là số nhóm có giá trị. Nó không tham gia retrieval
+score và không phải xác suất, source confidence hay medical confidence.
+
 ## Structural knowledge và verifier
 
 Taxonomy normalizer, EntityCards và Neo4j graph giúp build/validate các quan hệ
@@ -221,5 +233,7 @@ trực tiếp:
 - Cache/version/build/source/model identifiers và persisted metadata keys.
 
 Tài liệu phương pháp và parameter đầy đủ nằm tại
-[`METHODS_AND_FORMULAS.md`](METHODS_AND_FORMULAS.md). Quy trình vận hành nằm tại
+[`METHODS_AND_FORMULAS.md`](METHODS_AND_FORMULAS.md). Mapping từ phương pháp tới
+code owner, nguồn, classification và limitation nằm tại
+[`METHOD_TRACEABILITY.md`](METHOD_TRACEABILITY.md). Quy trình vận hành nằm tại
 [`OPERATIONS.md`](OPERATIONS.md).

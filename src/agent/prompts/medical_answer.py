@@ -1,4 +1,4 @@
-"""Evidence-grounded prompt boundaries for medical answer generation."""
+"""Xây prompt boundaries để generation chỉ sử dụng source evidence hiện tại."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ POLICY:
 def build_medical_system_instruction(
     question: str,
 ) -> str:
-    """Build policy/shape instructions for the provider's system channel."""
+    """Ghép policy và answer-shape instructions cho system channel của provider."""
 
     parts = [
         MEDICAL_RAG_SYSTEM_PROMPT.strip(),
@@ -45,7 +45,7 @@ def build_medical_prompt(
     available_sources: list[dict[str, Any]] | None = None,
     packed_context_text: str | None = None,
 ) -> str:
-    """Build user/data content; system policy is passed separately by the caller."""
+    """Tạo user/data content; caller truyền system policy ở channel riêng."""
 
     lines = ["<USER_DATA>"]
     if conversation_history:
@@ -82,7 +82,7 @@ def build_medical_prompt(
 
 
 def _render_legacy_contexts(contexts: list[dict[str, Any]]) -> str:
-    """Compatibility renderer for non-runtime callers; runtime uses PackedContext."""
+    """Renderer tương thích cho non-runtime caller; runtime dùng ``PackedContext``."""
 
     blocks: list[str] = []
     for index, context in enumerate(contexts, 1):
@@ -101,7 +101,7 @@ def _render_legacy_contexts(contexts: list[dict[str, Any]]) -> str:
 
 
 def observe_medical_prompt_budget(prompt: str):
-    """Return size-only accounting for the exact user prompt."""
+    """Đếm kích thước exact user prompt mà không đọc hay chấm điểm nội dung."""
 
     from src.retrieval.prompt_size import observe_prompt_components
 

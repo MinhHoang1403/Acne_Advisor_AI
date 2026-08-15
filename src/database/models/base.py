@@ -1,7 +1,4 @@
-"""
-src/database/models/base.py – SQLAlchemy Declarative Base & Mixins
-===================================================================
-"""
+"""SQLAlchemy declarative base và column mixins dùng chung."""
 
 from __future__ import annotations
 
@@ -14,20 +11,20 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    """Shared declarative base for all ORM models."""
+    """Declarative base dùng chung cho mọi ORM model."""
     pass
 
 
-# Expose MetaData for schema creation
+# Export MetaData để schema initializer dùng cùng model registry.
 metadata = Base.metadata
 
 
 # ---------------------------------------------------------------------------
-# Reusable column mixins
+# Column mixins có thể tái sử dụng.
 # ---------------------------------------------------------------------------
 
 class UUIDPrimaryKeyMixin:
-    """Adds a UUID primary key column (default: server-generated)."""
+    """Thêm UUID primary key, mặc định do server sinh."""
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -37,7 +34,7 @@ class UUIDPrimaryKeyMixin:
 
 
 class TimestampMixin:
-    """Adds created_at and updated_at timestamp columns."""
+    """Thêm hai timestamp columns ``created_at`` và ``updated_at``."""
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

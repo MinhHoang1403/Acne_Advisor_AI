@@ -1,7 +1,6 @@
-"""
-Database access layer for Acne Advisor AI.
+"""Database access layer của Acne Advisor AI.
 
-The active runtime uses PostgreSQL chat-history models/repositories and a
-Qdrant-backed source-evidence adapter. Neo4j remains a structural knowledge
-store used by build and integrity tooling, not runtime medical grounding.
+Runtime dùng PostgreSQL chat-history models/repositories và source-evidence
+adapter dựa trên Qdrant. Neo4j là structural knowledge store cho build/integrity
+tooling, không phải nguồn medical grounding ở runtime.
 """

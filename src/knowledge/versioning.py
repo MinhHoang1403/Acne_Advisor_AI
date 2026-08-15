@@ -1,4 +1,4 @@
-"""Knowledge-base versioning and embedding metadata helpers."""
+"""Helper quản lý knowledge-base version và embedding metadata."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _env_int(name: str, default: int) -> int:
 
 
 def get_embedding_metadata() -> dict[str, Any]:
-    """Return serializable embedding config metadata for KB payloads."""
+    """Trả embedding config có thể serialize vào KB payload."""
 
     return {
         "embedding_provider": _env_str("EMBEDDING_PROVIDER", DEFAULT_EMBEDDING_PROVIDER),
@@ -43,7 +43,7 @@ def get_embedding_metadata() -> dict[str, Any]:
 
 
 def get_knowledge_versions() -> dict[str, str]:
-    """Return version tags used to validate clean KB rebuilds."""
+    """Trả version tags dùng để kiểm tính tương thích của KB build."""
 
     return {
         "kb_version": _env_str("KB_VERSION", DEFAULT_KB_VERSION),
@@ -61,7 +61,7 @@ def get_knowledge_versions() -> dict[str, str]:
 
 
 def expected_kb_payload_metadata() -> dict[str, Any]:
-    """Return the combined metadata expected on chunk/entity payloads."""
+    """Trả metadata tổng hợp bắt buộc trên chunk/entity payload."""
 
     return {
         **get_embedding_metadata(),
@@ -73,7 +73,7 @@ def validate_embedding_config_compatibility(
     chunk_config: dict[str, Any],
     entity_config: dict[str, Any],
 ) -> list[str]:
-    """Return mismatch messages for chunk/entity collection compatibility checks."""
+    """Liệt kê mismatch khi đối chiếu tương thích chunk/entity collections."""
 
     issues: list[str] = []
     for field in (

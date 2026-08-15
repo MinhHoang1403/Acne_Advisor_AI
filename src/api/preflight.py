@@ -1,6 +1,4 @@
-"""
-Preflight checks for API, retrieval, and generation dependencies.
-"""
+"""Preflight check cho API, retrieval và generation dependencies."""
 
 from __future__ import annotations
 
@@ -30,7 +28,7 @@ REQUIRED_CORE_CHECKS = ("qdrant", "embedding", "generation")
 
 
 def _safe_dependency_error(service: str, exc: Exception) -> str:
-    """Describe failed dependency checks without returning raw connection details."""
+    """Mô tả dependency check lỗi mà không trả raw connection details."""
 
     logger.warning(
         "Preflight dependency unavailable: service=%s error_type=%s",
@@ -41,7 +39,7 @@ def _safe_dependency_error(service: str, exc: Exception) -> str:
 
 
 def _preload_check_dependencies() -> None:
-    """Avoid concurrent cold imports consuming the bounded health-check budget."""
+    """Tránh concurrent cold import tiêu hết health-check budget hữu hạn."""
 
     for module_name in (
         "src.database.connection",
@@ -89,12 +87,12 @@ def _normalize_provider(value: str | None) -> str:
 
 
 def get_runtime_provider_requirements() -> dict[str, Any]:
-    """Describe the configured generation runtime without probing paid providers.
+    """Mô tả generation runtime đã cấu hình mà không probe paid provider.
 
-    Gemini is the default runtime provider. Its opportunistic Ollama fallback is
-    selected only when a local model is available, so it does not make Ollama a
-    core health dependency. An explicitly configured Ollama primary provider,
-    or an explicitly required local fallback, does make it required.
+    Gemini là runtime provider mặc định. Ollama fallback cơ hội chỉ được chọn khi
+    local model available nên không tự biến Ollama thành core health dependency.
+    Ollama chỉ bắt buộc khi được cấu hình tường minh làm primary hoặc required
+    local fallback.
     """
 
     provider = _normalize_provider(os.getenv("LLM_PROVIDER", "gemini"))
@@ -122,7 +120,7 @@ def check_generation_provider(
     requirements: dict[str, Any],
     ollama: CheckResult,
 ) -> CheckResult:
-    """Validate the configured primary provider without sending a chat request."""
+    """Kiểm primary generation provider mà không gửi chat request."""
 
     provider = requirements["provider"]
     if provider == "gemini":
@@ -153,7 +151,7 @@ def check_generation_provider(
 
 
 def check_embedding_provider() -> CheckResult:
-    """Validate query-embedding configuration without spending provider quota."""
+    """Kiểm query-embedding config mà không tiêu provider quota."""
 
     model = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
     if not os.getenv("GOOGLE_API_KEY", "").strip():

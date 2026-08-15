@@ -15,7 +15,7 @@
       "claim_supported": "BM25 uses corpus IDF, saturating term frequency, and document-length normalization.",
       "project_method": "Qdrant native BM25 sparse retrieval",
       "date_verified": "2026-08-14",
-      "limitations": "Does not select project tokenizer or language policy."
+      "limitations": "Supports the BM25 method family, not Qdrant implementation details or the claim that k1=1.2, b=0.75, avg_len=256, tokenizer, or language settings are optimal for this acne corpus."
     },
     {
       "source_id": "qdrant_bm25_2026",
@@ -30,7 +30,7 @@
       "claim_supported": "Qdrant supports qdrant/bm25 document inference with explicit k, b, avg_len, tokenizer, language and IDF modifier.",
       "project_method": "Native BM25 document/query preprocessing parity",
       "date_verified": "2026-08-14",
-      "limitations": "Provider implementation contract, not independent evidence of retrieval quality."
+      "limitations": "Provider implementation contract, not independent evidence of retrieval quality or parameter optimality on the project corpus."
     },
     {
       "source_id": "google_gemini_embedding2_2026",
@@ -42,10 +42,10 @@
       "url": "https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2",
       "source_type": "official_provider_documentation",
       "role": "current",
-      "claim_supported": "Gemini Embedding 2 supports 3072-dimensional output and does not accept task_type.",
+      "claim_supported": "Gemini Embedding 2 supports 3072-dimensional output, does not accept task_type, and documents text-prefix instructions for text-only retrieval use cases.",
       "project_method": "Central dense embedding contract",
       "date_verified": "2026-08-14",
-      "limitations": "Provider contract; cross-lingual quality is not guaranteed for this corpus."
+      "limitations": "Provider contract only. It does not validate Vietnamese acne retrieval quality, the current unprefixed query/document format, or any improvement from retrieval-task instruction prefixes on this corpus."
     },
     {
       "source_id": "karpukhin_dpr_2020",
@@ -76,6 +76,126 @@
       "project_method": "Actual-corpus chunking comparison",
       "date_verified": "2026-08-14",
       "limitations": "The project does not implement PIC. The paper does not prescribe or validate this project's 2400-character cap or acne corpus policy."
+    },
+    {
+      "source_id": "qdrant_cosine_search_2026",
+      "title": "Collections and distance metrics documentation",
+      "authors_or_organization": "Qdrant",
+      "publication_date": "current at 2026-08-14",
+      "venue_or_publisher": "Qdrant documentation",
+      "doi": null,
+      "url": "https://qdrant.tech/documentation/manage-data/collections/",
+      "source_type": "official_provider_documentation",
+      "role": "current",
+      "claim_supported": "Qdrant collections can use cosine distance for dense-vector similarity search and normalize vectors for efficient cosine scoring.",
+      "project_method": "Dense cosine vector search provider contract",
+      "date_verified": "2026-08-14",
+      "limitations": "Defines provider behavior, not the relevance quality of Gemini vectors or retrieval effectiveness on the project corpus."
+    },
+    {
+      "source_id": "cormack_clarke_buettcher_rrf_2009",
+      "title": "Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods",
+      "authors_or_organization": "Gordon V. Cormack; Charles L. A. Clarke; Stefan Buettcher",
+      "publication_date": "2009",
+      "venue_or_publisher": "32nd International ACM SIGIR Conference",
+      "doi": "10.1145/1571941.1572114",
+      "url": "https://dl.acm.org/doi/10.1145/1571941.1572114",
+      "source_type": "peer_reviewed_paper",
+      "role": "foundational",
+      "claim_supported": "Reciprocal Rank Fusion combines ranked result lists using reciprocal rank contributions rather than raw score addition.",
+      "project_method": "Equal-weight Dense and BM25 rank fusion",
+      "date_verified": "2026-08-14",
+      "limitations": "Does not prove that k=60 or equal Dense/BM25 weights are optimal for Acne Advisor AI."
+    },
+    {
+      "source_id": "yao_react_2023",
+      "title": "ReAct: Synergizing Reasoning and Acting in Language Models",
+      "authors_or_organization": "Shunyu Yao et al.",
+      "publication_date": "2023",
+      "venue_or_publisher": "ICLR 2023",
+      "doi": null,
+      "url": "https://openreview.net/forum?id=WE_vluYUL-X",
+      "source_type": "peer_reviewed_paper",
+      "role": "related_literature",
+      "claim_supported": "Language-model reasoning traces can be interleaved with actions that acquire external information.",
+      "project_method": "Related conceptual basis for bounded semantic action selection",
+      "date_verified": "2026-08-14",
+      "limitations": "The project does not reproduce the paper's prompting setup or expose free-form chain of thought; the paper does not define this project's action schema or safety transitions."
+    },
+    {
+      "source_id": "jiang_active_rag_2023",
+      "title": "Active Retrieval Augmented Generation",
+      "authors_or_organization": "Zhengbao Jiang et al.",
+      "publication_date": "2023",
+      "venue_or_publisher": "EMNLP 2023",
+      "doi": "10.18653/v1/2023.emnlp-main.495",
+      "url": "https://aclanthology.org/2023.emnlp-main.495/",
+      "source_type": "peer_reviewed_paper",
+      "role": "related_literature",
+      "claim_supported": "Retrieval can be triggered actively according to model/evidence need during generation.",
+      "project_method": "Related conceptual basis for model-selected retrieve/retry actions",
+      "date_verified": "2026-08-14",
+      "limitations": "The project does not implement FLARE or its token-level retrieval mechanism; the paper does not validate the two-attempt project limit."
+    },
+    {
+      "source_id": "jeong_adaptive_rag_2024",
+      "title": "Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity",
+      "authors_or_organization": "Soyeong Jeong et al.",
+      "publication_date": "2024",
+      "venue_or_publisher": "NAACL 2024",
+      "doi": "10.18653/v1/2024.naacl-long.389",
+      "url": "https://aclanthology.org/2024.naacl-long.389/",
+      "source_type": "peer_reviewed_paper",
+      "role": "related_literature",
+      "claim_supported": "Retrieval strategy can be adapted to question complexity rather than fixed uniformly.",
+      "project_method": "Related conceptual basis for bounded request-dependent action selection",
+      "date_verified": "2026-08-14",
+      "limitations": "The project does not implement the paper's classifier or strategy set; the paper does not define this project's AgentDecision schema."
+    },
+    {
+      "source_id": "aws_timeouts_retries_backoff_jitter_2019",
+      "title": "Timeouts, retries, and backoff with jitter",
+      "authors_or_organization": "Marc Brooker; Amazon Web Services",
+      "publication_date": "2019",
+      "venue_or_publisher": "Amazon Builders' Library",
+      "doi": null,
+      "url": "https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/",
+      "source_type": "official_engineering_guidance",
+      "role": "engineering_reference",
+      "claim_supported": "Finite timeouts, bounded retries, exponential backoff, and jitter mitigate correlated retry load in distributed systems.",
+      "project_method": "Bounded provider retry and shared request deadline",
+      "date_verified": "2026-08-14",
+      "limitations": "Engineering guidance, not a scientific optimum; it does not prescribe the project's retry count, timeout values, backoff cap, or jitter ratio."
+    },
+    {
+      "source_id": "nist_fips_180_4_sha256",
+      "title": "Secure Hash Standard (SHS), FIPS PUB 180-4",
+      "authors_or_organization": "National Institute of Standards and Technology",
+      "publication_date": "2015-08",
+      "venue_or_publisher": "NIST",
+      "doi": "10.6028/NIST.FIPS.180-4",
+      "url": "https://csrc.nist.gov/pubs/fips/180-4/upd1/final",
+      "source_type": "technical_standard",
+      "role": "current_standard",
+      "claim_supported": "SHA-256 is a standardized secure hash algorithm producing a 256-bit message digest.",
+      "project_method": "Exact cache identity and canonical pipeline fingerprint hashing",
+      "date_verified": "2026-08-14",
+      "limitations": "The standard defines the hash algorithm; it does not validate project normalization, cache semantics, field selection, digest truncation, or authenticity."
+    },
+    {
+      "source_id": "ietf_rfc9562_uuidv5",
+      "title": "Universally Unique IDentifiers (UUIDs), RFC 9562",
+      "authors_or_organization": "Kyle Davis; Brad Peabody; Paul J. Leach",
+      "publication_date": "2024-05",
+      "venue_or_publisher": "RFC Editor",
+      "doi": "10.17487/RFC9562",
+      "url": "https://www.rfc-editor.org/info/rfc9562/",
+      "source_type": "technical_standard",
+      "role": "current_standard",
+      "claim_supported": "UUID version 5 deterministically derives a UUID from a namespace and name using SHA-1 as specified by the standard.",
+      "project_method": "Stable EntityCard Qdrant point identity",
+      "date_verified": "2026-08-14",
+      "limitations": "The standard defines UUIDv5 construction; it does not validate project canonical-name semantics, collision handling across changed namespaces, or data authenticity."
     },
     {
       "source_id": "nice_ng198_2026_08",

@@ -1,4 +1,4 @@
-"""Human-friendly source labels while preserving raw traceability IDs."""
+"""Tạo source label thân thiện nhưng vẫn giữ raw traceability IDs."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ _UNATTRIBUTED_SOURCE_CLAIM_RE = re.compile(
 
 @dataclass(frozen=True)
 class SourceValidationResult:
-    """A request-scoped source validation result for internal diagnostics."""
+    """Kết quả source validation theo request, dùng cho internal diagnostics."""
 
     answer: str
     removed_mentions: tuple[str, ...]
@@ -49,10 +49,10 @@ def build_source_metadata(
     sources: list[Any] | None,
     contexts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return stable display metadata for retrieved sources.
+    """Tạo display metadata ổn định cho các source vừa được retrieval.
 
-    ``source_id`` keeps the raw backend identifier for debugging and
-    traceability; ``display_name`` is the only field the UI should show.
+    ``source_id`` giữ raw backend identifier cho debugging/traceability;
+    ``display_name`` là field UI nên hiển thị.
     """
 
     context_by_id: dict[str, dict[str, Any]] = {}
@@ -79,13 +79,13 @@ def build_source_allowlist(
     sources: list[Any] | None,
     contexts: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return the canonical, request-scoped sources eligible for answer citations."""
+    """Trả canonical source allowlist mà answer hiện tại được phép trích dẫn."""
 
     return build_source_metadata(sources, contexts)
 
 
 def normalize_source_identifier(value: Any) -> str:
-    """Normalize a source ID across paths, separators, case and Unicode form."""
+    """Chuẩn hóa source ID qua path separator, case và Unicode form."""
 
     if isinstance(value, dict):
         raw = _first_text(
@@ -107,7 +107,7 @@ def normalize_source_identifier(value: Any) -> str:
 
 
 def is_source_request(question: str) -> bool:
-    """Return whether the user is asking for retrieved documents rather than facts."""
+    """Nhận diện khi user hỏi về tài liệu được retrieval thay vì hỏi fact."""
 
     folded = _fold_source_text(question)
     markers = (
@@ -122,7 +122,7 @@ def is_source_request(question: str) -> bool:
 
 
 def build_grounded_source_answer(question: str, allowlist: list[dict[str, Any]] | None) -> str:
-    """Answer source-selection questions only from the current retrieval allowlist."""
+    """Trả lời câu hỏi về nguồn chỉ từ retrieval allowlist của request hiện tại."""
 
     entries = [entry for entry in (allowlist or []) if entry.get("source_id")]
     if not entries:
@@ -139,11 +139,11 @@ def validate_answer_source_mentions(
     answer: str,
     allowlist: list[dict[str, Any]] | None,
 ) -> SourceValidationResult:
-    """Remove source labels that are absent from this response's retrieval allowlist.
+    """Bỏ source label không có trong retrieval allowlist của response.
 
-    This is deliberately conservative: it never guesses a replacement source.
-    It only removes unsupported source labels or replaces generic numbered
-    document labels with a neutral reference to retrieved context.
+    Hàm chủ ý bảo thủ và không đoán source thay thế. Nó chỉ bỏ label không được
+    hỗ trợ hoặc đổi document label đánh số chung thành cách gọi trung tính về
+    context đã retrieval.
     """
 
     allowed_ids = tuple(str(entry.get("source_id") or "") for entry in allowlist or [] if entry.get("source_id"))
@@ -161,14 +161,14 @@ def validate_answer_source_mentions(
         if generic_matches:
             removed.extend(generic_matches)
             if line.lstrip().startswith("|"):
-                # A numbered source table cannot be attributed safely. Keeping
-                # it would make an invented source label visible to the user.
+                # Không thể attribution an toàn cho bảng source đánh số; giữ bảng
+                # sẽ làm user nhìn thấy source label không có trong allowlist.
                 continue
             line = _GENERIC_SOURCE_LABEL_RE.sub("tài liệu đã truy hồi", line)
 
-        # Generic claims about an unnamed guideline/document still imply an
-        # attribution.  Keep the clinical sentence, but make the attribution
-        # neutral instead of presenting an unverifiable source reference.
+        # Claim chung về guideline/document không tên vẫn tạo attribution. Giữ
+        # câu clinical nhưng đổi attribution thành trung tính để không trình bày
+        # source reference chưa được kiểm chứng.
         unmatched_claim = _UNATTRIBUTED_SOURCE_CLAIM_RE.search(line)
         if unmatched_claim:
             removed.append(unmatched_claim.group(0))
@@ -197,7 +197,7 @@ def display_names_for_sources(
     sources: list[Any] | None,
     contexts: list[dict[str, Any]] | None = None,
 ) -> list[str]:
-    """Compatibility helper for legacy ``sources: list[str]`` responses."""
+    """Helper tương thích cho response cũ có ``sources: list[str]``."""
 
     return [entry["display_name"] for entry in build_source_metadata(sources, contexts)]
 

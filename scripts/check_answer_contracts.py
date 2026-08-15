@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline implementation checks for the evidence-grounded answer boundary."""
+"""Kiểm implementation offline tại evidence-grounded answer boundary."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from src.observability.versioning import build_pipeline_version_manifest  # noqa
 
 
 def run_answer_contract_checks() -> dict[str, Any]:
-    """Check architecture markers; this is not a clinical quality evaluation."""
+    """Kiểm architecture markers; đây không phải đánh giá chất lượng lâm sàng."""
 
     formatter_source = (PROJECT_ROOT / "src/agent/answer_formatting.py").read_text(encoding="utf-8")
     verifier_source = (PROJECT_ROOT / "src/quality/answer_verifier.py").read_text(encoding="utf-8")
