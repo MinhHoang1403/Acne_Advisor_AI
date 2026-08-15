@@ -1,402 +1,319 @@
 # Acne Advisor AI
 
-Acne Advisor AI is a bounded, evidence-grounded research system for Vietnamese
-acne information and skin-care advice. It combines a frozen medical knowledge
-foundation with a LangGraph Agentic RAG runtime. It is not an autonomous doctor,
-a diagnosis or prescription system, an image-based acne model, or a clinically
-validated decision-support product.
+Acne Advisor AI is a Vietnamese, evidence-grounded acne information assistant
+built with bounded Agentic RAG. It retrieves medical evidence, lets a language
+model decide whether to retrieve again, generate, or abstain, and applies
+deterministic boundaries for a small set of safety-critical situations.
 
-> The repository slug `RAG-system-for-acne-diagnose` is historical. The current
-> product provides acne information and advisory support; it does not diagnose.
+The system is not a diagnostic model, an autonomous physician, a prescription
+service, an image-analysis system, or a clinically validated medical product.
+The repository name contains the historical word `diagnose`, but the current
+application provides information and advisory support rather than diagnosis.
 
-## What This Project Is
+## Overview
 
-The system answers text questions by retrieving bounded source excerpts and
-asking a generation model to synthesize an answer from that evidence. It keeps
-source identity through retrieval and exposes citations and research metadata.
-For a small, explicit set of high-risk situations, deterministic policy can
-replace the normal RAG answer with urgent or policy guidance.
+The repository contains two cooperating parts:
 
-The design separates responsibilities deliberately:
+1. **Knowledge preparation and indexing** converts curated medical source
+   snapshots into versioned, provenance-preserving Qdrant indexes and structural
+   knowledge assets.
+2. **The Agentic RAG runtime** accepts questions through FastAPI, uses LangGraph
+   to select bounded actions, retrieves evidence with Dense and BM25 search,
+   generates or abstains, and returns an answer to the React interface.
 
-- **Phase 1 prepares evidence.** It compiles canonical source snapshots into
-  immutable, versioned knowledge assets.
-- **Retrieval finds evidence.** Dense and native BM25 channels search the frozen
-  Qdrant knowledge collection.
-- **The Agent decides.** A generation model selects one bounded semantic action:
-  `retrieve`, `retry`, `generate`, or `abstain`.
-- **The answer model synthesizes.** Normal medical meaning comes from retrieved
-  evidence and the configured Gemini or Ollama generation provider.
-- **Python enforces contracts.** It owns narrow safety overrides, legal state
-  transitions, finite budgets, provenance, cache eligibility, and fail-safe
-  behavior. It is not a general medical reasoner.
-- **FastAPI transports and React displays.** Neither layer supplies medical
-  knowledge.
+Responsibilities are intentionally separate:
 
-## System at a Glance
-
-| Area | Current verified state |
-|---|---|
-| Product boundary | acne medical-information/advisory research system |
-| **ACTIVE PHASE 1** | frozen build `ec0a6de32d58ac181af6` |
-| Frozen corpus | 4 source snapshots, 512 knowledge chunks |
-| Structural assets | 32 EntityCards; Neo4j 32 nodes / 27 relationships |
-| Qdrant | 512 knowledge points; 32 entity points |
-| Dense embedding | `models/gemini-embedding-2`, 3072 dimensions, cosine distance |
-| Sparse retrieval | Qdrant-native BM25 |
-| **ACTIVE RUNTIME** | 8-node LangGraph with 4 model-selectable actions |
-| Runtime contract | `minimal_agentic_rag_v1`; effective answer-cache namespace `v8` |
-| Retrieval budget | at most 2 actual retrieval executions |
-| Generation | Gemini or Ollama/local; provider fallback is opt-in |
-| Cache | exact normalized, versioned Redis answer cache; not semantic cache |
-| Deployment boundary | local, single-user research/development |
-| Research status | runtime architecture frozen; final E0 AI-quality evaluation not started |
-
-These counts are recorded in
-[`data/phase1_build_manifest.json`](data/phase1_build_manifest.json) and checked
-by `scripts/phase1.py status` and `scripts/phase1.py validate`.
+- retrieval supplies bounded source evidence;
+- the language model selects semantic actions and synthesizes normal answers;
+- Python validates transitions and enforces safety, provenance, finite budgets,
+  cache eligibility, and fail-safe behavior;
+- FastAPI transports the result and React presents it.
 
 ## Architecture
 
-The two phases have different lifecycles and ownership:
-
 ```text
-PHASE 1 - FROZEN KNOWLEDGE FOUNDATION
+KNOWLEDGE PREPARATION
 
-canonical source snapshots
+curated source snapshots
   -> deterministic parsing and normalization
-  -> structure-first chunking and provenance identities
+  -> structure-aware chunking and provenance identities
   -> Gemini Embedding 2 + Qdrant-native BM25 documents
-  -> immutable Qdrant knowledge/entity collections
-  -> deterministic EntityCards and Neo4j structural graph
+  -> versioned Qdrant knowledge/entity indexes
+  -> EntityCards and a deterministic Neo4j structural graph
 
-PHASE 2 - BOUNDED AGENTIC RAG RUNTIME
+AGENTIC RAG RUNTIME
 
 React -> FastAPI -> START -> prepare -> guard -> decide
-                                             +-- AI: retrieve/retry
+                                             +-- retrieve/retry
                                              |      -> retrieve -> assess -> decide
-                                             +-- AI: generate -> generate -> finalize -> END
-                                             +-- AI: abstain  -> abstain  -> finalize -> END
-                                             `-- Python: cache/safety -> finalize -> END
+                                             +-- generate -> generate -> finalize -> END
+                                             +-- abstain  -> abstain  -> finalize -> END
+                                             `-- cache/safety -> finalize -> END
 ```
 
-`retry` is a semantic action routed to the existing `retrieve` node; it is not a
-ninth graph node. Phase 2 reads the frozen Phase 1 knowledge collection and does
-not rebuild, re-embed, reindex, activate, or write to Phase 1 stores.
+The eight LangGraph nodes are `prepare`, `guard`, `decide`, `retrieve`,
+`assess`, `generate`, `abstain`, and `finalize`. `retry` is an Agent action that
+routes through the existing `retrieve` node, not a separate graph node.
 
-The normal request path is:
+Normal runtime requests read the existing indexed medical knowledge. They do
+not rebuild, re-embed, reindex, activate, or write to the knowledge indexes.
 
-```text
-ChatInput -> App -> chat API client -> POST /chat -> run_clinical_agent
-  -> prepare -> guard -> decide -> retrieve -> assess -> decide
-  -> generate / retry / abstain -> finalize -> ChatResponse
-  -> ChatWindow -> ChatMessage and citations
-```
+## Knowledge Preparation and Indexing
 
-See [Architecture](docs/ARCHITECTURE.md) and
-[Agent Workflow](docs/AGENT_WORKFLOW.md) for the maintained technical view.
+The current validated build is `ec0a6de32d58ac181af6`:
 
-## Why It Is Agentic RAG
-
-LangGraph topology alone is not the agency claim. At the `decide` boundary, the
-configured model must return strict `AgentDecision` JSON with one of four
-semantic actions:
-
-| Action | Meaning |
+| Artifact | Count or contract |
 |---|---|
-| `retrieve` | first evidence acquisition, legal only before retrieval has run |
-| `retry` | later evidence acquisition after a previous attempt |
-| `generate` | answer from provenance-complete evidence |
-| `abstain` | stop without an unsupported medical answer |
+| Curated source snapshots | 4 |
+| Knowledge chunks | 512 |
+| EntityCards | 32 |
+| Neo4j graph | 32 nodes / 27 relationships |
+| Qdrant knowledge index | 512 points |
+| Qdrant entity index | 32 points |
+| Dense vectors | `models/gemini-embedding-2`, 3072 dimensions, cosine distance |
+| Sparse vectors | Qdrant-native BM25 |
 
-The model owns semantic action selection, including whether evidence addresses
-the question. Python validates the schema and whether the transition is legal.
-Invalid output, impossible transitions, repeated non-recoverable queries, or an
-exhausted budget fail closed to abstention. The retrieval tool can execute at
-most twice; a third execution is rejected by both the transition validator and
-graph regression tests.
+Source, document, record, and chunk identities are content-bound. The pipeline
+uses structure-aware chunks capped at 2400 Unicode characters with zero overlap,
+proof-based artifact filtering, exact deduplication, and complete provenance.
+The deterministic graph is built from source-backed taxonomy data; no LLM graph
+extraction runs in the current pipeline.
 
-Cache hits and narrow safety overrides bypass model action selection and route
-deterministically to `finalize`. This is **bounded Agentic RAG**, not unrestricted
-autonomy and not deterministic rules presented as agent reasoning.
-
-## Phase 1 - Frozen Knowledge Foundation
-
-The supported operator interface is [`scripts/phase1.py`](scripts/phase1.py).
-Build `ec0a6de32d58ac181af6` is frozen and currently validates as:
-
-```text
-4 canonical source snapshots
-  -> 512 provenance-complete knowledge chunks
-  -> 32 source-backed EntityCards
-  -> deterministic graph: 32 nodes / 27 relationships
-  -> Qdrant: 512 knowledge points / 32 entity points
-```
-
-The pipeline uses deterministic, structure-first chunks capped at 2400 Unicode
-characters with zero overlap. Source, document, record, and chunk identities
-are content-bound. Dense vectors use Gemini Embedding 2 at 3072 dimensions with
-cosine distance; sparse documents use Qdrant-native BM25. The build has no LLM
-semantic graph-extraction stage.
-
-| Concern | Owner |
-|---|---|
-| operator interface | `scripts/phase1.py` |
-| parsing and orchestration | `src/ingestion/` |
-| structure-first chunking | `src/ingestion/chunking.py` |
-| provenance identities | `src/ingestion/provenance.py` |
-| Dense and native BM25 indexing | `src/ingestion/embedding.py`, `src/ingestion/bm25.py`, `src/ingestion/index.py` |
-| taxonomy, EntityCards, graph | `src/knowledge/` |
-| source registry | `data/sources/manifest.yaml` |
-| build machine record | `data/phase1_build_manifest.json` |
-
-EntityCards, the entity Qdrant collection, and Neo4j are **FROZEN STRUCTURAL
-ASSETS**. They remain valid Phase 1 outputs for build validation, structural
-inspection, and future evidence-driven research. They are not dead code, but
-they are absent from normal runtime medical grounding.
-
-Use only read-only checks during ordinary development:
+The supported operator interface remains
+[`scripts/phase1.py`](scripts/phase1.py):
 
 ```powershell
 .\venv\Scripts\python.exe scripts\phase1.py status
 .\venv\Scripts\python.exe scripts\phase1.py validate
 ```
 
-`build` and `--activate` are controlled migration operations. Do not rebuild
-Phase 1 to start the API, tune a runtime result, or prepare E0. See
-[Data Pipeline](docs/DATA_PIPELINE.md) before any approved source migration.
+Normal application development uses the existing indexed build. A controlled
+rebuild is needed only when source data, indexing configuration, provider
+compatibility, or the stored indexes materially change. Build and activation
+procedures are documented in [Data Pipeline](docs/DATA_PIPELINE.md) and
+[Operations](docs/OPERATIONS.md).
 
-## Phase 2 - Runtime
+EntityCards, the entity Qdrant index, and the Neo4j graph are maintained as
+structural knowledge assets for validation, inspection, and research. They are
+not queried when generating normal medical answers.
 
-[`src/agent/graph.py`](src/agent/graph.py) compiles these eight semantic nodes:
+## Agentic RAG Runtime
 
-`prepare`, `guard`, `decide`, `retrieve`, `assess`, `generate`, `abstain`, and
-`finalize`.
+The language model selects one of four typed actions:
 
-Important paths are:
+| Action | Meaning |
+|---|---|
+| `retrieve` | acquire evidence for the first time |
+| `retry` | make a later evidence request after a previous retrieval |
+| `generate` | answer from provenance-complete evidence |
+| `abstain` | stop without making an unsupported medical claim |
 
-- **Normal evidence path:** prepare, narrow guard/cache check, model decision,
-  retrieval, deterministic evidence-presence assessment, another model decision,
-  generation or abstention, then finalization.
-- **Exact-cache path:** an eligible cache hit routes from `decide` directly to
-  `finalize`; no retrieval or generation is repeated.
-- **Safety-override path:** a matching narrow safety rule supplies a deterministic
-  answer, clears normal evidence attribution, bypasses cache reuse, and finalizes.
-- **No-evidence/failure path:** the model may request one legal retry; after the
-  finite budget, the system abstains rather than fabricating evidence.
+Python validates whether each selected action is legal. Invalid model output,
+impossible transitions, repeated non-recoverable queries, and exhausted limits
+become abstention. The retrieval tool can execute at most twice.
 
-Normal generation receives the current question, bounded conversational context
-when applicable, the exact packed evidence, and a source allowlist. The prompt
-requires evidence-grounded synthesis, but this instruction does not guarantee
-perfect medical correctness or claim entailment.
+The normal request lifecycle is:
 
-Retrieval, context packing, prompt assembly, and provider dispatch are internal
-Python calls. There is no separate project-internal context HTTP service.
+```text
+ChatInput -> App -> POST /chat -> run_clinical_agent
+  -> prepare -> guard -> decide -> retrieve -> assess -> decide
+  -> generate / retry / abstain -> finalize -> ChatResponse
+  -> ChatWindow -> ChatMessage and citations
+```
 
-The **ACTIVE RUNTIME** has no reranker, Candidate Policy, post-RRF metadata
-boost, selector, EntityCard retrieval, Neo4j/graph retrieval, medical proposition
-engine, semantic cache, or deterministic normal-medical-answer engine. Historical
-experiments and frozen structural assets do not silently participate in answers.
+Cache hits and narrow safety overrides take a deterministic path to `finalize`.
+For normal generation, the model receives the current question, bounded
+conversation context when applicable, the exact packed evidence, and a source
+allowlist. Retrieval, context packing, prompt assembly, and provider dispatch
+are internal Python calls rather than separate HTTP services.
+
+The answer path does not contain a reranker, Candidate Policy, metadata score
+boost, evidence selector, EntityCard retrieval, graph retrieval, medical
+proposition engine, semantic cache, or deterministic normal-answer engine.
 
 ## Retrieval
 
-[`src/retrieval/service.py`](src/retrieval/service.py) is the sole production
-evidence service:
+[`src/retrieval/service.py`](src/retrieval/service.py) owns runtime evidence
+retrieval:
 
 ```text
 query
-  +-> Gemini query embedding -> Qdrant named vector "dense"
-  +-> query text             -> Qdrant native sparse vector "bm25"
+  +-> Gemini query embedding -> Qdrant "dense"
+  +-> query text             -> Qdrant "bm25"
                                   |
                                   v
-                    equal-weight Reciprocal Rank Fusion
+                    Reciprocal Rank Fusion (RRF)
                                   |
                                   v
-                   bounded provenance context packer
-                                  |
-                                  v
-                               evidence
+                    bounded provenance context
 ```
 
-| Runtime default | Value |
+| Default | Value |
 |---|---:|
-| candidate limit per channel | 16 |
-| selected context items | at most 8 |
-| packed context characters | at most 6000 |
-| timeout per retrieval channel | 20 seconds |
+| Candidate limit per channel | 16 |
+| Selected context items | 8 |
+| Packed context characters | 6000 |
+| Timeout per channel | 20 seconds |
 | RRF `k` | 60 |
 | Dense / BM25 weights | 1.0 / 1.0 |
 
-Dense and BM25 run concurrently with independent finite outcomes:
+Dense and BM25 execute concurrently with independent timeouts. If Dense fails
+but BM25 returns evidence, the result is preserved as `degraded_dense`. If BM25
+fails but Dense succeeds, it is preserved as `degraded_bm25`. If neither
+channel yields usable evidence, the Agent can request one legal retry and then
+abstains when the retrieval budget is exhausted.
 
-| Channel outcome | Runtime behavior |
-|---|---|
-| selected evidence and neither channel raised | normal RRF, status `ok` |
-| Dense timeout/failure, BM25 succeeds | preserve BM25 evidence, status `degraded_dense` |
-| BM25 timeout/failure, Dense succeeds | preserve Dense evidence, status `degraded_bm25` |
-| both return no evidence | status `no_evidence` |
-| both fail, or failure leaves no usable channel | recoverable failure for bounded retry/fail-safe handling |
+The formulas, provider contracts, and parameter classifications are documented
+in [Methods and Formulas](docs/METHODS_AND_FORMULAS.md).
 
-One channel failure does not discard the other channel's evidence. Degraded
-answers remain subject to the same provenance, evidence, generation, and cache
-eligibility contracts. Definitions, formulas, parameter classifications, and
-method sources are in [Methods and Formulas](docs/METHODS_AND_FORMULAS.md).
+## Evidence and Citations
 
-## Evidence, Grounding, and Limitations
+The deterministic `assess` node confirms only that packed evidence contains
+text and a source identifier. It does not determine medical relevance,
+completeness, truth, or semantic sufficiency. The model's `decide` action makes
+the semantic sufficiency decision.
 
-The deterministic `assess` node proves only **provenance-complete evidence
-presence**: at least one packed item has non-empty text and a source identifier.
-It does not prove relevance, completeness, medical truth, or semantic
-sufficiency. The model-selected `decide` action evaluates semantic sufficiency.
+Source allowlisting prevents an answer from displaying a source outside the
+request's retrieved evidence. This validates source identity, but it does not
+prove that every sentence or medical claim is entailed by its cited chunk.
 
-Final source allowlisting ensures that a displayed source belongs to the
-request's retrieved evidence. This is **source validity**, not proof of **claim
-faithfulness**. The current runtime does not deterministically verify that every
-sentence or atomic medical claim is entailed by its cited chunk.
-
-[`src/quality/answer_verifier.py`](src/quality/answer_verifier.py) checks answer
-presentation, structural contracts, and provenance identity. It is not a
-clinical-truth verifier, a semantic entailment model, or a complete claim-level
-grounding verifier. Claim-level groundedness is an E0 measurement target; this
-README task does not add a mitigation subsystem before that evidence exists.
+[`src/quality/answer_verifier.py`](src/quality/answer_verifier.py) checks
+presentation, structural contracts, and provenance identity. Claim-level
+groundedness and medical correctness are evaluated separately; they are not
+deterministically established by the current verifier.
 
 ## Safety
 
-[`src/agent/safety_policy.py`](src/agent/safety_policy.py) is the one deterministic
-owner for seven narrow, source-mapped overrides:
+[`src/agent/safety_policy.py`](src/agent/safety_policy.py) defines seven narrow,
+source-mapped deterministic boundaries:
 
-- anaphylaxis-like breathing difficulty with swelling/hives;
+- anaphylaxis-like breathing difficulty with swelling or hives;
 - chest pain or tightness with breathlessness;
-- explicit personal/current self-harm or suicide intent;
+- explicit personal and current self-harm or suicide intent;
 - acne fulminans-like severe lesions with fever or joint pain;
-- isotretinoin in pregnancy or pregnancy planning;
+- isotretinoin during pregnancy or pregnancy planning;
 - isotretinoin with severe headache plus visual or gastrointestinal symptoms;
-- explicit requests to prescribe, choose a drug, or choose a dose.
+- explicit requests to prescribe, select a drug, or select a dose.
 
-These are high-precision action boundaries, not a comprehensive medical
-classifier. The self-harm phrase detector is intentionally narrow and is not a
-validated suicide-risk classifier. Ordinary medical semantics continue through
-retrieved evidence and model synthesis. Tests protect known rule behavior; they
-do not establish clinical sensitivity, specificity, or patient safety.
+These rules are action-oriented safeguards, not a general medical classifier.
+The self-harm detector is intentionally narrow and is not a validated
+suicide-risk classifier. Ordinary medical questions continue through retrieved
+evidence and model synthesis. See [Safety](docs/SAFETY.md) for the exact trigger
+boundaries and sources.
 
-See [Safety](docs/SAFETY.md) for trigger boundaries and authoritative sources.
+## Cache and Reliability
 
-## Cache and Resilience
+Redis stores exact normalized answers, not semantic-similarity matches. Cache
+identity includes the schema and answer versions, pipeline fingerprint,
+normalized question, provider, and model. Stored metadata retains selected
+evidence identifiers and the source allowlist. Answers involving history,
+safety overrides, fallback, failed retrieval, or failed quality checks are not
+reused as ordinary cache entries.
 
-Redis stores an **exact normalized answer cache**, not a semantic cache. Its key
-identity contains cache schema/version, pipeline fingerprint, exact normalized
-question, provider, and model. Stored metadata retains the selected evidence
-IDs and source allowlist. History-bearing, safety, fallback, failed, or
-quality-rejected paths are not reused as ordinary cache answers.
+The effective answer-cache namespace is `v8`. The pipeline fingerprint is
+computed from a secret-free runtime manifest. Provider calls, retrieval
+channels, the overall Agent request, and frontend requests use finite timeouts.
+Retries are bounded, and provider fallback requires both server configuration
+and request-level opt-in.
 
-`CACHE_ANSWER_VERSION=v8` is the effective namespace. The pipeline fingerprint
-is computed from the current secret-free runtime manifest; it is not hardcoded.
-Provider calls, retrieval channels, frontend requests, and the total agent run
-have finite timeouts. Provider retries are bounded and classified as transient
-or permanent. Provider fallback is disabled by default and requires both server
-configuration and per-request opt-in.
+## Data Stores and Providers
 
-## Data Stores and External Providers
-
-| System | Current role | Runtime requirement |
+| Component | Responsibility | Runtime role |
 |---|---|---|
-| Qdrant knowledge collection | read-only Dense + BM25 medical evidence | core for normal RAG |
-| Google embedding API | 3072-dimensional Dense query embedding | core preflight dependency; BM25 can preserve evidence during an individual Dense-channel failure |
+| Qdrant knowledge index | Dense and BM25 medical evidence | required for normal RAG |
+| Google embedding API | 3072-dimensional Dense query embeddings | required by current preflight; BM25 can preserve evidence during an individual Dense-channel failure |
 | Gemini or Ollama | action selection and answer generation | one configured generation path is required |
-| PostgreSQL | chat/session persistence and history endpoints | optional/degradable for one chat response; history features depend on it |
-| Redis | exact eligible-answer cache | optional/degradable; a miss continues normally |
-| Neo4j | frozen Phase 1 structural graph and integrity tooling | optional for Phase 2; not runtime medical grounding |
-| Qdrant entity collection | frozen EntityCard index | not queried by the normal answer path |
+| PostgreSQL | chat/session persistence and history endpoints | optional for a single chat response; history features depend on it |
+| Redis | exact answer cache | optional; cache failure becomes a miss |
+| Neo4j | structural graph and integrity inspection | not used for runtime medical grounding |
+| Qdrant entity index | EntityCard lookup asset | not used by the normal answer path |
 
-Choosing Ollama changes answer generation only. Dense query embedding still
-uses the configured Google Gemini Embedding 2 provider, so Ollama generation
-does not make the entire RAG pipeline fully local or offline.
+Ollama can run answer generation locally, but Dense retrieval still uses Gemini
+Embedding 2 under the current embedding configuration. Selecting Ollama does
+not make the complete RAG pipeline fully local or offline.
 
 ## API
 
-The application entrypoint is `src.api.app:app`.
+The FastAPI entrypoint is `src.api.app:app`.
 
 | Method | Route | Purpose |
 |---|---|---|
 | `GET` | `/health` | bounded dependency and provider readiness |
-| `GET` | `/retrieve?q=...` | trusted-operator retrieval diagnostics; disabled by default |
-| `GET` | `/models` | available generation-model catalog |
-| `POST` | `/chat` | complete guarded Agentic RAG request |
-| `GET` | `/chat/sessions` | list persisted chat sessions |
-| `DELETE` | `/chat/sessions` | delete app-owned chat history and answer-cache keys |
-| `GET` | `/chat/sessions/{session_id}/messages` | list persisted session messages |
+| `GET` | `/retrieve?q=...` | trusted-operator retrieval diagnostics, disabled by default |
+| `GET` | `/models` | available generation models |
+| `POST` | `/chat` | guarded Agentic RAG request |
+| `GET` | `/chat/sessions` | list persisted sessions |
+| `DELETE` | `/chat/sessions` | delete application chat history and answer-cache keys |
+| `GET` | `/chat/sessions/{session_id}/messages` | list session messages |
 | `PATCH` | `/chat/sessions/{session_id}/rename` | rename a session |
 | `PATCH` | `/chat/sessions/{session_id}/hide` | hide a session |
-| `POST` | `/chat/sessions/sync` | import external/backward-compatible history |
+| `POST` | `/chat/sessions/sync` | import compatible history records |
 
-`/retrieve` returns 404 unless a trusted local operator sets
-`ENABLE_DIAGNOSTIC_RETRIEVE=true`. It uses the same retrieval service as the
-agent and is not a parallel production RAG API.
+`/retrieve` returns 404 unless a trusted local operator enables
+`ENABLE_DIAGNOSTIC_RETRIEVE`. It uses the same retrieval service as the Agent
+and is not a separate production answer API.
 
-`ChatResponse` exposes friendly source labels plus structured source/runtime
-metadata useful for local research, debugging, evaluation, and provenance
-inspection. The response contract has not been sanitized as an untrusted,
-multi-tenant public API. Swagger is available locally at
-`http://127.0.0.1:8000/docs`.
+`ChatResponse` includes friendly citations and structured source/runtime
+metadata for local research, debugging, and provenance inspection. The current
+API is not hardened as an untrusted multi-tenant public interface. Local OpenAPI
+documentation is available at `http://127.0.0.1:8000/docs`.
 
 ## Frontend
 
-The React request/render path is intentionally small:
+The React request and render path is:
 
 ```text
 ChatInput -> App.sendQuestion -> chatApi.sendChatMessage -> FastAPI
-  -> ChatResponse -> React session state -> ChatWindow -> ChatMessage/citations
+  -> ChatResponse -> session state -> ChatWindow -> ChatMessage/citations
 ```
 
-`src/frontend/src/utils/presentationMetadata.js` maps trusted source metadata to
-friendly display labels while the backend retains raw source identity. The only
-browser configuration is `VITE_API_URL`. Every `VITE_*` value is browser-visible;
-never put provider keys, database credentials, or private secrets there.
+Source metadata is converted to friendly labels for display while the backend
+retains raw source identity. `VITE_API_URL` is the only browser configuration.
+All `VITE_*` values are visible to browser users, so provider keys and database
+credentials belong only in backend configuration.
 
 ## Deployment Boundary
 
-The supported deployment is **local, single-user research and development** on
-loopback addresses. Docker Compose binds the project services to `127.0.0.1`.
-The application has an in-process session lock, but it does not provide public
-end-user authentication, tenant authorization, multi-tenant isolation,
-production rate limiting, distributed session locking, or a hardened public
-security boundary.
+The current deployment configuration targets trusted, local, single-user
+research and development. Docker Compose binds project services to
+`127.0.0.1`. Chat/session routes do not provide end-user authentication,
+tenant-level authorization, multi-tenant isolation, production rate limiting,
+or distributed session locking.
 
-A public multi-user deployment requires additional authentication,
-authorization, TLS, restrictive CORS, rate limiting, tenant isolation, secret
-management, and operational hardening. This is a declared thesis-prototype scope
-boundary, not a claim of production deployment readiness.
+Public deployment requires authentication, authorization, TLS, restrictive
+CORS, rate limiting, tenant isolation, secret management, and operational
+hardening.
 
-## Repository Map
+## Repository Structure
 
 | Location | Responsibility |
 |---|---|
-| `scripts/phase1.py` | supported Phase 1 build/validate/status interface |
-| `src/ingestion/` | Phase 1 parsing, chunking, provenance, validation, and indexing |
-| `src/knowledge/` | Phase 1 taxonomy, EntityCards, and deterministic graph assets |
-| `src/retrieval/` | active Dense + native BM25 + RRF evidence retrieval |
-| `src/agent/` | LangGraph state, model decisions, generation, safety, and presentation |
+| `scripts/phase1.py` | knowledge build, validation, and status interface |
+| `src/ingestion/` | parsing, chunking, provenance, validation, and indexing |
+| `src/knowledge/` | taxonomy, EntityCards, and deterministic graph assets |
+| `src/retrieval/` | Dense + native BM25 + RRF evidence retrieval |
+| `src/agent/` | LangGraph state, decisions, generation, safety, and presentation |
 | `src/quality/` | structural/provenance verification and safe fallback contracts |
 | `src/cache/` | exact Redis answer cache |
-| `src/resilience/` | finite deadlines, retries, and provider-failure contracts |
+| `src/resilience/` | deadlines, retries, and provider-failure contracts |
 | `src/api/` | FastAPI routes and dependency preflight |
 | `src/database/` | Qdrant adapter and PostgreSQL persistence |
 | `src/integrations/` | external provider SDK adapters |
-| `src/frontend/` | React/Vite user interface |
-| `docs/` | canonical architecture, methods, safety, data, and operations docs |
+| `src/frontend/` | React/Vite interface |
+| `docs/` | architecture, methods, safety, data, and operations documentation |
 | `tests/` | implementation and regression contracts |
 
-## Local Development
+## Local Setup
 
 ### Prerequisites
 
 - Python 3.11 (`3.11.9` in CI) and pip `26.1.2`
-- Node.js 24 and npm for the frontend
+- Node.js 24 and npm
 - Docker Desktop with Compose
 - a Gemini API key for live Gemini generation and Dense query embeddings
-- Ollama with `qwen3:8b` only when Ollama generation or fallback is enabled
+- Ollama with `qwen3:8b` when Ollama generation or fallback is enabled
 
-### Install
+### Installation
 
 ```powershell
 git clone https://github.com/MinhHoang1403/RAG-system-for-acne-diagnose.git
@@ -409,11 +326,11 @@ python -m pip install -r requirements.lock.txt
 Copy-Item .env.example .env
 ```
 
-Fill only the secrets required by the selected providers. Never commit `.env`.
-Local Docker Qdrant works with an empty `QDRANT_API_KEY`; secured Qdrant passes a
-non-empty key through runtime and preflight clients.
+Fill only the secrets required by the selected providers, and keep `.env` out
+of version control. Local Docker Qdrant works with an empty `QDRANT_API_KEY`;
+secured Qdrant passes a configured key through runtime and preflight clients.
 
-Start pinned backing services and initialize application schemas:
+Start the backing services and initialize application schemas:
 
 ```powershell
 docker compose pull
@@ -423,19 +340,19 @@ docker compose ps
 .\venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
 
-These commands do not create or mutate the frozen Phase 1 knowledge foundation.
-Normal development assumes its Qdrant/Neo4j bind-mounted data has been
-provisioned. Confirm it with the read-only Phase 1 checks above. A fresh machine
-without those stores needs an explicitly approved provisioning/build workflow;
-Phase 1 is not an automatic API-startup step.
+These commands initialize application infrastructure but do not create the
+indexed medical knowledge. An existing development environment can verify its
+current build with `scripts/phase1.py status`. A new environment must provision
+the validated indexes through the controlled knowledge-build procedure in
+[Operations](docs/OPERATIONS.md).
 
-Start the bounded local launcher:
+Start the application with the bounded local launcher:
 
 ```powershell
 .\scripts\start_local_dev.ps1
 ```
 
-Or start each application manually:
+Or start each layer manually:
 
 ```powershell
 .\venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
@@ -445,13 +362,12 @@ npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Environment variables are grouped in [`.env.example`](.env.example): generation,
-embedding, retrieval budgets, Qdrant, PostgreSQL, Redis, Neo4j, resilience,
-versioning, and observability. Do not expose backend secrets to the frontend.
+Environment settings are grouped in [`.env.example`](.env.example) by provider,
+embedding, retrieval, datastore, reliability, versioning, and observability.
 
-## Validation and Testing
+## Testing
 
-Backend and repository contracts:
+Backend and runtime contracts:
 
 ```powershell
 .\venv\Scripts\python.exe -m pip check
@@ -459,13 +375,12 @@ Backend and repository contracts:
 .\venv\Scripts\python.exe -m ruff check src scripts tests
 .\venv\Scripts\python.exe -m pytest -q
 .\venv\Scripts\python.exe scripts\check_phase2_contracts.py
-.\venv\Scripts\python.exe scripts\inspect_phase2_readiness.py
 .\venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
 .\venv\Scripts\python.exe scripts\check_reproducible_environment.py
 .\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
 ```
 
-Frozen Phase 1, read-only:
+Knowledge build validation:
 
 ```powershell
 .\venv\Scripts\python.exe scripts\phase1.py status
@@ -483,59 +398,29 @@ npm run build
 npm audit
 ```
 
-These checks establish software contracts, graph bounds, regression behavior,
-cache and retrieval wiring, provenance handling, and environment readiness. They
-do not prove representative retrieval relevance, model action accuracy, medical
-factual correctness, claim-level faithfulness, human preference, clinical safety
-effectiveness, or deployment readiness.
+Unit and integration tests verify software contracts, graph bounds, regression
+behavior, cache and retrieval wiring, provenance handling, and environment
+readiness. They do not establish representative retrieval quality, medical
+correctness, claim-level faithfulness, clinical effectiveness, or deployment
+readiness. Those qualities require separate system evaluation and clinical
+review.
 
-## Research and Evaluation Status
+## Limitations
 
-The runtime architecture is frozen for evaluation. **E0 has not started.** The
-next research stage is intended to measure separate dimensions rather than infer
-AI quality from implementation tests:
+- The indexed corpus contains four curated acne source snapshots and is not
+  comprehensive dermatology coverage.
+- The NICE-derived snapshot has a provenance discrepancy: official NICE
+  metadata reports 30 April 2026, while the local snapshot represents 3 August
+  2026. Its exact current-version provenance has not been independently
+  reconciled.
+- Source allowlisting does not prove sentence-level or claim-level entailment.
+- End-to-end medical quality and clinical safety effectiveness have not been
+  clinically validated.
+- Dense query embedding uses the external Gemini Embedding 2 provider under the
+  current configuration.
+- Deployment assumptions target trusted, local, single-user use.
 
-- Agent decision quality;
-- retrieval quality;
-- answer quality and groundedness;
-- abstention behavior;
-- narrow safety behavior;
-- latency and cost;
-- controlled ablations.
-
-No final AI-quality or clinical claim is made from the current test suite.
-
-## Known Limitations
-
-- **Small frozen corpus:** the knowledge foundation contains four source
-  snapshots. It is not comprehensive dermatology coverage.
-- **NICE provenance:** NICE NG198 exists as a NICE-derived project snapshot.
-  Official metadata reports an update date of 2026-04-30, while the local frozen
-  snapshot represents 2026-08-03. Full current official-version provenance has
-  not been independently reconciled, so the project does not claim a fully
-  verified current official NICE snapshot. It also does not claim the snapshot's
-  medical content is wrong without evidence.
-- **Claim-level verification:** source allowlisting does not prove every answer
-  claim is entailed by its cited evidence.
-- **Evaluation pending:** final E0 retrieval, decision, answer, safety, and human
-  quality evaluation has not started.
-- **No clinical validation:** the system has no established clinical accuracy,
-  efficacy, sensitivity, or safety performance.
-- **Local trust boundary:** authentication, authorization, tenant isolation, and
-  public-production hardening are outside the current implementation.
-- **External Dense embedding:** runtime Dense queries use Gemini Embedding 2;
-  Ollama answer generation alone is not a fully local/offline system.
-
-The accepted NICE limitation is detailed in
-[Data Pipeline](docs/DATA_PIPELINE.md), [References](docs/REFERENCES.md), and the
-[method/source registry](data/phase1_method_sources.json).
-
-## Methods, Sources, and Documentation
-
-The project separates scientific methods, provider/framework contracts,
-clinical safety sources, engineering policies, and empirical project decisions.
-Runtime constants are bounded project contracts, not claims of scientific or
-clinical optimality.
+## References and Technical Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Agent Workflow](docs/AGENT_WORKFLOW.md)
@@ -544,21 +429,10 @@ clinical optimality.
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
 - [References](docs/REFERENCES.md)
-- [Phase 1 method/source registry](data/phase1_method_sources.json)
-- [Canonical source manifest](data/sources/manifest.yaml)
-
-Code is the source of truth, tests confirm contracts, canonical docs explain
-methods, and this README summarizes the merged pre-E0 system.
-
-## Scope and Disclaimer
-
-Acne Advisor AI provides research and educational information only. It does not
-diagnose disease, select personal treatment, prescribe medication, or replace a
-doctor, dermatologist, pharmacist, emergency service, or other qualified health
-professional. Do not use it as the sole basis for urgent or high-risk medical
-decisions.
+- [Method and source registry](data/phase1_method_sources.json)
+- [Source manifest](data/sources/manifest.yaml)
 
 Project metadata declares the MIT license in `pyproject.toml`. No standalone
-`LICENSE` file is currently present. Confirm source-corpus, institutional, and
-redistribution requirements before publishing medical documents or generated
-artifacts.
+`LICENSE` file is currently present. Source-corpus, institutional, and
+redistribution requirements should be reviewed before publishing medical
+documents or generated artifacts.

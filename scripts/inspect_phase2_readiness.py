@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only readiness inspection for the frozen Phase 1 and Phase 2 runtime."""
+"""Inspect the validated knowledge build and Agentic RAG runtime readiness."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Candidate Qdrant indexing for the frozen dense + true-BM25 foundation."""
+"""Candidate Qdrant indexing for Dense and native-BM25 knowledge records."""
 
 from __future__ import annotations
 

@@ -69,7 +69,7 @@ def build_observability_event(
     safe_payload: dict[str, Any] | None = None,
     max_text_chars: int | None = None,
 ) -> ObservabilityEvent:
-    """Build a compact event around the current frozen contracts."""
+    """Build a compact event around the current versioned contracts."""
 
     state = state or {}
     result = result or {}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the full offline/read-only Phase 2 implementation contract suite."""
+"""Run the full offline/read-only runtime implementation contract suite."""
 
 from __future__ import annotations
 

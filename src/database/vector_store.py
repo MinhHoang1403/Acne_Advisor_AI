@@ -50,7 +50,7 @@ def _embed_sync(text: str) -> list[float]:
     """Synchronous Gemini embedding call for a single query string.
 
     Gemini Embedding 2 does not accept a task type. Documents and queries share
-    the same frozen model/configuration contract.
+    the same versioned model and index contract.
     """
     from src.integrations.google_genai import embed_texts_sync
 

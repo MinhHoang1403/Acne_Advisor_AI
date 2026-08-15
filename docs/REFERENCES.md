@@ -15,7 +15,7 @@ clinical sources are deliberately separated.
 - Cormack, G. V., Clarke, C. L. A., and Buettcher, S. (2009). *Reciprocal Rank
   Fusion Outperforms Condorcet and Individual Rank Learning Methods*. SIGIR.
   DOI: 10.1145/1571941.1572114. Supports rank-only fusion at the runtime
-  boundary; it is not part of Phase 1 indexing.
+  boundary; it is not part of knowledge indexing.
 - Lewis, P. et al. (2020). *Retrieval-Augmented Generation for
   Knowledge-Intensive NLP Tasks*. NeurIPS. Establishes retrieval-grounded
   generation as a distinct model/evidence architecture.
@@ -69,18 +69,18 @@ clinical sources are deliberately separated.
 - Bo Y te Viet Nam. Quyet dinh 4416/QD-BYT ngay 06/12/2023, *Huong dan chan
   doan va dieu tri cac benh da lieu*; the local corpus contains only the acne
   excerpt (pages 433-442).
-- American Academy of Dermatology public acne education pages, frozen crawl
+- American Academy of Dermatology public acne education pages, source snapshot
   retrieved 2026-07-03. https://www.aad.org/public/diseases/acne
 
-### Accepted NICE Corpus Limitation
+### NICE Source Provenance
 
-The frozen Phase 1 NICE-derived snapshot was acquired through a text-rendering
-transport and represents 2026-08-03, which conflicts with the official NICE
-metadata date above. A complete official replacement was blocked through the
-approved acquisition routes. The project therefore retains the frozen snapshot
-as an unresolved provenance limitation and does not claim it is fully or
-currently verified. This reference correction does not change the frozen source
-bytes, source ID, build identity, Qdrant index, or Neo4j graph.
+The NICE-derived project snapshot was acquired through a text-rendering transport
+and represents 2026-08-03, which differs from the official NICE metadata date
+above. A complete official replacement was unavailable through the supported
+acquisition routes. The snapshot remains part of the research corpus, but the
+project does not claim it is a fully verified current official version. This
+provenance note does not change the source bytes, source ID, build identity,
+Qdrant index, or Neo4j graph.
 
 ## Current Safety Cross-Checks
 

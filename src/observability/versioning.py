@@ -1,4 +1,4 @@
-"""Deterministic, secret-free manifest for the frozen runtime."""
+"""Deterministic, secret-free manifest for the current runtime contracts."""
 
 from __future__ import annotations
 

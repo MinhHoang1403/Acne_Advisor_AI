@@ -1,4 +1,4 @@
-"""Deterministic path-independent Phase 1 provenance identities."""
+"""Deterministic path-independent knowledge provenance identities."""
 
 from __future__ import annotations
 

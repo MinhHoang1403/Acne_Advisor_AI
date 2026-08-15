@@ -1010,7 +1010,7 @@ async def delete_all_chat_sessions():
     Safety:
     - Deletes chat_messages and chat_sessions rows only.
     - Does not drop tables.
-    - Does not touch Qdrant, Neo4j, ingestion data, or Phase 1 stores.
+    - Does not touch Qdrant, Neo4j, ingestion data, or indexed knowledge stores.
     - Deletes Redis keys only under the app answer-cache prefix.
     """
     from src.database.repositories import chat_history as repo

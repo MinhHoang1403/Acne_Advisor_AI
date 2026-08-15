@@ -1,4 +1,4 @@
-"""Thin canonical operator CLI for the frozen Phase 1 foundation."""
+"""Canonical operator CLI for knowledge compilation and validation."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from src.ingestion.pipeline import (  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build, validate or inspect frozen Phase 1.")
+    parser = argparse.ArgumentParser(description="Build, validate, or inspect the knowledge index.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     build = subparsers.add_parser("build", help="Build immutable Qdrant candidates.")
     build.add_argument("--source", type=Path, default=Path("sample_data"))
@@ -36,7 +36,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Verified pre-mutation Qdrant/Neo4j backup required by --activate.",
     )
-    validate = subparsers.add_parser("validate", help="Run layered Phase 1 validation.")
+    validate = subparsers.add_parser("validate", help="Run layered knowledge-build validation.")
     validate.add_argument("--offline", action="store_true")
     subparsers.add_parser("status", help="Show expected and current build identity.")
     return parser.parse_args(argv)

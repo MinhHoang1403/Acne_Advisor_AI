@@ -2,14 +2,14 @@
 
 ## Dense Retrieval
 
-The frozen knowledge collection uses `models/gemini-embedding-2`, 3072
+The current indexed knowledge collection uses `models/gemini-embedding-2`, 3072
 dimensions, and cosine distance. Runtime query embeddings use the same model
 contract. Runtime retrieval does not rebuild or alter stored vectors.
 
 ## Native BM25
 
-The sparse channel is Qdrant-native BM25 with collection-side IDF and the frozen
-Phase 1 configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer `word`,
+The sparse channel is Qdrant-native BM25 with collection-side IDF and the
+validated build configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer `word`,
 lowercase enabled, language `none`, no stemming, and no stopword list.
 
 For term `t`, document `d`, corpus size `N`, document frequency `n(t)`, document
@@ -38,7 +38,7 @@ adjustment or structural-store score changes the fused ranking.
 `src/retrieval/context_packer.py` preserves fused order, deduplicates only by
 stable item identity, retains provenance, and enforces finite item/character
 budgets. Evidence is marked usable only when at least one packed item has both
-text and a source identifier. This is a deterministic presence/provenance gate,
+text and a source identifier. This is a deterministic presence/provenance check,
 not a semantic sufficiency or entailment claim. The exact bounded
 `PackedContext.context_text` is the evidence sent to generation; full candidate
 text cannot bypass the configured character limit.
@@ -110,20 +110,20 @@ policy. It is not a general medical reasoner. Ordinary answer meaning remains
 and provenance-related contracts. It does not prove medical truth, semantic
 entailment, or evidence completeness.
 
-## Frozen Phase 1
+## Knowledge Build Contracts
 
-Structure-first chunking remains capped at 2400 Unicode characters with zero
-overlap. Phase 1 filtering, provenance, embedding, BM25, taxonomy, EntityCards,
-and Neo4j contracts are frozen.
+Structure-aware chunking is capped at 2400 Unicode characters with zero overlap.
+Filtering, provenance, embedding, BM25, taxonomy, EntityCard, and Neo4j settings
+are versioned parts of the current validated build.
 
 ## Parameter Classification
 
 | Parameter | Value | Classification |
 |---|---:|---|
-| chunk maximum | 2400 Unicode characters | frozen project engineering contract |
-| chunk overlap | 0 | frozen project engineering contract |
+| chunk maximum | 2400 Unicode characters | versioned build engineering contract |
+| chunk overlap | 0 | versioned build engineering contract |
 | Dense dimensions | 3072 | provider/index compatibility contract |
-| BM25 `k1`, `b`, `avg_len` | 1.2, 0.75, 256 | frozen provider configuration |
+| BM25 `k1`, `b`, `avg_len` | 1.2, 0.75, 256 | indexed provider configuration |
 | RRF `k` | 60 | runtime engineering policy |
 | channel weights | 1.0 / 1.0 | runtime engineering policy |
 | retrieval candidates | default 16 | runtime resource policy |
