@@ -1,5 +1,5 @@
 """
-Phase 2 preflight checks for API/runtime retrieval dependencies.
+Preflight checks for API, retrieval, and generation dependencies.
 """
 
 from __future__ import annotations

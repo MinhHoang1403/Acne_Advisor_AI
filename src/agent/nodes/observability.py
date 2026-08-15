@@ -1,4 +1,4 @@
-"""LangGraph node for optional Phase 2 observability export."""
+"""LangGraph node for optional runtime observability export."""
 
 from __future__ import annotations
 

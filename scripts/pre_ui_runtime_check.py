@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only pre-UI check for the frozen backend contract."""
+"""Read-only backend readiness check used before starting the UI."""
 
 from __future__ import annotations
 

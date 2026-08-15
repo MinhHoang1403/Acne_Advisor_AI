@@ -87,10 +87,10 @@
       "url": "https://www.nice.org.uk/guidance/ng198",
       "source_type": "clinical_guideline",
       "role": "frozen_project_corpus_snapshot",
-      "claim_supported": "Frozen project evidence snapshot covering acne management, antibiotic stewardship, pregnancy and isotretinoin safety guidance.",
-      "project_method": "Frozen medical evidence corpus snapshot",
+      "claim_supported": "Project evidence snapshot covering acne management, antibiotic stewardship, pregnancy and isotretinoin safety guidance.",
+      "project_method": "Versioned medical evidence corpus snapshot",
       "date_verified": "2026-08-14",
-      "limitations": "The local frozen Markdown was acquired through a text-rendering transport and carries a represented date of 2026-08-03. It has not been independently verified as the complete current official version last updated 2026-04-30; current official-version provenance remains unresolved."
+      "limitations": "The local Markdown snapshot was acquired through a text-rendering transport and carries a represented date of 2026-08-03. It has not been independently verified as the complete current official version last updated 2026-04-30; current official-version provenance remains unresolved."
     },
     {
       "source_id": "aad_acne_guideline_2024",
@@ -150,7 +150,7 @@
       "claim_supported": "Patient-facing acne definitions, treatment and care information.",
       "project_method": "Canonical medical evidence corpus",
       "date_verified": "2026-08-14",
-      "limitations": "Frozen web crawl; individual pages may change after retrieval."
+      "limitations": "Web source snapshot; individual pages may change after retrieval."
     }
   ]
 }

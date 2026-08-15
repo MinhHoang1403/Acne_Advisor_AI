@@ -1,4 +1,4 @@
-"""Phase 2 observability helpers."""
+"""Runtime observability helpers."""
 
 from src.observability.versioning import (
     build_pipeline_version_manifest,

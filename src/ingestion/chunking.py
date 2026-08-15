@@ -1,4 +1,4 @@
-"""Deterministic structure-first chunking for the frozen Phase 1 corpus."""
+"""Deterministic structure-aware chunking for the indexed corpus."""
 
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ def _hard_split(text: str, *, max_chars: int) -> list[str]:
 
 
 def naive_split(text: str, size: int, overlap: int) -> list[str]:
-    """Deprecated test helper; canonical Phase 1 uses :func:`structural_chunks`."""
+    """Deprecated test helper; the canonical build uses :func:`structural_chunks`."""
 
     parts: list[str] = []
     start = 0

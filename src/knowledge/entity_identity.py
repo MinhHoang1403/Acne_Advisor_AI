@@ -1,4 +1,4 @@
-"""Deterministic identities for Phase 1 EntityCard points."""
+"""Deterministic identities for indexed EntityCard points."""
 
 from __future__ import annotations
 

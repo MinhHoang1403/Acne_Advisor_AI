@@ -1,4 +1,4 @@
-"""Layered validation for compiled and indexed Phase 1 builds."""
+"""Layered validation for compiled and indexed knowledge builds."""
 
 from __future__ import annotations
 

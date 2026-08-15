@@ -1,4 +1,4 @@
-"""Deterministic safe fallback helpers for Phase 2 chat flow."""
+"""Deterministic safe fallback helpers for the Agentic RAG chat flow."""
 
 from __future__ import annotations
 

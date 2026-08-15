@@ -1,4 +1,4 @@
-"""Proof-based artifact filtering for the frozen Phase 1 corpus."""
+"""Proof-based artifact filtering for the indexed medical corpus."""
 
 from __future__ import annotations
 

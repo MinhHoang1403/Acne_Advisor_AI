@@ -18,7 +18,7 @@ def test_segmentation_reference_uses_verified_acl_metadata() -> None:
     assert "qu_segmentation_2025" not in records
 
 
-def test_nice_provenance_limitation_is_disclosed_in_registry_and_docs() -> None:
+def test_nice_source_provenance_is_disclosed_in_registry_and_docs() -> None:
     registry = json.loads(
         Path("data/phase1_method_sources.json").read_text(encoding="utf-8")
     )
@@ -31,12 +31,12 @@ def test_nice_provenance_limitation_is_disclosed_in_registry_and_docs() -> None:
     assert "official metadata last updated 2026-04-30" in nice["publication_date"]
     assert "current official-version provenance remains unresolved" in nice["limitations"]
     assert not nice["claim_supported"].startswith("Current ")
-    assert "Accepted NICE Provenance Limitation" in data_pipeline
-    assert "does not claim that the snapshot is fully or currently verified" in data_pipeline
-    assert "Accepted NICE Corpus Limitation" in references
+    assert "NICE Source Provenance" in data_pipeline
+    assert "does not claim that it is a fully" in data_pipeline
+    assert "NICE Source Provenance" in references
 
 
-def test_method_registry_correction_does_not_change_frozen_build_identity() -> None:
+def test_method_registry_correction_does_not_change_validated_build_identity() -> None:
     identity = compute_build_identity(
         Path("data/sources/manifest.yaml"),
         Path("data/taxonomy/drug_aliases.yaml"),

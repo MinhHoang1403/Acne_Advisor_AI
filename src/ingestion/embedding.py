@@ -40,7 +40,7 @@ class EmbeddingContract:
 
 
 def embed_documents(texts: list[str], *, api_key: str) -> list[list[float]]:
-    """Embed Phase 1 texts under the frozen Gemini Embedding 2 contract."""
+    """Embed knowledge texts under the versioned Gemini Embedding 2 contract."""
 
     return embed_texts_sync(
         texts,

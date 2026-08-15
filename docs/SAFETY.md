@@ -13,7 +13,7 @@ Key invariants:
 - evidence must include medical text and source provenance;
 - insufficient evidence after two attempts produces explicit abstention;
 - provider failure produces a safe, non-fabricated fallback;
-- cache entries are versioned, fingerprinted, and quality-gated;
+- cache entries are versioned, fingerprinted, and subject to quality checks;
 - EntityCards and graph structure are not medical evidence;
 - observability redacts raw queries and secret-like values.
 
@@ -42,7 +42,7 @@ clinical safety action source; it is not a clinically validated suicide-risk
 classifier. Ambiguous or informational mentions continue through the grounded
 agent path rather than being classified in Python.
 
-The two NICE-mapped rules use the official recommendation URL as the current
-safety cross-check. The frozen NICE-derived retrieval snapshot has the accepted
-date/provenance conflict documented in [Data Pipeline](DATA_PIPELINE.md); passing
-this safety contract does not resolve that corpus limitation.
+The two NICE-mapped rules use the official recommendation URL as a current safety
+cross-check. The NICE-derived retrieval snapshot has the provenance discrepancy
+documented in [Data Pipeline](DATA_PIPELINE.md); passing this safety contract
+does not independently reconcile that source version.

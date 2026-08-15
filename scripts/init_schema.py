@@ -10,7 +10,7 @@ Responsibilities
 2. Create patient_records table in PostgreSQL with JSONB profile.
 3. Enable PostgreSQL extensions.
 4. Create SQLAlchemy model tables if src.database.models exists.
-5. Leave the frozen Phase 1 Qdrant foundation to ``scripts/phase1.py``.
+5. Leave knowledge-index lifecycle operations to ``scripts/phase1.py``.
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ async def _setup_postgres() -> None:
 
 
 async def _setup_qdrant() -> None:
-    """Refuse to create or recreate the frozen Phase 1 collection here."""
+    """Refuse to create or recreate the validated knowledge collection here."""
 
     logger.info(
         "Qdrant ownership belongs to scripts/phase1.py; init_schema does not mutate %s.",

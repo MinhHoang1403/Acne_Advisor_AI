@@ -244,7 +244,7 @@ async def delete_all_chat_history(session: AsyncSession) -> dict[str, int]:
     Delete persisted chat history only.
 
     This removes rows from chat_messages and chat_sessions, but does not touch
-    any schema objects or Phase 1 stores.
+    any schema objects or indexed knowledge stores.
     """
     messages_result = await session.execute(
         text("DELETE FROM chat_messages")

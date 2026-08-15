@@ -1,4 +1,4 @@
-"""Pydantic contracts for Phase 2 observability events."""
+"""Pydantic contracts for runtime observability events."""
 
 from __future__ import annotations
 

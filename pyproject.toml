@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "acne-agent-system"
 version = "0.1.0"
-description = "Vietnamese acne information assistant with frozen Agentic RAG"
+description = "Vietnamese acne information assistant with evidence-grounded Agentic RAG"
 requires-python = ">=3.11,<3.12"
 readme = "README.md"
 license = { text = "MIT" }

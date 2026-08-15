@@ -1,4 +1,4 @@
-"""Final content-derived Phase 1 build manifest."""
+"""Content-derived knowledge-build manifest."""
 
 from __future__ import annotations
 
@@ -122,7 +122,7 @@ def save_build_manifest(path: Path, manifest: dict[str, Any]) -> None:
 def load_build_manifest(path: Path) -> dict[str, Any]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if raw.get("schema") != BUILD_MANIFEST_SCHEMA:
-        raise ValueError(f"Unsupported Phase 1 build manifest at {path}")
+        raise ValueError(f"Unsupported knowledge-build manifest at {path}")
     return raw
 
 

@@ -1,4 +1,4 @@
-"""Pure deterministic compilation of frozen sources into Phase 1 records."""
+"""Pure deterministic compilation of source snapshots into knowledge records."""
 
 from __future__ import annotations
 

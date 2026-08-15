@@ -13,7 +13,7 @@ from src.knowledge.schemas import EntityCard, EntityType, canonical_text_key
 
 
 # This YAML is the only active source-backed taxonomy for runtime normalization,
-# EntityCards, and the deterministic Phase 1 graph.
+# EntityCards, and the deterministic structural graph.
 DEFAULT_TAXONOMY_PATH = Path(__file__).resolve().parents[2] / "data" / "taxonomy" / "drug_aliases.yaml"
 ACTIVE_TAXONOMY_CONTRACT = "data/taxonomy/drug_aliases.yaml"
 

@@ -19,7 +19,7 @@ docker compose ps
 .\venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
 
-## Phase 1
+## Knowledge Build
 
 ```powershell
 .\venv\Scripts\python.exe scripts\phase1.py build --source sample_data
@@ -35,9 +35,9 @@ snapshots plus a Neo4j cold backup:
 .\venv\Scripts\python.exe scripts\phase1.py build --activate --rollback-root data\backups\<snapshot>
 ```
 
-Do not run Phase 1 merely to start the UI. `scripts/init_schema.py` owns SQL
-schema initialization and does not create, recreate or delete the frozen
-Qdrant knowledge store.
+Starting the UI or API normally reuses the existing indexed knowledge.
+`scripts/init_schema.py` owns SQL schema initialization and does not create,
+recreate, or delete the Qdrant knowledge index.
 
 ## Runtime Checks
 
@@ -48,12 +48,13 @@ Qdrant knowledge store.
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
-The production runtime uses exact normalized answer cache `v8`. Cache identity
+The runtime uses exact normalized answer cache `v8`. Cache identity
 includes provider, model, pipeline fingerprint, and the normalized question; no
 semantic-similarity lookup is performed. Runtime retrieval is read-only
 Dense + native BM25 + RRF over
-`acne_knowledge`; it does not query EntityCards or Neo4j. Do not run Phase 1
-build, activation, reindexing, or embedding as part of Phase 2 startup.
+`acne_knowledge`; it does not query EntityCards or Neo4j. Knowledge compilation,
+activation, reindexing, and embedding are separate maintenance operations rather
+than application-startup steps.
 
 ## Supported Commands
 
@@ -65,10 +66,10 @@ checks.
 | `phase1.py` | controlled build, validate and status |
 | `init_schema.py`, `init_chat_schema.py` | relational schema initialization |
 | `inspect_phase2_readiness.py`, `pre_ui_runtime_check.py` | local readiness |
-| `check_reproducible_environment.py`, `check_release_readiness.py` | release gates |
+| `check_reproducible_environment.py`, `check_release_readiness.py` | environment and release-readiness checks |
 | `smoke_phase2_runtime.py` | provider-free structural agent smoke |
 | `check_answer_contracts.py`, `check_phase2_contracts.py` | implementation contracts; not clinical evaluation |
-| `check_safe_fallback_flow.py`, `check_runtime_resilience.py` | fallback/resilience gates |
+| `check_safe_fallback_flow.py`, `check_runtime_resilience.py` | fallback and resilience checks |
 | `inspect_cache_versions.py` | cache and fingerprint inspection |
 | `clear_redis_cache.py` | explicit, developer-triggered answer-cache cleanup |
 
@@ -109,7 +110,7 @@ or Redis `FLUSHALL` as a startup/shutdown strategy.
 
 For runtime rollback, check out the previous integration commit, preserve the
 existing bind-mounted data, start pinned services with `--pull never --no-build`,
-then rerun readiness and Phase 1 status checks. A Phase 1 datastore rollback
+then rerun readiness and knowledge-build status checks. A knowledge datastore rollback
 must use its verified snapshots and cold backup; it is a separate controlled
 migration operation.
 

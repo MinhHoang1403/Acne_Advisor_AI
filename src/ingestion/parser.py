@@ -1,4 +1,4 @@
-"""Content-addressed parsed intermediate representation for Phase 1."""
+"""Content-addressed intermediate representation for knowledge preparation."""
 
 from __future__ import annotations
 

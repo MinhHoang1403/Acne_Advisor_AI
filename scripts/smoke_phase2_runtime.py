@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-free structural smoke for the frozen runtime."""
+"""Provider-free structural smoke test for the Agentic RAG runtime."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def run_offline_smoke() -> dict:
     if len(graph_nodes) != 8:
         errors.append(f"Expected 8 semantic graph nodes, found {len(graph_nodes)}")
     if len(ClinicalState.__annotations__) >= 97:
-        errors.append("ClinicalState exceeds the frozen compact-state upper bound")
+        errors.append("ClinicalState exceeds the compact-state upper bound")
     if not all(case["passed"] for case in cases):
         errors.append("One or more structural retrieval cases failed")
     return {

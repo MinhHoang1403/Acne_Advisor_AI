@@ -1,4 +1,4 @@
-"""Canonical Phase 1 orchestration; scripts only delegate to this module."""
+"""Canonical knowledge-build orchestration used by the operator CLI."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ async def prepare_phase1(
         validate_graph_records(graph_records),
     )
     if not layers["passed"]:
-        raise RuntimeError(f"Offline Phase 1 validation failed: {layers['errors']}")
+        raise RuntimeError(f"Offline knowledge validation failed: {layers['errors']}")
     return {
         "sources": sources,
         "artifacts": artifacts,
@@ -158,7 +158,7 @@ async def build_phase1(
         *prepared["offline_validation"]["layers"], qdrant_knowledge, qdrant_entities
     )
     if not validation["passed"]:
-        raise RuntimeError(f"Candidate Phase 1 validation failed: {validation['errors']}")
+        raise RuntimeError(f"Candidate knowledge validation failed: {validation['errors']}")
     graph_records = prepared["graph_records"]
     manifest = build_manifest(
         compiled,
@@ -234,7 +234,7 @@ async def activate_phase1(
     manifest = load_build_manifest(manifest_path)
     prepared = await prepare_phase1()
     if manifest["build_id"] != prepared["identity"].build_id:
-        raise RuntimeError("Candidate manifest does not match the frozen input build identity")
+        raise RuntimeError("Candidate manifest does not match the validated input build identity")
 
     driver = get_neo4j_driver()
     try:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only inspection for Phase 2 answer-cache version/fingerprint state."""
+"""Inspect the runtime answer-cache version and pipeline fingerprint."""
 
 from __future__ import annotations
 

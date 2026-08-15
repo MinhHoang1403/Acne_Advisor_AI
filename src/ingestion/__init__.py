@@ -1,1 +1,1 @@
-"""Frozen Phase 1 ingestion package."""
+"""Content-addressed knowledge preparation and indexing package."""
