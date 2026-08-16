@@ -65,15 +65,32 @@ def safety_rule_inventory() -> tuple[SafetyRule, ...]:
 
 
 def _anaphylaxis(text: str) -> bool:
-    return _has(text, "kho tho", "kho khe", "nghet tho", "tho rit") and _has(
+    inactive_breathing = _has(
         text,
-        "sung moi",
-        "sung mieng",
-        "sung luoi",
-        "sung hong",
-        "noi me day",
-        "phat ban ngua lan nhanh",
-        "soc phan ve",
+        "tung kho tho",
+        "tung bi kho tho",
+        "truoc day kho tho",
+        "truoc day bi kho tho",
+        "kho tho truoc day",
+        "da het kho tho",
+        "kho tho da het",
+        "khong con kho tho",
+        "hien khong kho tho",
+        "tho binh thuong",
+    )
+    return (
+        not inactive_breathing
+        and _has_unnegated(text, "kho tho", "kho khe", "nghet tho", "tho rit")
+        and _has_unnegated(
+            text,
+            "sung moi",
+            "sung mieng",
+            "sung luoi",
+            "sung hong",
+            "noi me day",
+            "phat ban ngua lan nhanh",
+            "soc phan ve",
+        )
     )
 
 
@@ -222,9 +239,29 @@ def _isotretinoin_pregnancy(text: str) -> bool:
 
 
 def _isotretinoin_neurologic(text: str) -> bool:
-    severe_headache = _has(text, "dau dau du doi", "dau dau rat nang", "severe headache")
-    visual_or_gi = _has(text, "nhin mo", "mo mat", "blurred vision", "buon non", "non")
-    return "isotretinoin" in text and severe_headache and visual_or_gi
+    resolved_headache = _has(
+        text,
+        "tung dau dau du doi",
+        "tung bi dau dau du doi",
+        "tung dau dau rat nang",
+        "truoc day dau dau du doi",
+        "da het dau dau du doi",
+        "dau dau du doi da het",
+        "khong con dau dau du doi",
+        "hien da het",
+    )
+    severe_headache = _has_unnegated(
+        text, "dau dau du doi", "dau dau rat nang", "severe headache"
+    )
+    visual_or_gi = _has_unnegated(
+        text, "nhin mo", "mo mat", "blurred vision", "buon non", "non"
+    )
+    return (
+        "isotretinoin" in text
+        and not resolved_headache
+        and severe_headache
+        and visual_or_gi
+    )
 
 
 def _prescription_execution(text: str) -> bool:

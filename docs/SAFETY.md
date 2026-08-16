@@ -17,7 +17,7 @@ Key invariants:
 - EntityCards and graph structure are not medical evidence;
 - observability redacts raw queries and secret-like values.
 
-Regression tests cover all seven narrow rules, fallback, source validation,
+Regression tests cover all nine narrow rules, fallback, source validation,
 Markdown presentation, and cache eligibility. Regression fixtures protect
 software behavior; they are not clinical gold and do not establish answer
 quality or external validity.
@@ -27,6 +27,8 @@ quality or external validity.
 | Override | Trigger boundary | Authoritative policy source |
 |---|---|---|
 | anaphylaxis-like emergency | breathing difficulty with swelling of the lips/mouth/tongue/throat or rapidly spreading hives | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) |
+| breathing difficulty after medication | personal, current, unnegated breathing difficulty after taking or using medication | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) and [NHS Shortness of breath](https://www.nhs.uk/symptoms/shortness-of-breath/) |
+| significant bleeding after acne manipulation | current heavy or uncontrolled bleeding after squeezing or puncturing acne | [St John Ambulance severe bleeding](https://www.sja.org.uk/first-aid-advice/severe-bleeding/) |
 | chest pain with breathlessness | unnegated chest pain/tightness plus breathlessness | [NHS Chest pain](https://www.nhs.uk/symptoms/chest-pain/) |
 | immediate self-harm safety | explicit personal/current self-harm or suicide intent; informational topic mentions do not trigger | [WHO Suicide Q&A](https://www.who.int/news-room/questions-and-answers/item/suicide) |
 | suspected acne fulminans | acne plus fever/joint pain and severe nodular, cystic, ulcerative, or rapidly erupting lesions | [NICE NG198 recommendation 1.4.1](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) |
@@ -41,6 +43,10 @@ The exact self-harm phrase detector is a narrow engineering policy mapped to a
 clinical safety action source; it is not a clinically validated suicide-risk
 classifier. Ambiguous or informational mentions continue through the grounded
 agent path rather than being classified in Python.
+
+The runtime compatibility identifier `NHS_FIRST_AID_HEAVY_BLEEDING` is retained,
+but its older NHS URL now redirects to St John Ambulance. Current attribution
+therefore names St John Ambulance rather than presenting the guidance as NHS-owned.
 
 The two NICE-mapped rules use the official recommendation URL as a current safety
 cross-check. The NICE-derived retrieval snapshot has the provenance discrepancy

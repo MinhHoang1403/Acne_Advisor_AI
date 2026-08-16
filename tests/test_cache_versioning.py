@@ -92,18 +92,32 @@ def test_legacy_cache_versions_are_promoted_to_v9() -> None:
     assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v9"}) == "v9"
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v13() -> None:
+def test_legacy_answer_formatting_contract_is_promoted_to_v14() -> None:
     manifest = build_pipeline_version_manifest(
         {"ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8"}
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v13"
+    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v14"
 
 
-def test_legacy_prompt_version_is_promoted_to_v4() -> None:
+def test_legacy_prompt_version_is_promoted_to_v5() -> None:
     manifest = build_pipeline_version_manifest({"PROMPT_VERSION": "medical_prompt_v3"})
 
-    assert manifest["prompt_version"] == "medical_prompt_v4"
+    assert manifest["prompt_version"] == "medical_prompt_v5"
+
+
+def test_changed_runtime_contract_owners_partition_cache_without_answer_version_bump() -> None:
+    current = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v9"})
+    previous = {
+        **current,
+        "agent_decision_version": "minimal_agent_decision_v1",
+        "safety_policy_version": "source_mapped_safety_policy_v1",
+        "prompt_version": "medical_prompt_v4",
+        "answer_formatting_contract_version": "answer_formatting_contract_v13",
+    }
+
+    assert current["answer_cache_version"] == previous["answer_cache_version"] == "v9"
+    assert compute_pipeline_fingerprint(current) != compute_pipeline_fingerprint(previous)
 
 
 def test_pipeline_manifest_does_not_include_secrets() -> None:

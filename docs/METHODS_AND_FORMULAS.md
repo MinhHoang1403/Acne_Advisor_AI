@@ -134,9 +134,20 @@ Retry and provider fallback consume the same remaining budget. AWS engineering
 guidance supports finite timeout, retry, exponential backoff, and jitter as a
 pattern; it does not prescribe this project's exact retry count or timing values.
 
+The Agent decision model sees at most the first 5 evidence items and the first
+1200 characters of each item. This bounded visibility is an engineering policy,
+not evidence sufficiency or a scientific optimum. The generation path can see
+more packed evidence through its separate limit of 8 items and 6000 characters;
+that asymmetry remains an evaluation question.
+
+When Ollama reports truncated generation, the client performs at most one compact
+retry with an instruction capped at 160 words. This engineering policy can change
+output length, latency, provider-call count, completeness, and style; it is not
+claimed optimal.
+
 ## Safety and Verification
 
-`src/agent/safety_policy.py` owns seven narrow deterministic overrides mapped to
+`src/agent/safety_policy.py` owns nine narrow deterministic overrides mapped to
 clinical/public-health sources or an explicit no-prescription engineering
 policy. It is not a general medical reasoner. Ordinary answer meaning remains
 `source evidence -> LLM synthesis`.
@@ -180,6 +191,7 @@ medical confidence, source reliability score, or scientific formula.
 | retrieval candidates | default 16 | runtime resource policy |
 | context items/chars | defaults 8 / 6000 | runtime resource policy |
 | retrieval attempts | maximum 2 | bounded safety/latency policy |
+| decision evidence visibility | first 5 items; 1200 chars/item | runtime engineering policy |
 | agent action schema | 4 semantic actions | implemented research method + engineering contract |
 | exact cache namespace | v9 | engineering invalidation policy |
 | cache question/TTL | 600 chars / 86400 seconds | engineering resource policy |
@@ -187,7 +199,8 @@ medical confidence, source reliability score, or scientific formula.
 | total/retrieval deadlines | 210 / 20 seconds | engineering resilience policy |
 | Gemini/Ollama call deadlines | 45 / 160 seconds | engineering resilience policy |
 | LLM retries | 1 retry, 1-second base, 4-second cap, 0.1 jitter | engineering resilience policy |
-| safety overrides | 7 source-mapped rules | clinical safety sources + engineering policy |
+| Ollama truncation retry | 1 compact retry; 160-word instruction bound | provider-specific engineering policy |
+| safety overrides | 9 source-mapped rules | clinical safety sources + engineering policy |
 | answer shape parsing | requested table/column/item/style only | structural engineering policy |
 | source allowlist | evidence source IDs only | provenance engineering contract |
 | core preflight | Qdrant, query embedding, generation provider | architecture dependency contract |
