@@ -248,7 +248,6 @@ def _isotretinoin_neurologic(text: str) -> bool:
         "da het dau dau du doi",
         "dau dau du doi da het",
         "khong con dau dau du doi",
-        "hien da het",
     )
     severe_headache = _has_unnegated(
         text, "dau dau du doi", "dau dau rat nang", "severe headache"

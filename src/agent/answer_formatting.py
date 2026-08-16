@@ -163,9 +163,9 @@ def should_include_medical_disclaimer(
     text = _fold(question)
     medication_advice = bool(
         re.search(
-            r"\b(?:thuoc nao|ke don|toa thuoc|tang lieu|giam lieu|chon lieu|"
-            r"co nen dung|nen dung|nen uong|nen boi|dung .{0,50} the nao|"
-            r"dieu tri .{0,40} the nao|tri mun .{0,40} the nao|thuoc .{0,40} phu hop)\b",
+            r"\b(?:thuoc nao|ke don|ke thuoc|toa thuoc|tang lieu|giam lieu|chon lieu|"
+            r"(?:co nen|nen) (?:dung|uong|boi) thuoc|"
+            r"(?:dung|uong|boi) thuoc .{0,50} the nao|thuoc .{0,40} phu hop)\b",
             text,
         )
     )

@@ -78,6 +78,15 @@ def test_isotretinoin_neurologic_rule_requires_active_unnegated_severe_headache(
     assert evaluate_safety(query) is None
 
 
+def test_resolved_other_symptom_does_not_suppress_active_isotretinoin_neurologic_rule() -> None:
+    decision = evaluate_safety(
+        "Tôi dùng isotretinoin, hiện đã hết buồn nôn nhưng vẫn đau đầu dữ dội và nhìn mờ."
+    )
+
+    assert decision is not None
+    assert decision.rule_id == "isotretinoin_severe_headache_visual_symptoms"
+
+
 @pytest.mark.parametrize(
     "query",
     [
