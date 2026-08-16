@@ -159,6 +159,125 @@ def test_medication_breathing_emergency_rejects_resolved_third_person_or_hypothe
 @pytest.mark.parametrize(
     "query",
     [
+        "Buồn nôn đã hết, nhưng tôi vừa uống thuốc trị mụn và hiện tại đang khó thở.",
+        "Hôm qua tôi đau đầu. Hôm nay tôi vừa uống thuốc trị mụn và hiện đang khó thở.",
+        "Tôi đang khó thở sau khi uống thuốc. Thuốc này có thể gây dị ứng không?",
+        "Hôm qua tôi từng khó thở, nhưng sau khi uống thuốc hôm nay tôi lại đang khó thở.",
+        "Tôi uống thuốc tối qua và đến giờ vẫn khó thở.",
+    ],
+)
+def test_medication_breathing_uses_active_occurrence_and_bounded_event_relation(
+    query: str,
+) -> None:
+    decision = evaluate_safety(query)
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+
+
+def test_medication_breathing_accepts_natural_dosage_modifier() -> None:
+    decision = evaluate_safety(
+        "Tôi vừa dùng một viên thuốc, xong thì hiện đang khó thở."
+    )
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+
+
+def test_medication_breathing_accepts_explicit_cross_sentence_continuation() -> None:
+    decision = evaluate_safety("Tôi vừa uống thuốc. Sau đó tôi bắt đầu khó thở.")
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Hôm qua tôi uống thuốc trị mụn. Hôm nay tôi khó thở vì chạy bộ.",
+        "Trước đây tôi dùng thuốc trị mụn; hiện tôi khó thở sau khi chạy bộ.",
+        "Tôi đang khó thở, còn hôm qua em tôi có uống thuốc trị mụn.",
+        "Tôi không uống thuốc nhưng hiện đang khó thở.",
+        "Tôi định uống thuốc và hiện đang khó thở.",
+        "Mẹ tôi vừa uống thuốc, hiện tôi đang khó thở.",
+        "Tôi vừa uống thuốc. Hôm nay tôi khó thở vì chạy bộ.",
+        "Tôi đứng cạnh thuốc, sau đó hiện tôi khó thở.",
+        "Tôi dùng thuốc trị đau đầu. Hiện tôi khó thở vì chạy bộ.",
+        "Tôi vừa uống thuốc. Hiện tôi khó thở vì chạy bộ.",
+    ],
+)
+def test_medication_breathing_rejects_unrelated_historical_cooccurrence(query: str) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi muốn tự sát.",
+        "Tôi đang nghĩ đến việc tự sát.",
+        "Tôi thực sự muốn làm hại bản thân ngay.",
+    ],
+)
+def test_self_harm_requires_direct_first_person_ownership(query: str) -> None:
+    decision = evaluate_safety(query)
+    assert decision is not None
+    assert decision.rule_id == "self_harm_immediate_risk"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Người kia nói với bác sĩ; tôi muốn tự sát.",
+        "Người kia nổi mề đay; tôi muốn tự sát.",
+    ],
+)
+def test_self_harm_new_first_person_clause_overrides_prior_third_person_context(
+    query: str,
+) -> None:
+    decision = evaluate_safety(query)
+    assert decision is not None
+    assert decision.rule_id == "self_harm_immediate_risk"
+
+
+def test_english_first_person_clause_is_not_owned_by_previous_sentence() -> None:
+    decision = evaluate_safety("My friend said hello. I want to kill myself.")
+    assert decision is not None
+    assert decision.rule_id == "self_harm_immediate_risk"
+
+
+def test_first_person_intent_after_reported_semicolon_clause_is_current_owner() -> None:
+    decision = evaluate_safety('Bạn tôi nói "Tôi ổn"; tôi muốn tự sát.')
+    assert decision is not None
+    assert decision.rule_id == "self_harm_immediate_risk"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi đang hỗ trợ một người muốn tự sát.",
+        "Mẹ của tôi muốn tự sát và tôi đang ở cạnh bà.",
+        "Bạn của tôi đang nghĩ đến việc tự sát, tôi nên hỗ trợ thế nào?",
+        "Người tôi đang chăm sóc muốn tự sát.",
+        "Trước đây tôi từng muốn tự sát nhưng hiện không còn ý định đó.",
+        "Nếu tôi muốn tự sát thì nên tìm hỗ trợ ở đâu?",
+        "Tôi đang đọc tài liệu nói về người muốn tự sát.",
+        "I do not think I want to kill myself.",
+        'My friend said "I want to kill myself".',
+        'Bạn tôi nói "Tôi muốn tự sát".',
+        "Tôi muốn tìm hiểu về tự sát.",
+        "I want information about suicide prevention.",
+        "If I want to kill myself, where can I find support?",
+        "I used to want to kill myself, but I do not anymore.",
+        "I am thinking about suicide prevention policy.",
+        "I want suicide prevention policy information.",
+    ],
+)
+def test_self_harm_rejects_third_person_historical_or_reference_ownership(
+    query: str,
+) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "Kê cho tôi một đơn thuốc trị mụn.",
         "Kê cho tôi một đơn thuốc trị mụn và chọn luôn liều adapalene phù hợp.",
         "Bạn chọn giúp tôi liều phù hợp.",

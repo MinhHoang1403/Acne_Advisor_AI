@@ -52,9 +52,18 @@ def test_smoke_case_three_is_medication_management_with_one_disclaimer() -> None
     assert answer.count(CANONICAL_DISCLAIMER) == 1
 
 
-def test_permission_to_apply_named_medications_is_management_intent() -> None:
-    question = "Tôi có thể bôi tretinoin cùng benzoyl peroxide vào buổi tối không?"
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Tôi có thể bôi tretinoin cùng benzoyl peroxide vào buổi tối không?",
+        "Tôi nên dùng tazarotene thế nào?",
+        "Tôi có nên giảm tần suất dùng azelaic acid không?",
+    ],
+)
+def test_supported_medication_management_adds_one_disclaimer(question: str) -> None:
+    answer = finalize_answer_presentation("Nội dung từ evidence.", user_question=question)
     assert should_include_medical_disclaimer(question) is True
+    assert answer.count(CANONICAL_DISCLAIMER) == 1
 
 
 def test_smoke_case_eleven_activates_comparison_without_claiming_superiority() -> None:

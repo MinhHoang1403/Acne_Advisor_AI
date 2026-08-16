@@ -20,9 +20,8 @@ from src.agent.semantic_signals import (
     contains_bounded_sequence,
     has_active_symptom,
     has_first_person_reference,
-    has_past_or_resolved_symptom,
+    has_medication_related_active_symptom,
     has_unnegated_concept,
-    is_medication_use_event,
     is_prescription_execution_request,
     normalize_text,
 )
@@ -57,7 +56,7 @@ class SafetyDecision:
 def evaluate_safety(query: str) -> SafetyDecision | None:
     """Trả một override hẹp; semantics thông thường vẫn thuộc Agent."""
 
-    text = normalize_text(query)
+    text = normalize_text(query, preserve_boundaries=True)
     for rule in SAFETY_RULES:
         if rule.trigger(text):
             return SafetyDecision(
@@ -94,13 +93,7 @@ def _anaphylaxis(text: str) -> bool:
 
 def _breathing_after_medication(text: str) -> bool:
     breathing = ("kho tho", "hut hoi")
-    return (
-        has_first_person_reference(text)
-        and is_medication_use_event(text)
-        and has_active_symptom(text, breathing)
-        and not has_past_or_resolved_symptom(text, breathing)
-        and "khong lien quan thuoc" not in text
-    )
+    return has_medication_related_active_symptom(text, breathing)
 
 
 def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
@@ -142,47 +135,31 @@ def _chest_breathing_emergency(text: str) -> bool:
 
 
 def _self_harm(text: str) -> bool:
-    if _has(
-        text,
-        "toi khong muon tu sat",
-        "toi khong muon tu tu",
-        "toi khong muon lam hai ban than",
-        "toi chua bao gio muon tu sat",
-        "toi chua bao gio muon tu tu",
-        "i do not want to kill myself",
-        "i don t want to kill myself",
-        "i do not want to harm myself",
-        "i don t want to harm myself",
-        "tung doc ve tu sat",
-        "tai lieu noi ve tu sat",
-        "nghien cuu ve tu sat",
-    ):
+    concepts = (
+        "tu sat",
+        "tu tu",
+        "lam hai ban than",
+        "suicide",
+        "kill myself",
+        "harm myself",
+    )
+    if not has_active_symptom(text, concepts):
         return False
-    if _has(
-        text,
-        "i want to kill myself",
-        "i want to harm myself",
-        "i am going to kill myself",
-        "i m going to kill myself",
-        "i am thinking about suicide",
-        "i m thinking about suicide",
-    ):
-        return True
-    if not has_first_person_reference(text):
-        return False
-    concepts = ("tu sat", "tu tu", "lam hai ban than")
-    if not _has_unnegated(text, *concepts):
+    if not has_first_person_reference(text, concepts):
         return False
     direct_intent = any(
-        contains_bounded_sequence(text, (intent, concept), max_gap=4)
-        for intent in ("muon", "sap", "se")
+        contains_bounded_sequence(text, (intent, concept), max_gap=1)
+        for intent in ("muon", "sap", "se", "want", "going")
         for concept in concepts
     )
     active_thought = any(
         contains_bounded_sequence(text, ("dang", "nghi", concept), max_gap=4)
         for concept in concepts
+    ) or any(
+        contains_bounded_sequence(text, ("thinking", "about", concept), max_gap=2)
+        for concept in concepts
     )
-    return direct_intent or active_thought
+    return (direct_intent or active_thought) and not _has_reference_purpose(text, concepts)
 
 
 def _acne_fulminans(text: str) -> bool:
@@ -251,6 +228,19 @@ def _has(text: str, *phrases: str) -> bool:
 
 def _has_unnegated(text: str, *phrases: str) -> bool:
     return has_unnegated_concept(text, phrases)
+
+
+def _has_reference_purpose(text: str, concepts: tuple[str, ...]) -> bool:
+    reference_terms = r"(?:information|policy|prevention|research)"
+    return any(
+        re.search(
+            rf"(?:{reference_terms}(?:\s+\w+){{0,2}}\s+{re.escape(concept)}|"
+            rf"{re.escape(concept)}(?:\s+\w+){{0,2}}\s+{reference_terms})",
+            text,
+        )
+        is not None
+        for concept in concepts
+    )
 
 
 SAFETY_RULES: tuple[SafetyRule, ...] = (

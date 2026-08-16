@@ -4,6 +4,7 @@ import pytest
 
 from src.agent.semantic_signals import (
     contains_bounded_sequence,
+    has_active_symptom,
     has_unnegated_concept,
     is_comparison_intent,
     is_medication_management_intent,
@@ -39,6 +40,30 @@ def test_bounded_sequence_allows_narrow_modifiers_but_not_unbounded_distance() -
 )
 def test_unnegated_concept_respects_local_negation(text: str, expected: bool) -> None:
     assert has_unnegated_concept(text, ("kho tho",)) is expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Buồn nôn đã hết, nhưng tôi hiện đang khó thở.", True),
+        ("Hôm qua tôi đau đầu. Hôm nay tôi đang khó thở.", True),
+        ("Hôm qua tôi từng khó thở và sau đó đã ổn.", False),
+        ("Hôm qua tôi từng khó thở, nhưng hôm nay tôi lại đang khó thở.", True),
+        ("Tôi đang khó thở. Thuốc này có thể gây dị ứng không?", True),
+        ("Nếu thuốc có thể gây dị ứng thì sao? Hiện tôi đang khó thở.", True),
+        ("Tôi đang khó thở. Hôm qua tôi chỉ bị đau đầu.", True),
+        ("Tôi từng khó thở nhưng giờ tôi lại khó thở.", True),
+        ("Nếu hai giờ nữa tôi khó thở thì cần làm gì?", False),
+        ("Nếu trong giờ tới tôi khó thở thì cần làm gì?", False),
+        ("Tôi hiện không khó thở.", False),
+        ("HIỆN TÔI ĐANG KHÓ THỞ!", True),
+    ],
+)
+def test_active_symptom_state_is_local_to_each_concept_occurrence(
+    text: str,
+    expected: bool,
+) -> None:
+    assert has_active_symptom(text, ("kho tho",)) is expected
 
 
 @pytest.mark.parametrize(
@@ -86,6 +111,37 @@ def test_medication_management_uses_shared_request_signals(question: str) -> Non
 @pytest.mark.parametrize(
     "question",
     [
+        "Tôi có nên bôi tretinoin không?",
+        "Tôi nên dùng tazarotene thế nào?",
+        "Tôi có nên giảm tần suất dùng azelaic acid không?",
+        "Tôi nên dùng salicylic acid bao lâu?",
+        "Tôi có thể bôi clascoterone không?",
+        "Tôi có nên uống minocycline không?",
+        "Tôi nên dùng sarecycline thế nào?",
+        "Tôi có nên giảm liều spironolactone không?",
+        "Tôi có thể bôi trifarotene mỗi tối không?",
+    ],
+)
+def test_medication_management_uses_canonical_supported_identity(question: str) -> None:
+    assert is_medication_management_intent(question) is True
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Tretinoin là gì?",
+        "Tazarotene dùng để làm gì?",
+        "Azelaic acid có tác dụng gì?",
+        "Trifarotene dùng để trị gì?",
+    ],
+)
+def test_supported_medication_factual_questions_are_not_management(question: str) -> None:
+    assert is_medication_management_intent(question) is False
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
         "Adapalene là gì?",
         "Benzoyl peroxide dùng để làm gì?",
         "Có nên dùng sữa rửa mặt này không?",
@@ -98,6 +154,18 @@ def test_medication_management_rejects_facts_and_ordinary_skincare(question: str
 
 def test_frequency_language_without_medication_does_not_become_medication_management() -> None:
     assert is_medication_management_intent("Tôi có nên tăng số lần rửa mặt không?") is False
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Tôi có nên bôi kem dưỡng không?",
+        "Tôi nên dùng sữa rửa mặt thế nào?",
+        "Tôi có nên tăng tần suất dùng kem chống nắng không?",
+    ],
+)
+def test_ordinary_skincare_remains_outside_medication_management(question: str) -> None:
+    assert is_medication_management_intent(question) is False
 
 
 @pytest.mark.parametrize(
