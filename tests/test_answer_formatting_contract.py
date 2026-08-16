@@ -114,6 +114,7 @@ async def test_emergency_receives_disclaimer_after_action_and_safe_fallback_does
         "Thuốc nào có thể trị mụn trứng cá?",
         "Tôi nên dùng thuốc trị mụn thế nào?",
         "Có nên tăng liều thuốc trị mụn không?",
+        "Tôi nên bôi thuốc trị mụn thế nào?",
     ],
 )
 async def test_explicit_medication_advice_receives_one_canonical_disclaimer(
@@ -132,6 +133,10 @@ async def test_explicit_medication_advice_receives_one_canonical_disclaimer(
         "Mụn đầu đen là gì?",
         "Mụn viêm là gì?",
         "Da dầu có gây mụn không?",
+        "Điều trị mụn đầu đen thế nào?",
+        "Chăm sóc mụn viêm thế nào?",
+        "Có nên dùng sữa rửa mặt này không?",
+        "Nên dùng kem dưỡng nào cho da mụn?",
         "Adapalene là gì?",
         "Adapalene dùng để làm gì?",
     ],
