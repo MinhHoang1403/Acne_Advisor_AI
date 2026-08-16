@@ -254,7 +254,12 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
         _metadata_value(context, "authority"),
     )
     source_url = _first_text(context.get("source_url"), _metadata_value(context, "source_url"))
-    display_name = _display_name(source_id, document_title=document_title, source_type=source_type)
+    display_name = _display_name(
+        source_id,
+        document_title=document_title,
+        source_type=source_type,
+        authority=authority,
+    )
     return {
         "source_id": source_id,
         "canonical_filename": Path(source_id.replace("\\", "/")).name if source_type in {"document", "dataset"} else None,
@@ -270,10 +275,18 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _display_name(source_id: str, *, document_title: str | None, source_type: str) -> str:
+def _display_name(
+    source_id: str,
+    *,
+    document_title: str | None,
+    source_type: str,
+    authority: str | None,
+) -> str:
     filename = Path(source_id.replace("\\", "/")).name
     if filename in FILE_SOURCE_DISPLAY_NAMES:
         return FILE_SOURCE_DISPLAY_NAMES[filename]
+    if source_id.casefold().startswith("web_") and authority and document_title:
+        return f"{authority} — {document_title}"
     if document_title:
         return document_title
     if filename:

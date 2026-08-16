@@ -67,7 +67,7 @@ def test_corrected_source_and_curation_contracts_have_expected_build_identity() 
         Path("data/taxonomy/drug_aliases.yaml"),
     )
 
-    assert identity.build_id == "45bc4bb563acb89725b5"
+    assert identity.build_id == "94d613bc9b33628de3ef"
 
 
 def test_method_traceability_covers_methods_and_technical_standards() -> None:

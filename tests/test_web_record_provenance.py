@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from src.ingestion.pipeline import prepare_knowledge
+from src.ingestion import pipeline as ingestion_pipeline
+from src.ingestion.pipeline import inspect_embedding_cache_reuse, prepare_knowledge
 from src.ingestion.source_manifest import (
     load_source_manifest,
     load_web_record_catalog,
@@ -103,3 +104,60 @@ def test_compiled_web_provenance_and_claim_curation_are_exact() -> None:
     assert all(record["source_file"] == "web_raw_dataset.json" for record in web_records)
     assert not any("phân loại thai kỳ" in record["text"].casefold() for record in records)
     assert sha256_file(ROOT / "sample_data" / "web_raw_dataset.json") == _web_source().sha256
+
+
+def test_approved_build_cache_reuse_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    _require_canonical_corpus()
+
+    def forbidden_call(*args, **kwargs):
+        raise AssertionError("inspect-cache must not invoke providers or datastores")
+
+    async def forbidden_async_call(*args, **kwargs):
+        raise AssertionError("inspect-cache must not parse or resolve embeddings")
+
+    monkeypatch.setattr(ingestion_pipeline, "AsyncQdrantClient", forbidden_call)
+    monkeypatch.setattr(ingestion_pipeline, "get_neo4j_driver", forbidden_call)
+    monkeypatch.setattr(ingestion_pipeline, "load_or_parse_source", forbidden_async_call)
+    monkeypatch.setattr(ingestion_pipeline, "resolve_embeddings", forbidden_async_call)
+    monkeypatch.setattr(ingestion_pipeline.EmbeddingCache, "put", forbidden_call)
+
+    cache_roots = (
+        ROOT / "data" / "cache" / "phase1" / "parsed",
+        ROOT / "data" / "cache" / "phase1" / "embeddings",
+    )
+
+    def snapshot() -> dict[str, tuple[int, int]]:
+        return {
+            str(path.relative_to(ROOT)): (path.stat().st_size, path.stat().st_mtime_ns)
+            for root in cache_roots
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+
+    cache_before = snapshot()
+
+    result = asyncio.run(inspect_embedding_cache_reuse())
+
+    assert snapshot() == cache_before
+
+    assert result["passed"] is True
+    assert result["build_id"] == "94d613bc9b33628de3ef"
+    assert result["parsed"] == {
+        "hits": 4,
+        "misses": 0,
+        "total": 4,
+        "missing_or_invalid_source_ids": [],
+    }
+    assert result["knowledge_embeddings"] == {
+        "inspected": True,
+        "hits": 507,
+        "misses": 5,
+        "total": 512,
+    }
+    assert result["entity_embeddings"] == {
+        "inspected": True,
+        "hits": 32,
+        "misses": 0,
+        "total": 32,
+    }
+    assert result["provider_calls"] == 0

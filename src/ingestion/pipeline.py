@@ -30,7 +30,11 @@ from src.ingestion.index import (
     switch_alias,
 )
 from src.ingestion.manifest import build_manifest, load_build_manifest, save_build_manifest
-from src.ingestion.parser import load_or_parse_source
+from src.ingestion.parser import (
+    artifact_path,
+    load_or_parse_source,
+    load_parsed_artifact,
+)
 from src.ingestion.source_manifest import (
     load_source_manifest,
     load_web_record_catalog,
@@ -82,6 +86,26 @@ async def prepare_knowledge(
         )
         artifacts[source.source_id] = artifact
         parsed_cache_hits += int(cache_hit)
+    prepared = _compile_prepared_knowledge(
+        sources=sources,
+        artifacts=artifacts,
+        source_dir=source_dir,
+        source_manifest_path=source_manifest_path,
+        taxonomy_path=taxonomy_path,
+    )
+    return {**prepared, "parsed_cache_hits": parsed_cache_hits}
+
+
+def _compile_prepared_knowledge(
+    *,
+    sources: tuple[Any, ...],
+    artifacts: dict[str, Any],
+    source_dir: Path,
+    source_manifest_path: Path,
+    taxonomy_path: Path,
+) -> dict[str, Any]:
+    """Compile artifacts supplied by either normal preparation or cache inspection."""
+
     web_record_catalogs = {
         source.source_id: load_web_record_catalog(
             source,
@@ -127,7 +151,6 @@ async def prepare_knowledge(
         "cards": cards,
         "graph_records": graph_records,
         "offline_validation": layers,
-        "parsed_cache_hits": parsed_cache_hits,
         "web_record_catalogs": web_record_catalogs,
         "claim_exclusions": claim_exclusions,
     }
@@ -136,11 +159,58 @@ async def prepare_knowledge(
 async def inspect_embedding_cache_reuse(
     *,
     source_dir: Path = DEFAULT_SOURCE_DIR,
+    source_manifest_path: Path = DEFAULT_SOURCE_MANIFEST,
+    taxonomy_path: Path = DEFAULT_TAXONOMY,
+    parsed_cache: Path = DEFAULT_PARSED_CACHE,
     embedding_cache: Path = DEFAULT_EMBEDDING_CACHE,
 ) -> dict[str, Any]:
-    """Read cache entries only; never invokes an embedding provider or datastore."""
+    """Inspect verified parser/vector cache entries without repairing any miss."""
 
-    prepared = await prepare_knowledge(source_dir=source_dir)
+    sources = load_source_manifest(source_manifest_path)
+    verify_source_files(sources, source_dir)
+    verify_manifest_support_files(sources, source_manifest_path)
+    artifacts = {}
+    missing_source_ids: list[str] = []
+    for source in sources:
+        try:
+            artifact = load_parsed_artifact(artifact_path(parsed_cache, source), source)
+        except (UnicodeError, ValueError):
+            artifact = None
+        if artifact is None:
+            missing_source_ids.append(source.source_id)
+        else:
+            artifacts[source.source_id] = artifact
+
+    parsed_stats = {
+        "hits": len(artifacts),
+        "misses": len(missing_source_ids),
+        "total": len(sources),
+        "missing_or_invalid_source_ids": missing_source_ids,
+    }
+    if missing_source_ids:
+        skipped = {
+            "inspected": False,
+            "hits": 0,
+            "misses": 0,
+            "total": 0,
+            "skipped_reason": "parsed_cache_incomplete",
+        }
+        return {
+            "passed": False,
+            "build_id": None,
+            "parsed": parsed_stats,
+            "knowledge_embeddings": dict(skipped),
+            "entity_embeddings": dict(skipped),
+            "provider_calls": 0,
+        }
+
+    prepared = _compile_prepared_knowledge(
+        sources=sources,
+        artifacts=artifacts,
+        source_dir=source_dir,
+        source_manifest_path=source_manifest_path,
+        taxonomy_path=taxonomy_path,
+    )
     cache = EmbeddingCache(embedding_cache)
     knowledge_hits = sum(
         cache.get(record["text"]) is not None for record in prepared["compiled"].records
@@ -149,27 +219,23 @@ async def inspect_embedding_cache_reuse(
         cache.get(entity_card_to_text(card)) is not None for card in prepared["cards"]
     )
     result = {
-        "passed": False,
+        "passed": prepared["offline_validation"]["passed"],
         "build_id": prepared["identity"].build_id,
-        "parsed": {
-            "hits": prepared["parsed_cache_hits"],
-            "total": len(prepared["sources"]),
-        },
+        "parsed": parsed_stats,
         "knowledge_embeddings": {
+            "inspected": True,
             "hits": knowledge_hits,
             "misses": len(prepared["compiled"].records) - knowledge_hits,
+            "total": len(prepared["compiled"].records),
         },
         "entity_embeddings": {
+            "inspected": True,
             "hits": entity_hits,
             "misses": len(prepared["cards"]) - entity_hits,
+            "total": len(prepared["cards"]),
         },
         "provider_calls": 0,
     }
-    result["passed"] = (
-        result["parsed"] == {"hits": 4, "total": 4}
-        and result["knowledge_embeddings"] == {"hits": 507, "misses": 5}
-        and result["entity_embeddings"] == {"hits": 32, "misses": 0}
-    )
     return result
 
 

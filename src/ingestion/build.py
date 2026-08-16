@@ -44,7 +44,7 @@ from src.ingestion.source_manifest import CanonicalSource, WebRecordSource, sour
 
 
 BUILD_MANIFEST_SCHEMA = "phase1_build_manifest"
-BUILD_CONTRACT_ID = "record_provenance_curated_phase1_build_v2"
+BUILD_CONTRACT_ID = "record_provenance_curated_phase1_build_v3"
 GRAPH_CONTRACT_ID = "deterministic_source_backed_taxonomy_graph"
 ENTITY_CARD_CONTRACT_ID = "narrow_source_backed_entity_cards"
 
@@ -152,11 +152,12 @@ def compile_knowledge(
                     filtered += 1
                     continue
                 seen_content.add(content_hash)
+                scoped_chunk_index = unit_chunk_index if record_catalog else source_chunk_count
                 identifier = chunk_id(
                     source_base["document_id"],
                     unit_record_id,
                     chunk.section_path,
-                    unit_chunk_index,
+                    scoped_chunk_index,
                     content_hash,
                 )
                 source_url = unit.source_url or source.original_url
@@ -170,7 +171,7 @@ def compile_knowledge(
                     "page_end": unit.page_end,
                     "section_path": list(chunk.section_path),
                     "header": chunk.section_path[-1] if chunk.section_path else "",
-                    "chunk_index": unit_chunk_index,
+                    "chunk_index": scoped_chunk_index,
                     "chunk_id": identifier,
                     "chunk_content_hash": content_hash,
                     "content_hash": content_hash,

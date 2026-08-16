@@ -86,3 +86,15 @@ test('sourceDisplayLabels does not expose raw source ids without display metadat
     [],
   );
 });
+
+test('sourceDisplayLabels removes duplicate labels from distinct child source ids', () => {
+  assert.deepEqual(
+    sourceDisplayLabels({
+      source_metadata: [
+        { source_id: 'web-1', display_name: 'DermNet — Acne' },
+        { source_id: 'web-2', display_name: 'DermNet — Acne' },
+      ],
+    }),
+    ['DermNet — Acne'],
+  );
+});
