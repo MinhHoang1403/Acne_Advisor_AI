@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import yaml
+
 from src.ingestion.build import compute_build_identity
 
 
@@ -26,6 +28,12 @@ def test_nice_source_provenance_is_disclosed_in_registry_and_docs() -> None:
     nice = records["nice_ng198_2026_08"]
     data_pipeline = Path("docs/DATA_PIPELINE.md").read_text(encoding="utf-8")
     references = Path("docs/REFERENCES.md").read_text(encoding="utf-8")
+    source_manifest = yaml.safe_load(
+        Path("data/sources/manifest.yaml").read_text(encoding="utf-8")
+    )
+    nice_manifest = next(
+        source for source in source_manifest["sources"] if source["source_id"] == "nice_ng198_2026_08"
+    )
 
     assert nice["role"] == "frozen_project_corpus_snapshot"
     assert "official metadata last updated 2026-04-30" in nice["publication_date"]
@@ -34,6 +42,23 @@ def test_nice_source_provenance_is_disclosed_in_registry_and_docs() -> None:
     assert "NICE Source Provenance" in data_pipeline
     assert "does not claim that it is a fully" in data_pipeline
     assert "NICE Source Provenance" in references
+    assert nice_manifest["current_as_of_cutoff"] is None
+    assert "remain unresolved" in nice_manifest["limitation"]
+    assert nice_manifest["sha256"] == "8a5b8e104c1394a48bf20aaca5724c33c526a0be7466682b57204c8092a94869"
+
+
+def test_new_safety_cross_checks_are_attributed_without_entering_retrieval_corpus() -> None:
+    registry = json.loads(
+        Path("data/method_sources.json").read_text(encoding="utf-8")
+    )
+    records = {record["source_id"]: record for record in registry["sources"]}
+
+    breathing = records["nhs_anaphylaxis_shortness_of_breath_2026"]
+    bleeding = records["st_john_ambulance_severe_bleeding_2025"]
+    assert breathing["role"] == "safety_cross_check_not_retrieval_corpus"
+    assert bleeding["role"] == "safety_cross_check_not_retrieval_corpus"
+    assert bleeding["authors_or_organization"] == "St John Ambulance"
+    assert "NHS_FIRST_AID_HEAVY_BLEEDING" in bleeding["limitations"]
 
 
 def test_method_registry_correction_does_not_change_validated_build_identity() -> None:
@@ -62,7 +87,7 @@ def test_method_traceability_covers_methods_and_technical_standards() -> None:
         "ietf_rfc9562_uuidv5",
     }
 
-    assert registry["verified_through"] == "2026-08-14"
+    assert registry["verified_through"] == "2026-08-16"
     assert required <= records.keys()
     for source_id in required:
         assert source_id in traceability

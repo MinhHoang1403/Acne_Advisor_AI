@@ -1,6 +1,6 @@
 # Method, Provider, and Medical Sources
 
-Verified through 2026-08-14. Machine-readable claim mapping lives in
+Verified through 2026-08-16. Machine-readable claim mapping lives in
 `data/method_sources.json`; canonical corpus metadata lives in
 `data/sources/manifest.yaml`. Scientific evidence, provider contracts, and
 clinical sources are deliberately separated.
@@ -123,17 +123,24 @@ Qdrant index, or Neo4j graph.
 
 ## Current Safety Cross-Checks
 
-These sources validate currency and safety review; they are not silently
-inserted into the canonical retrieval corpus.
+These sources support narrow safety cross-checks at the stated verification
+dates; they do not establish corpus-wide currency and are not silently inserted
+into the canonical retrieval corpus.
 
 - UK MHRA isotretinoin safety communications, verified 2026-08-14.
   https://www.gov.uk/drug-safety-update/isotretinoin-roaccutanev-new-safety-measures-to-be-introduced-in-the-coming-months-including-additional-oversight-on-initiation-of-treatment-for-patients-under-18-years
   https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk
 - European Medicines Agency, retinoid pregnancy-prevention measures, verified
   2026-08-14. https://www.ema.europa.eu/en/medicines/human/referrals/retinoid-containing-medicinal-products
-- NHS, *Anaphylaxis* and *Chest pain*, verified 2026-08-14.
+- NHS, *Anaphylaxis*, *Shortness of breath*, and *Chest pain*, verified 2026-08-16.
   https://www.nhs.uk/conditions/anaphylaxis/
+  https://www.nhs.uk/symptoms/shortness-of-breath/
   https://www.nhs.uk/symptoms/chest-pain/
+- St John Ambulance, *Severe bleeding*, clinically reviewed 2025-04-28 and
+  verified 2026-08-16. https://www.sja.org.uk/first-aid-advice/severe-bleeding/
+  The runtime compatibility ID `NHS_FIRST_AID_HEAVY_BLEEDING` retains an older
+  NHS URL that now redirects to St John Ambulance; current attribution is St
+  John Ambulance. This safety cross-check is not part of the retrieval corpus.
 - World Health Organization, *Suicide: questions and answers*, verified
   2026-08-14. https://www.who.int/news-room/questions-and-answers/item/suicide
 - DailyMed, isotretinoin medication guide, verified 2026-08-14.

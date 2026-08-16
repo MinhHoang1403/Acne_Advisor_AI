@@ -73,7 +73,6 @@ async def finalize_response_node(state: ClinicalState) -> dict:
         cached_answer = state.get("final_answer") or state.get("cached_answer") or ""
         final_answer, source_validation = present_and_validate(
             repair_mojibake(cached_answer),
-            add_disclaimer=True,
         )
         return {
             "final_answer": final_answer,
@@ -88,7 +87,7 @@ async def finalize_response_node(state: ClinicalState) -> dict:
 
     draft = repair_mojibake(state.get("draft_answer", ""))
     logger.debug("Finalizing generated/fallback response with profile=%s.", profile)
-    final_answer, source_validation = present_and_validate(draft, add_disclaimer=True)
+    final_answer, source_validation = present_and_validate(draft)
     return {
         "final_answer": repair_mojibake(final_answer),
         "response_profile": profile,

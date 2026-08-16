@@ -51,6 +51,36 @@ def test_nearby_negative_boundaries_do_not_trigger(query: str) -> None:
 @pytest.mark.parametrize(
     "query",
     [
+        "Tôi không khó thở nhưng bị sưng môi.",
+        "Tôi từng khó thở nhưng hiện chỉ còn sưng môi.",
+        "Tôi từng bị khó thở, hiện chỉ còn sưng môi.",
+        "Tôi khó thở trước đây nhưng đã hết, giờ chỉ sưng môi.",
+        "Tôi bị sưng môi nhưng thở bình thường.",
+    ],
+)
+def test_anaphylaxis_requires_current_unnegated_breathing_difficulty(query: str) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi dùng isotretinoin nhưng không đau đầu dữ dội, chỉ hơi mỏi mắt và nhìn mờ.",
+        "Tôi từng đau đầu dữ dội, hiện đã hết nhưng còn hơi nhìn mờ khi dùng isotretinoin.",
+        "Tôi từng bị đau đầu dữ dội khi dùng isotretinoin, hiện chỉ còn hơi nhìn mờ.",
+        "Tôi dùng isotretinoin, đau đầu dữ dội đã hết nhưng mắt còn hơi mờ.",
+        "Tôi dùng isotretinoin và chỉ hơi mỏi mắt.",
+    ],
+)
+def test_isotretinoin_neurologic_rule_requires_active_unnegated_severe_headache(
+    query: str,
+) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "Tôi đang khó thở sau khi uống thuốc trị mụn.",
         "Uống thuốc xong tôi thấy khó thở.",
         "Sau khi dùng thuốc tôi đang bị hụt hơi.",
@@ -117,6 +147,7 @@ def test_bleeding_rule_rejects_minor_resolved_hypothetical_or_negated_queries(
 
 def test_rule_inventory_has_unique_ids_and_specific_source_mapping() -> None:
     rules = safety_rule_inventory()
+    assert len(rules) == 9
     assert len({rule.rule_id for rule in rules}) == len(rules)
     anaphylaxis = next(rule for rule in rules if rule.rule_id == "anaphylaxis_like_emergency")
     neurologic = next(

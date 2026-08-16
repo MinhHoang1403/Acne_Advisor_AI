@@ -14,10 +14,11 @@ sources:
     media_type: text/markdown
     sha256: 8a5b8e104c1394a48bf20aaca5724c33c526a0be7466682b57204c8092a94869
     licensing: NICE notice of rights; local processing only
-    current_as_of_cutoff: true
+    current_as_of_cutoff: null
     supersedes_source_hash: f90f02cd1e7b01833ffb9d6feb284a878b1e2624729147a2e2e648a7e5eed1ef
-    inclusion_reason: current authoritative guideline including 2026 safety updates
+    inclusion_reason: local NICE-derived research snapshot covering acne management and represented as 2026-08-03
     acquisition_note: official PDF URL rendered to Markdown through a text transport after direct access returned HTTP 403
+    limitation: official NICE metadata reports 2026-04-30; completeness and current official-version equivalence of the local snapshot remain unresolved
   - source_id: aad_acne_guideline_2024
     title: Guidelines of care for the management of acne vulgaris
     authority: American Academy of Dermatology / JAAD

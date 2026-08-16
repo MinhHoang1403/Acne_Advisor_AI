@@ -1,6 +1,6 @@
 {
   "schema": "phase1_method_source_registry",
-  "verified_through": "2026-08-14",
+  "verified_through": "2026-08-16",
   "sources": [
     {
       "source_id": "robertson_zaragoza_bm25_2009",
@@ -211,6 +211,36 @@
       "project_method": "Versioned medical evidence corpus snapshot",
       "date_verified": "2026-08-14",
       "limitations": "The local Markdown snapshot was acquired through a text-rendering transport and carries a represented date of 2026-08-03. It has not been independently verified as the complete current official version last updated 2026-04-30; current official-version provenance remains unresolved."
+    },
+    {
+      "source_id": "nhs_anaphylaxis_shortness_of_breath_2026",
+      "title": "Anaphylaxis and shortness of breath",
+      "authors_or_organization": "NHS",
+      "publication_date": "pages verified 2026-08-16",
+      "venue_or_publisher": "NHS public health guidance",
+      "doi": null,
+      "url": "https://www.nhs.uk/conditions/anaphylaxis/",
+      "source_type": "official_public_health_guidance",
+      "role": "safety_cross_check_not_retrieval_corpus",
+      "claim_supported": "Medicine can trigger anaphylaxis; active breathing difficulty is an emergency symptom requiring immediate action.",
+      "project_method": "Source mapping for breathing_difficulty_after_medication",
+      "date_verified": "2026-08-16",
+      "limitations": "Supports a narrow emergency action boundary, not the project's exact phrase trigger, negation handling, diagnostic accuracy, or clinical validation. The related shortness-of-breath page is https://www.nhs.uk/symptoms/shortness-of-breath/."
+    },
+    {
+      "source_id": "st_john_ambulance_severe_bleeding_2025",
+      "title": "Severe bleeding first aid",
+      "authors_or_organization": "St John Ambulance",
+      "publication_date": "clinically reviewed 2025-04-28",
+      "venue_or_publisher": "St John Ambulance first-aid guidance",
+      "doi": null,
+      "url": "https://www.sja.org.uk/first-aid-advice/severe-bleeding/",
+      "source_type": "official_first_aid_guidance",
+      "role": "safety_cross_check_not_retrieval_corpus",
+      "claim_supported": "Severe bleeding requires prompt direct firm pressure and emergency assistance.",
+      "project_method": "Source mapping for significant_bleeding_after_acne_manipulation",
+      "date_verified": "2026-08-16",
+      "limitations": "The compatibility ID NHS_FIRST_AID_HEAVY_BLEEDING retains an older NHS URL that now redirects to St John Ambulance. This source does not validate the project's acne-specific phrase trigger or clinical effectiveness."
     },
     {
       "source_id": "aad_acne_guideline_2024",

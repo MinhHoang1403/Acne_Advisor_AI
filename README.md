@@ -182,10 +182,12 @@ deterministically established by the current verifier.
 
 ## Safety
 
-[`src/agent/safety_policy.py`](src/agent/safety_policy.py) defines seven narrow,
+[`src/agent/safety_policy.py`](src/agent/safety_policy.py) defines nine narrow,
 source-mapped deterministic boundaries:
 
 - anaphylaxis-like breathing difficulty with swelling or hives;
+- active breathing difficulty after medication use;
+- significant bleeding after acne manipulation;
 - chest pain or tightness with breathlessness;
 - explicit personal and current self-harm or suicide intent;
 - acne fulminans-like severe lesions with fever or joint pain;

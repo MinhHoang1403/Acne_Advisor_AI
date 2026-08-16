@@ -54,7 +54,9 @@ async def test_agent_chooses_generation_after_evidence(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
-async def test_agent_chooses_materially_different_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_agent_chooses_lexically_distinct_normalized_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     await _model(
         monkeypatch,
         '{"action":"retry","retrieval_query":"adapalene topical retinoid pregnancy","reason_code":"evidence_gap"}',
@@ -165,6 +167,65 @@ def test_generate_without_evidence_is_rejected() -> None:
         action="generate", retrieval_query=None, reason_code="evidence_sufficient"
     )
     assert validate_agent_decision(decision, {"retrieval_attempt": 0}).action == "abstain"
+
+
+@pytest.mark.parametrize(
+    ("action", "reason_code", "state"),
+    [
+        ("generate", "out_of_scope", {"retrieval_attempt": 1, "evidence_assessment": {"usable": True}}),
+        ("generate", "evidence_gap", {"retrieval_attempt": 1, "evidence_assessment": {"usable": True}}),
+        ("retrieve", "evidence_sufficient", {"retrieval_attempt": 0}),
+        ("retry", "out_of_scope", {"retrieval_attempt": 1}),
+    ],
+)
+def test_invalid_action_reason_pairs_fail_closed(
+    action: str,
+    reason_code: str,
+    state: dict,
+) -> None:
+    decision = AgentDecision(
+        action=action,
+        retrieval_query="acne evidence" if action in {"retrieve", "retry"} else None,
+        reason_code=reason_code,
+    )
+
+    result = validate_agent_decision(decision, state)
+
+    assert result.model_dump() == {
+        "action": "abstain",
+        "retrieval_query": None,
+        "reason_code": "cannot_safely_proceed",
+    }
+
+
+@pytest.mark.parametrize(
+    ("action", "reason_code"),
+    [
+        ("retrieve", "needs_evidence"),
+        ("retry", "evidence_gap"),
+        ("generate", "evidence_sufficient"),
+        ("abstain", "evidence_gap"),
+        ("abstain", "out_of_scope"),
+        ("abstain", "cannot_safely_proceed"),
+    ],
+)
+def test_action_reason_contract_accepts_only_legal_semantic_pairs(
+    action: str,
+    reason_code: str,
+) -> None:
+    query = "different acne query" if action in {"retrieve", "retry"} else None
+    state = {
+        "retrieval_attempt": 0 if action == "retrieve" else 1,
+        "evidence_assessment": {"usable": action == "generate"},
+        "retrieval_status": "no_evidence",
+        "retry_history": [{"query": "original query"}],
+    }
+    decision = AgentDecision(action=action, retrieval_query=query, reason_code=reason_code)
+
+    result = validate_agent_decision(decision, state)
+
+    assert result.action == action
+    assert result.reason_code == reason_code
 
 
 @pytest.mark.asyncio

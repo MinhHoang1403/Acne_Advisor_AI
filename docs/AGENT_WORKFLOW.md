@@ -23,8 +23,8 @@ whitespace normalization are not agent actions.
 least one item has non-empty text and source identity. It does not prove medical
 relevance, completeness, or claim entailment. `retrieve` is legal only for the
 first evidence acquisition at attempt zero; `retry` is legal only after one
-retrieval and requires a materially different query unless the prior failure is
-recoverable. A request may execute the retrieval tool at most twice. Once the
+retrieval and requires a query that differs after normalized lexical comparison
+unless the prior failure is recoverable. A request may execute the retrieval tool at most twice. Once the
 counter reaches two, both `retrieve` and `retry` fail closed to abstention;
 generation remains legal only with provenance-complete evidence.
 
@@ -52,15 +52,21 @@ sequenceDiagram
     alt eligible cache hit
         Cache-->>Agent: grounded cached answer
     else cache miss
-        Agent->>Tool: retrieve source evidence
-        Tool->>Qdrant: Dense and native BM25 queries
-        Qdrant-->>Tool: ranked source chunks
-        Tool-->>Agent: equal RRF and bounded provenance
-        Agent->>Agent: assess evidence
-        Agent->>LLM: select typed action
-        LLM-->>Agent: retrieve, retry, generate, or abstain
-        Agent->>LLM: system policy + user data + bounded source evidence
-        LLM-->>Agent: draft answer
+        Agent->>LLM: select initial typed action
+        LLM-->>Agent: retrieve or abstain
+        opt retrieve selected
+            Agent->>Tool: retrieve source evidence
+            Tool->>Qdrant: Dense and native BM25 queries
+            Qdrant-->>Tool: ranked source chunks
+            Tool-->>Agent: equal RRF and bounded provenance
+            Agent->>Agent: assess evidence
+            Agent->>LLM: select post-retrieval action
+            LLM-->>Agent: retry, generate, or abstain
+        end
+        opt generate selected with usable evidence
+            Agent->>LLM: system policy + user data + bounded source evidence
+            LLM-->>Agent: draft answer
+        end
         Agent->>Agent: verify, safety, format, finalize
         Agent->>Cache: store only when eligible
     end
