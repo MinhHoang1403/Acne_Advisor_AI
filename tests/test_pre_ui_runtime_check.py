@@ -19,9 +19,9 @@ def test_frontend_config_has_api_contract() -> None:
     assert status["api_contract_source"] is True
 
 
-def test_pre_ui_requires_runtime_readiness_and_cache_v9(monkeypatch) -> None:
+def test_pre_ui_requires_runtime_readiness_and_cache_v10(monkeypatch) -> None:
     monkeypatch.setattr(pre_ui, "inspect_readiness", lambda: {"passed": True, "checks": []})
-    monkeypatch.setattr(pre_ui, "get_answer_cache_version", lambda: "v9")
+    monkeypatch.setattr(pre_ui, "get_answer_cache_version", lambda: "v10")
     monkeypatch.setattr(
         pre_ui,
         "frontend_config_status",

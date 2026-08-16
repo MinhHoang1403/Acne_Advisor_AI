@@ -97,6 +97,23 @@ test('formatText renders headings, lists, code blocks, and safe external links',
   assert.equal(links[0].props.rel, 'noopener noreferrer');
 });
 
+test('formatText preserves nested bullet hierarchy', () => {
+  const rendered = formatText(
+    [
+      '- Retinoid bôi',
+      '  - Adapalene',
+      '  - Tretinoin',
+      '- Hoạt chất kháng khuẩn',
+      '  - Benzoyl peroxide',
+    ].join('\n'),
+  );
+
+  assert.equal(collectByType(rendered, 'ul').length, 3);
+  assert.equal(collectByType(rendered, 'li').length, 5);
+  assert.match(collectText(rendered), /Adapalene/);
+  assert.match(collectText(rendered), /Benzoyl peroxide/);
+});
+
 test('formatText renders unsafe markdown links as plain text', () => {
   const rendered = formatText('[Không mở](javascript:alert(1)) và [data](data:text/html,bad)');
 

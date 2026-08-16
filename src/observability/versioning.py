@@ -13,23 +13,28 @@ import json
 import os
 from typing import Any, Mapping
 
-DEFAULT_ANSWER_CACHE_VERSION = "v9"
-DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v14"
-DEFAULT_PROMPT_VERSION = "medical_prompt_v5"
-LEGACY_ANSWER_CACHE_VERSIONS = {"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"}
+DEFAULT_ANSWER_CACHE_VERSION = "v10"
+DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v15"
+DEFAULT_PROMPT_VERSION = "medical_prompt_v6"
+DEFAULT_EVIDENCE_GROUNDING_VERSION = "evidence_grounded_runtime_v2"
+DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
+LEGACY_ANSWER_CACHE_VERSIONS = {f"v{version}" for version in range(1, 10)}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
-    f"answer_formatting_contract_v{version}" for version in range(1, 14)
+    f"answer_formatting_contract_v{version}" for version in range(1, 15)
 }
-LEGACY_PROMPT_VERSIONS = {
-    "medical_prompt_v1",
-    "medical_prompt_v2",
-    "medical_prompt_v3",
-    "medical_prompt_v4",
-}
+LEGACY_PROMPT_VERSIONS = {f"medical_prompt_v{version}" for version in range(1, 6)}
 ARCHITECTURE_VERSION = "minimal_agentic_rag_v1"
 ARCHITECTURE_FROZEN = True
 
-_SECRET_KEY_MARKERS = ("api_key", "token", "password", "secret", "authorization", "bearer", "cookie")
+_SECRET_KEY_MARKERS = (
+    "api_key",
+    "token",
+    "password",
+    "secret",
+    "authorization",
+    "bearer",
+    "cookie",
+)
 
 
 def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -51,15 +56,17 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "rrf_k": 60,
         "rrf_dense_weight": 1.0,
         "rrf_bm25_weight": 1.0,
-        "context_packer_version": "bounded_provenance_packer_v1",
+        "context_packer_version": "bounded_provenance_packer_v2",
         "retrieval_candidate_limit": _env_int(value("RETRIEVAL_CANDIDATE_LIMIT", "16"), 16),
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
         "agent_decision_version": "minimal_agent_decision_v2",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
-        "evidence_grounding_version": value(
-            "EVIDENCE_GROUNDING_VERSION", "evidence_grounded_runtime_v1"
+        "evidence_grounding_version": _effective_contract_version(
+            value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),
+            legacy={"evidence_grounded_runtime_v1"},
+            default=DEFAULT_EVIDENCE_GROUNDING_VERSION,
         ),
         "answer_validation_version": "structural_provenance_validation_v1",
         "answer_formatting_contract_version": _effective_answer_formatting_contract_version(
@@ -71,21 +78,33 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "safety_policy_version": "source_mapped_safety_policy_v2",
         "safe_fallback_flow_version": value("SAFE_FALLBACK_FLOW_VERSION", "safe_fallback_flow_v1"),
         "runtime_resilience_version": "bounded_retry_runtime_v1",
-        "llm_fallback_policy_version": value("LLM_FALLBACK_POLICY_VERSION", "llm_fallback_policy_v3"),
+        "llm_fallback_policy_version": value(
+            "LLM_FALLBACK_POLICY_VERSION", "llm_fallback_policy_v3"
+        ),
         "google_genai_sdk_version": value("GOOGLE_GENAI_SDK_VERSION", "google_genai_sdk_v1"),
         "google_model": value("GOOGLE_MODEL", "gemini-3.5-flash") or "gemini-3.5-flash",
-        "google_fallback_models": _csv_list(value("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")),
+        "google_fallback_models": _csv_list(
+            value("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")
+        ),
         "ollama_model": value("OLLAMA_MODEL", "qwen3:8b") or "qwen3:8b",
-        "answer_cache_version": _effective_answer_cache_version(value("CACHE_ANSWER_VERSION", None)),
+        "answer_cache_version": _effective_answer_cache_version(
+            value("CACHE_ANSWER_VERSION", None)
+        ),
         "cache_schema_version": value("CACHE_SCHEMA_VERSION", "v3"),
         "embedding_model": value("EMBEDDING_MODEL", "models/gemini-embedding-2"),
         "embedding_dimensions": _env_int(value("EMBEDDING_DIMENSIONS", "3072"), 3072),
         "qdrant_collection_name": _runtime_chunk_collection_name(settings),
         "kb_version": value("KB_VERSION", "frozen_phase1_build"),
-        "prompt_version": _effective_prompt_version(value("PROMPT_VERSION", DEFAULT_PROMPT_VERSION)),
+        "prompt_version": _effective_prompt_version(
+            value("PROMPT_VERSION", DEFAULT_PROMPT_VERSION)
+        ),
         "taxonomy_version": value("TAXONOMY_VERSION", "acne_taxonomy_2026_08"),
         "neo4j_schema_version": value("NEO4J_SCHEMA_VERSION", "neo4j_schema_v1"),
-        "source_normalization_version": value("SOURCE_NORMALIZATION_VERSION", "source_normalization_v1"),
+        "source_normalization_version": _effective_contract_version(
+            value("SOURCE_NORMALIZATION_VERSION", DEFAULT_SOURCE_NORMALIZATION_VERSION),
+            legacy={"source_normalization_v1"},
+            default=DEFAULT_SOURCE_NORMALIZATION_VERSION,
+        ),
         "conversation_context_version": "bounded_conversation_context_v1",
         "performance_instrumentation_version": value(
             "PERFORMANCE_INSTRUMENTATION_VERSION", "performance_instrumentation_v1"
@@ -168,6 +187,13 @@ def _effective_prompt_version(configured: Any) -> str:
     text = str(configured or "").strip()
     if not text or text.lower() in LEGACY_PROMPT_VERSIONS:
         return DEFAULT_PROMPT_VERSION
+    return text
+
+
+def _effective_contract_version(configured: Any, *, legacy: set[str], default: str) -> str:
+    text = str(configured or "").strip()
+    if not text or text.casefold() in {value.casefold() for value in legacy}:
+        return default
     return text
 
 

@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.ingestion.pipeline import (  # noqa: E402
     activate_knowledge,
     build_knowledge,
+    inspect_embedding_cache_reuse,
     knowledge_status,
     validate_knowledge,
 )
@@ -44,6 +45,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     validate = subparsers.add_parser("validate", help="Run layered knowledge-build validation.")
     validate.add_argument("--offline", action="store_true")
+    subparsers.add_parser(
+        "inspect-cache",
+        help="Verify parser and embedding cache reuse without provider or datastore calls.",
+    )
     subparsers.add_parser("status", help="Show expected and current build identity.")
     return parser.parse_args(argv)
 
@@ -53,11 +58,15 @@ async def async_main(argv: list[str] | None = None) -> int:
     if args.command == "build":
         if args.activate and args.rollback_root is None:
             raise SystemExit("--activate requires --rollback-root")
-        result = await build_knowledge(source_dir=args.source, replace_candidate=args.replace_candidate)
+        result = await build_knowledge(
+            source_dir=args.source, replace_candidate=args.replace_candidate
+        )
         if args.activate:
             result = await activate_knowledge(rollback_root=args.rollback_root)
     elif args.command == "validate":
         result = await validate_knowledge(live=not args.offline)
+    elif args.command == "inspect-cache":
+        result = await inspect_embedding_cache_reuse()
     else:
         result = await knowledge_status()
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))

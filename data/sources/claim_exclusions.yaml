@@ -1,0 +1,29 @@
+schema: source_bound_claim_exclusions
+schema_version: 1
+source_id: vn_moh_dermatology_4416_2023_acne
+source_sha256: 2957dfdfc603040b08d414043066b153127064416011fc17fa630e0f5a199f4b
+decision_basis:
+  - nice_ng198_2026_08
+  - aad_acne_guideline_2024
+actions:
+  - action_id: remove_legacy_pregnancy_letter_azelaic_v1
+    pre_curation_content_hash: 227ffc182ee44609f95f8ef364c7a1ca7293ced6e5b6e24a0049656ea991406b
+    exact_texts:
+      - ' (Phân loại thai kỳ nhóm B)'
+  - action_id: remove_legacy_pregnancy_letter_benzoyl_peroxide_v1
+    pre_curation_content_hash: 54746d5686d981c126fdb703651cadc504aa67b4a78b8fc8097c29b3530e2b99
+    exact_texts:
+      - 'C, '
+  - action_id: remove_legacy_pregnancy_letter_topical_antibiotics_v1
+    pre_curation_content_hash: 4c83b124d731f90cd2c5c8c873ddc9e37b9964c65af6bab00482235d2a08e89a
+    exact_texts:
+      - ' (Phân loại thai kỳ nhóm B)'
+  - action_id: remove_legacy_pregnancy_letter_isotretinoin_v1
+    pre_curation_content_hash: ac5f6d5fd3a4c4ccd9cd5677f120888ddb346d43e2ae066600cc8aafbe56b1b0
+    exact_texts:
+      - ' (phân loại thai kỳ X)'
+  - action_id: remove_legacy_pregnancy_letters_topical_retinoids_v1
+    pre_curation_content_hash: 7f3b5dd020b1cca77dbc463c6317078bf0d37f09ea34328ea1911764de2db9ce
+    exact_texts:
+      - '- Tretinoin và adapalen thuộc phân loại thai kỳ C đối với phụ nữ có thai.'
+      - ', phân loại thai kỳ X'

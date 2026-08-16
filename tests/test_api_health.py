@@ -314,3 +314,63 @@ def test_openapi_has_explicit_success_schemas_for_active_endpoints():
         else:
             assert response_schema["type"] == "array"
             assert response_schema["items"]["$ref"].endswith("/MessageResponse")
+
+
+@pytest.mark.asyncio
+async def test_chat_prefers_client_history_and_uses_recent_db_fallback(monkeypatch):
+    captured: list[list[dict[str, str]]] = []
+    db_calls: list[str] = []
+
+    async def fake_run_clinical_agent(**kwargs):
+        captured.append(kwargs["conversation_history"])
+        return {
+            "answer": "Câu trả lời từ evidence.",
+            "session_id": kwargs["session_id"],
+            "sources": [],
+            "vector_contexts": [],
+            "is_in_domain": True,
+            "retrieval_status": "ok",
+            "fallback_applied": False,
+            "fallback_type": "none",
+            "actual_provider": "gemini",
+            "actual_model": "gemini-3.5-flash",
+            "pipeline_manifest": {"phase": "production", "answer_cache_version": "v10"},
+        }
+
+    async def fake_load_recent_history(session_id: str):
+        db_calls.append(session_id)
+        return [
+            {"role": "assistant", "content": "recent assistant"},
+            {"role": "user", "content": "recent user"},
+        ]
+
+    async def fake_persist_chat_to_db(**kwargs):
+        return None
+
+    monkeypatch.setattr("src.api.app.run_clinical_agent", fake_run_clinical_agent)
+    monkeypatch.setattr("src.api.app._load_recent_history_from_db", fake_load_recent_history)
+    monkeypatch.setattr("src.api.app._persist_chat_to_db", fake_persist_chat_to_db)
+    monkeypatch.setenv("RELEASE_READINESS_TEST_MODE", "")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        with_client = await client.post(
+            "/chat",
+            json={
+                "message": "Câu tiếp theo",
+                "session_id": "client-history",
+                "conversation_history": [{"role": "user", "content": "client wins"}],
+            },
+        )
+        with_db = await client.post(
+            "/chat",
+            json={"message": "Câu tiếp theo", "session_id": "db-history"},
+        )
+
+    assert with_client.status_code == 200
+    assert with_db.status_code == 200
+    assert captured[0] == [{"role": "user", "content": "client wins"}]
+    assert captured[1] == [
+        {"role": "assistant", "content": "recent assistant"},
+        {"role": "user", "content": "recent user"},
+    ]
+    assert db_calls == ["db-history"]

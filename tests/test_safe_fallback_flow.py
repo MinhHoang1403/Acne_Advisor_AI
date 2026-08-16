@@ -81,4 +81,4 @@ def test_safe_fallback_version_partitions_pipeline_fingerprint() -> None:
     )
     assert new["safe_fallback_flow_version"] == SAFE_FALLBACK_FLOW_VERSION
     assert compute_pipeline_fingerprint(old) != compute_pipeline_fingerprint(new)
-    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v9"
+    assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v5"}) == "v10"

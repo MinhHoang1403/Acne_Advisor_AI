@@ -91,7 +91,9 @@ def pack_context(
     if not selected:
         warnings.append("No usable source evidence was available for the prompt.")
 
-    context_text = "\n\n".join(_render_block_from_item(item, index) for index, item in enumerate(selected, 1))
+    context_text = "\n\n".join(
+        _render_block_from_item(item, index) for index, item in enumerate(selected, 1)
+    )
     if len(context_text) > char_limit:
         context_text = context_text[:char_limit].rstrip()
 
@@ -154,7 +156,33 @@ def _render_block_from_item(item: ContextItem, index: int) -> str:
 def _render_header(payload: dict[str, Any], item_id: str, index: int) -> str:
     source_id = _source_id(payload) or "unknown"
     chunk_id = str(payload.get("chunk_id") or item_id)
-    return f"[Evidence {index} | source={source_id} | chunk={chunk_id}]"
+    fields = [f"Evidence {index}", f"source={source_id}", f"chunk={chunk_id}"]
+    fields.extend(f"{key}={value}" for key, value in _local_scope_fields(payload))
+    return f"[{' | '.join(fields)}]"
+
+
+def _local_scope_fields(payload: dict[str, Any]) -> list[tuple[str, str]]:
+    """Expose only bounded attribution fields already present on the chunk."""
+
+    section_path = payload.get("section_path")
+    section = payload.get("header")
+    if not section and isinstance(section_path, list) and section_path:
+        section = section_path[-1]
+    values = (
+        ("section", section),
+        ("drug_product", payload.get("drug_product")),
+        ("active_ingredient", payload.get("active_ingredient")),
+        ("drug_class", payload.get("drug_class")),
+    )
+    return [(key, rendered) for key, value in values if (rendered := _bounded_header_value(value))]
+
+
+def _bounded_header_value(value: Any) -> str:
+    if isinstance(value, (list, tuple)):
+        text = ", ".join(str(item) for item in value if str(item).strip())
+    else:
+        text = str(value or "")
+    return " ".join(text.replace("|", "/").split())[:120]
 
 
 def _source_id(payload: dict[str, Any]) -> str:

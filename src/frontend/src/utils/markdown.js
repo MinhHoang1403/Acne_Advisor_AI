@@ -104,18 +104,39 @@ function renderTable(lines, key) {
 }
 
 function renderList(lines, key) {
-  return React.createElement(
-    'ul',
-    { key, className: 'chat-list' },
-    lines.map((line, index) => {
-      const content = line.replace(/^\s*[-*]\s+/, '');
-      return React.createElement(
-        'li',
-        { key: index, className: 'chat-list-item' },
-        renderInline(content, `${key}-li-${index}`),
-      );
-    }),
-  );
+  const roots = [];
+  const stack = [{ indent: -1, items: roots }];
+  for (const line of lines) {
+    const match = line.match(/^(\s*)[-*]\s+(.+)$/);
+    if (!match) continue;
+    const indent = match[1].replace(/\t/g, '  ').length;
+    while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+      stack.pop();
+    }
+    const node = { content: match[2], children: [] };
+    stack[stack.length - 1].items.push(node);
+    stack.push({ indent, items: node.children });
+  }
+
+  function renderItems(items, listKey) {
+    return React.createElement(
+      'ul',
+      { key: listKey, className: 'chat-list' },
+      items.map((item, index) => {
+        const children = renderInline(item.content, `${listKey}-li-${index}`);
+        if (item.children.length > 0) {
+          children.push(renderItems(item.children, `${listKey}-nested-${index}`));
+        }
+        return React.createElement(
+          'li',
+          { key: index, className: 'chat-list-item' },
+          ...children,
+        );
+      }),
+    );
+  }
+
+  return renderItems(roots, key);
 }
 
 function renderParagraph(line, key) {

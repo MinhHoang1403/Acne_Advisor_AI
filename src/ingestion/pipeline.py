@@ -21,6 +21,7 @@ from qdrant_client import AsyncQdrantClient
 from src.database.vector_store import qdrant_client_kwargs
 from src.ingestion.build import compile_knowledge, compute_build_identity
 from src.ingestion.embedding import EmbeddingCache
+from src.ingestion.filtering import load_claim_exclusions
 from src.ingestion.index import (
     build_entity_candidate,
     build_knowledge_candidate,
@@ -30,7 +31,12 @@ from src.ingestion.index import (
 )
 from src.ingestion.manifest import build_manifest, load_build_manifest, save_build_manifest
 from src.ingestion.parser import load_or_parse_source
-from src.ingestion.source_manifest import load_source_manifest, verify_source_files
+from src.ingestion.source_manifest import (
+    load_source_manifest,
+    load_web_record_catalog,
+    verify_manifest_support_files,
+    verify_source_files,
+)
 from src.ingestion.validation import (
     combine_validation_layers,
     validate_compiled_knowledge,
@@ -64,6 +70,7 @@ async def prepare_knowledge(
     """Tạo artifacts deterministic và chạy validation không ghi datastore live."""
     sources = load_source_manifest(source_manifest_path)
     verify_source_files(sources, source_dir)
+    verify_manifest_support_files(sources, source_manifest_path)
     artifacts = {}
     parsed_cache_hits = 0
     for source in sources:
@@ -75,13 +82,35 @@ async def prepare_knowledge(
         )
         artifacts[source.source_id] = artifact
         parsed_cache_hits += int(cache_hit)
+    web_record_catalogs = {
+        source.source_id: load_web_record_catalog(
+            source,
+            manifest_path=source_manifest_path,
+            source_dir=source_dir,
+        )
+        for source in sources
+        if source.record_catalog
+    }
+    claim_exclusions = tuple(
+        action
+        for source in sources
+        for action in load_claim_exclusions(source, manifest_path=source_manifest_path)
+    )
     identity = compute_build_identity(source_manifest_path, taxonomy_path)
-    compiled = compile_knowledge(sources, artifacts, identity)
+    compiled = compile_knowledge(
+        sources,
+        artifacts,
+        identity,
+        web_record_catalogs=web_record_catalogs,
+        claim_exclusions=claim_exclusions,
+    )
     cards = build_entity_cards_from_taxonomy()
     graph_records = build_entity_graph_records(cards, kb_version=identity.build_id)
     taxonomy_source_ids = {
         str(record.get("source_id"))
-        for record in json.loads(Path("data/method_sources.json").read_text(encoding="utf-8"))["sources"]
+        for record in json.loads(Path("data/method_sources.json").read_text(encoding="utf-8"))[
+            "sources"
+        ]
     }
     layers = combine_validation_layers(
         validate_compiled_knowledge(compiled, sources),
@@ -99,7 +128,49 @@ async def prepare_knowledge(
         "graph_records": graph_records,
         "offline_validation": layers,
         "parsed_cache_hits": parsed_cache_hits,
+        "web_record_catalogs": web_record_catalogs,
+        "claim_exclusions": claim_exclusions,
     }
+
+
+async def inspect_embedding_cache_reuse(
+    *,
+    source_dir: Path = DEFAULT_SOURCE_DIR,
+    embedding_cache: Path = DEFAULT_EMBEDDING_CACHE,
+) -> dict[str, Any]:
+    """Read cache entries only; never invokes an embedding provider or datastore."""
+
+    prepared = await prepare_knowledge(source_dir=source_dir)
+    cache = EmbeddingCache(embedding_cache)
+    knowledge_hits = sum(
+        cache.get(record["text"]) is not None for record in prepared["compiled"].records
+    )
+    entity_hits = sum(
+        cache.get(entity_card_to_text(card)) is not None for card in prepared["cards"]
+    )
+    result = {
+        "passed": False,
+        "build_id": prepared["identity"].build_id,
+        "parsed": {
+            "hits": prepared["parsed_cache_hits"],
+            "total": len(prepared["sources"]),
+        },
+        "knowledge_embeddings": {
+            "hits": knowledge_hits,
+            "misses": len(prepared["compiled"].records) - knowledge_hits,
+        },
+        "entity_embeddings": {
+            "hits": entity_hits,
+            "misses": len(prepared["cards"]) - entity_hits,
+        },
+        "provider_calls": 0,
+    }
+    result["passed"] = (
+        result["parsed"] == {"hits": 4, "total": 4}
+        and result["knowledge_embeddings"] == {"hits": 507, "misses": 5}
+        and result["entity_embeddings"] == {"hits": 32, "misses": 0}
+    )
+    return result
 
 
 async def build_knowledge(
@@ -208,7 +279,14 @@ async def validate_knowledge(
     layers = list(prepared["offline_validation"]["layers"])
     if manifest is not None:
         if manifest.get("build_id") != prepared["identity"].build_id:
-            layers.append({"layer": "manifest", "passed": False, "errors": ["build ID mismatch"]})
+            layers.append(
+                {
+                    "layer": "manifest",
+                    "passed": not live,
+                    "errors": ["build ID mismatch"] if live else [],
+                    "warnings": ["prepared build is not activated"] if not live else [],
+                }
+            )
         else:
             layers.append({"layer": "manifest", "passed": True, "errors": []})
     if live and manifest is not None:
@@ -370,6 +448,7 @@ def _git_commit() -> str:
 __all__ = [
     "activate_knowledge",
     "build_knowledge",
+    "inspect_embedding_cache_reuse",
     "knowledge_status",
     "prepare_knowledge",
     "validate_knowledge",

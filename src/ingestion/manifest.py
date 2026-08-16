@@ -27,11 +27,11 @@ from src.ingestion.embedding import (
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
 )
-from src.ingestion.filtering import FILTER_CONTRACT_ID
+from src.ingestion.filtering import CLAIM_CURATION_CONTRACT_ID, FILTER_CONTRACT_ID
 from src.ingestion.normalization import NORMALIZATION_CONTRACT_ID
 from src.ingestion.parser import PARSER_CONFIGURATION, PARSER_CONTRACT_ID, ParsedArtifact
 from src.ingestion.provenance import PROVENANCE_CONTRACT_ID
-from src.ingestion.source_manifest import CanonicalSource
+from src.ingestion.source_manifest import CanonicalSource, SOURCE_MANIFEST_SCHEMA_VERSION
 
 
 def build_manifest(
@@ -73,10 +73,12 @@ def build_manifest(
             for source in sources
         ],
         "contracts": {
+            "source_manifest_schema": SOURCE_MANIFEST_SCHEMA_VERSION,
             "parser": {"id": PARSER_CONTRACT_ID, "configuration": PARSER_CONFIGURATION},
             "normalization": NORMALIZATION_CONTRACT_ID,
             "chunk": CHUNK_CONTRACT_ID,
             "filter": FILTER_CONTRACT_ID,
+            "claim_curation": CLAIM_CURATION_CONTRACT_ID,
             "provenance": PROVENANCE_CONTRACT_ID,
             "embedding": {
                 "id": EMBEDDING_CONTRACT_ID,

@@ -24,8 +24,8 @@ def run_answer_contract_checks() -> dict[str, Any]:
     verifier_source = (PROJECT_ROOT / "src/quality/answer_verifier.py").read_text(encoding="utf-8")
     manifest = build_pipeline_version_manifest()
     checks = {
-        "formatting_contract_v14": ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v14",
-        "evidence_grounding_contract": manifest.get("evidence_grounding_version") == "evidence_grounded_runtime_v1",
+        "formatting_contract_v15": ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v15",
+        "evidence_grounding_contract": manifest.get("evidence_grounding_version") == "evidence_grounded_runtime_v2",
         "system_policy_requires_evidence": "evidence" in MEDICAL_RAG_SYSTEM_PROMPT.casefold(),
         "no_taxonomy_in_formatter": "DrugEntityNormalizer" not in formatter_source,
         "no_medical_semantic_verifier": "medical_semantic_verification\": False" in verifier_source,

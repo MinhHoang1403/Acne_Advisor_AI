@@ -111,6 +111,8 @@ data/cache/
 !data/sources/
 data/sources/*
 !data/sources/manifest.yaml
+!data/sources/web_records.yaml
+!data/sources/claim_exclusions.yaml
 !data/taxonomy/
 data/taxonomy/*
 !data/taxonomy/drug_aliases.yaml

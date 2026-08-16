@@ -16,20 +16,37 @@ import hashlib
 import uuid
 from typing import Any
 
-from src.ingestion.source_manifest import CanonicalSource
+from src.ingestion.source_manifest import CanonicalSource, WebRecordSource
 
 
-PROVENANCE_CONTRACT_ID = "portable_content_bound_provenance"
+PROVENANCE_CONTRACT_ID = "record_source_content_bound_provenance_v2"
 _CHUNK_NAMESPACE = uuid.UUID("c957660c-5c3f-5bca-8baf-67d9bb4273c8")
 
 REQUIRED_PROVENANCE_FIELDS = frozenset(
     {
-        "source_id", "source_title", "source_authority", "source_type",
-        "source_url", "source_version_date", "source_content_hash", "document_id",
-        "record_id", "page_start", "page_end", "section_path", "chunk_index",
-        "chunk_id", "chunk_content_hash", "parser_contract_id",
-        "normalization_contract_id", "chunk_contract_id", "filter_contract_id",
-        "embedding_contract_id", "bm25_contract_id", "build_id", "ingested_at",
+        "source_id",
+        "source_title",
+        "source_authority",
+        "source_type",
+        "source_url",
+        "source_version_date",
+        "source_content_hash",
+        "document_id",
+        "record_id",
+        "page_start",
+        "page_end",
+        "section_path",
+        "chunk_index",
+        "chunk_id",
+        "chunk_content_hash",
+        "parser_contract_id",
+        "normalization_contract_id",
+        "chunk_contract_id",
+        "filter_contract_id",
+        "embedding_contract_id",
+        "bm25_contract_id",
+        "build_id",
+        "ingested_at",
     }
 )
 
@@ -78,13 +95,32 @@ def base_source_provenance(source: CanonicalSource) -> dict[str, Any]:
     }
 
 
+def base_web_record_provenance(
+    parent: CanonicalSource,
+    child: WebRecordSource,
+) -> dict[str, Any]:
+    """Expose the publisher page as evidence source while retaining parent bytes."""
+
+    return {
+        "source_id": child.source_id,
+        "source_title": child.title,
+        "source_authority": child.authority,
+        "source_type": child.source_type,
+        "source_url": child.source_url,
+        "source_version_date": parent.version_date,
+        "source_content_hash": child.raw_text_sha256,
+        "document_id": document_id(child.source_id, child.raw_text_sha256),
+        "parent_source_id": parent.source_id,
+        "parent_source_content_hash": parent.sha256,
+    }
+
+
 def validate_provenance(payload: dict[str, Any]) -> list[str]:
     """Báo field thiếu/null; không xác minh nội dung y khoa của payload."""
 
     missing = sorted(field for field in REQUIRED_PROVENANCE_FIELDS if field not in payload)
     empty = sorted(
-        field for field in REQUIRED_PROVENANCE_FIELDS
-        if field in payload and payload[field] is None
+        field for field in REQUIRED_PROVENANCE_FIELDS if field in payload and payload[field] is None
     )
     return [*(f"missing:{field}" for field in missing), *(f"null:{field}" for field in empty)]
 
@@ -93,6 +129,7 @@ __all__ = [
     "PROVENANCE_CONTRACT_ID",
     "REQUIRED_PROVENANCE_FIELDS",
     "base_source_provenance",
+    "base_web_record_provenance",
     "chunk_id",
     "document_id",
     "record_id",

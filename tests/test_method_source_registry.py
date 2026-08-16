@@ -61,13 +61,13 @@ def test_new_safety_cross_checks_are_attributed_without_entering_retrieval_corpu
     assert "NHS_FIRST_AID_HEAVY_BLEEDING" in bleeding["limitations"]
 
 
-def test_method_registry_correction_does_not_change_validated_build_identity() -> None:
+def test_corrected_source_and_curation_contracts_have_expected_build_identity() -> None:
     identity = compute_build_identity(
         Path("data/sources/manifest.yaml"),
         Path("data/taxonomy/drug_aliases.yaml"),
     )
 
-    assert identity.build_id == "ec0a6de32d58ac181af6"
+    assert identity.build_id == "45bc4bb563acb89725b5"
 
 
 def test_method_traceability_covers_methods_and_technical_standards() -> None:

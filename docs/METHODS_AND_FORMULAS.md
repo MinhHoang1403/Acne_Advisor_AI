@@ -193,7 +193,7 @@ medical confidence, source reliability score, or scientific formula.
 | retrieval attempts | maximum 2 | bounded safety/latency policy |
 | decision evidence visibility | first 5 items; 1200 chars/item | runtime engineering policy |
 | agent action schema | 4 semantic actions | implemented research method + engineering contract |
-| exact cache namespace | v9 | engineering invalidation policy |
+| exact cache namespace | v10 | engineering invalidation policy |
 | cache question/TTL | 600 chars / 86400 seconds | engineering resource policy |
 | request/history bounds | 500 chars; 10 messages x 1000 chars | engineering resource policy |
 | total/retrieval deadlines | 210 / 20 seconds | engineering resilience policy |

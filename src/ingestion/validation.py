@@ -32,8 +32,12 @@ def validate_compiled_knowledge(
     warnings: list[str] = []
     source_ids = {source.source_id for source in sources}
     record_sources = Counter(record.get("source_id") for record in compiled.records)
-    if set(record_sources) != source_ids:
-        errors.append("compiled source coverage does not equal canonical manifest")
+    represented_parents = {
+        str(record.get("parent_source_id") or record.get("source_id") or "")
+        for record in compiled.records
+    }
+    if represented_parents != source_ids:
+        errors.append("compiled parent source coverage does not equal canonical manifest")
     identifiers = [record["chunk_id"] for record in compiled.records]
     if len(identifiers) != len(set(identifiers)):
         errors.append("duplicate chunk_id")
@@ -45,6 +49,9 @@ def validate_compiled_knowledge(
             errors.append(f"chunk {index} exceeds character cap")
         if record.get("build_id") != compiled.identity.build_id:
             errors.append(f"chunk {index} build ID mismatch")
+        parent_source_id = record.get("parent_source_id")
+        if parent_source_id and parent_source_id not in source_ids:
+            errors.append(f"chunk {index} has unknown parent source")
         if ":\\" in str(record.get("source_path")):
             errors.append(f"chunk {index} has absolute Windows source path")
     return {
@@ -59,7 +66,9 @@ def validate_compiled_knowledge(
     }
 
 
-def validate_entity_cards(cards: list[EntityCard], canonical_source_ids: set[str]) -> dict[str, Any]:
+def validate_entity_cards(
+    cards: list[EntityCard], canonical_source_ids: set[str]
+) -> dict[str, Any]:
     errors: list[str] = []
     identities: set[str] = set()
     for card in cards:
@@ -83,8 +92,11 @@ def validate_graph_records(records: dict[str, list[dict[str, Any]]]) -> dict[str
     edge_keys: set[tuple[str, str, str, str, str]] = set()
     for edge in records.get("relationships", []):
         key = (
-            edge["source_label"], edge["source_name"], edge["relationship"],
-            edge["target_label"], edge["target_name"],
+            edge["source_label"],
+            edge["source_name"],
+            edge["relationship"],
+            edge["target_label"],
+            edge["target_name"],
         )
         if key in edge_keys:
             errors.append(f"duplicate graph relationship: {key}")
@@ -118,7 +130,11 @@ async def validate_qdrant_collection(
     params = info.config.params
     dense = params.vectors.get("dense") if isinstance(params.vectors, dict) else None
     sparse = params.sparse_vectors.get(BM25_VECTOR_NAME) if params.sparse_vectors else None
-    if dense is None or dense.size != EMBEDDING_DIMENSIONS or dense.distance != models.Distance.COSINE:
+    if (
+        dense is None
+        or dense.size != EMBEDDING_DIMENSIONS
+        or dense.distance != models.Distance.COSINE
+    ):
         errors.append("dense schema mismatch")
     if sparse is None or sparse.modifier != models.Modifier.IDF:
         errors.append("BM25 sparse schema missing collection IDF")

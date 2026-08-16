@@ -289,18 +289,18 @@
     },
     {
       "source_id": "aad_public_acne_2026_07",
-      "title": "AAD public acne education snapshot",
-      "authors_or_organization": "American Academy of Dermatology",
+      "title": "Multi-publisher public acne education collection",
+      "authors_or_organization": "AAD; NHS; WebMD; DermNet; Healthline; Da Lieu Viet Nam",
       "publication_date": "retrieved 2026-07-03",
-      "venue_or_publisher": "AAD public website",
+      "venue_or_publisher": "Six public health and dermatology publishers",
       "doi": null,
-      "url": "https://www.aad.org/public/diseases/acne",
-      "source_type": "professional_organization_patient_education",
+      "url": "sample_data/web_raw_dataset.json",
+      "source_type": "multi_publisher_web_page_collection",
       "role": "supplemental_canonical_corpus",
       "claim_supported": "Patient-facing acne definitions, treatment and care information.",
       "project_method": "Canonical medical evidence corpus",
       "date_verified": "2026-08-14",
-      "limitations": "Web source snapshot; individual pages may change after retrieval."
+      "limitations": "This ID names the immutable parent acquisition artifact only. Record-level source IDs, publisher authority, URLs and raw text hashes are defined in data/sources/web_records.yaml; individual pages may change after retrieval."
     }
   ]
 }

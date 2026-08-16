@@ -1,0 +1,440 @@
+schema: web_record_provenance
+schema_version: 1
+parent_source_id: aad_public_acne_2026_07
+publishers:
+  aad:
+    domains:
+    - aad.org
+    authority: American Academy of Dermatology
+    source_type: professional_organization_patient_education
+  nhs:
+    domains:
+    - nhs.uk
+    authority: National Health Service
+    source_type: official_public_health_guidance
+  webmd:
+    domains:
+    - webmd.com
+    authority: WebMD
+    source_type: medically_reviewed_health_education
+  dermnetnz:
+    domains:
+    - dermnetnz.org
+    authority: DermNet
+    source_type: dermatology_reference
+  healthline:
+    domains:
+    - healthline.com
+    authority: Healthline
+    source_type: medically_reviewed_health_education
+  dalieu_vn:
+    domains:
+    - dalieu.vn
+    authority: Da Lieu Viet Nam
+    source_type: dermatology_health_education
+records:
+- source_id: web_aad_eb67ac58641ae1c2
+  source_url: https://www.aad.org/public/diseases/acne
+  title: Acne
+  publisher: aad
+  raw_text_sha256: eb83c0db845cb2ee8eada9a47edc2ac2fac0deaa6e4272ade08249bebf2b771c
+- source_id: web_aad_953a1363781ef616
+  source_url: https://www.aad.org/public/diseases/acne/diy
+  title: Acne self-care
+  publisher: aad
+  raw_text_sha256: ff8f476f4e5d19695e76171f3ba2bbe468f9845592a10fa973e9ac5659e4fd58
+- source_id: web_aad_8c2d1ea83468f3b3
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat
+  title: Dermatologist acne treatment
+  publisher: aad
+  raw_text_sha256: 81f1ee1826c1e0b035b7a713febe248cbf9a8d611a93cbb3e7e2d8ec7c31785b
+- source_id: web_aad_713ac4dc72c13a5c
+  source_url: https://www.aad.org/public/diseases/acne/skin-care
+  title: Acne skin care
+  publisher: aad
+  raw_text_sha256: 26c9fd4341e6acc256cbe957a7bca8485d5b84a9ae92d883e15627cf997a5e57
+- source_id: web_aad_f804c38287438116
+  source_url: https://www.aad.org/public/diseases/acne/causes
+  title: Acne causes
+  publisher: aad
+  raw_text_sha256: 045bd4aeca48b104cc5898bf0e68dc71beaa6f134345e78b1c3b02ef0f656b8b
+- source_id: web_aad_704d63ef07b2b55e
+  source_url: https://www.aad.org/public/diseases/acne/really-acne
+  title: Acne and acne-like conditions
+  publisher: aad
+  raw_text_sha256: bbe602d0392ae1be7f9ba8c0355d5c97aac8398efc7c95895b3d8f9209f0d62f
+- source_id: web_aad_02f221d87118c136
+  source_url: https://www.aad.org/public/diseases/acne/diy/skin-color
+  title: 'Acne: Skin Color'
+  publisher: aad
+  raw_text_sha256: e72b81b072e4ef639b76003892713239499f61cf521f36a88f2d2c860548dfd2
+- source_id: web_aad_fa00b4ce617b72b8
+  source_url: https://www.aad.org/public/diseases/acne/diy/adult-acne-treatment
+  title: 'Acne: Adult Acne Treatment'
+  publisher: aad
+  raw_text_sha256: 84cab14d613c7019ea40f121b347135de4ac5c2619dcc4c21de8f91ec34ac9c1
+- source_id: web_aad_3704c0d667aad94b
+  source_url: https://www.aad.org/public/diseases/acne/skin-care/tips
+  title: 'Acne: Tips'
+  publisher: aad
+  raw_text_sha256: 00f687d4b986bf8e4b83e867a72150b4546b546d47bb9196c8f47c0677c74c1c
+- source_id: web_aad_ea7e272194ae30a8
+  source_url: https://www.aad.org/public/diseases/acne/diy/back-acne
+  title: 'Acne: Back Acne'
+  publisher: aad
+  raw_text_sha256: eb2f51c685ba50d8ffe2be3c0e3d8a899717d8443762c1e0e76e46d61833f8bc
+- source_id: web_aad_92490f362113d291
+  source_url: https://www.aad.org/public/diseases/acne/diy/treat-early
+  title: 'Acne: Treat Early'
+  publisher: aad
+  raw_text_sha256: bc53f910c068915b1204b6f946f9825f7905a62d40599dc27ea3d113860d994c
+- source_id: web_aad_34ba10cee98903e4
+  source_url: https://www.aad.org/public/diseases/acne/diy/wont-clear
+  title: 'Acne: Wont Clear'
+  publisher: aad
+  raw_text_sha256: df3e70a2321abfa072942df58f2138d02702897961bd48b7adbb63c693a62d91
+- source_id: web_aad_fc9197bb611abbf3
+  source_url: https://www.aad.org/public/diseases/acne/diy/types-breakouts
+  title: 'Acne: Types Breakouts'
+  publisher: aad
+  raw_text_sha256: cba1e98ad02883955b08afabf7e1d8e2dfa1224c773ab3724261f173d60fa1bb
+- source_id: web_aad_502603ec115bf029
+  source_url: https://www.aad.org/public/diseases/acne/diy/when-derm
+  title: 'Acne: When Derm'
+  publisher: aad
+  raw_text_sha256: 86afaf6f555e0474bfb862a314ae05ef5ce087be9c64543de5d0a350796a3d8b
+- source_id: web_aad_8b5ac304bb90a8f1
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/treat
+  title: 'Acne: Treat'
+  publisher: aad
+  raw_text_sha256: 9ba44091c3b8f6cd710b2cc23b5f7e51351d3252e26dd2fbf8e622e640ef2b4f
+- source_id: web_aad_821fd08b1e2acf72
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/scars
+  title: 'Acne: Scars'
+  publisher: aad
+  raw_text_sha256: 547fb21675f4a14d2a795d322d4bf880063ffb832f5a449257e0b1f1491744a1
+- source_id: web_aad_39a37c16fd5805d7
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/antibiotics
+  title: 'Acne: Antibiotics'
+  publisher: aad
+  raw_text_sha256: f9db91a2ba184a783bbaaed22eda8922f7ee5caefc72fb0b461f006dc1d694e6
+- source_id: web_aad_9cbdba4d25a0e47f
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/hormonal-therapy
+  title: 'Acne: Hormonal Therapy'
+  publisher: aad
+  raw_text_sha256: e85e5ca88e62446fad5f9f4dc4d04557f5c9409e1f8bdcbfaf89db87cf116852
+- source_id: web_aad_f91bfdcf9257111e
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/isotretinoin
+  title: 'Acne: Isotretinoin'
+  publisher: aad
+  raw_text_sha256: ae1ebd002257d900803b26048be9efc5049eb8b754980720b3a84fe51a52c804
+- source_id: web_aad_1fb3ce4ca890127b
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/lasers-lights
+  title: 'Acne: Lasers Lights'
+  publisher: aad
+  raw_text_sha256: 6b85120d6d014bbd6d80e5a9b725ceaf1b1ea53a6d418a3ceedd7389c1085819
+- source_id: web_aad_1c6fa230d571eecd
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/severe-acne
+  title: 'Acne: Severe Acne'
+  publisher: aad
+  raw_text_sha256: 2fec2ded65e889ba96cd3ed87f3f546e19ba99677a05a5d40017b6745dd92718
+- source_id: web_aad_88a4258288696392
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/pregnancy
+  title: 'Acne: Pregnancy'
+  publisher: aad
+  raw_text_sha256: 96f5be58bdca9c1157c5e55ce20aa24bca5dac25a788a80e3a0212862a9eac3c
+- source_id: web_aad_b334bf638847c33a
+  source_url: https://www.aad.org/public/diseases/acne/skin-care/habits-stop
+  title: 'Acne: Habits Stop'
+  publisher: aad
+  raw_text_sha256: 422a6ecc4f7a25af2361eb24d25b27a48cfb44580511f8605561fc23d16392b1
+- source_id: web_aad_073fc820df3299fa
+  source_url: https://www.aad.org/public/diseases/acne/skin-care/moisturizer
+  title: 'Acne: Moisturizer'
+  publisher: aad
+  raw_text_sha256: 934d17486fb6d4fbda9673c82933cf35ca45b559c9c02a915a67717329cf880c
+- source_id: web_aad_c501c1ec85d8d264
+  source_url: https://www.aad.org/public/diseases/acne/skin-care/popping
+  title: 'Acne: Popping'
+  publisher: aad
+  raw_text_sha256: 0538c3eab044a7c027642d968be6c6c0c0b900de3daea39cf1401beb2e7b3a1b
+- source_id: web_aad_fe498971f4522913
+  source_url: https://www.aad.org/public/diseases/acne/causes/acne-causes
+  title: 'Acne: Acne Causes'
+  publisher: aad
+  raw_text_sha256: bfee0178f4ff6c92641296c2b6d60f4b7e61e434a1466589c2ebb856da1666fb
+- source_id: web_aad_3abe48e920985887
+  source_url: https://www.aad.org/public/diseases/acne/causes/diet
+  title: 'Acne: Diet'
+  publisher: aad
+  raw_text_sha256: 9c1ce983a0e9b721ebd4b735b55dd03633f3e016b8db8032d9a1b46e6c3e921b
+- source_id: web_aad_eb1e045f03b00753
+  source_url: https://www.aad.org/public/diseases/acne/causes/hair-products
+  title: 'Acne: Hair Products'
+  publisher: aad
+  raw_text_sha256: 86e957e60f4075bb2e5bf260d883a75155fecb32d2ab5124fc56ccc02fdf606d
+- source_id: web_aad_b3a7f283617a12dd
+  source_url: https://www.aad.org/public/diseases/acne/causes/makeup
+  title: 'Acne: Makeup'
+  publisher: aad
+  raw_text_sha256: 24d8f4deb024f375792509b26d5b14b59a5a61e1021c5ff0cb8e14b72809dadc
+- source_id: web_aad_9b5e272fa150e083
+  source_url: https://www.aad.org/public/diseases/acne/causes/sports-equipment
+  title: 'Acne: Sports Equipment'
+  publisher: aad
+  raw_text_sha256: e9d12bab180b418ce5fd66c8d8c03bade2037d87093c5a0bda2ffdf79a55f0af
+- source_id: web_aad_ea1a28a877650a1c
+  source_url: https://www.aad.org/public/diseases/acne/causes/workouts
+  title: 'Acne: Workouts'
+  publisher: aad
+  raw_text_sha256: 93771660e486705cd0762a2c4c27bbf3a7d33af5a9677bab810c6c458bceb6a6
+- source_id: web_aad_c6ba84215f2ed2e6
+  source_url: https://www.aad.org/public/diseases/acne/really-acne/acne-rosacea
+  title: 'Acne: Acne Rosacea'
+  publisher: aad
+  raw_text_sha256: be392e6ae6470f7b501607bdedf37a1a5ccfe3cfe07d87d27b710bca505671ff
+- source_id: web_aad_3bfd7764e3c15696
+  source_url: https://www.aad.org/public/diseases/acne/really-acne/adult-acne
+  title: 'Acne: Adult Acne'
+  publisher: aad
+  raw_text_sha256: d6ece395972ca249782bf99e1271a7be526086e58a1553b8ce025ccaf9820dcd
+- source_id: web_aad_35a02cc996257b60
+  source_url: https://www.aad.org/public/diseases/acne/really-acne/baby-acne
+  title: 'Acne: Baby Acne'
+  publisher: aad
+  raw_text_sha256: 245fe043631b77384a610919c788bcf0eee6ef6a57b12a0bd65b578921a648e3
+- source_id: web_aad_6151c4343a6193f2
+  source_url: https://www.aad.org/public/diseases/acne/really-acne/stubborn-acne
+  title: 'Acne: Stubborn Acne'
+  publisher: aad
+  raw_text_sha256: a853208be717a2eb832daf938b729f4324b1b04ea575dfff1d7eb28db0740e7d
+- source_id: web_aad_75bb191293d75b2a
+  source_url: https://www.aad.org/public/diseases/acne/really-acne/symptoms
+  title: 'Acne: Symptoms'
+  publisher: aad
+  raw_text_sha256: 8170282f2b14db0777489fe05d1153a0603c880648f878a3844c5f68b8366696
+- source_id: web_aad_8aab9bec6b5205a1
+  source_url: https://www.aad.org/public/diseases/acne/really-acne/overview
+  title: 'Acne: Overview'
+  publisher: aad
+  raw_text_sha256: c92c55ef60b874e0344fcf5c4428ecef630a914507a4d79189ef918a80548645
+- source_id: web_aad_8a4004398dd94966
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/adult-acne-natalie-story
+  title: 'Acne: Adult Acne Natalie Story'
+  publisher: aad
+  raw_text_sha256: 92e95169615eb9942ca8eaf3850c165a11bfad5bac968a7579f7dd8b1a308a82
+- source_id: web_aad_4d448a651ca1a898
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/gender-affirming-testosterone-therapy
+  title: 'Acne: Gender Affirming Testosterone Therapy'
+  publisher: aad
+  raw_text_sha256: 1f5fb9cc90a173da39e17bb5e277d451f7eba6f8a5c4087207401037a70118bd
+- source_id: web_aad_d727d6d0315b20e8
+  source_url: https://www.aad.org/public/diseases/acne/derm-treat/scars/treatment
+  title: 'Acne: Treatment'
+  publisher: aad
+  raw_text_sha256: 3db0d977c2d55c95a88ab7392ccdb0806ed4fbfad539da9cb32236fc7c50d610
+- source_id: web_aad_238c4d7073ed94e5
+  source_url: https://www.aad.org/public/diseases/acne/diy/treat-deep-painful-pimple
+  title: 'Acne: Treat Deep Painful Pimple'
+  publisher: aad
+  raw_text_sha256: d5bc948fad9eb5e0d64b9e485e2bcba5493d5d91bbe5b3a134673559c566ac1a
+- source_id: web_aad_b9d64bfaa18c335e
+  source_url: https://www.aad.org/public/diseases/acne/acne-myths
+  title: 'Acne: Acne Myths'
+  publisher: aad
+  raw_text_sha256: f4cfb2839ed659dbd55e9f4515cf059cfb961e95b71c9d535872f236a972f9ae
+- source_id: web_aad_3c3e24b89e9c4a8f
+  source_url: https://www.aad.org/public/diseases/acne/acne-teenage-five-ways-to-help
+  title: 'Acne: Acne Teenage Five Ways To Help'
+  publisher: aad
+  raw_text_sha256: 1a865c87eb91d2d20e9870c29e27b3b819d063509305b4f81a6cb35cc22919ab
+- source_id: web_aad_afb0c99a0b1a06e7
+  source_url: https://www.aad.org/public/diseases/acne/acne-emotional-effects
+  title: 'Acne: Acne Emotional Effects'
+  publisher: aad
+  raw_text_sha256: 0b8b91abef2012a649e49f284da865eb4a4a6358557eacd6171fbf3597a1097d
+- source_id: web_nhs_2073fedbb93a882d
+  source_url: https://www.nhs.uk/conditions/acne
+  title: Acne
+  publisher: nhs
+  raw_text_sha256: 8bd2db8e211978c2cb3e455a961dfe7cdcea05f692d9cb5bd30dcd281e1acbf8
+- source_id: web_nhs_473a5fe637767b2a
+  source_url: https://www.nhs.uk/conditions/acne/diagnosis
+  title: 'Acne: Diagnosis'
+  publisher: nhs
+  raw_text_sha256: 3560219ec450ecee14c0f0aac78b0e29442a814f7c65546bf24041f8548b5b79
+- source_id: web_webmd_fbe1f977331d1ba6
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne
+  title: Acne
+  publisher: webmd
+  raw_text_sha256: ca0d28695e284e8557122aad8ac3c89024dcfbbae6c7d5878253dbb96204e066
+- source_id: web_webmd_d8707a47060c3a11
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/understanding-acne-basics
+  title: 'Acne: Understanding Acne Basics'
+  publisher: webmd
+  raw_text_sha256: 6f7285f10bc2caedf43657274412fa57d0cd1dddf522a79f6f7c9aab5aa234ed
+- source_id: web_webmd_702b9d39b645709b
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/default.htm
+  title: Acne overview
+  publisher: webmd
+  raw_text_sha256: ca0d28695e284e8557122aad8ac3c89024dcfbbae6c7d5878253dbb96204e066
+- source_id: web_webmd_d7530a116892ea26
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/understanding-acne-symptoms
+  title: 'Acne: Understanding Acne Symptoms'
+  publisher: webmd
+  raw_text_sha256: a6ed5a78e9a1dc6a26d4e7a716bbc18002c7f2e964f8414ffe0cbec81287679b
+- source_id: web_webmd_097f0ce1d63f69be
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/acne-causes
+  title: 'Acne: Acne Causes'
+  publisher: webmd
+  raw_text_sha256: bb50c702fd0d57ba90d5faa0367f57d2270c87379092f2054fa276119abd620f
+- source_id: web_webmd_33a916352cbd1587
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/understanding-acne-treatment
+  title: 'Acne: Understanding Acne Treatment'
+  publisher: webmd
+  raw_text_sha256: b1fe15f9d32424bc050fe006ef4e7a49a2e6764a69bfe3b191bcccf27a62d343
+- source_id: web_webmd_d5f34b505f03c4b0
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/10-tips-for-preventing-pimples
+  title: 'Acne: 10 Tips For Preventing Pimples'
+  publisher: webmd
+  raw_text_sha256: 11ed23ef071f9a0ca8c8dc23906b7a7eec653940601dc6e8aaef07bf35330dfb
+- source_id: web_webmd_e2c766354fad7725
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/cm/rm-quiz-acne-treatment
+  title: 'Acne: Rm Quiz Acne Treatment'
+  publisher: webmd
+  raw_text_sha256: b2e40711acee2c2a53e873266dfb436b443f9c1b7758778402c9458a1471d027
+- source_id: web_webmd_0eddbeb4d06c0f22
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/ss/slideshow-acne-best-worst-foods
+  title: 'Acne: Slideshow Acne Best Worst Foods'
+  publisher: webmd
+  raw_text_sha256: 1611d03b764593f927313d60ab82f4ee944470d2e5e2b8d54ca40364294e2084
+- source_id: web_webmd_a53c0ed594b62de2
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/acne-treatments-that-work
+  title: 'Acne: Acne Treatments That Work'
+  publisher: webmd
+  raw_text_sha256: 839efdfc607c4285b475c8b189282623bd8745f6bafd09bcb572f4baff5f27cb
+- source_id: web_webmd_767147e32e3b9c86
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/picture-of-baby-acne
+  title: 'Acne: Picture Of Baby Acne'
+  publisher: webmd
+  raw_text_sha256: 90a9696687d0ac99b465e1aa424b2a7bb67ea4b813af79bfc43daa17d2905dc8
+- source_id: web_webmd_0190f6ad0414f833
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/what-is-acne
+  title: 'Acne: What Is Acne'
+  publisher: webmd
+  raw_text_sha256: 15e61d70de084c25d481651eaf26f52181f62410a6dea8416d4bb63f3ae3376d
+- source_id: web_webmd_2f5bede800c5dd20
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/acne-during-pregnancy-treatments-causes
+  title: 'Acne: Acne During Pregnancy Treatments Causes'
+  publisher: webmd
+  raw_text_sha256: d6a385d41aa058fa2de73ab26c4763b1ec184f2874a97437bc2b73b7c7c37277
+- source_id: web_webmd_c0ee260eba0f8672
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/guide-to-treating-acne-scars-and-skin-damage
+  title: 'Acne: Guide To Treating Acne Scars And Skin Damage'
+  publisher: webmd
+  raw_text_sha256: 361f957cef3b7b5172248984ffa486f11c6e86fa917f3733b378194319d0b624
+- source_id: web_webmd_ac23e97d312c18a9
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/phototherapy-for-acne
+  title: 'Acne: Phototherapy For Acne'
+  publisher: webmd
+  raw_text_sha256: 5316f55618f74c9cd7ef4e637f066024142da389e9e2250f9dfba954a41da6e3
+- source_id: web_webmd_f0e9536a7a6d0993
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/news-features
+  title: Acne news and features
+  publisher: webmd
+  raw_text_sha256: 5f061183d6759f207917e03dce3c8d5ad921bd8d285b7a935f955d9f8206bd45
+- source_id: web_webmd_5117b72504d0a71c
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/medical-reference-index
+  title: Acne medical reference
+  publisher: webmd
+  raw_text_sha256: 819b7378541f9b59d9c20ba9984ac94a262ad67c40e505f2ec985bc40b6355ad
+- source_id: web_webmd_19eb05a25ec596c1
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/ss/slideshow-index
+  title: Acne slideshows
+  publisher: webmd
+  raw_text_sha256: a03c5dadaaedbcf136e5a9e7c5d660060435dba30fdafc20850f8f354e399a32
+- source_id: web_webmd_2e1a68d057fcef88
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/video/video-index
+  title: Acne videos
+  publisher: webmd
+  raw_text_sha256: 16893fdc31d5f9ac111cd6d5603ccb308917e5ed690f465e20f9b9cd46b1c227
+- source_id: web_webmd_c412d3b787047c80
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/how-get-rid-blackheads
+  title: 'Acne: How Get Rid Blackheads'
+  publisher: webmd
+  raw_text_sha256: d04f6effbcaa1871bc587d029c2831a5e723bdd9e27ec13e6590aa28bd644044
+- source_id: web_webmd_1e6c578a72c10649
+  source_url: https://www.webmd.com/skin-problems-and-treatments/acne/medical-reference/default.htm
+  title: Acne medical reference
+  publisher: webmd
+  raw_text_sha256: 819b7378541f9b59d9c20ba9984ac94a262ad67c40e505f2ec985bc40b6355ad
+- source_id: web_dermnetnz_35860b4af4910f27
+  source_url: https://dermnetnz.org/topics/acne
+  title: Acne
+  publisher: dermnetnz
+  raw_text_sha256: d86e90888cd886d612f36b4d1e67a0ca333e887a37a79fdd5c27ad308a0ace7c
+- source_id: web_dermnetnz_58d1724a2b394bd3
+  source_url: https://dermnetnz.org/topics/acne-scarring
+  title: 'Acne: Acne Scarring'
+  publisher: dermnetnz
+  raw_text_sha256: ea4e426d7062f35e64a7e3a421ec082a23d3e7b143cf1ae86aa117ba72187d48
+- source_id: web_dermnetnz_f085d1fdb8511252
+  source_url: https://dermnetnz.org/topics/acne-vulgaris
+  title: 'Acne: Acne Vulgaris'
+  publisher: dermnetnz
+  raw_text_sha256: 3b36bbe84b24d8acd34f8fe16345f5e550cb71685cbf8f938c688a18fa73570b
+- source_id: web_dermnetnz_3c2faa7fc8cbafce
+  source_url: https://dermnetnz.org/topics/acne-and-other-follicular-disorders
+  title: 'Acne: Acne And Other Follicular Disorders'
+  publisher: dermnetnz
+  raw_text_sha256: 042aeb2be39560c278974fcf59e3a0b332ae1be9a2f30f420b6c81475c939e72
+- source_id: web_dermnetnz_8d930888c730deaa
+  source_url: https://dermnetnz.org/topics/acne-in-children
+  title: 'Acne: Acne In Children'
+  publisher: dermnetnz
+  raw_text_sha256: 0e4a22e91b3ff7c58d08d703b9b0eb3b203cb2d73535e7b79291ca26b6dbfb64
+- source_id: web_dermnetnz_7f9070f55ec6ffce
+  source_url: https://dermnetnz.org/topics/acne-face-images
+  title: 'Acne: Acne Face Images'
+  publisher: dermnetnz
+  raw_text_sha256: b0c9288fe0fcb6a3b9cc052eea0fa6271bfe833514e8a5cf3e6a2749fd9be6bf
+- source_id: web_dermnetnz_1f84ef6be37a6f41
+  source_url: https://dermnetnz.org/topics/acne-treatment
+  title: 'Acne: Acne Treatment'
+  publisher: dermnetnz
+  raw_text_sha256: 2c1f3f6d762f00d369c7449f5ce4a4e871089637aa91f263c3484ba432ddfd3d
+- source_id: web_dermnetnz_bd03071a0f669923
+  source_url: https://dermnetnz.org/topics/acne-in-pregnancy
+  title: 'Acne: Acne In Pregnancy'
+  publisher: dermnetnz
+  raw_text_sha256: 298708a5ff16319566c595fd46576e60059d903628957f6d4115bb8a46dd4c36
+- source_id: web_dermnetnz_ec0c3bbd95f04a92
+  source_url: https://dermnetnz.org/topics/acne-fulminans
+  title: 'Acne: Acne Fulminans'
+  publisher: dermnetnz
+  raw_text_sha256: 8752516334ce52c626e28e7e8ec438a6619ccc06ecafc811b1074e55b7c58b39
+- source_id: web_dermnetnz_f1d65592ea32d9a9
+  source_url: https://dermnetnz.org/topics/acne-excorie
+  title: 'Acne: Acne Excorie'
+  publisher: dermnetnz
+  raw_text_sha256: 807f3f592927a31d7ca2ace1e63487bb4c9d8ba7513783bff2c935458387aa5d
+- source_id: web_dermnetnz_cddf43ad3f7f941d
+  source_url: https://dermnetnz.org/topics/comedonal-acne
+  title: 'Acne: Comedonal Acne'
+  publisher: dermnetnz
+  raw_text_sha256: cb0f3851a91d8d436b2c9483dd5ee807c5ced1f38d85d26c7371c515868e060b
+- source_id: web_dermnetnz_1722a714e689b578
+  source_url: https://dermnetnz.org/topics/nodulocystic-acne
+  title: 'Acne: Nodulocystic Acne'
+  publisher: dermnetnz
+  raw_text_sha256: dd9800aaa6eed4a85f0717ae42876669c9bdecb54161162a1b2dbca7cfcac2f2
+- source_id: web_healthline_7818063059457ea6
+  source_url: https://www.healthline.com/health/skin/acne
+  title: Acne
+  publisher: healthline
+  raw_text_sha256: ae1044db04093bfba94d752edd46a10d52047eae91805b70b25039b1822ea3fb
+- source_id: web_dalieu_vn_10a8b699200d7eb5
+  source_url: https://dalieu.vn/chuyen-muc/kien-thuc-benh-ly/
+  title: Kiến thức bệnh lý da liễu
+  publisher: dalieu_vn
+  raw_text_sha256: 9a2638e33ba1d613edf52b77771a6f98e77e9a5d11099e8a7777839ec96ffa64

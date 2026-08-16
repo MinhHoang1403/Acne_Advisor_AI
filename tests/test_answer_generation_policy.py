@@ -53,3 +53,13 @@ def test_prompt_contract_has_no_graph_fact_input_channel() -> None:
         packed_context_text="source evidence",
     )
     assert "graph_facts" not in prompt
+
+
+def test_system_policy_keeps_cross_drug_claims_local_and_forbids_disclaimer_leakage() -> None:
+    policy = MEDICAL_RAG_SYSTEM_PROMPT
+
+    assert "không chuyển tương tác, chống chỉ định, thời gian điều trị" in policy
+    assert "thuốc anh em khác" in policy
+    assert '"không có vi khuẩn"' in policy
+    assert "Nếu các evidence block xung đột" in policy
+    assert "Không tự thêm disclaimer boilerplate chung" in policy
