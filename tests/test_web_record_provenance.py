@@ -27,7 +27,18 @@ def _web_source():
     )
 
 
+def _require_canonical_corpus() -> None:
+    missing = [
+        source.local_filename
+        for source in load_source_manifest(MANIFEST)
+        if not (ROOT / "sample_data" / source.local_filename).is_file()
+    ]
+    if missing:
+        pytest.skip("Canonical licensed corpus is not present in this checkout")
+
+
 def test_web_catalog_covers_all_raw_records_with_correct_publishers() -> None:
+    _require_canonical_corpus()
     catalog = load_web_record_catalog(
         _web_source(),
         manifest_path=MANIFEST,
@@ -52,6 +63,7 @@ def test_web_catalog_covers_all_raw_records_with_correct_publishers() -> None:
 
 
 def test_web_catalog_fails_closed_when_raw_record_text_changes(tmp_path: Path) -> None:
+    _require_canonical_corpus()
     source = _web_source()
     source_dir = tmp_path / "sample_data"
     manifest_dir = tmp_path / "sources"
@@ -77,6 +89,7 @@ def test_web_catalog_fails_closed_when_raw_record_text_changes(tmp_path: Path) -
 
 
 def test_compiled_web_provenance_and_claim_curation_are_exact() -> None:
+    _require_canonical_corpus()
     prepared = asyncio.run(prepare_knowledge())
     records = prepared["compiled"].records
     web_records = [record for record in records if record.get("parent_source_id")]
