@@ -14,13 +14,14 @@ import os
 from typing import Any, Mapping
 
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
-DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v15"
+DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
+DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v2"
 DEFAULT_PROMPT_VERSION = "medical_prompt_v6"
 DEFAULT_EVIDENCE_GROUNDING_VERSION = "evidence_grounded_runtime_v2"
 DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
 LEGACY_ANSWER_CACHE_VERSIONS = {f"v{version}" for version in range(1, 10)}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
-    f"answer_formatting_contract_v{version}" for version in range(1, 15)
+    f"answer_formatting_contract_v{version}" for version in range(1, 16)
 }
 LEGACY_PROMPT_VERSIONS = {f"medical_prompt_v{version}" for version in range(1, 6)}
 ARCHITECTURE_VERSION = "minimal_agentic_rag_v1"
@@ -61,22 +62,26 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
-        "agent_decision_version": "minimal_agent_decision_v2",
+        "agent_decision_version": "minimal_agent_decision_v3",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
             value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),
             legacy={"evidence_grounded_runtime_v1"},
             default=DEFAULT_EVIDENCE_GROUNDING_VERSION,
         ),
-        "answer_validation_version": "structural_provenance_validation_v1",
+        "answer_validation_version": "structural_provenance_locality_validation_v2",
         "answer_formatting_contract_version": _effective_answer_formatting_contract_version(
             value(
                 "ANSWER_FORMATTING_CONTRACT_VERSION",
                 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION,
             )
         ),
-        "safety_policy_version": "source_mapped_safety_policy_v2",
-        "safe_fallback_flow_version": value("SAFE_FALLBACK_FLOW_VERSION", "safe_fallback_flow_v1"),
+        "safety_policy_version": "source_mapped_safety_policy_v3",
+        "safe_fallback_flow_version": _effective_contract_version(
+            value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
+            legacy={"safe_fallback_flow_v1"},
+            default=DEFAULT_SAFE_FALLBACK_FLOW_VERSION,
+        ),
         "runtime_resilience_version": "bounded_retry_runtime_v1",
         "llm_fallback_policy_version": value(
             "LLM_FALLBACK_POLICY_VERSION", "llm_fallback_policy_v3"

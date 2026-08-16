@@ -7,6 +7,10 @@ import unicodedata
 from typing import Any, Literal
 
 from src.agent.requested_structure import parse_requested_structure
+from src.agent.semantic_signals import (
+    is_comparison_intent,
+    is_medication_management_intent,
+)
 
 
 ResponseProfile = Literal[
@@ -17,7 +21,7 @@ ResponseProfile = Literal[
     "safe_fallback",
 ]
 
-ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v15"
+ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
 
 CANONICAL_DISCLAIMER = (
     "Thông tin chỉ mang tính tham khảo và hỗ trợ tìm hiểu, không thay thế tư vấn, "
@@ -37,7 +41,7 @@ LEGACY_BOILERPLATE_HEADINGS = (
 )
 
 ANSWER_FORMATTING_CONTRACT = """\
-ANSWER PRESENTATION CONTRACT V15:
+ANSWER PRESENTATION CONTRACT V16:
 - Dùng cùng một chuẩn trình bày cho mọi provider và mọi response origin.
 - Không lặp lại câu hỏi làm tiêu đề; bắt đầu ngay bằng câu trả lời.
 - Trả lời trực tiếp trước, sau đó mới giải thích.
@@ -469,29 +473,11 @@ def _count_markdown_items(text: str) -> int:
 
 
 def _is_medication_management_question(text: str) -> bool:
-    if re.search(r"\b(?:la gi|dung de lam gi|dung de tri gi|co tac dung gi)\b", text):
-        return False
-    if re.search(
-        r"\b(?:sua rua mat|kem duong|kem chong nang|my pham|san pham nay|cham soc|routine)\b",
-        text,
-    ):
-        return False
-    explicit = re.search(
-        r"\b(?:thuoc nao|ke don|ke thuoc|toa thuoc|tang lieu|giam lieu|chon lieu|"
-        r"thuoc .{0,40} phu hop)\b",
-        text,
-    )
-    management = re.search(
-        r"\b(?:(?:co nen|nen|khong nen) (?:tu )?(?:dung|uong|boi) .{1,60}|"
-        r"(?:dung|uong|boi) .{1,60} (?:the nao|ra sao|bao lau)|"
-        r".{1,50} (?:dung|uong|boi) (?:the nao|ra sao|bao lau))\b",
-        text,
-    )
-    return bool(explicit or management)
+    return is_medication_management_intent(text)
 
 
 def _is_comparison_question(text: str) -> bool:
-    return any(marker in text for marker in ("khac nhau", "khac gi", "khac the nao", "so sanh", "doi chieu", " vs ", "versus"))
+    return is_comparison_intent(text)
 
 
 def _is_direct_question(text: str) -> bool:

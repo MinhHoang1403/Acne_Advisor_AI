@@ -22,6 +22,7 @@ class ClinicalState(TypedDict, total=False):
     session_id: str | None
     conversation_history: list[dict[str, str]]
     standalone_question: str | None
+    retrieval_query: str | None
     normalized_question: str
     conversation_context: dict[str, Any] | None
 
@@ -53,6 +54,7 @@ class ClinicalState(TypedDict, total=False):
     fallback_applied: bool
     fallback_type: str | None
     fallback_reason: str | None
+    fallback_reason_code: str | None
     fallback_answer: str | None
     fallback_cache_eligible: bool | None
 

@@ -56,6 +56,40 @@ async def test_abstention_never_manufactures_evidence_or_cache_eligibility() -> 
     assert result["fallback_cache_eligible"] is False
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("reason_code", "expected_type"),
+    [
+        ("provider_unavailable", "retrieval_error"),
+        ("out_of_scope", "out_of_scope"),
+        ("insufficient_evidence", "no_retrieval_evidence"),
+        ("cannot_safely_proceed", "cannot_safely_proceed"),
+        ("retrieval_unavailable", "retrieval_error"),
+    ],
+)
+async def test_abstention_preserves_structured_cause(
+    reason_code: str,
+    expected_type: str,
+) -> None:
+    result = await abstain_node(
+        {
+            "fallback_reason_code": reason_code,
+            "agent_decision": {"reason_code": "evidence_gap"},
+        }
+    )
+    assert result["fallback_reason_code"] == reason_code
+    assert result["fallback_type"] == expected_type
+
+
+@pytest.mark.asyncio
+async def test_out_of_scope_fallback_does_not_claim_missing_provenance() -> None:
+    result = await abstain_node(
+        {"agent_decision": {"reason_code": "out_of_scope"}}
+    )
+    assert result["fallback_reason_code"] == "out_of_scope"
+    assert "provenance-complete" not in str(result["fallback_reason"]).casefold()
+
+
 def test_safe_fallback_answers_are_generic_infrastructure_messages() -> None:
     for fallback_type in ("no_retrieval_evidence", "retrieval_error", "invalid_generation"):
         answer = build_safe_fallback_answer(fallback_type)

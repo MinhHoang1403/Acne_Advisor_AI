@@ -28,7 +28,8 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
         {"normalized_question": "Benzoyl peroxide là gì?", "retrieval_attempt": 0}
     )
     assert result["next_action"] == "retrieve"
-    assert result["standalone_question"] == "benzoyl peroxide acne"
+    assert result["retrieval_query"] == "benzoyl peroxide acne"
+    assert "standalone_question" not in result
     assert result["agent_decision"]["provider"] == "test"
     assert result["performance_timings"]["agent_decision_1"] >= 0
 
@@ -72,7 +73,8 @@ async def test_agent_chooses_lexically_distinct_normalized_retry(
         }
     )
     assert result["next_action"] == "retry"
-    assert result["standalone_question"] != "adapalene"
+    assert result["retrieval_query"] == "adapalene topical retinoid pregnancy"
+    assert "standalone_question" not in result
 
 
 def test_exhausted_retry_and_identical_retry_abstain() -> None:
@@ -160,6 +162,23 @@ async def test_invalid_schema_fails_closed(monkeypatch: pytest.MonkeyPatch) -> N
     result = await select_agent_action({"normalized_question": "q", "retrieval_attempt": 0})
     assert result["next_action"] == "abstain"
     assert result["agent_decision"]["reason_code"] == "cannot_safely_proceed"
+    assert result["fallback_reason_code"] == "cannot_safely_proceed"
+
+
+@pytest.mark.asyncio
+async def test_action_provider_failure_keeps_provider_unavailable_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def unavailable(**_: object) -> dict:
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(decision_module, "generate_llm_response", unavailable)
+    result = await select_agent_action(
+        {"normalized_question": "Mụn đầu đen là gì?", "retrieval_attempt": 0}
+    )
+
+    assert result["next_action"] == "abstain"
+    assert result["fallback_reason_code"] == "provider_unavailable"
 
 
 def test_generate_without_evidence_is_rejected() -> None:
@@ -252,4 +271,27 @@ async def test_multiturn_history_has_one_semantic_owner(monkeypatch: pytest.Monk
         }
     )
     assert "Benzoyl peroxide" in captured["prompt"]
-    assert result["standalone_question"] == "benzoyl peroxide dùng buổi tối"
+    assert result["retrieval_query"] == "benzoyl peroxide dùng buổi tối"
+    assert "standalone_question" not in result
+
+
+@pytest.mark.asyncio
+async def test_retrieval_rewrite_does_not_replace_original_temporal_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _model(
+        monkeypatch,
+        '{"action":"retrieve","retrieval_query":"isotretinoin breathing adverse effect","reason_code":"needs_evidence"}',
+    )
+    original = "Hôm qua tôi khó thở, nhưng đã hết và hiện tại tôi bình thường."
+    result = await select_agent_action(
+        {
+            "user_question": original,
+            "normalized_question": original,
+            "standalone_question": original,
+            "retrieval_attempt": 0,
+        }
+    )
+
+    assert result["retrieval_query"] == "isotretinoin breathing adverse effect"
+    assert "standalone_question" not in result

@@ -25,7 +25,7 @@ async def observability_export_node(state: ClinicalState) -> dict[str, Any]:
         return {"observability_exported": False}
 
     try:
-        query = state.get("standalone_question") or state.get("user_question", "")
+        query = state.get("normalized_question") or state.get("user_question", "")
         event = build_observability_event(
             query=query,
             state=dict(state),

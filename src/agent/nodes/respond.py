@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def _question_for_presentation(state: ClinicalState) -> str:
-    return state.get("standalone_question") or state.get("user_question", "")
+    return state.get("normalized_question") or state.get("user_question", "")
 
 
 async def finalize_response_node(state: ClinicalState) -> dict:

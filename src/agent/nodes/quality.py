@@ -54,6 +54,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             answer=answer,
             packed_context=packed_context,
             retrieval_trace=state.get("retrieval_trace"),
+            final_source_ids=list(state.get("sources") or []),
         )
         profile = state.get("response_profile") or infer_response_profile(
             query,

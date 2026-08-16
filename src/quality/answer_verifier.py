@@ -17,6 +17,7 @@ from src.retrieval.contracts import PackedContext
 
 ERROR = "error"
 WARNING = "warning"
+ANSWER_VALIDATION_VERSION = "structural_provenance_locality_validation_v2"
 
 
 def verify_answer_quality(
@@ -24,6 +25,7 @@ def verify_answer_quality(
     answer: str,
     packed_context: PackedContext | None = None,
     retrieval_trace: Any | None = None,
+    final_source_ids: list[str] | None = None,
 ) -> AnswerVerificationReport:
     """Kiểm tra shape và evidence identity mà không phán xét medical truth."""
 
@@ -53,7 +55,12 @@ def verify_answer_quality(
             "medical_semantic_verification": False,
             "packed_context_items": len(packed_context.items) if packed_context else 0,
             "retrieval_trace_available": retrieval_trace is not None,
-            "answer_validation": {"version": "structural_provenance_validation_v1"},
+            "answer_validation": {"version": ANSWER_VALIDATION_VERSION},
+            "evidence_locality": _evidence_locality_diagnostics(
+                packed_context,
+                retrieval_trace,
+                final_source_ids or [],
+            ),
         },
     )
 
@@ -81,6 +88,60 @@ def _packed_context_provenance_errors(packed_context: PackedContext | None) -> l
     return issues
 
 
+def _evidence_locality_diagnostics(
+    packed_context: PackedContext | None,
+    retrieval_trace: Any | None,
+    final_source_ids: list[str],
+) -> dict[str, Any]:
+    """Expose scope labels per item without inferring claim entailment."""
+
+    trace = retrieval_trace if isinstance(retrieval_trace, dict) else {}
+    items: list[dict[str, Any]] = []
+    for item in packed_context.items if packed_context else []:
+        payload = item.payload
+        section_path = payload.get("section_path")
+        section = payload.get("header")
+        if not section and isinstance(section_path, list) and section_path:
+            section = section_path[-1]
+        source_id = str(
+            payload.get("source_id")
+            or payload.get("source_path")
+            or payload.get("source_file")
+            or payload.get("document_id")
+            or ""
+        ).strip()
+        scope_parts = [
+            str(value).strip()
+            for value in (
+                payload.get("drug_product"),
+                payload.get("active_ingredient"),
+                payload.get("drug_class"),
+                section,
+            )
+            if str(value or "").strip()
+        ]
+        items.append(
+            {
+                "item_id": item.item_id,
+                "source_id": source_id,
+                "publisher": payload.get("publisher") or payload.get("authority"),
+                "section": section,
+                "drug_product": payload.get("drug_product"),
+                "active_ingredient": payload.get("active_ingredient"),
+                "drug_class": payload.get("drug_class"),
+                "scope": " | ".join(scope_parts) or "unscoped",
+            }
+        )
+    return {
+        "diagnostic_only": True,
+        "semantic_entailment_checked": False,
+        "retrieval_attempt": trace.get("attempt") or trace.get("retrieval_attempt"),
+        "selected_ids": list(trace.get("selected_ids") or []),
+        "final_cited_source_ids": list(dict.fromkeys(final_source_ids)),
+        "items": items,
+    }
+
+
 def _issue(
     code: str,
     severity: str,
@@ -96,4 +157,4 @@ def _issue(
     )
 
 
-__all__ = ["verify_answer_quality"]
+__all__ = ["ANSWER_VALIDATION_VERSION", "verify_answer_quality"]
