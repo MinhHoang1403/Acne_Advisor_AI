@@ -23,21 +23,28 @@ from src.ingestion.bm25 import BM25_CONTRACT_ID, bm25_config
 from src.ingestion.chunking import CHUNK_CONTRACT_ID, structural_chunks
 from src.ingestion.domain_metadata import enrich_domain_metadata
 from src.ingestion.embedding import EMBEDDING_CONTRACT_ID
-from src.ingestion.filtering import FILTER_CONTRACT_ID, is_noisy_chunk
+from src.ingestion.filtering import (
+    CLAIM_CURATION_CONTRACT_ID,
+    FILTER_CONTRACT_ID,
+    ClaimExclusion,
+    apply_claim_exclusion,
+    is_noisy_chunk,
+)
 from src.ingestion.normalization import NORMALIZATION_CONTRACT_ID
 from src.ingestion.parser import PARSER_CONTRACT_ID, ParsedArtifact
 from src.ingestion.provenance import (
     PROVENANCE_CONTRACT_ID,
     base_source_provenance,
+    base_web_record_provenance,
     chunk_id,
     record_id,
     sha256_text,
 )
-from src.ingestion.source_manifest import CanonicalSource, source_manifest_hash
+from src.ingestion.source_manifest import CanonicalSource, WebRecordSource, source_manifest_hash
 
 
 BUILD_MANIFEST_SCHEMA = "phase1_build_manifest"
-BUILD_CONTRACT_ID = "frozen_phase1_build"
+BUILD_CONTRACT_ID = "record_provenance_curated_phase1_build_v3"
 GRAPH_CONTRACT_ID = "deterministic_source_backed_taxonomy_graph"
 ENTITY_CARD_CONTRACT_ID = "narrow_source_backed_entity_cards"
 
@@ -63,9 +70,7 @@ def compute_build_identity(source_manifest_path: Path, taxonomy_path: Path) -> B
     """Tính build ID từ source, taxonomy và toàn bộ compilation contracts."""
 
     source_hash = source_manifest_hash(source_manifest_path)
-    taxonomy_bytes = (
-        taxonomy_path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-    )
+    taxonomy_bytes = taxonomy_path.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
     taxonomy_hash = hashlib.sha256(taxonomy_bytes).hexdigest()
     contract = {
         "build": BUILD_CONTRACT_ID,
@@ -73,6 +78,7 @@ def compute_build_identity(source_manifest_path: Path, taxonomy_path: Path) -> B
         "normalization": NORMALIZATION_CONTRACT_ID,
         "chunk": CHUNK_CONTRACT_ID,
         "filter": FILTER_CONTRACT_ID,
+        "claim_curation": CLAIM_CURATION_CONTRACT_ID,
         "provenance": PROVENANCE_CONTRACT_ID,
         "embedding": EMBEDDING_CONTRACT_ID,
         "bm25": BM25_CONTRACT_ID,
@@ -90,6 +96,8 @@ def compile_knowledge(
     artifacts: dict[str, ParsedArtifact],
     identity: BuildIdentity,
     *,
+    web_record_catalogs: dict[str, dict[str, WebRecordSource]] | None = None,
+    claim_exclusions: tuple[ClaimExclusion, ...] = (),
     ingested_at: str | None = None,
 ) -> CompiledKnowledge:
     """Chuyển parsed units thành ordered payload records cho bước indexing."""
@@ -98,32 +106,58 @@ def compile_knowledge(
     records: list[dict[str, Any]] = []
     source_counts: dict[str, int] = {}
     filtered_counts: dict[str, int] = {}
+    web_record_catalogs = web_record_catalogs or {}
+    actions_by_source: dict[str, dict[str, ClaimExclusion]] = {}
+    for action in claim_exclusions:
+        actions_by_source.setdefault(action.source_id, {})[action.pre_curation_content_hash] = (
+            action
+        )
+    applied_actions: set[str] = set()
 
     for source in sources:
         artifact = artifacts.get(source.source_id)
         if artifact is None:
             raise ValueError(f"Missing parsed artifact for {source.source_id}")
-        source_base = base_source_provenance(source)
+        if source.record_catalog and source.source_id not in web_record_catalogs:
+            raise ValueError(f"Missing child provenance catalog for {source.source_id}")
+        if source.claim_exclusions and source.source_id not in actions_by_source:
+            raise ValueError(f"Missing claim exclusions for {source.source_id}")
+        record_catalog = web_record_catalogs.get(source.source_id, {})
         seen_content: set[str] = set()
-        chunk_index = 0
+        source_chunk_count = 0
         filtered = 0
         for unit in artifact.units:
+            if record_catalog:
+                child_source = record_catalog.get(unit.source_url)
+                if child_source is None:
+                    raise ValueError(f"Parsed web unit has no child provenance: {unit.source_url}")
+                source_base = base_web_record_provenance(source, child_source)
+            else:
+                source_base = base_source_provenance(source)
             unit_record_id = record_id(source_base["document_id"], unit.locator)
+            unit_chunk_index = 0
             for chunk in structural_chunks(unit.text):
-                noisy, _reason = is_noisy_chunk(
+                curated_text, pre_curation_hash, action_ids = apply_claim_exclusion(
                     chunk.text,
+                    source=source,
+                    actions_by_hash=actions_by_source.get(source.source_id, {}),
+                )
+                applied_actions.update(action_ids)
+                noisy, _reason = is_noisy_chunk(
+                    curated_text,
                     chunk.section_path[-1] if chunk.section_path else None,
                 )
-                content_hash = sha256_text(chunk.text)
+                content_hash = sha256_text(curated_text)
                 if noisy or content_hash in seen_content:
                     filtered += 1
                     continue
                 seen_content.add(content_hash)
+                scoped_chunk_index = unit_chunk_index if record_catalog else source_chunk_count
                 identifier = chunk_id(
                     source_base["document_id"],
                     unit_record_id,
                     chunk.section_path,
-                    chunk_index,
+                    scoped_chunk_index,
                     content_hash,
                 )
                 source_url = unit.source_url or source.original_url
@@ -137,18 +171,19 @@ def compile_knowledge(
                     "page_end": unit.page_end,
                     "section_path": list(chunk.section_path),
                     "header": chunk.section_path[-1] if chunk.section_path else "",
-                    "chunk_index": chunk_index,
+                    "chunk_index": scoped_chunk_index,
                     "chunk_id": identifier,
                     "chunk_content_hash": content_hash,
                     "content_hash": content_hash,
-                    "text": chunk.text,
-                    "content": chunk.text,
+                    "text": curated_text,
+                    "content": curated_text,
                     "parser_contract_id": PARSER_CONTRACT_ID,
                     "parsed_output_hash": artifact.parsed_output_hash,
                     "normalized_output_hash": artifact.normalized_output_hash,
                     "normalization_contract_id": NORMALIZATION_CONTRACT_ID,
                     "chunk_contract_id": CHUNK_CONTRACT_ID,
                     "filter_contract_id": FILTER_CONTRACT_ID,
+                    "claim_curation_contract_id": CLAIM_CURATION_CONTRACT_ID,
                     "provenance_contract_id": PROVENANCE_CONTRACT_ID,
                     "embedding_contract_id": EMBEDDING_CONTRACT_ID,
                     "bm25_contract_id": BM25_CONTRACT_ID,
@@ -158,11 +193,23 @@ def compile_knowledge(
                     "ingested_at": timestamp,
                     "semantic_enrichment": "removed",
                 }
-                payload.update(enrich_domain_metadata(chunk.text, existing_metadata=payload))
+                if action_ids:
+                    payload["pre_curation_content_hash"] = pre_curation_hash
+                    payload["curation_action_ids"] = list(action_ids)
+                payload.update(enrich_domain_metadata(curated_text, existing_metadata=payload))
                 records.append(payload)
-                chunk_index += 1
-        source_counts[source.source_id] = chunk_index
+                unit_chunk_index += 1
+                source_chunk_count += 1
+        source_counts[source.source_id] = source_chunk_count
         filtered_counts[source.source_id] = filtered
+
+    expected_actions = {action.action_id for action in claim_exclusions}
+    if applied_actions != expected_actions:
+        missing = sorted(expected_actions - applied_actions)
+        unexpected = sorted(applied_actions - expected_actions)
+        raise ValueError(
+            f"Claim exclusion application mismatch: missing={missing}, unexpected={unexpected}"
+        )
 
     structural_hash = structural_records_hash(records)
     return CompiledKnowledge(

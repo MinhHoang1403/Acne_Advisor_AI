@@ -416,7 +416,7 @@ async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
 
     try:
         async with db_session.begin():
-            messages = await repo.get_messages(
+            messages = await repo.get_recent_messages(
                 session=db_session,
                 session_id=session_id,
                 limit=MAX_CONVERSATION_HISTORY_MESSAGES,

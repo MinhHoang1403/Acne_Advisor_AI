@@ -48,7 +48,7 @@ recreate, or delete the Qdrant knowledge index.
 .\venv\Scripts\python.exe -m pytest -q
 ```
 
-The runtime uses exact normalized answer cache `v9`. Cache identity
+The runtime uses exact normalized answer cache `v10`. Cache identity
 includes provider, model, pipeline fingerprint, and the normalized question; no
 semantic-similarity lookup is performed. Runtime retrieval is read-only
 Dense + native BM25 + RRF over

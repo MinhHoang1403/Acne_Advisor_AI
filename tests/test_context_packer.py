@@ -9,7 +9,9 @@ def _query() -> NormalizedQuery:
     )
 
 
-def _candidate(candidate_id: str, text: str, rank: int, source: str = "source-a") -> RetrievedCandidate:
+def _candidate(
+    candidate_id: str, text: str, rank: int, source: str = "source-a"
+) -> RetrievedCandidate:
     return RetrievedCandidate(
         candidate_id=candidate_id,
         collection="acne_knowledge",
@@ -22,6 +24,9 @@ def _candidate(candidate_id: str, text: str, rank: int, source: str = "source-a"
             "document_id": source,
             "source_id": source,
             "source_path": f"sample_data/{source}.pdf",
+            "header": "Retinoid tại chỗ",
+            "active_ingredient": ["adapalene"],
+            "drug_class": ["topical retinoid"],
         },
     )
 
@@ -39,6 +44,19 @@ def test_packer_preserves_fused_order_and_provenance() -> None:
     assert packed.chunk_items_count == 2
     assert "source=source-a" in packed.context_text
     assert "chunk=chunk-1" in packed.context_text
+    assert "section=Retinoid tại chỗ" in packed.context_text
+    assert "active_ingredient=adapalene" in packed.context_text
+    assert "drug_class=topical retinoid" in packed.context_text
+
+
+def test_packer_exposes_only_bounded_local_scope_without_reordering_text() -> None:
+    candidate = _candidate("chunk-1", "Exact evidence text.", 1)
+    candidate.payload["arbitrary_internal_metadata"] = "must not enter prompt"
+    packed = pack_context(_query(), [candidate], max_chars=1000)
+
+    assert packed.context_text.endswith("\nExact evidence text.")
+    assert "arbitrary_internal_metadata" not in packed.context_text
+    assert [item.item_id for item in packed.items] == ["chunk-1"]
 
 
 def test_packer_enforces_explicit_item_and_character_limits() -> None:

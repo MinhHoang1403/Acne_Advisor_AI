@@ -62,6 +62,75 @@ def test_source_metadata_deduplicates_filename_and_stable_source_id() -> None:
     assert all(entry["chunk_id"] for entry in metadata)
 
 
+def test_child_web_source_hides_parent_dataset_label_and_keeps_traceability() -> None:
+    metadata = build_source_metadata(
+        ["web_raw_dataset.json"],
+        contexts=[
+            {
+                "source_id": "web_dermnetnz_35860b4af4910f27",
+                "source_file": "web_raw_dataset.json",
+                "parent_source_id": "aad_public_acne_2026_07",
+                "source_title": "Acne",
+                "source_authority": "DermNet",
+                "source_url": "https://dermnetnz.org/topics/acne",
+                "source_type": "dermatology_reference",
+                "chunk_id": "chunk-dermnet",
+            }
+        ],
+    )
+
+    assert metadata == [
+        {
+            "source_id": "web_dermnetnz_35860b4af4910f27",
+            "canonical_filename": None,
+            "source_type": "other",
+            "source_path": None,
+            "document_title": "Acne",
+            "display_name": "DermNet — Acne",
+            "authority": "DermNet",
+            "source_url": "https://dermnetnz.org/topics/acne",
+            "chunk_id": "chunk-dermnet",
+            "page": None,
+            "origin": "dermatology_reference",
+        }
+    ]
+
+
+def test_child_web_source_labels_distinguish_publishers_with_the_same_page_title() -> None:
+    metadata = build_source_metadata(
+        ["web_raw_dataset.json"],
+        contexts=[
+            {
+                "source_id": "web_dermnetnz_35860b4af4910f27",
+                "source_file": "web_raw_dataset.json",
+                "parent_source_id": "aad_public_acne_2026_07",
+                "source_title": "Acne",
+                "source_authority": "DermNet",
+                "source_url": "https://dermnetnz.org/topics/acne",
+                "source_type": "dermatology_reference",
+                "chunk_id": "chunk-dermnet",
+            },
+            {
+                "source_id": "web_aad_eb67ac58641ae1c2",
+                "source_file": "web_raw_dataset.json",
+                "parent_source_id": "aad_public_acne_2026_07",
+                "source_title": "Acne",
+                "source_authority": "American Academy of Dermatology",
+                "source_url": "https://www.aad.org/public/diseases/acne",
+                "source_type": "dermatology_reference",
+                "chunk_id": "chunk-aad",
+            },
+        ],
+    )
+
+    assert {entry["display_name"] for entry in metadata} == {
+        "DermNet — Acne",
+        "American Academy of Dermatology — Acne",
+    }
+    assert len({entry["source_id"] for entry in metadata}) == 2
+    assert all(entry["display_name"] != "AAD public acne dataset" for entry in metadata)
+
+
 def test_source_validation_removes_only_unretrieved_names() -> None:
     result = validate_answer_source_mentions(
         "Theo invented-guide.pdf, hãy xem qd_4416_cut.pdf ở trang 3.",

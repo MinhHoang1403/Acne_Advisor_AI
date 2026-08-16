@@ -38,7 +38,7 @@ SOURCE_TYPE_ORDER = {
     "other": 2,
 }
 
-SOURCE_NORMALIZATION_VERSION = "source_normalization_v1"
+SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
 _KNOWN_SOURCE_IDS = {
     source_id.casefold(): source_id
     for source_id in FILE_SOURCE_DISPLAY_NAMES
@@ -72,15 +72,27 @@ def build_source_metadata(
     """
 
     context_by_id: dict[str, dict[str, Any]] = {}
+    backing_source_ids: set[str] = set()
     for ctx in contexts or []:
         source_id = _source_id_from_context(ctx)
         if source_id and source_id not in context_by_id:
             context_by_id[source_id] = ctx
+        for value in (
+            ctx.get("parent_source_id"),
+            ctx.get("source_file"),
+            ctx.get("source_path"),
+            _metadata_value(ctx, "parent_source_id"),
+            _metadata_value(ctx, "source_file"),
+            _metadata_value(ctx, "source_path"),
+        ):
+            normalized = normalize_source_identifier(value)
+            if normalized and normalized != source_id:
+                backing_source_ids.add(normalized)
 
     ordered_ids: list[str] = []
     for source in sources or []:
         source_id = _source_id_from_value(source)
-        if source_id and source_id not in ordered_ids:
+        if source_id and source_id not in backing_source_ids and source_id not in ordered_ids:
             ordered_ids.append(source_id)
     for source_id in context_by_id:
         if source_id not in ordered_ids:
@@ -235,7 +247,19 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
     )
     source_type = _source_type(source_id, context)
     source_path = _first_text(context.get("source_path"), _metadata_value(context, "source_path"))
-    display_name = _display_name(source_id, document_title=document_title, source_type=source_type)
+    authority = _first_text(
+        context.get("source_authority"),
+        context.get("authority"),
+        _metadata_value(context, "source_authority"),
+        _metadata_value(context, "authority"),
+    )
+    source_url = _first_text(context.get("source_url"), _metadata_value(context, "source_url"))
+    display_name = _display_name(
+        source_id,
+        document_title=document_title,
+        source_type=source_type,
+        authority=authority,
+    )
     return {
         "source_id": source_id,
         "canonical_filename": Path(source_id.replace("\\", "/")).name if source_type in {"document", "dataset"} else None,
@@ -243,16 +267,26 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
         "source_path": source_path,
         "document_title": document_title,
         "display_name": display_name,
+        "authority": authority,
+        "source_url": source_url,
         "chunk_id": _first_text(context.get("chunk_id"), _metadata_value(context, "chunk_id")),
         "page": context.get("page") or _metadata_value(context, "page"),
         "origin": _first_text(context.get("source_type"), _metadata_value(context, "source_type")) or source_type,
     }
 
 
-def _display_name(source_id: str, *, document_title: str | None, source_type: str) -> str:
+def _display_name(
+    source_id: str,
+    *,
+    document_title: str | None,
+    source_type: str,
+    authority: str | None,
+) -> str:
     filename = Path(source_id.replace("\\", "/")).name
     if filename in FILE_SOURCE_DISPLAY_NAMES:
         return FILE_SOURCE_DISPLAY_NAMES[filename]
+    if source_id.casefold().startswith("web_") and authority and document_title:
+        return f"{authority} — {document_title}"
     if document_title:
         return document_title
     if filename:
@@ -266,11 +300,11 @@ def _display_name(source_id: str, *, document_title: str | None, source_type: st
 
 def _source_id_from_context(context: dict[str, Any]) -> str:
     return normalize_source_identifier(_first_text(
-        context.get("source_file"),
         context.get("source_id"),
+        context.get("source_file"),
         context.get("source_path"),
-        _metadata_value(context, "source_file"),
         _metadata_value(context, "source_id"),
+        _metadata_value(context, "source_file"),
         _metadata_value(context, "source_path"),
     ))
 

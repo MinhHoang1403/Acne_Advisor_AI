@@ -16,7 +16,7 @@ from src.agent.prompts.medical_answer import MEDICAL_RAG_SYSTEM_PROMPT
 
 def test_formatting_contract_version_and_comparison_shape_are_current() -> None:
     instruction = answer_format_instruction_for_question("A và B khác nhau thế nào?")
-    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v14"
+    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v15"
     assert "đối chiếu" in instruction
     assert "evidence" in instruction
 
@@ -130,6 +130,20 @@ async def test_explicit_medication_advice_receives_one_canonical_disclaimer(
 @pytest.mark.parametrize(
     "question",
     [
+        "Tôi nên dùng adapalene thế nào?",
+        "Adapalene dùng thế nào?",
+        "Bôi benzoyl peroxide ra sao?",
+        "Có nên tự dùng isotretinoin không?",
+        "Uống doxycycline bao lâu?",
+    ],
+)
+def test_named_treatment_management_questions_require_disclaimer(question: str) -> None:
+    assert should_include_medical_disclaimer(question) is True
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
         "Mụn đầu đen là gì?",
         "Mụn viêm là gì?",
         "Da dầu có gây mụn không?",
@@ -139,6 +153,8 @@ async def test_explicit_medication_advice_receives_one_canonical_disclaimer(
         "Nên dùng kem dưỡng nào cho da mụn?",
         "Adapalene là gì?",
         "Adapalene dùng để làm gì?",
+        "Nên dùng kem dưỡng nào?",
+        "Chăm sóc mụn thế nào?",
     ],
 )
 def test_ordinary_information_does_not_require_generic_disclaimer(question: str) -> None:
@@ -180,3 +196,23 @@ def test_duplicate_heading_and_disclaimer_cleanup_is_idempotent() -> None:
     twice = finalize_answer_presentation(once, user_question="Câu hỏi?")
     assert once == twice
     assert once.count("Thông tin mang tính tham khảo") <= 1
+
+
+def test_terminal_generic_boilerplate_is_removed_but_specific_safety_action_remains() -> None:
+    generic = finalize_answer_presentation(
+        "Nội dung từ evidence.\n\nBạn nên tham khảo bác sĩ da liễu để được tư vấn phác đồ phù hợp.",
+        user_question="Adapalene dùng để làm gì?",
+    )
+    safety = finalize_answer_presentation(
+        "Ngừng thuốc và liên hệ nhân viên y tế nếu bạn khó thở.",
+        user_question="Tôi khó thở sau khi bôi thuốc.",
+        severity="emergency",
+    )
+    assert generic == "Nội dung từ evidence."
+    assert safety.startswith("Ngừng thuốc và liên hệ nhân viên y tế")
+    assert safety.count(CANONICAL_DISCLAIMER) == 1
+
+
+def test_terminal_markdown_artifacts_are_removed_without_touching_valid_bold() -> None:
+    cleaned = normalize_answer_markdown("**Lưu ý**\n\nNội dung hợp lệ. **\n*.")
+    assert cleaned == "**Lưu ý**\n\nNội dung hợp lệ."

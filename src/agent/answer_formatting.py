@@ -17,7 +17,7 @@ ResponseProfile = Literal[
     "safe_fallback",
 ]
 
-ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v14"
+ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v15"
 
 CANONICAL_DISCLAIMER = (
     "Thông tin chỉ mang tính tham khảo và hỗ trợ tìm hiểu, không thay thế tư vấn, "
@@ -37,7 +37,7 @@ LEGACY_BOILERPLATE_HEADINGS = (
 )
 
 ANSWER_FORMATTING_CONTRACT = """\
-ANSWER PRESENTATION CONTRACT V14:
+ANSWER PRESENTATION CONTRACT V15:
 - Dùng cùng một chuẩn trình bày cho mọi provider và mọi response origin.
 - Không lặp lại câu hỏi làm tiêu đề; bắt đầu ngay bằng câu trả lời.
 - Trả lời trực tiếp trước, sau đó mới giải thích.
@@ -161,14 +161,7 @@ def should_include_medical_disclaimer(
         return True
 
     text = _fold(question)
-    medication_advice = bool(
-        re.search(
-            r"\b(?:thuoc nao|ke don|ke thuoc|toa thuoc|tang lieu|giam lieu|chon lieu|"
-            r"(?:co nen|nen) (?:dung|uong|boi) thuoc|"
-            r"(?:dung|uong|boi) thuoc .{0,50} the nao|thuoc .{0,40} phu hop)\b",
-            text,
-        )
-    )
+    medication_advice = _is_medication_management_question(text)
     if fallback_type and fallback_type != "none" and not medication_advice:
         return False
     return medication_advice
@@ -180,6 +173,7 @@ def normalize_answer_markdown(text: str, *, disclaimer: str | None = None) -> st
     answer = _remove_greetings(_normalize_newlines(text))
     answer = _normalize_table_spacing(answer)
     answer = _remove_empty_markdown_headings(answer)
+    answer = _remove_terminal_markdown_artifacts(answer)
     answer = _dedupe_exact_headings(answer)
     if disclaimer:
         answer = _dedupe_disclaimer(answer, disclaimer)
@@ -310,7 +304,7 @@ def _remove_known_disclaimers(text: str) -> str:
     output = text
     for disclaimer in (CANONICAL_DISCLAIMER, *LEGACY_DISCLAIMERS):
         output = output.replace(disclaimer, "")
-    return output.strip()
+    return _remove_terminal_generic_boilerplate(output).strip()
 
 
 def _append_disclaimer_once(text: str, disclaimer: str) -> str:
@@ -335,6 +329,38 @@ def _normalize_table_spacing(text: str) -> str:
             continue
         output.append(line.rstrip())
     return "\n".join(output)
+
+
+def _remove_terminal_markdown_artifacts(text: str) -> str:
+    lines = text.splitlines()
+    while lines and lines[-1].strip() in {"*", "*.", "**", "**."}:
+        lines.pop()
+    if lines:
+        lines[-1] = re.sub(r"\s+\*{1,2}\.?$", "", lines[-1]).rstrip()
+    return "\n".join(lines)
+
+
+def _remove_terminal_generic_boilerplate(text: str) -> str:
+    paragraphs = [part.strip() for part in re.split(r"\n{2,}", text) if part.strip()]
+    while paragraphs and _is_generic_disclaimer_paragraph(paragraphs[-1]):
+        paragraphs.pop()
+    return "\n\n".join(paragraphs)
+
+
+def _is_generic_disclaimer_paragraph(paragraph: str) -> bool:
+    folded = _fold(paragraph)
+    safety_markers = (
+        "goi cap cuu", "di kham ngay", "ngung thuoc", "mang thai",
+        "lien he bac si ke don", "neu ",
+    )
+    if any(marker in folded for marker in safety_markers) or len(folded.split()) > 45:
+        return False
+    return bool(re.fullmatch(
+        r"(?:thong tin (?:nay|tren) (?:chi )?(?:mang tinh tham khao|mang tinh chat ho tro tim hieu).*)|"
+        r"(?:viec chan doan va dieu tri nen do bac si.*)|"
+        r"(?:ban nen tham khao bac si da lieu de duoc tu van phac do phu hop[.!]?)",
+        folded,
+    ))
 
 
 def _remove_empty_markdown_headings(text: str) -> str:
@@ -440,6 +466,28 @@ def _contains_markdown_table(text: str) -> bool:
 
 def _count_markdown_items(text: str) -> int:
     return len(re.findall(r"(?m)^\s*(?:[-*+] |\d+[.)] )\S", text or ""))
+
+
+def _is_medication_management_question(text: str) -> bool:
+    if re.search(r"\b(?:la gi|dung de lam gi|dung de tri gi|co tac dung gi)\b", text):
+        return False
+    if re.search(
+        r"\b(?:sua rua mat|kem duong|kem chong nang|my pham|san pham nay|cham soc|routine)\b",
+        text,
+    ):
+        return False
+    explicit = re.search(
+        r"\b(?:thuoc nao|ke don|ke thuoc|toa thuoc|tang lieu|giam lieu|chon lieu|"
+        r"thuoc .{0,40} phu hop)\b",
+        text,
+    )
+    management = re.search(
+        r"\b(?:(?:co nen|nen|khong nen) (?:tu )?(?:dung|uong|boi) .{1,60}|"
+        r"(?:dung|uong|boi) .{1,60} (?:the nao|ra sao|bao lau)|"
+        r".{1,50} (?:dung|uong|boi) (?:the nao|ra sao|bao lau))\b",
+        text,
+    )
+    return bool(explicit or management)
 
 
 def _is_comparison_question(text: str) -> bool:

@@ -149,6 +149,29 @@ async def get_messages(
     return [dict(row) for row in result.mappings().fetchall()]
 
 
+async def get_recent_messages(
+    session: AsyncSession,
+    session_id: str,
+    limit: int = 10,
+) -> list[dict]:
+    """Chọn latest N messages rồi trả lại theo thứ tự hội thoại tăng dần."""
+    result = await session.execute(
+        text("""
+            SELECT id, session_id, role, content, sources, metadata, created_at
+            FROM (
+                SELECT id, session_id, role, content, sources, metadata, created_at
+                FROM chat_messages
+                WHERE session_id = :session_id
+                ORDER BY created_at DESC, id DESC
+                LIMIT :limit
+            ) AS recent_messages
+            ORDER BY created_at ASC, id ASC
+        """),
+        {"session_id": session_id, "limit": limit},
+    )
+    return [dict(row) for row in result.mappings().fetchall()]
+
+
 async def rename_session(
     session: AsyncSession,
     session_id: str,

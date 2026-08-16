@@ -1,7 +1,7 @@
 schema: phase1_source_manifest
-schema_version: 1
+schema_version: 2
 verified_through: '2026-08-14'
-identity_contract: source_id_is_curated_stable_id_document_id_is_sha256_of_source_id_and_content_hash
+identity_contract: parent_artifact_sha256_child_source_id_from_publisher_and_url_document_id_from_source_id_and_content_hash
 sources:
   - source_id: nice_ng198_2026_08
     title: 'Acne vulgaris: management (NG198)'
@@ -46,16 +46,20 @@ sources:
     current_as_of_cutoff: true
     inclusion_reason: authoritative Vietnamese terminology and clinical context
     limitation: local file contains pages 433-442 only; direct attachment URL unavailable
+    claim_exclusions: claim_exclusions.yaml
+    claim_exclusions_sha256: bf09e16b37a54815818e1389531a2b8dad21f0b43f52c7dcfdfb633d4b5d3128
   - source_id: aad_public_acne_2026_07
-    title: AAD public acne education snapshot
-    authority: American Academy of Dermatology
-    source_type: professional_organization_patient_education
+    title: Multi-publisher public acne education collection
+    authority: AAD, NHS, WebMD, DermNet, Healthline, and Da Lieu Viet Nam
+    source_type: multi_publisher_web_page_collection
     version_date: '2026-07-03'
     retrieved_at: '2026-07-03'
     original_url: https://www.aad.org/public/diseases/acne
     local_filename: web_raw_dataset.json
     media_type: application/json
     sha256: 540def711016b8608832b0ddac1a9004076e3e7e6c87ee783f205fe656e5a235
-    licensing: AAD copyright; factual excerpts retained for local research
+    licensing: publisher-specific copyright; factual excerpts retained for local research
     current_as_of_cutoff: true
-    inclusion_reason: supplemental patient-facing evidence and terminology
+    inclusion_reason: supplemental patient-facing evidence and terminology from six publishers
+    record_catalog: web_records.yaml
+    record_catalog_sha256: 5c403edf97e4da4dd51765a104199af6d9b29ecdc528194907f899d9574df1c5

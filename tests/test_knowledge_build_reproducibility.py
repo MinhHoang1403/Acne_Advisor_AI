@@ -2,19 +2,189 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from src.ingestion.build import compile_knowledge, compute_build_identity
-from src.ingestion.parser import load_or_parse_source
+from src.ingestion.build import BuildIdentity, compile_knowledge, compute_build_identity
+from src.ingestion.embedding import EmbeddingContract
+from src.ingestion.filtering import load_claim_exclusions
+from src.ingestion.parser import ParsedArtifact, ParsedUnit, load_or_parse_source
 from src.ingestion.provenance import validate_provenance
-from src.ingestion.source_manifest import load_source_manifest
+from src.ingestion.source_manifest import (
+    CanonicalSource,
+    WebRecordSource,
+    load_source_manifest,
+    load_web_record_catalog,
+)
+
+
+def _synthetic_source(*, web: bool = False) -> CanonicalSource:
+    return CanonicalSource(
+        source_id="synthetic_web" if web else "synthetic_document",
+        title="Synthetic source",
+        authority="Test authority",
+        source_type="web" if web else "document",
+        version_date="2026-08-17",
+        original_url="https://example.test/source",
+        local_filename="source.json" if web else "source.md",
+        media_type="application/json" if web else "text/markdown",
+        sha256="a" * 64,
+        record_catalog="records.yaml" if web else "",
+        record_catalog_sha256="b" * 64 if web else "",
+    )
+
+
+def _synthetic_artifact(source: CanonicalSource) -> ParsedArtifact:
+    return ParsedArtifact(
+        source_id=source.source_id,
+        source_hash=source.sha256,
+        parser_contract_id="parser",
+        normalization_contract_id="normalizer",
+        parsed_output_hash="c" * 64,
+        normalized_output_hash="d" * 64,
+        units=(
+            ParsedUnit(locator="record-1", text="First distinct paragraph.", source_url="https://example.test/1"),
+            ParsedUnit(locator="record-2", text="Second distinct paragraph.", source_url="https://example.test/2"),
+        ),
+    )
+
+
+def _synthetic_identity() -> BuildIdentity:
+    return BuildIdentity("build", "source-hash", "taxonomy-hash", "contract-hash")
+
+
+def test_non_web_chunk_indexes_remain_source_global_across_parsed_units() -> None:
+    source = _synthetic_source()
+
+    compiled = compile_knowledge(
+        (source,),
+        {source.source_id: _synthetic_artifact(source)},
+        _synthetic_identity(),
+    )
+
+    assert [record["chunk_index"] for record in compiled.records] == [0, 1]
+    assert [record["chunk_id"] for record in compiled.records] == [
+        "c4ae4f95-596d-5628-8510-c754d7ecc440",
+        "db447cb2-0349-57c0-a09c-feb247db0158",
+    ]
+
+
+def test_child_web_chunk_indexes_are_record_local() -> None:
+    source = _synthetic_source(web=True)
+    catalog = {
+        url: WebRecordSource(
+            parent_source_id=source.source_id,
+            source_id=f"child-{index}",
+            title=f"Child {index}",
+            authority="Test publisher",
+            source_type="web",
+            source_url=url,
+            raw_text_sha256=str(index) * 64,
+        )
+        for index, url in enumerate(("https://example.test/1", "https://example.test/2"), 1)
+    }
+
+    compiled = compile_knowledge(
+        (source,),
+        {source.source_id: _synthetic_artifact(source)},
+        _synthetic_identity(),
+        web_record_catalogs={source.source_id: catalog},
+    )
+
+    assert [record["chunk_index"] for record in compiled.records] == [0, 0]
+
+
+def test_chunk_id_scope_does_not_change_embedding_text_or_cache_identity() -> None:
+    document_source = _synthetic_source()
+    web_source = _synthetic_source(web=True)
+    urls = ("https://example.test/1", "https://example.test/2")
+    catalog = {
+        url: WebRecordSource(
+            parent_source_id=web_source.source_id,
+            source_id=f"child-{index}",
+            title=f"Child {index}",
+            authority="Test publisher",
+            source_type="web",
+            source_url=url,
+            raw_text_sha256=str(index) * 64,
+        )
+        for index, url in enumerate(urls, 1)
+    }
+    document_records = compile_knowledge(
+        (document_source,),
+        {document_source.source_id: _synthetic_artifact(document_source)},
+        _synthetic_identity(),
+    ).records
+    web_records = compile_knowledge(
+        (web_source,),
+        {web_source.source_id: _synthetic_artifact(web_source)},
+        _synthetic_identity(),
+        web_record_catalogs={web_source.source_id: catalog},
+    ).records
+    contract = EmbeddingContract()
+
+    assert [record["text"] for record in document_records] == [
+        record["text"] for record in web_records
+    ]
+    assert [contract.identity(record["text"]) for record in document_records] == [
+        contract.identity(record["text"]) for record in web_records
+    ]
+    assert [record["chunk_id"] for record in document_records] != [
+        record["chunk_id"] for record in web_records
+    ]
+
+
+def test_manifest_mismatch_is_only_non_blocking_for_offline_validation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from src.ingestion import pipeline
+
+    async def fake_prepare_knowledge():
+        return {
+            "identity": SimpleNamespace(build_id="prepared-build"),
+            "offline_validation": {
+                "layers": [{"layer": "compiled", "passed": True, "errors": []}]
+            },
+            "compiled": SimpleNamespace(records=[]),
+            "cards": [],
+        }
+
+    manifest = {
+        "build_id": "active-build",
+        "collections": {
+            "knowledge_physical": "knowledge-active",
+            "entity_physical": "entities-active",
+        },
+    }
+
+    class FakeQdrantClient:
+        async def close(self) -> None:
+            return None
+
+    async def fake_validate_collection(*args, **kwargs):
+        return {"layer": "qdrant", "passed": True, "errors": []}
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(pipeline, "prepare_knowledge", fake_prepare_knowledge)
+    monkeypatch.setattr(pipeline, "load_build_manifest", lambda path: manifest)
+    monkeypatch.setattr(pipeline, "AsyncQdrantClient", lambda **kwargs: FakeQdrantClient())
+    monkeypatch.setattr(pipeline, "validate_qdrant_collection", fake_validate_collection)
+
+    offline = asyncio.run(pipeline.validate_knowledge(manifest_path=manifest_path, live=False))
+    live = asyncio.run(pipeline.validate_knowledge(manifest_path=manifest_path, live=True))
+
+    offline_manifest = next(layer for layer in offline["layers"] if layer["layer"] == "manifest")
+    assert offline["passed"] is True
+    assert offline_manifest["warnings"] == ["prepared build is not activated"]
+    assert live["passed"] is False
+    assert "build ID mismatch" in live["errors"]
 
 
 def test_build_identity_is_stable_across_taxonomy_line_endings(tmp_path: Path) -> None:
-    source_manifest = (
-        Path(__file__).resolve().parents[1] / "data" / "sources" / "manifest.yaml"
-    )
+    source_manifest = Path(__file__).resolve().parents[1] / "data" / "sources" / "manifest.yaml"
     taxonomy_lf = tmp_path / "taxonomy-lf.yaml"
     taxonomy_crlf = tmp_path / "taxonomy-crlf.yaml"
     taxonomy_lf.write_bytes(b"version: v1\nentries:\n  - adapalene\n")
@@ -30,7 +200,11 @@ def test_build_identity_is_stable_across_taxonomy_line_endings(tmp_path: Path) -
 def test_frozen_actual_corpus_compiles_reproducibly_with_complete_provenance() -> None:
     root = Path(__file__).resolve().parents[1]
     sources = load_source_manifest(root / "data" / "sources" / "manifest.yaml")
-    missing = [source.local_filename for source in sources if not (root / "sample_data" / source.local_filename).is_file()]
+    missing = [
+        source.local_filename
+        for source in sources
+        if not (root / "sample_data" / source.local_filename).is_file()
+    ]
     if missing:
         pytest.skip("Canonical licensed corpus is not present in this checkout")
 
@@ -51,8 +225,37 @@ def test_frozen_actual_corpus_compiles_reproducibly_with_complete_provenance() -
         root / "data" / "sources" / "manifest.yaml",
         root / "data" / "taxonomy" / "drug_aliases.yaml",
     )
-    first = compile_knowledge(sources, artifacts, identity, ingested_at="A")
-    second = compile_knowledge(sources, artifacts, identity, ingested_at="B")
+    manifest_path = root / "data" / "sources" / "manifest.yaml"
+    web_catalogs = {
+        source.source_id: load_web_record_catalog(
+            source,
+            manifest_path=manifest_path,
+            source_dir=root / "sample_data",
+        )
+        for source in sources
+        if source.record_catalog
+    }
+    exclusions = tuple(
+        action
+        for source in sources
+        for action in load_claim_exclusions(source, manifest_path=manifest_path)
+    )
+    first = compile_knowledge(
+        sources,
+        artifacts,
+        identity,
+        web_record_catalogs=web_catalogs,
+        claim_exclusions=exclusions,
+        ingested_at="A",
+    )
+    second = compile_knowledge(
+        sources,
+        artifacts,
+        identity,
+        web_record_catalogs=web_catalogs,
+        claim_exclusions=exclusions,
+        ingested_at="B",
+    )
 
     assert first.identity == second.identity
     assert first.structural_hash == second.structural_hash
@@ -61,6 +264,8 @@ def test_frozen_actual_corpus_compiles_reproducibly_with_complete_provenance() -
     ]
     assert len(first.records) == 512
     assert all(not validate_provenance(record) for record in first.records)
-    assert {record["source_id"] for record in first.records} == {
-        source.source_id for source in sources
+    represented_parents = {
+        record.get("parent_source_id") or record["source_id"] for record in first.records
     }
+    assert represented_parents == {source.source_id for source in sources}
+    assert len([record for record in first.records if record.get("curation_action_ids")]) == 5
