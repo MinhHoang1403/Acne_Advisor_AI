@@ -8,6 +8,7 @@ replace; module không tự build, activate hoặc mutate datastore.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,9 @@ from src.ingestion.normalization import NORMALIZATION_CONTRACT_ID
 from src.ingestion.parser import PARSER_CONFIGURATION, PARSER_CONTRACT_ID, ParsedArtifact
 from src.ingestion.provenance import PROVENANCE_CONTRACT_ID
 from src.ingestion.source_manifest import CanonicalSource, SOURCE_MANIFEST_SCHEMA_VERSION
+
+
+BUILD_ID_PATTERN = re.compile(r"^[0-9a-f]{20}$")
 
 
 def build_manifest(
@@ -137,4 +141,20 @@ def load_build_manifest(path: Path) -> dict[str, Any]:
     return raw
 
 
-__all__ = ["build_manifest", "load_build_manifest", "save_build_manifest"]
+def validate_build_id(value: str | None, *, setting_name: str = "KB_VERSION") -> str:
+    """Return a frozen-build identifier or fail closed on missing/stale config."""
+
+    candidate = (value or "").strip()
+    if not BUILD_ID_PATTERN.fullmatch(candidate):
+        raise ValueError(
+            f"{setting_name} must be a 20-character lowercase hexadecimal build ID"
+        )
+    return candidate
+
+
+__all__ = [
+    "build_manifest",
+    "load_build_manifest",
+    "save_build_manifest",
+    "validate_build_id",
+]

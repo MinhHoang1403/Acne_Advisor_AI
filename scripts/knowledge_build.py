@@ -1,4 +1,4 @@
-"""Operator CLI cho build, validate, activate và xem knowledge status.
+"""Operator CLI cho build, validate, activate, finalize và xem knowledge status.
 
 ``status`` và ``validate --offline`` không ghi datastore. ``build`` tạo candidate
 collections/cache/manifest; ``--activate`` còn chuyển Qdrant aliases và thay entity
@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.ingestion.pipeline import (  # noqa: E402
     activate_knowledge,
     build_knowledge,
+    finalize_knowledge_activation,
     inspect_embedding_cache_reuse,
     knowledge_status,
     validate_knowledge,
@@ -49,6 +50,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "inspect-cache",
         help="Verify parser and embedding cache reuse without provider or datastore calls.",
     )
+    subparsers.add_parser(
+        "finalize-activation",
+        help="Validate an activated live build and atomically finalize its manifest.",
+    )
     subparsers.add_parser("status", help="Show expected and current build identity.")
     return parser.parse_args(argv)
 
@@ -67,6 +72,8 @@ async def async_main(argv: list[str] | None = None) -> int:
         result = await validate_knowledge(live=not args.offline)
     elif args.command == "inspect-cache":
         result = await inspect_embedding_cache_reuse()
+    elif args.command == "finalize-activation":
+        result = await finalize_knowledge_activation()
     else:
         result = await knowledge_status()
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
