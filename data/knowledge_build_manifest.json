@@ -429,7 +429,7 @@
       }
     },
     "knowledge_alias": "acne_knowledge",
-    "rollback_root": "data/backups/20260813T211931Z_s4a_pre_mutation",
+    "rollback_root": "data/backups/20260816T182252Z",
     "validation": {
       "errors": [],
       "layers": [
@@ -439,9 +439,87 @@
             {
               "counts_by_source": {
                 "aad_acne_guideline_2024": 151,
-                "aad_public_acne_2026_07": 209,
                 "nice_ng198_2026_08": 106,
-                "vn_moh_dermatology_4416_2023_acne": 46
+                "vn_moh_dermatology_4416_2023_acne": 46,
+                "web_aad_02f221d87118c136": 4,
+                "web_aad_073fc820df3299fa": 2,
+                "web_aad_1c6fa230d571eecd": 3,
+                "web_aad_1fb3ce4ca890127b": 3,
+                "web_aad_238c4d7073ed94e5": 2,
+                "web_aad_34ba10cee98903e4": 3,
+                "web_aad_35a02cc996257b60": 2,
+                "web_aad_3704c0d667aad94b": 2,
+                "web_aad_39a37c16fd5805d7": 2,
+                "web_aad_3abe48e920985887": 4,
+                "web_aad_3bfd7764e3c15696": 2,
+                "web_aad_3c3e24b89e9c4a8f": 2,
+                "web_aad_4d448a651ca1a898": 4,
+                "web_aad_502603ec115bf029": 1,
+                "web_aad_6151c4343a6193f2": 4,
+                "web_aad_704d63ef07b2b55e": 1,
+                "web_aad_713ac4dc72c13a5c": 1,
+                "web_aad_75bb191293d75b2a": 3,
+                "web_aad_821fd08b1e2acf72": 2,
+                "web_aad_88a4258288696392": 2,
+                "web_aad_8a4004398dd94966": 4,
+                "web_aad_8aab9bec6b5205a1": 2,
+                "web_aad_8b5ac304bb90a8f1": 7,
+                "web_aad_8c2d1ea83468f3b3": 1,
+                "web_aad_92490f362113d291": 2,
+                "web_aad_953a1363781ef616": 1,
+                "web_aad_9b5e272fa150e083": 2,
+                "web_aad_9cbdba4d25a0e47f": 5,
+                "web_aad_afb0c99a0b1a06e7": 3,
+                "web_aad_b334bf638847c33a": 3,
+                "web_aad_b3a7f283617a12dd": 3,
+                "web_aad_b9d64bfaa18c335e": 1,
+                "web_aad_c501c1ec85d8d264": 2,
+                "web_aad_c6ba84215f2ed2e6": 1,
+                "web_aad_d727d6d0315b20e8": 5,
+                "web_aad_ea1a28a877650a1c": 2,
+                "web_aad_ea7e272194ae30a8": 3,
+                "web_aad_eb1e045f03b00753": 2,
+                "web_aad_eb67ac58641ae1c2": 1,
+                "web_aad_f804c38287438116": 1,
+                "web_aad_f91bfdcf9257111e": 2,
+                "web_aad_fa00b4ce617b72b8": 3,
+                "web_aad_fc9197bb611abbf3": 2,
+                "web_aad_fe498971f4522913": 3,
+                "web_dalieu_vn_10a8b699200d7eb5": 1,
+                "web_dermnetnz_1722a714e689b578": 3,
+                "web_dermnetnz_1f84ef6be37a6f41": 3,
+                "web_dermnetnz_35860b4af4910f27": 3,
+                "web_dermnetnz_3c2faa7fc8cbafce": 3,
+                "web_dermnetnz_58d1724a2b394bd3": 5,
+                "web_dermnetnz_7f9070f55ec6ffce": 1,
+                "web_dermnetnz_8d930888c730deaa": 4,
+                "web_dermnetnz_bd03071a0f669923": 2,
+                "web_dermnetnz_cddf43ad3f7f941d": 3,
+                "web_dermnetnz_ec0c3bbd95f04a92": 2,
+                "web_dermnetnz_f085d1fdb8511252": 3,
+                "web_dermnetnz_f1d65592ea32d9a9": 2,
+                "web_healthline_7818063059457ea6": 6,
+                "web_nhs_2073fedbb93a882d": 3,
+                "web_nhs_473a5fe637767b2a": 1,
+                "web_webmd_0190f6ad0414f833": 4,
+                "web_webmd_097f0ce1d63f69be": 3,
+                "web_webmd_0eddbeb4d06c0f22": 3,
+                "web_webmd_19eb05a25ec596c1": 1,
+                "web_webmd_2e1a68d057fcef88": 1,
+                "web_webmd_2f5bede800c5dd20": 3,
+                "web_webmd_33a916352cbd1587": 6,
+                "web_webmd_5117b72504d0a71c": 3,
+                "web_webmd_767147e32e3b9c86": 3,
+                "web_webmd_a53c0ed594b62de2": 7,
+                "web_webmd_ac23e97d312c18a9": 2,
+                "web_webmd_c0ee260eba0f8672": 5,
+                "web_webmd_c412d3b787047c80": 2,
+                "web_webmd_d5f34b505f03c4b0": 4,
+                "web_webmd_d7530a116892ea26": 1,
+                "web_webmd_d8707a47060c3a11": 2,
+                "web_webmd_e2c766354fad7725": 1,
+                "web_webmd_f0e9536a7a6d0993": 2,
+                "web_webmd_fbe1f977331d1ba6": 1
               },
               "errors": [],
               "layer": "compiled_knowledge",
@@ -469,7 +547,7 @@
             },
             {
               "bm25_smoke_ids": [
-                "7941aafd-ba7e-5c76-bdbc-b80582084961",
+                "482af244-740e-5c80-a8ed-ecd5ffcb6fd8",
                 "0811a89d-e1a3-598a-abd9-4ccb52b8933e",
                 "0db005da-2cd8-5d04-9413-1843f19377fd"
               ],
@@ -494,7 +572,7 @@
         },
         {
           "bm25_smoke_ids": [
-            "7941aafd-ba7e-5c76-bdbc-b80582084961",
+            "482af244-740e-5c80-a8ed-ecd5ffcb6fd8",
             "0811a89d-e1a3-598a-abd9-4ccb52b8933e",
             "0db005da-2cd8-5d04-9413-1843f19377fd"
           ],
@@ -939,7 +1017,7 @@
       "passed": true
     }
   },
-  "build_id": "ec0a6de32d58ac181af6",
+  "build_id": "94d613bc9b33628de3ef",
   "cache": {
     "entity_embeddings": {
       "cache_hits": 32,
@@ -948,25 +1026,25 @@
       "retry_count": 0
     },
     "knowledge_embeddings": {
-      "cache_hits": 512,
-      "cache_misses": 0,
-      "provider_calls": 0,
+      "cache_hits": 507,
+      "cache_misses": 5,
+      "provider_calls": 1,
       "retry_count": 0
     },
     "legacy_dense_reuse": {
-      "loaded": 638,
-      "unreadable": 1
+      "loaded": 0,
+      "unreadable": 0
     },
     "parsed_hits": 4,
     "parsed_total": 4
   },
   "collections": {
     "entity_logical": "acne_entities",
-    "entity_physical": "acne_entities__ec0a6de32d58ac181af6",
+    "entity_physical": "acne_entities__94d613bc9b33628de3ef",
     "knowledge_logical": "acne_knowledge",
-    "knowledge_physical": "acne_knowledge__ec0a6de32d58ac181af6"
+    "knowledge_physical": "acne_knowledge__94d613bc9b33628de3ef"
   },
-  "contract_hash": "bc0f578f5e951945b52de2a128f1db0270dc2e589c29fc3eedb5c2a071ccd19e",
+  "contract_hash": "e83cd55eef2f3ec3d2bcebc0bbb1746384c8b570e1c4aebcd3baa61945bc22f8",
   "contracts": {
     "bm25": {
       "configuration": {
@@ -988,6 +1066,7 @@
       "modifier": "idf"
     },
     "chunk": "structure_first_chars_2400_no_overlap",
+    "claim_curation": "source_bound_exact_claim_exclusion_v1",
     "embedding": {
       "dimensions": 3072,
       "distance": "cosine",
@@ -1018,8 +1097,9 @@
       },
       "id": "llamaparse_0_6_94_markdown_or_direct_utf8"
     },
-    "provenance": "portable_content_bound_provenance",
-    "semantic_enrichment": "removed"
+    "provenance": "record_source_content_bound_provenance_v2",
+    "semantic_enrichment": "removed",
+    "source_manifest_schema": 2
   },
   "counts": {
     "entities": 32,
@@ -1028,11 +1108,11 @@
     "knowledge_chunks": 512,
     "sources": 4
   },
-  "created_at": "2026-08-13T22:46:43.388350+00:00",
-  "git_commit": "5321438eec09192a3ca2a15f595c1faf7f6df1ef",
+  "created_at": "2026-08-16T18:31:01.761424+00:00",
+  "git_commit": "699888cea2070a0f805be426f015af23e1f248e5",
   "phase1_frozen": true,
   "schema": "phase1_build_manifest",
-  "source_manifest_hash": "6f036185801d3651a68294007c7f3e05b89f1020165ab3773cd79b690d740091",
+  "source_manifest_hash": "cf6e094d0ae091338eb37b168c501674d2f7a77d78cb39ebf72a37ef0b360a0e",
   "sources": [
     {
       "chunk_count": 106,
@@ -1068,7 +1148,7 @@
     }
   ],
   "status": "activated",
-  "structural_hash": "5a3a1c2a9f27d337aac2dff6787e15e41c30c13ea32bf5631208c0176a1614a9",
+  "structural_hash": "7637686b26859e040425412dbf3b8b00f8c43d4c97b90e15e9f8e02c560d389a",
   "taxonomy_hash": "0fce290b2dbea500b9f2aaa59452b4af0cfb8ba606783d9b6de48ffc7471d763",
   "validation": {
     "errors": [],
@@ -1076,9 +1156,87 @@
       {
         "counts_by_source": {
           "aad_acne_guideline_2024": 151,
-          "aad_public_acne_2026_07": 209,
           "nice_ng198_2026_08": 106,
-          "vn_moh_dermatology_4416_2023_acne": 46
+          "vn_moh_dermatology_4416_2023_acne": 46,
+          "web_aad_02f221d87118c136": 4,
+          "web_aad_073fc820df3299fa": 2,
+          "web_aad_1c6fa230d571eecd": 3,
+          "web_aad_1fb3ce4ca890127b": 3,
+          "web_aad_238c4d7073ed94e5": 2,
+          "web_aad_34ba10cee98903e4": 3,
+          "web_aad_35a02cc996257b60": 2,
+          "web_aad_3704c0d667aad94b": 2,
+          "web_aad_39a37c16fd5805d7": 2,
+          "web_aad_3abe48e920985887": 4,
+          "web_aad_3bfd7764e3c15696": 2,
+          "web_aad_3c3e24b89e9c4a8f": 2,
+          "web_aad_4d448a651ca1a898": 4,
+          "web_aad_502603ec115bf029": 1,
+          "web_aad_6151c4343a6193f2": 4,
+          "web_aad_704d63ef07b2b55e": 1,
+          "web_aad_713ac4dc72c13a5c": 1,
+          "web_aad_75bb191293d75b2a": 3,
+          "web_aad_821fd08b1e2acf72": 2,
+          "web_aad_88a4258288696392": 2,
+          "web_aad_8a4004398dd94966": 4,
+          "web_aad_8aab9bec6b5205a1": 2,
+          "web_aad_8b5ac304bb90a8f1": 7,
+          "web_aad_8c2d1ea83468f3b3": 1,
+          "web_aad_92490f362113d291": 2,
+          "web_aad_953a1363781ef616": 1,
+          "web_aad_9b5e272fa150e083": 2,
+          "web_aad_9cbdba4d25a0e47f": 5,
+          "web_aad_afb0c99a0b1a06e7": 3,
+          "web_aad_b334bf638847c33a": 3,
+          "web_aad_b3a7f283617a12dd": 3,
+          "web_aad_b9d64bfaa18c335e": 1,
+          "web_aad_c501c1ec85d8d264": 2,
+          "web_aad_c6ba84215f2ed2e6": 1,
+          "web_aad_d727d6d0315b20e8": 5,
+          "web_aad_ea1a28a877650a1c": 2,
+          "web_aad_ea7e272194ae30a8": 3,
+          "web_aad_eb1e045f03b00753": 2,
+          "web_aad_eb67ac58641ae1c2": 1,
+          "web_aad_f804c38287438116": 1,
+          "web_aad_f91bfdcf9257111e": 2,
+          "web_aad_fa00b4ce617b72b8": 3,
+          "web_aad_fc9197bb611abbf3": 2,
+          "web_aad_fe498971f4522913": 3,
+          "web_dalieu_vn_10a8b699200d7eb5": 1,
+          "web_dermnetnz_1722a714e689b578": 3,
+          "web_dermnetnz_1f84ef6be37a6f41": 3,
+          "web_dermnetnz_35860b4af4910f27": 3,
+          "web_dermnetnz_3c2faa7fc8cbafce": 3,
+          "web_dermnetnz_58d1724a2b394bd3": 5,
+          "web_dermnetnz_7f9070f55ec6ffce": 1,
+          "web_dermnetnz_8d930888c730deaa": 4,
+          "web_dermnetnz_bd03071a0f669923": 2,
+          "web_dermnetnz_cddf43ad3f7f941d": 3,
+          "web_dermnetnz_ec0c3bbd95f04a92": 2,
+          "web_dermnetnz_f085d1fdb8511252": 3,
+          "web_dermnetnz_f1d65592ea32d9a9": 2,
+          "web_healthline_7818063059457ea6": 6,
+          "web_nhs_2073fedbb93a882d": 3,
+          "web_nhs_473a5fe637767b2a": 1,
+          "web_webmd_0190f6ad0414f833": 4,
+          "web_webmd_097f0ce1d63f69be": 3,
+          "web_webmd_0eddbeb4d06c0f22": 3,
+          "web_webmd_19eb05a25ec596c1": 1,
+          "web_webmd_2e1a68d057fcef88": 1,
+          "web_webmd_2f5bede800c5dd20": 3,
+          "web_webmd_33a916352cbd1587": 6,
+          "web_webmd_5117b72504d0a71c": 3,
+          "web_webmd_767147e32e3b9c86": 3,
+          "web_webmd_a53c0ed594b62de2": 7,
+          "web_webmd_ac23e97d312c18a9": 2,
+          "web_webmd_c0ee260eba0f8672": 5,
+          "web_webmd_c412d3b787047c80": 2,
+          "web_webmd_d5f34b505f03c4b0": 4,
+          "web_webmd_d7530a116892ea26": 1,
+          "web_webmd_d8707a47060c3a11": 2,
+          "web_webmd_e2c766354fad7725": 1,
+          "web_webmd_f0e9536a7a6d0993": 2,
+          "web_webmd_fbe1f977331d1ba6": 1
         },
         "errors": [],
         "layer": "compiled_knowledge",
@@ -1101,7 +1259,7 @@
       },
       {
         "bm25_smoke_ids": [
-          "7941aafd-ba7e-5c76-bdbc-b80582084961",
+          "482af244-740e-5c80-a8ed-ecd5ffcb6fd8",
           "0811a89d-e1a3-598a-abd9-4ccb52b8933e",
           "0db005da-2cd8-5d04-9413-1843f19377fd"
         ],
