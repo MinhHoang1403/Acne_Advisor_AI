@@ -49,7 +49,7 @@ def _write_manifest(path: Path, **overrides: object) -> bytes:
     return raw
 
 
-def _patch_successful_freeze_dependencies(
+def _patch_successful_finalization_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     *,
     prepared_build_id: str = BUILD_ID,
@@ -75,7 +75,7 @@ def _patch_successful_freeze_dependencies(
         return {"passed": True, "errors": [], "layers": []}
 
     monkeypatch.setattr(pipeline, "inspect_embedding_cache_reuse", inspect_cache)
-    monkeypatch.setattr(pipeline, "_validate_freeze_live_state", validate_live)
+    monkeypatch.setattr(pipeline, "_validate_activated_live_state", validate_live)
 
 
 def test_runtime_readiness_has_no_hardcoded_expected_build() -> None:
@@ -117,11 +117,11 @@ def test_runtime_readiness_fails_closed_for_mismatched_or_invalid_kb_version(
     assert check["passed"] is False
 
 
-def test_freeze_cli_is_explicit_operator_command() -> None:
-    assert parse_args(["freeze"]).command == "freeze"
+def test_finalize_activation_cli_is_explicit_operator_command() -> None:
+    assert parse_args(["finalize-activation"]).command == "finalize-activation"
 
 
-def test_freeze_refuses_non_activated_manifest_without_writing(
+def test_finalization_refuses_non_activated_manifest_without_writing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -130,12 +130,12 @@ def test_freeze_refuses_non_activated_manifest_without_writing(
     monkeypatch.setenv("KB_VERSION", BUILD_ID)
 
     with pytest.raises(RuntimeError, match="activated"):
-        asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
     assert manifest_path.read_bytes() == before
 
 
-def test_freeze_refuses_configured_build_mismatch_without_writing(
+def test_finalization_refuses_configured_build_mismatch_without_writing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -144,12 +144,12 @@ def test_freeze_refuses_configured_build_mismatch_without_writing(
     monkeypatch.setenv("KB_VERSION", OTHER_BUILD_ID)
 
     with pytest.raises(RuntimeError, match="KB_VERSION"):
-        asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
     assert manifest_path.read_bytes() == before
 
 
-def test_freeze_fails_closed_when_kb_version_is_missing(
+def test_finalization_fails_closed_when_kb_version_is_missing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -158,37 +158,37 @@ def test_freeze_fails_closed_when_kb_version_is_missing(
     monkeypatch.delenv("KB_VERSION", raising=False)
 
     with pytest.raises(RuntimeError, match="KB_VERSION"):
-        asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
     assert manifest_path.read_bytes() == before
 
 
-def test_freeze_refuses_prepared_identity_mismatch_without_writing(
+def test_finalization_refuses_prepared_identity_mismatch_without_writing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     manifest_path = tmp_path / "manifest.json"
     before = _write_manifest(manifest_path)
-    _patch_successful_freeze_dependencies(
+    _patch_successful_finalization_dependencies(
         monkeypatch,
         prepared_build_id=OTHER_BUILD_ID,
     )
 
     with pytest.raises(RuntimeError, match="prepared build identity"):
-        asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
     assert manifest_path.read_bytes() == before
 
 
-def test_freeze_sets_true_only_after_all_validation_passes(
+def test_finalization_sets_legacy_field_only_after_all_validation_passes(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     manifest_path = tmp_path / "manifest.json"
     _write_manifest(manifest_path)
-    _patch_successful_freeze_dependencies(monkeypatch)
+    _patch_successful_finalization_dependencies(monkeypatch)
 
-    result = asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+    result = asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
     persisted = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert result["passed"] is True
@@ -198,42 +198,42 @@ def test_freeze_sets_true_only_after_all_validation_passes(
     assert persisted["build_id"] == BUILD_ID
 
 
-def test_freeze_keeps_manifest_unchanged_when_live_validation_fails(
+def test_finalization_keeps_manifest_unchanged_when_live_validation_fails(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     manifest_path = tmp_path / "manifest.json"
     before = _write_manifest(manifest_path)
-    _patch_successful_freeze_dependencies(monkeypatch)
+    _patch_successful_finalization_dependencies(monkeypatch)
 
     async def failed_live_validation(_manifest):
         return {"passed": False, "errors": ["alias mismatch"], "layers": []}
 
     monkeypatch.setattr(
         pipeline,
-        "_validate_freeze_live_state",
+        "_validate_activated_live_state",
         failed_live_validation,
     )
 
     with pytest.raises(RuntimeError, match="Live knowledge validation failed"):
-        asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
     assert manifest_path.read_bytes() == before
 
 
-def test_freeze_does_not_use_indexing_or_provider_paths(
+def test_finalization_does_not_use_indexing_or_provider_paths(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     manifest_path = tmp_path / "manifest.json"
     _write_manifest(manifest_path)
-    _patch_successful_freeze_dependencies(monkeypatch)
+    _patch_successful_finalization_dependencies(monkeypatch)
 
     def forbidden(*_args, **_kwargs):
-        raise AssertionError("freeze must not call a write/provider path")
+        raise AssertionError("finalization must not call a write/provider path")
 
     async def forbidden_async(*_args, **_kwargs):
-        raise AssertionError("freeze must not call a write/provider path")
+        raise AssertionError("finalization must not call a write/provider path")
 
     monkeypatch.setattr(pipeline, "prepare_knowledge", forbidden_async)
     monkeypatch.setattr(pipeline, "load_or_parse_source", forbidden_async)
@@ -244,16 +244,16 @@ def test_freeze_does_not_use_indexing_or_provider_paths(
     monkeypatch.setattr(pipeline, "switch_alias", forbidden_async)
     monkeypatch.setattr(pipeline.EmbeddingCache, "put", forbidden)
 
-    result = asyncio.run(pipeline.freeze_knowledge(manifest_path=manifest_path))
+    result = asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
     assert result["passed"] is True
-    freeze_source = inspect.getsource(pipeline.freeze_knowledge)
-    assert "prepare_knowledge(" not in freeze_source
-    assert "load_or_parse_source(" not in freeze_source
-    assert "resolve_embeddings(" not in freeze_source
+    finalization_source = inspect.getsource(pipeline.finalize_knowledge_activation)
+    assert "prepare_knowledge(" not in finalization_source
+    assert "load_or_parse_source(" not in finalization_source
+    assert "resolve_embeddings(" not in finalization_source
 
 
-def test_live_freeze_validation_rejects_physical_collection_from_another_build(
+def test_activated_live_validation_rejects_physical_collection_from_another_build(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manifest = _manifest()
@@ -296,17 +296,17 @@ def test_live_freeze_validation_rejects_physical_collection_from_another_build(
     )
     monkeypatch.setattr(
         pipeline,
-        "_inspect_freeze_graph_state",
+        "_inspect_activated_graph_state",
         passing_graph_validation,
     )
 
-    result = asyncio.run(pipeline._validate_freeze_live_state(manifest))
+    result = asyncio.run(pipeline._validate_activated_live_state(manifest))
 
     assert result["passed"] is False
     assert any("activated build" in error for error in result["errors"])
 
 
-def test_live_freeze_validation_requires_canonical_logical_aliases(
+def test_activated_live_validation_requires_canonical_logical_aliases(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manifest = _manifest()
@@ -349,17 +349,17 @@ def test_live_freeze_validation_requires_canonical_logical_aliases(
     )
     monkeypatch.setattr(
         pipeline,
-        "_inspect_freeze_graph_state",
+        "_inspect_activated_graph_state",
         passing_graph_validation,
     )
 
-    result = asyncio.run(pipeline._validate_freeze_live_state(manifest))
+    result = asyncio.run(pipeline._validate_activated_live_state(manifest))
 
     assert result["passed"] is False
     assert any("logical collection" in error for error in result["errors"])
 
 
-def test_graph_freeze_validation_rejects_mixed_build_identity(
+def test_activated_graph_validation_rejects_mixed_build_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeResult:
@@ -390,7 +390,7 @@ def test_graph_freeze_validation_rejects_mixed_build_identity(
 
     monkeypatch.setattr(pipeline, "get_neo4j_driver", lambda: FakeDriver())
 
-    result = asyncio.run(pipeline._inspect_freeze_graph_state(BUILD_ID))
+    result = asyncio.run(pipeline._inspect_activated_graph_state(BUILD_ID))
 
     assert result["passed"] is False
     assert result["nodes"] == 32

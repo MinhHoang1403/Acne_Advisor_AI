@@ -69,10 +69,10 @@ DEFAULT_BUILD_MANIFEST = Path("data/knowledge_build_manifest.json")
 LEGACY_INGESTION_MANIFEST = Path("data/ingestion_manifest.json")
 KNOWLEDGE_LOGICAL_COLLECTION = "acne_knowledge"
 ENTITY_LOGICAL_COLLECTION = "acne_entities"
-FROZEN_KNOWLEDGE_POINTS = 512
-FROZEN_ENTITY_POINTS = 32
-FROZEN_GRAPH_NODES = 32
-FROZEN_GRAPH_RELATIONSHIPS = 27
+EXPECTED_KNOWLEDGE_POINTS = 512
+EXPECTED_ENTITY_POINTS = 32
+EXPECTED_GRAPH_NODES = 32
+EXPECTED_GRAPH_RELATIONSHIPS = 27
 
 
 async def prepare_knowledge(
@@ -481,7 +481,7 @@ async def activate_knowledge(
     return manifest
 
 
-async def freeze_knowledge(
+async def finalize_knowledge_activation(
     *,
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     source_dir: Path = DEFAULT_SOURCE_DIR,
@@ -490,11 +490,11 @@ async def freeze_knowledge(
     parsed_cache: Path = DEFAULT_PARSED_CACHE,
     embedding_cache: Path = DEFAULT_EMBEDDING_CACHE,
 ) -> dict[str, Any]:
-    """Freeze an activated build after read-only identity and live-state checks."""
+    """Finalize an activated build after read-only identity and live-state checks."""
 
     manifest = load_build_manifest(manifest_path)
     if manifest.get("status") != "activated":
-        raise RuntimeError("Knowledge manifest must have status activated before freeze")
+        raise RuntimeError("Knowledge manifest must have status activated before finalization")
 
     try:
         configured_build = validate_build_id(os.getenv("KB_VERSION"))
@@ -509,10 +509,10 @@ async def freeze_knowledge(
         raise RuntimeError("Activated manifest does not match current prepared build identity")
 
     expected_counts = {
-        "knowledge_chunks": FROZEN_KNOWLEDGE_POINTS,
-        "entities": FROZEN_ENTITY_POINTS,
-        "graph_nodes": FROZEN_GRAPH_NODES,
-        "graph_relationships": FROZEN_GRAPH_RELATIONSHIPS,
+        "knowledge_chunks": EXPECTED_KNOWLEDGE_POINTS,
+        "entities": EXPECTED_ENTITY_POINTS,
+        "graph_nodes": EXPECTED_GRAPH_NODES,
+        "graph_relationships": EXPECTED_GRAPH_RELATIONSHIPS,
     }
     counts = manifest.get("counts") or {}
     count_errors = [
@@ -521,7 +521,7 @@ async def freeze_knowledge(
         if counts.get(name) != expected
     ]
     if count_errors:
-        raise RuntimeError(f"Manifest freeze counts failed: {count_errors}")
+        raise RuntimeError(f"Activation finalization manifest counts failed: {count_errors}")
 
     cache_validation = await inspect_embedding_cache_reuse(
         source_dir=source_dir,
@@ -536,22 +536,25 @@ async def freeze_knowledge(
         and cache_validation.get("provider_calls") == 0
         and (cache_validation.get("parsed") or {}).get("misses") == 0
         and (cache_validation.get("knowledge_embeddings") or {}).get("total")
-        == FROZEN_KNOWLEDGE_POINTS
+        == EXPECTED_KNOWLEDGE_POINTS
         and (cache_validation.get("entity_embeddings") or {}).get("total")
-        == FROZEN_ENTITY_POINTS
+        == EXPECTED_ENTITY_POINTS
     )
     if not cache_totals_match:
-        raise RuntimeError("Read-only prepared knowledge validation failed before freeze")
-
-    live_validation = await _validate_freeze_live_state(manifest)
-    if live_validation.get("passed") is not True:
         raise RuntimeError(
-            f"Live knowledge validation failed before freeze: {live_validation.get('errors', [])}"
+            "Read-only prepared knowledge validation failed before finalization"
         )
 
-    frozen_manifest = dict(manifest)
-    frozen_manifest["phase1_frozen"] = True
-    save_build_manifest(manifest_path, frozen_manifest)
+    live_validation = await _validate_activated_live_state(manifest)
+    if live_validation.get("passed") is not True:
+        raise RuntimeError(
+            "Live knowledge validation failed before finalization: "
+            f"{live_validation.get('errors', [])}"
+        )
+
+    finalized_manifest = dict(manifest)
+    finalized_manifest["phase1_frozen"] = True
+    save_build_manifest(manifest_path, finalized_manifest)
     return {
         "passed": True,
         "build_id": manifest_build,
@@ -563,7 +566,7 @@ async def freeze_knowledge(
     }
 
 
-async def _validate_freeze_live_state(manifest: dict[str, Any]) -> dict[str, Any]:
+async def _validate_activated_live_state(manifest: dict[str, Any]) -> dict[str, Any]:
     """Read aliases, Qdrant schema/counts and Neo4j identity/counts only."""
 
     build_id = str(manifest["build_id"])
@@ -601,12 +604,12 @@ async def _validate_freeze_live_state(manifest: dict[str, Any]) -> dict[str, Any
                     await validate_qdrant_collection(
                         client,
                         collection_name=KNOWLEDGE_LOGICAL_COLLECTION,
-                        expected_points=FROZEN_KNOWLEDGE_POINTS,
+                        expected_points=EXPECTED_KNOWLEDGE_POINTS,
                     ),
                     await validate_qdrant_collection(
                         client,
                         collection_name=ENTITY_LOGICAL_COLLECTION,
-                        expected_points=FROZEN_ENTITY_POINTS,
+                        expected_points=EXPECTED_ENTITY_POINTS,
                         smoke_query="adapalene",
                     ),
                 ]
@@ -620,11 +623,11 @@ async def _validate_freeze_live_state(manifest: dict[str, Any]) -> dict[str, Any
         "errors": alias_errors,
         "expected": expected_aliases,
     }
-    graph_layer = await _inspect_freeze_graph_state(build_id)
+    graph_layer = await _inspect_activated_graph_state(build_id)
     return combine_validation_layers(alias_layer, *qdrant_layers, graph_layer)
 
 
-async def _inspect_freeze_graph_state(build_id: str) -> dict[str, Any]:
+async def _inspect_activated_graph_state(build_id: str) -> dict[str, Any]:
     """Read global graph counts and ensure every record belongs to ``build_id``."""
 
     driver = get_neo4j_driver()
@@ -650,12 +653,12 @@ async def _inspect_freeze_graph_state(build_id: str) -> dict[str, Any]:
     relationships = int((relationship_record or {}).get("total", 0))
     matching_relationships = int((relationship_record or {}).get("matching", 0))
     errors = []
-    if nodes != FROZEN_GRAPH_NODES:
-        errors.append(f"Neo4j node count mismatch: expected {FROZEN_GRAPH_NODES}, got {nodes}")
-    if relationships != FROZEN_GRAPH_RELATIONSHIPS:
+    if nodes != EXPECTED_GRAPH_NODES:
+        errors.append(f"Neo4j node count mismatch: expected {EXPECTED_GRAPH_NODES}, got {nodes}")
+    if relationships != EXPECTED_GRAPH_RELATIONSHIPS:
         errors.append(
             "Neo4j relationship count mismatch: "
-            f"expected {FROZEN_GRAPH_RELATIONSHIPS}, got {relationships}"
+            f"expected {EXPECTED_GRAPH_RELATIONSHIPS}, got {relationships}"
         )
     if matching_nodes != nodes or matching_relationships != relationships:
         errors.append("Neo4j build identity does not match the activated manifest")
@@ -713,7 +716,7 @@ def _git_commit() -> str:
 __all__ = [
     "activate_knowledge",
     "build_knowledge",
-    "freeze_knowledge",
+    "finalize_knowledge_activation",
     "inspect_embedding_cache_reuse",
     "knowledge_status",
     "prepare_knowledge",
