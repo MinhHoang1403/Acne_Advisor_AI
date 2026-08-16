@@ -24,9 +24,8 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 from src.agent.graph import clinical_graph  # noqa: E402
 from src.agent.state import ClinicalState  # noqa: E402
+from src.ingestion.manifest import validate_build_id  # noqa: E402
 from src.observability.versioning import build_pipeline_version_manifest  # noqa: E402
-
-EXPECTED_BUILD = "ec0a6de32d58ac181af6"
 
 
 def inspect_readiness() -> dict[str, Any]:
@@ -73,14 +72,16 @@ def _knowledge_manifest_check() -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         counts = data.get("counts") or {}
+        configured_build = validate_build_id(os.getenv("KB_VERSION"))
         details = {
             "build_id": data.get("build_id"),
+            "configured_kb_version": configured_build,
             "phase1_frozen": data.get("phase1_frozen"),
             "status": data.get("status"),
             "counts": counts,
         }
         passed = (
-            data.get("build_id") == EXPECTED_BUILD
+            data.get("build_id") == configured_build
             and data.get("phase1_frozen") is True
             and data.get("status") == "activated"
             and counts.get("sources") == 4
@@ -90,6 +91,12 @@ def _knowledge_manifest_check() -> dict[str, Any]:
             and counts.get("graph_relationships") == 27
         )
         return {"name": "frozen_phase1_manifest", "passed": passed, "details": details}
+    except ValueError as exc:
+        return {
+            "name": "frozen_phase1_manifest",
+            "passed": False,
+            "details": {"error": str(exc)},
+        }
     except Exception as exc:
         return {"name": "frozen_phase1_manifest", "passed": False, "details": {"error": exc.__class__.__name__}}
 
