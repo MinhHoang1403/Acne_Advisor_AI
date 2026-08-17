@@ -80,8 +80,15 @@ async def test_gemini_429_falls_back_to_flash_lite(monkeypatch):
         resilience_settings=_settings(),
     )
     assert calls == [("gemini", "gemini-3.5-flash"), ("gemini", "gemini-3.1-flash-lite")]
+    assert result["requested_provider"] == "gemini"
+    assert result["requested_model"] == "gemini-3.5-flash"
+    assert result["provider"] == "gemini"
     assert result["model"] == "gemini-3.1-flash-lite"
+    assert result["fallback_used"] is True
+    assert result["fallback_provider"] == "gemini"
+    assert result["fallback_model"] == "gemini-3.1-flash-lite"
     assert result["fallback_reason"] == "quota_exhausted"
+    assert [entry["status"] for entry in result["fallback_chain"]] == ["failed", "success"]
 
 
 @pytest.mark.asyncio
@@ -110,6 +117,15 @@ async def test_both_gemini_models_fail_then_ollama_success(monkeypatch):
         ("ollama", "qwen3:8b"),
     ]
     assert result["provider"] == "ollama"
+    assert result["model"] == "qwen3:8b"
+    assert result["fallback_used"] is True
+    assert result["fallback_provider"] == "ollama"
+    assert result["fallback_model"] == "qwen3:8b"
+    assert [entry["status"] for entry in result["fallback_chain"]] == [
+        "failed",
+        "failed",
+        "success",
+    ]
 
 
 @pytest.mark.asyncio

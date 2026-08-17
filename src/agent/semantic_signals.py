@@ -110,6 +110,16 @@ ORDINARY_SKINCARE_TERMS = (
     "cham soc",
     "routine",
 )
+BREATHING_DIFFICULTY_CONCEPTS = (
+    "kho tho",
+    "hut hoi",
+    "tho khong du hoi",
+    "tho gap",
+    "kho khe",
+    "nghet tho",
+    "tho rit",
+    "tho khong ra hoi",
+)
 
 
 def normalize_text(value: str, *, preserve_boundaries: bool = False) -> str:
@@ -275,6 +285,9 @@ def has_medication_related_active_symptom(
 def is_prescription_execution_request(text: str) -> bool:
     """Nhận diện yêu cầu kê/chọn đơn hoặc liều cho chính người dùng."""
 
+    if _is_personalized_quantitative_dose_selection(text):
+        return True
+
     normalized = normalize_text(text)
     tokens = normalized.split()
     if not has_first_person_reference(normalized):
@@ -305,6 +318,71 @@ def is_prescription_execution_request(text: str) -> bool:
         ("cho", "toi", "don"),
     )
     return any(contains_bounded_sequence(normalized, pattern, max_gap=3) for pattern in patterns)
+
+
+def _is_personalized_quantitative_dose_selection(text: str) -> bool:
+    """Ghép yêu cầu ủy quyền với thuốc cụ thể và định lượng cá nhân."""
+
+    bounded_tokens = normalize_text(text, preserve_boundaries=True).split()
+    if QUOTE_BOUNDARY in bounded_tokens:
+        return False
+
+    normalized = normalize_text(text)
+    tokens = normalized.split()
+    if not has_first_person_reference(normalized):
+        return False
+    if any(
+        marker in normalized
+        for marker in (
+            "bac si da",
+            "truoc day",
+            "tai lieu",
+            "nghien cuu",
+            "noi gi ve",
+        )
+    ):
+        return False
+
+    canonical_medication_present = any(
+        phrase != ("thuoc",) and _phrase_spans(tokens, list(phrase))
+        for phrase in _canonical_medication_phrases()
+    )
+    if not canonical_medication_present:
+        return False
+
+    delegation_positions = [
+        start
+        for phrase in ("quyet dinh", "chon", "xac dinh", "tinh")
+        for start, _ in _phrase_spans(tokens, normalize_text(phrase).split())
+    ]
+    delegation_positions = [
+        position
+        for position in delegation_positions
+        if not ({*NEGATION_TOKENS, "dung"}).intersection(
+            tokens[max(0, position - 2) : position]
+        )
+    ]
+    if not delegation_positions:
+        return False
+
+    quantity_request = any(
+        marker in normalized
+        for marker in ("bao nhieu", "may vien", "may lan", "nong do nao", "ham luong nao")
+    )
+    dosing_dimension = any(
+        marker in normalized
+        for marker in (
+            "mg",
+            "vien",
+            "phan tram",
+            "nong do",
+            "ham luong",
+            "moi ngay",
+            "mot ngay",
+            "lan ngay",
+        )
+    )
+    return quantity_request and dosing_dimension
 
 
 def is_medication_management_intent(text: str) -> bool:
@@ -667,6 +745,7 @@ def _phrase_ends(
 
 
 __all__ = [
+    "BREATHING_DIFFICULTY_CONCEPTS",
     "contains_bounded_sequence",
     "has_active_symptom",
     "has_first_person_reference",
