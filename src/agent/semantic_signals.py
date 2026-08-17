@@ -324,65 +324,110 @@ def _is_personalized_quantitative_dose_selection(text: str) -> bool:
     """Ghép yêu cầu ủy quyền với thuốc cụ thể và định lượng cá nhân."""
 
     bounded_tokens = normalize_text(text, preserve_boundaries=True).split()
-    if QUOTE_BOUNDARY in bounded_tokens:
-        return False
-
-    normalized = normalize_text(text)
-    tokens = normalized.split()
-    if not has_first_person_reference(normalized):
-        return False
-    if any(
-        marker in normalized
-        for marker in (
-            "bac si da",
-            "truoc day",
-            "tai lieu",
-            "nghien cuu",
-            "noi gi ve",
+    for tokens in _unquoted_local_spans(bounded_tokens):
+        medication_spans = sorted(
+            {
+                span
+                for phrase in _canonical_medication_phrases()
+                if phrase != ("thuoc",)
+                for span in _phrase_spans(tokens, list(phrase))
+            }
         )
-    ):
-        return False
+        delegation_spans = [
+            span
+            for phrase in ("quyet dinh", "chon", "xac dinh", "tinh")
+            for span in _phrase_spans(tokens, normalize_text(phrase).split())
+            if not ({*NEGATION_TOKENS, "dung"}).intersection(
+                tokens[max(0, span[0] - 5) : span[0]]
+            )
+        ]
+        quantity_spans = [
+            span
+            for marker in (
+                "bao nhieu",
+                "may vien",
+                "may lan",
+                "nong do nao",
+                "ham luong nao",
+            )
+            for span in _phrase_spans(tokens, marker.split())
+        ]
+        dosing_spans = [
+            span
+            for marker in (
+                "mg",
+                "vien",
+                "phan tram",
+                "nong do",
+                "ham luong",
+                "moi ngay",
+                "mot ngay",
+                "lan ngay",
+            )
+            for span in _phrase_spans(tokens, marker.split())
+        ]
+        if not (delegation_spans and medication_spans and quantity_spans and dosing_spans):
+            continue
 
-    canonical_medication_present = any(
-        phrase != ("thuoc",) and _phrase_spans(tokens, list(phrase))
-        for phrase in _canonical_medication_phrases()
-    )
-    if not canonical_medication_present:
-        return False
+        for delegation_start, delegation_end in delegation_spans:
+            for medication_start, medication_end in medication_spans:
+                if not (
+                    0 <= medication_start - delegation_end <= 6
+                    and _nearest_subject_owner(tokens, medication_start) is True
+                    and any(
+                        0 <= quantity_start - medication_end <= 6
+                        for quantity_start, _ in quantity_spans
+                    )
+                    and any(
+                        0 <= dosing_start - medication_end <= 8
+                        for dosing_start, _ in dosing_spans
+                    )
+                ):
+                    continue
+                current_end = _latest_marker_end(
+                    tokens,
+                    CURRENT_STATE_MARKERS,
+                    start=0,
+                    stop=medication_start,
+                )
+                noncurrent_end = _latest_marker_end(
+                    tokens,
+                    (
+                        *HISTORICAL_STATE_MARKERS,
+                        "bac si da",
+                        "tai lieu",
+                        "nghien cuu",
+                        "noi gi ve",
+                    ),
+                    start=0,
+                    stop=medication_start,
+                )
+                if noncurrent_end <= current_end:
+                    return True
+    return False
 
-    delegation_positions = [
-        start
-        for phrase in ("quyet dinh", "chon", "xac dinh", "tinh")
-        for start, _ in _phrase_spans(tokens, normalize_text(phrase).split())
-    ]
-    delegation_positions = [
-        position
-        for position in delegation_positions
-        if not ({*NEGATION_TOKENS, "dung"}).intersection(
-            tokens[max(0, position - 2) : position]
-        )
-    ]
-    if not delegation_positions:
-        return False
 
-    quantity_request = any(
-        marker in normalized
-        for marker in ("bao nhieu", "may vien", "may lan", "nong do nao", "ham luong nao")
-    )
-    dosing_dimension = any(
-        marker in normalized
-        for marker in (
-            "mg",
-            "vien",
-            "phan tram",
-            "nong do",
-            "ham luong",
-            "moi ngay",
-            "mot ngay",
-            "lan ngay",
-        )
-    )
-    return quantity_request and dosing_dimension
+def _unquoted_local_spans(tokens: list[str]) -> list[list[str]]:
+    """Tách các mệnh đề không trích dẫn để tín hiệu không ghép xuyên boundary."""
+
+    spans: list[list[str]] = []
+    current: list[str] = []
+    in_quote = False
+    for token in tokens:
+        if token == QUOTE_BOUNDARY:
+            if current and not in_quote:
+                spans.append(current)
+            current = []
+            in_quote = not in_quote
+        elif token in {CLAUSE_BOUNDARY, SOFT_CLAUSE_BOUNDARY}:
+            if current and not in_quote:
+                spans.append(current)
+            current = []
+        elif not in_quote:
+            current.append(token)
+    if current and not in_quote:
+        spans.append(current)
+    return spans
 
 
 def is_medication_management_intent(text: str) -> bool:
@@ -393,7 +438,7 @@ def is_medication_management_intent(text: str) -> bool:
         return False
     if any(marker in normalized for marker in ORDINARY_SKINCARE_TERMS):
         return False
-    if is_prescription_execution_request(normalized):
+    if is_prescription_execution_request(text):
         return True
     medication_present = _has_medication_identity(normalized)
     if "thuoc nao" in normalized:
