@@ -76,7 +76,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
                 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION,
             )
         ),
-        "safety_policy_version": "source_mapped_safety_policy_v5",
+        "safety_policy_version": "source_mapped_safety_policy_v6",
         "safe_fallback_flow_version": _effective_contract_version(
             value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
             legacy={"safe_fallback_flow_v1"},

@@ -10,31 +10,12 @@ import re
 import unicodedata
 from collections.abc import Iterable, Sequence
 from functools import lru_cache
+from itertools import product
 
 from src.knowledge.normalizer import DrugEntityNormalizer
 
 
 NEGATION_TOKENS = frozenset({"khong", "chua", "not", "never"})
-RESOLUTION_PREFIXES = (
-    "da het",
-    "khong con",
-    "gio het",
-    "hien khong",
-    "tung",
-    "tung bi",
-    "truoc day",
-    "truoc day bi",
-    "hom qua",
-)
-RESOLUTION_MARKERS = (
-    "da het",
-    "khong con",
-    "gio het",
-    "hien tai binh thuong",
-    "hien gio binh thuong",
-    "dang binh thuong",
-    "tro lai binh thuong",
-)
 HYPOTHETICAL_MARKERS = (
     "neu",
     "if",
@@ -64,21 +45,25 @@ CURRENT_STATE_MARKERS = (
 )
 HISTORICAL_STATE_MARKERS = (
     "hom qua",
+    "toi qua",
     "truoc day",
     "da tung",
     "tung bi",
     "tung",
     "used to",
 )
-RESOLVED_AFTER_MARKERS = (
+RESOLVED_STATE_MARKERS = (
     "da het",
     "gio da het",
+    "gio het",
+    "khong con",
     "khong con nua",
+    "hien khong",
     "hien tai binh thuong",
     "hien gio binh thuong",
+    "dang binh thuong",
     "tro lai binh thuong",
 )
-HISTORICAL_AFTER_MARKERS = ("truoc day", "hom qua", "toi qua")
 THIRD_PERSON_SUBJECTS = frozenset(
     {
         "nguoi",
@@ -177,11 +162,23 @@ def has_unnegated_concept(
     for concept in concepts:
         phrase = normalize_text(concept).split()
         for start, _ in _phrase_spans(tokens, phrase):
-            prefix = tokens[max(0, start - negation_window) : start]
-            prefix_text = " ".join(prefix)
-            if NEGATION_TOKENS.intersection(prefix):
+            direct_prefix = tokens[max(0, start - negation_window) : start]
+            if NEGATION_TOKENS.intersection(direct_prefix):
                 continue
-            if any(prefix_text.endswith(marker) for marker in RESOLUTION_PREFIXES):
+            state_start = max(0, start - 10)
+            current_end = _latest_marker_end(
+                tokens,
+                CURRENT_STATE_MARKERS,
+                start=state_start,
+                stop=start,
+            )
+            inactive_end = _latest_marker_end(
+                tokens,
+                (*HISTORICAL_STATE_MARKERS, *RESOLVED_STATE_MARKERS),
+                start=state_start,
+                stop=start,
+            )
+            if inactive_end > current_end:
                 continue
             return True
     return False
@@ -196,6 +193,57 @@ def has_active_symptom(text: str, concepts: Iterable[str]) -> bool:
         for concept in concepts
         for start, end in _phrase_spans(tokens, normalize_text(concept).split())
     )
+
+
+def has_local_concept_groups(
+    text: str,
+    concept_groups: Sequence[Iterable[str]],
+    *,
+    active_group_indexes: Iterable[int] | None = None,
+    required_owner: bool | None = None,
+    max_span_tokens: int = 24,
+) -> bool:
+    """Ghép các concept cục bộ khi state, owner và event span tương thích."""
+
+    tokens = normalize_text(text, preserve_boundaries=True).split()
+    active_indexes = (
+        set(range(len(concept_groups)))
+        if active_group_indexes is None
+        else set(active_group_indexes)
+    )
+    occurrences: list[list[tuple[int, int, bool | None]]] = []
+    for group_index, concepts in enumerate(concept_groups):
+        group_occurrences = sorted(
+            {
+                (start, end, _nearest_subject_owner(tokens, start))
+                for concept in concepts
+                for start, end in _phrase_spans(
+                    tokens,
+                    normalize_text(concept).split(),
+                )
+                if group_index not in active_indexes
+                or _occurrence_is_active(tokens, start, end)
+            }
+        )
+        if not group_occurrences:
+            return False
+        occurrences.append(group_occurrences)
+
+    boundaries = {CLAUSE_BOUNDARY, SOFT_CLAUSE_BOUNDARY}
+    for candidate in product(*occurrences):
+        span_start = min(start for start, _, _ in candidate)
+        span_end = max(end for _, end, _ in candidate)
+        if span_end - span_start > max_span_tokens:
+            continue
+        if sum(token in boundaries for token in tokens[span_start:span_end]) > 1:
+            continue
+        known_owners = {owner for _, _, owner in candidate if owner is not None}
+        if len(known_owners) > 1:
+            continue
+        if required_owner is not None and known_owners != {required_owner}:
+            continue
+        return True
+    return False
 
 
 def has_past_or_resolved_symptom(text: str, concepts: Iterable[str]) -> bool:
@@ -508,7 +556,7 @@ def _occurrence_is_active(tokens: list[str], start: int, end: int) -> bool:
 
     historical_end = _latest_marker_end(
         tokens,
-        (*HISTORICAL_STATE_MARKERS, *RESOLUTION_PREFIXES, *RESOLUTION_MARKERS),
+        (*HISTORICAL_STATE_MARKERS, *RESOLVED_STATE_MARKERS),
         start=prefix_start,
         stop=start,
     )
@@ -517,14 +565,14 @@ def _occurrence_is_active(tokens: list[str], start: int, end: int) -> bool:
 
     if _first_marker_start(
         tokens,
-        RESOLVED_AFTER_MARKERS,
+        RESOLVED_STATE_MARKERS,
         start=end,
         stop=suffix_stop,
     ) >= 0:
         return False
     if current_end < 0 and _first_marker_start(
         tokens,
-        HISTORICAL_AFTER_MARKERS,
+        HISTORICAL_STATE_MARKERS,
         start=end,
         stop=suffix_stop,
     ) >= 0:
@@ -814,6 +862,7 @@ __all__ = [
     "contains_bounded_sequence",
     "has_active_symptom",
     "has_first_person_reference",
+    "has_local_concept_groups",
     "has_medication_related_active_symptom",
     "has_past_or_resolved_symptom",
     "has_unnegated_concept",
