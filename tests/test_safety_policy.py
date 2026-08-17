@@ -112,6 +112,28 @@ def test_current_breathing_difficulty_after_medication_triggers_emergency(query:
 @pytest.mark.parametrize(
     "query",
     [
+        (
+            "Khoảng 15 phút sau khi tôi thoa thuốc trị mụn,\n"
+            "bây giờ tôi cảm thấy thở không đủ hơi."
+        ),
+        "Khoảng vài phút sau khi tôi bôi thuốc trị mụn, giờ tôi thấy khó thở.",
+        "Tầm mười phút sau lúc tôi thoa thuốc, hiện tôi đang hụt hơi.",
+        (
+            "Sau khi tôi vừa dùng thuốc trị mụn, một lúc sau "
+            "tôi thấy thở không đủ hơi."
+        ),
+    ],
+)
+def test_breathing_after_medication_accepts_owned_temporal_prefix(query: str) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "Thuốc trị mụn có gây khó thở không?",
         "Tôi không bị khó thở sau khi uống thuốc.",
         "Tôi từng đọc rằng thuốc này có thể gây khó thở.",
