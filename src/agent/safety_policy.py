@@ -17,6 +17,7 @@ import re
 from typing import Callable, Literal
 
 from src.agent.semantic_signals import (
+    BREATHING_DIFFICULTY_CONCEPTS,
     contains_bounded_sequence,
     has_active_symptom,
     has_first_person_reference,
@@ -27,7 +28,7 @@ from src.agent.semantic_signals import (
 )
 
 SafetySeverity = Literal["policy", "urgent", "emergency"]
-SAFETY_POLICY_VERSION = "source_mapped_safety_policy_v3"
+SAFETY_POLICY_VERSION = "source_mapped_safety_policy_v4"
 
 
 @dataclass(frozen=True)
@@ -75,9 +76,8 @@ def safety_rule_inventory() -> tuple[SafetyRule, ...]:
 
 
 def _anaphylaxis(text: str) -> bool:
-    breathing = ("kho tho", "kho khe", "nghet tho", "tho rit")
     return (
-        has_active_symptom(text, breathing)
+        has_active_symptom(text, BREATHING_DIFFICULTY_CONCEPTS)
         and _has_unnegated(
             text,
             "sung moi",
@@ -92,8 +92,7 @@ def _anaphylaxis(text: str) -> bool:
 
 
 def _breathing_after_medication(text: str) -> bool:
-    breathing = ("kho tho", "hut hoi")
-    return has_medication_related_active_symptom(text, breathing)
+    return has_medication_related_active_symptom(text, BREATHING_DIFFICULTY_CONCEPTS)
 
 
 def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
@@ -130,7 +129,7 @@ def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
 
 def _chest_breathing_emergency(text: str) -> bool:
     return has_active_symptom(text, ("dau nguc", "tuc nguc", "nguc bi ep chat")) and has_active_symptom(
-        text, ("kho tho", "hut hoi", "tho khong ra hoi")
+        text, BREATHING_DIFFICULTY_CONCEPTS
     )
 
 

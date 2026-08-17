@@ -141,6 +141,51 @@ def test_medication_breathing_emergency_accepts_modifier_order_and_surface_varia
 
 
 @pytest.mark.parametrize(
+    ("query", "rule_id"),
+    [
+        (
+            "Sau thuốc tôi thở không đủ hơi, sưng môi và nổi mề đay.",
+            "anaphylaxis_like_emergency",
+        ),
+        (
+            "Hôm qua tôi sốt. Tôi vừa uống thuốc xong thì thở gấp.",
+            "breathing_difficulty_after_medication",
+        ),
+        (
+            "TOI VUA UONG THUOC, XONG THI THO KHONG DU HOI!",
+            "breathing_difficulty_after_medication",
+        ),
+        ("Tôi đau ngực và đang thở gấp.", "chest_pain_with_breathlessness"),
+    ],
+)
+def test_breathing_equivalence_classes_reach_existing_safety_composition(
+    query: str,
+    rule_id: str,
+) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == rule_id
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi vừa uống thuốc nhưng đang thở bình thường.",
+        "Tôi vừa uống thuốc nhưng không thở gấp.",
+        "Tôi từng thở không đủ hơi sau thuốc nhưng triệu chứng đã hết.",
+        "Nếu uống thuốc rồi thở gấp thì phải làm gì?",
+        "Bạn tôi vừa uống thuốc và đang thở gấp.",
+        "Tôi thở gấp sau khi chạy bộ.",
+        "Tôi vừa uống thuốc rồi tập thở sâu.",
+        "Tôi uống thuốc hôm qua. Hôm nay thở gấp sau khi chạy bộ, không liên quan thuốc.",
+    ],
+)
+def test_breathing_equivalence_classes_preserve_negative_boundaries(query: str) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
     "query",
     [
         "Hôm qua tôi khó thở sau khi uống thuốc, nhưng đã hết và hiện tại tôi bình thường.",
@@ -316,6 +361,87 @@ def test_prescription_policy_accepts_natural_request_order(query: str) -> None:
     ],
 )
 def test_prescription_policy_rejects_non_execution_mentions(query: str) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Bạn quyết định giúp tôi nên dùng isotretinoin bao nhiêu mg mỗi ngày.",
+        "Bạn chọn giúp tôi uống doxycycline mấy viên mỗi ngày.",
+        "Hãy xác định giúp tôi bôi tretinoin nồng độ bao nhiêu phần trăm.",
+    ],
+)
+def test_prescription_policy_blocks_personalized_quantitative_selection(query: str) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == "prescription_execution_request"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        (
+            "Trước đây bác sĩ đã kê isotretinoin 20 mg. "
+            "Bây giờ bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        (
+            'Tôi từng thấy "20 mg" trên hộp; '
+            "bây giờ bạn xác định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        (
+            "Tài liệu nói về liều cũ.\n"
+            "Bạn chọn giúp tôi uống doxycycline mấy viên mỗi ngày."
+        ),
+    ],
+)
+def test_prescription_policy_uses_current_local_request_despite_unrelated_context(
+    query: str,
+) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == "prescription_execution_request"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Isotretinoin 20 mg là dạng thuốc gì?",
+        "Isotretinoin có những hàm lượng nào?",
+        "Tài liệu nói gì về liều isotretinoin?",
+        "Bác sĩ đã kê cho tôi isotretinoin 20 mg mỗi ngày.",
+        "Nghiên cứu này sử dụng isotretinoin bao nhiêu mg?",
+        "Bạn tôi nên dùng isotretinoin bao nhiêu mg mỗi ngày?",
+        "Trước đây tôi đã dùng isotretinoin 20 mg mỗi ngày.",
+        "Đừng quyết định giúp tôi dùng isotretinoin bao nhiêu mg.",
+        'Bác sĩ hỏi: "Bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg?"',
+    ],
+)
+def test_prescription_policy_allows_non_executing_quantitative_mentions(query: str) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Bạn quyết định giúp tôi lịch tái khám. Isotretinoin có hàm lượng nào?",
+        (
+            "Tôi không nhờ bạn quyết định cho tôi; "
+            "isotretinoin có hàm lượng bao nhiêu mg?"
+        ),
+        (
+            "Tôi đang tìm hiểu cho mẹ. "
+            "Bạn quyết định giúp mẹ tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        (
+            "Bác sĩ đã kê isotretinoin 20 mg cho tôi.\n"
+            "Hiện tôi chỉ hỏi thuốc có những hàm lượng nào."
+        ),
+    ],
+)
+def test_prescription_policy_does_not_compose_signals_across_local_spans(query: str) -> None:
     assert evaluate_safety(query) is None
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from src.agent.semantic_signals import (
+    BREATHING_DIFFICULTY_CONCEPTS,
     contains_bounded_sequence,
     has_active_symptom,
     has_unnegated_concept,
@@ -92,6 +93,28 @@ def test_active_symptom_state_is_bounded_to_the_local_clause(
 
 
 @pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Tôi đang khó thở.", True),
+        ("Tôi đang hụt hơi.", True),
+        ("Tôi cảm thấy thở không đủ hơi.", True),
+        ("Hiện tôi đang thở gấp!", True),
+        ("TÔI ĐANG THỞ KHÔNG ĐỦ HƠI?", True),
+        ("Tôi không thở gấp.", False),
+        ("Tôi từng thở không đủ hơi nhưng đã hết.", False),
+        ("Nếu sau này thở gấp thì sao?", False),
+    ],
+)
+def test_shared_breathing_concepts_reuse_occurrence_local_state(
+    text: str,
+    expected: bool,
+) -> None:
+    bounded_text = normalize_text(text, preserve_boundaries=True)
+
+    assert has_active_symptom(bounded_text, BREATHING_DIFFICULTY_CONCEPTS) is expected
+
+
+@pytest.mark.parametrize(
     "question",
     [
         "Kê đơn cho tôi.",
@@ -117,6 +140,140 @@ def test_prescription_execution_rejects_negated_historical_or_reference_forms(
     question: str,
 ) -> None:
     assert is_prescription_execution_request(question) is False
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Bạn quyết định giúp tôi nên dùng isotretinoin bao nhiêu mg mỗi ngày.",
+        "Bạn chọn giúp tôi uống doxycycline mấy viên mỗi ngày.",
+        "Hãy xác định giúp tôi bôi tretinoin nồng độ bao nhiêu phần trăm.",
+        "Bạn tính giúp tôi cần dùng spironolactone bao nhiêu mg một ngày.",
+    ],
+)
+def test_prescription_execution_recognizes_personalized_quantitative_selection(
+    question: str,
+) -> None:
+    assert is_prescription_execution_request(question) is True
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        (
+            "Trước đây bác sĩ đã kê isotretinoin 20 mg. "
+            "Bây giờ bạn quyết định giúp tôi nên dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        (
+            "Tài liệu nói về liều isotretinoin trước đây; "
+            "bây giờ bạn xác định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        (
+            'Tôi từng thấy "20 mg" trên hộp. '
+            "Bây giờ bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        (
+            "Nghiên cứu ghi nhận nhiều hàm lượng.\n"
+            "Bạn chọn giúp tôi uống doxycycline mấy viên mỗi ngày."
+        ),
+        (
+            "Bác sĩ từng trao đổi về thuốc: "
+            "hiện bạn tính giúp tôi dùng spironolactone bao nhiêu mg một ngày."
+        ),
+        (
+            "Trước đây tôi đã dùng isotretinoin 20 mg, nhưng bây giờ "
+            "bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        "BAN XAC DINH GIUP TOI DUNG ISOTRETINOIN BAO NHIEU MG MOI NGAY?",
+    ],
+)
+def test_prescription_execution_composes_current_request_within_local_span(
+    question: str,
+) -> None:
+    assert is_prescription_execution_request(question) is True
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Isotretinoin 20 mg là dạng thuốc gì?",
+        "Isotretinoin có những hàm lượng nào?",
+        "Tài liệu nói gì về liều isotretinoin?",
+        "Bác sĩ đã kê cho tôi isotretinoin 20 mg mỗi ngày.",
+        "Nghiên cứu này sử dụng isotretinoin bao nhiêu mg?",
+        "Bạn tôi nên dùng isotretinoin bao nhiêu mg mỗi ngày?",
+        "Trước đây tôi đã dùng isotretinoin 20 mg mỗi ngày.",
+        "Đừng quyết định giúp tôi dùng isotretinoin bao nhiêu mg.",
+        'Bác sĩ hỏi: "Bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg?"',
+    ],
+)
+def test_prescription_execution_rejects_non_executing_quantitative_mentions(
+    question: str,
+) -> None:
+    assert is_prescription_execution_request(question) is False
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        (
+            "Bạn quyết định giúp tôi lịch tái khám. "
+            "Isotretinoin có hàm lượng nào?"
+        ),
+        (
+            "Tôi không nhờ bạn quyết định cho tôi; "
+            "isotretinoin có hàm lượng bao nhiêu mg?"
+        ),
+        (
+            "Tôi đang tìm hiểu cho mẹ. "
+            "Bạn quyết định giúp mẹ tôi dùng isotretinoin bao nhiêu mg mỗi ngày."
+        ),
+        "Bạn quyết định giúp mẹ tôi dùng isotretinoin bao nhiêu mg mỗi ngày.",
+        (
+            "Tôi từng nghe bác sĩ nói.\n"
+            'Bác sĩ hỏi: "Bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg?"'
+        ),
+        (
+            "Bác sĩ đã quyết định cho tôi dùng isotretinoin 20 mg mỗi ngày; "
+            "hiện tôi chỉ muốn biết thuốc có những hàm lượng nào."
+        ),
+        (
+            "Bạn quyết định giúp tôi lịch tái khám vào tháng tới, còn "
+            "isotretinoin có hàm lượng bao nhiêu mg?"
+        ),
+        (
+            "Bạn quyết định giúp tôi dùng isotretinoin trong đợt tới, còn "
+            "doxycycline có hàm lượng bao nhiêu mg?"
+        ),
+        "Tôi không nhờ bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày.",
+    ],
+)
+def test_prescription_execution_does_not_mix_unrelated_local_spans(
+    question: str,
+) -> None:
+    assert is_prescription_execution_request(question) is False
+
+
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        (
+            "Trước đây bác sĩ đã kê isotretinoin 20 mg. "
+            "Bây giờ bạn quyết định giúp tôi dùng isotretinoin bao nhiêu mg mỗi ngày.",
+            True,
+        ),
+        (
+            "Bạn quyết định giúp tôi lịch tái khám. "
+            "Isotretinoin có hàm lượng bao nhiêu mg?",
+            False,
+        ),
+    ],
+)
+def test_medication_management_preserves_local_request_boundaries(
+    question: str,
+    expected: bool,
+) -> None:
+    assert is_medication_management_intent(question) is expected
 
 
 @pytest.mark.parametrize(

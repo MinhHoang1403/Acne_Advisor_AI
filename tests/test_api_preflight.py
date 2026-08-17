@@ -69,7 +69,7 @@ def test_runtime_provider_requirements_require_explicit_ollama_fallback(monkeypa
 @pytest.mark.asyncio
 async def test_preflight_keeps_optional_ollama_unavailability_out_of_core_status(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
-    monkeypatch.delenv("LLM_PROVIDER_FALLBACK_ENABLED", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER_FALLBACK_ENABLED", "false")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
 
     async def ok_check():
