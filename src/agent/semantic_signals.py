@@ -269,9 +269,9 @@ def has_medication_related_active_symptom(
                 if event_before_symptom
                 else tokens[symptom_end:event_start]
             )
-            context_start = max(0, min(event_start, symptom_start) - 3)
+            context_start = max(0, min(event_start, symptom_start) - 5)
             context_end = min(len(tokens), max(event_end, symptom_end) + 3)
-            event_prefix = tokens[max(0, event_start - 3) : event_start]
+            event_prefix = tokens[max(0, event_start - 5) : event_start]
             if _has_medication_symptom_relation(
                 between,
                 context_tokens=tokens[context_start:context_end],
@@ -729,15 +729,13 @@ def _has_medication_symptom_relation(
 ) -> bool:
     between = " ".join(between_tokens)
     context = " ".join(context_tokens)
-    event_prefix = " ".join(event_prefix_tokens)
-    event_prefix_relation = any(
-        event_prefix.endswith(marker) for marker in ("sau khi", "sau luc", "tu sau")
+    event_prefix_relation = _event_prefix_has_temporal_relation(event_prefix_tokens)
+    between_relation = any(
+        marker in between
+        for marker in ("xong", "thi", "roi", "sau do", "bat dau", "den gio van")
     )
     if event_before_symptom:
-        has_ordered_relation = event_prefix_relation or any(
-            marker in between
-            for marker in ("xong", "thi", "roi", "sau do", "bat dau", "den gio van")
-        )
+        has_ordered_relation = event_prefix_relation or between_relation
     else:
         has_ordered_relation = any(
             marker in between
@@ -747,6 +745,12 @@ def _has_medication_symptom_relation(
         marker in context for marker in ("hom qua", "toi qua", "truoc day", "tung")
     )
     if has_historical_event and not has_ordered_relation:
+        return False
+    crosses_clause = any(
+        token in {CLAUSE_BOUNDARY, SOFT_CLAUSE_BOUNDARY}
+        for token in between_tokens
+    )
+    if has_historical_event and crosses_clause and not between_relation:
         return False
     if CLAUSE_BOUNDARY in between_tokens and not has_ordered_relation:
         return False
@@ -760,6 +764,22 @@ def _has_medication_symptom_relation(
     if not event_before_symptom:
         return has_ordered_relation
     return has_ordered_relation or immediate_or_current
+
+
+def _event_prefix_has_temporal_relation(tokens: list[str]) -> bool:
+    """Khớp relation marker ngay trước event, có thể xen một owner ngôi thứ nhất."""
+
+    for marker in ("sau khi", "sau luc", "tu sau"):
+        marker_tokens = marker.split()
+        if tokens[-len(marker_tokens) :] == marker_tokens:
+            return True
+        if (
+            len(tokens) > len(marker_tokens)
+            and tokens[-1] in FIRST_PERSON
+            and tokens[-len(marker_tokens) - 1 : -1] == marker_tokens
+        ):
+            return True
+    return False
 
 
 def _phrase_spans(tokens: list[str], phrase: list[str]) -> list[tuple[int, int]]:

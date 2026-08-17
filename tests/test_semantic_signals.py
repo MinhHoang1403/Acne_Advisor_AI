@@ -6,6 +6,7 @@ from src.agent.semantic_signals import (
     BREATHING_DIFFICULTY_CONCEPTS,
     contains_bounded_sequence,
     has_active_symptom,
+    has_medication_related_active_symptom,
     has_unnegated_concept,
     is_comparison_intent,
     is_medication_management_intent,
@@ -112,6 +113,60 @@ def test_shared_breathing_concepts_reuse_occurrence_local_state(
     bounded_text = normalize_text(text, preserve_boundaries=True)
 
     assert has_active_symptom(bounded_text, BREATHING_DIFFICULTY_CONCEPTS) is expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        (
+            "Khoảng 15 phút sau khi tôi thoa thuốc trị mụn,\n"
+            "bây giờ tôi cảm thấy thở không đủ hơi."
+        ),
+        "Khoảng vài phút sau khi tôi bôi thuốc trị mụn, giờ tôi thấy khó thở.",
+        "Tầm mười phút sau lúc tôi thoa thuốc, hiện tôi đang hụt hơi.",
+        (
+            "Sau khi tôi vừa dùng thuốc trị mụn, một lúc sau "
+            "tôi thấy thở không đủ hơi."
+        ),
+        "Hai mươi phút sau khi tôi uống thuốc; bây giờ tôi thở gấp.",
+        "KHOANG VAI PHUT SAU KHI TOI BOI THUOC TRI MUN, HIEN TOI DANG KHO THO!",
+    ],
+)
+def test_medication_symptom_relation_accepts_owned_temporal_prefix(text: str) -> None:
+    bounded_text = normalize_text(text, preserve_boundaries=True)
+
+    assert has_medication_related_active_symptom(
+        bounded_text,
+        BREATHING_DIFFICULTY_CONCEPTS,
+    ) is True
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Vài phút sau khi mẹ tôi bôi thuốc trị mụn, giờ tôi thấy khó thở.",
+        "Vài phút sau khi tôi bôi thuốc trị mụn, giờ mẹ tôi thấy khó thở.",
+        "Nếu sau khi tôi bôi thuốc mà khó thở thì sao?",
+        "Sau khi tôi bôi thuốc hôm qua có hụt hơi nhưng giờ đã hết.",
+        (
+            "Sau khi tôi bôi thuốc, tôi chạy bộ và giờ thở gấp vì chạy bộ, "
+            "không liên quan thuốc."
+        ),
+        "Hôm qua sau khi tôi bôi thuốc. Hôm nay tôi khó thở vì chạy bộ.",
+        "Sau khi tôi bôi thuốc, hiện tôi đang thở bình thường.",
+        "Sau khi tôi bôi thuốc, hiện tôi không khó thở.",
+        "Sau khi tôi chạy bộ, tôi bôi thuốc trị mụn; bây giờ tôi thấy thở gấp.",
+    ],
+)
+def test_medication_symptom_relation_rejects_unowned_or_unrelated_context(
+    text: str,
+) -> None:
+    bounded_text = normalize_text(text, preserve_boundaries=True)
+
+    assert has_medication_related_active_symptom(
+        bounded_text,
+        BREATHING_DIFFICULTY_CONCEPTS,
+    ) is False
 
 
 @pytest.mark.parametrize(
