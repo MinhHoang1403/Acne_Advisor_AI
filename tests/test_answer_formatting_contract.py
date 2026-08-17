@@ -16,7 +16,60 @@ from src.agent.prompts.medical_answer import MEDICAL_RAG_SYSTEM_PROMPT
 
 def test_formatting_contract_version_and_comparison_shape_are_current() -> None:
     instruction = answer_format_instruction_for_question("A và B khác nhau thế nào?")
-    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v15"
+    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v16"
+    assert "đối chiếu" in instruction
+    assert "evidence" in instruction
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Adapalene có tốt hơn benzoyl peroxide không?",
+        "Thuốc nào tác dụng nhanh hơn?",
+        "Loại nào hiệu quả hơn và ít kích ứng hơn?",
+    ],
+)
+def test_comparative_language_activates_comparison_profile(question: str) -> None:
+    instruction = answer_format_instruction_for_question(question)
+    assert "đối chiếu" in instruction
+    assert "evidence" in instruction
+
+
+def test_inserted_medication_modifier_still_requires_disclaimer_once() -> None:
+    question = "Tôi có nên tăng thêm số lần bôi adapalene mỗi tuần không?"
+    answer = finalize_answer_presentation("Nội dung từ evidence.", user_question=question)
+    assert should_include_medical_disclaimer(question) is True
+    assert answer.count(CANONICAL_DISCLAIMER) == 1
+
+
+def test_smoke_case_three_is_medication_management_with_one_disclaimer() -> None:
+    question = (
+        "Da tôi đang bong và khô khi dùng adapalene, tôi có nên tăng lên bôi 2 lần "
+        "mỗi ngày để nhanh hết mụn không?"
+    )
+    answer = finalize_answer_presentation("Nội dung từ evidence.", user_question=question)
+    assert should_include_medical_disclaimer(question) is True
+    assert answer.count(CANONICAL_DISCLAIMER) == 1
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Tôi có thể bôi tretinoin cùng benzoyl peroxide vào buổi tối không?",
+        "Tôi nên dùng tazarotene thế nào?",
+        "Tôi có nên giảm tần suất dùng azelaic acid không?",
+    ],
+)
+def test_supported_medication_management_adds_one_disclaimer(question: str) -> None:
+    answer = finalize_answer_presentation("Nội dung từ evidence.", user_question=question)
+    assert should_include_medical_disclaimer(question) is True
+    assert answer.count(CANONICAL_DISCLAIMER) == 1
+
+
+def test_smoke_case_eleven_activates_comparison_without_claiming_superiority() -> None:
+    instruction = answer_format_instruction_for_question(
+        "Adapalene có tốt hơn tretinoin không? Thuốc nào trị mụn nhanh hơn?"
+    )
     assert "đối chiếu" in instruction
     assert "evidence" in instruction
 
@@ -53,6 +106,21 @@ async def test_finalize_preserves_short_valid_model_answer() -> None:
     )
     assert result["final_answer"].startswith(draft)
     assert CANONICAL_DISCLAIMER not in result["final_answer"]
+
+
+@pytest.mark.asyncio
+async def test_presentation_uses_original_question_instead_of_retrieval_rewrite() -> None:
+    result = await finalize_response_node(
+        {
+            "user_question": "Tôi có nên tăng số lần bôi adapalene không?",
+            "normalized_question": "Tôi có nên tăng số lần bôi adapalene không?",
+            "standalone_question": "adapalene topical frequency evidence",
+            "retrieval_query": "adapalene topical frequency evidence",
+            "draft_answer": "Nội dung từ evidence.",
+        }
+    )
+
+    assert result["final_answer"].count(CANONICAL_DISCLAIMER) == 1
 
 
 def test_medical_prompt_requires_natural_proportional_answers_without_source_narration() -> None:

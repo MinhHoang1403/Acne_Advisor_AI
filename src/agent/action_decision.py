@@ -21,14 +21,17 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from src.agent.llm.provider import generate_llm_response
 from src.agent.state import ClinicalState
-from src.quality.safe_fallback import sanitize_fallback_reason
+from src.quality.safe_fallback import (
+    fallback_reason_code_from_agent_reason,
+    sanitize_fallback_reason,
+)
 from src.resilience.budget import DeadlineBudget
 from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilience_settings_from_env
 
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVAL_ATTEMPTS = 2
-AGENT_DECISION_VERSION = "minimal_agent_decision_v2"
+AGENT_DECISION_VERSION = "minimal_agent_decision_v3"
 
 # Đây là engineering limit cho số lần gọi retrieval trong một request, không phải
 # ngưỡng confidence hay đánh giá mức độ đúng y khoa của evidence.
@@ -128,6 +131,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
 
     started = time.perf_counter()
     system_prompt, prompt = build_agent_decision_prompt(state)
+    fallback_reason_code: str | None = None
     try:
         settings = _runtime_settings(state)
         response = await generate_llm_response(
@@ -140,8 +144,6 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             budget=_runtime_budget(state, settings),
             resilience_settings=settings,
         )
-        decision = parse_agent_decision(response.get("text"))
-        validated = validate_agent_decision(decision, state)
         provider_metadata = {
             "provider": response.get("provider"),
             "model": response.get("model"),
@@ -155,6 +157,18 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             reason_code="cannot_safely_proceed",
         )
         provider_metadata = {"error": sanitize_fallback_reason(exc)}
+        fallback_reason_code = "provider_unavailable"
+    else:
+        try:
+            decision = parse_agent_decision(response.get("text"))
+            validated = validate_agent_decision(decision, state)
+        except Exception as exc:
+            logger.warning("Agent action output failed bounded validation: %s", sanitize_fallback_reason(exc))
+            validated = _invalid_action_abstention()
+            provider_metadata["error"] = sanitize_fallback_reason(exc)
+
+    if validated.action == "abstain" and fallback_reason_code is None:
+        fallback_reason_code = fallback_reason_code_from_agent_reason(validated.reason_code)
 
     effective_query = validated.retrieval_query
     updates: dict[str, Any] = {
@@ -174,7 +188,9 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
         },
     }
     if effective_query:
-        updates["standalone_question"] = effective_query
+        updates["retrieval_query"] = effective_query
+    if fallback_reason_code:
+        updates["fallback_reason_code"] = fallback_reason_code
     return updates
 
 

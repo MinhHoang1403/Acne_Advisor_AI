@@ -14,10 +14,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-import unicodedata
 from typing import Callable, Literal
 
+from src.agent.semantic_signals import (
+    contains_bounded_sequence,
+    has_active_symptom,
+    has_first_person_reference,
+    has_medication_related_active_symptom,
+    has_unnegated_concept,
+    is_prescription_execution_request,
+    normalize_text,
+)
+
 SafetySeverity = Literal["policy", "urgent", "emergency"]
+SAFETY_POLICY_VERSION = "source_mapped_safety_policy_v3"
 
 
 @dataclass(frozen=True)
@@ -46,7 +56,7 @@ class SafetyDecision:
 def evaluate_safety(query: str) -> SafetyDecision | None:
     """Trả một override hẹp; semantics thông thường vẫn thuộc Agent."""
 
-    text = _fold(query)
+    text = normalize_text(query, preserve_boundaries=True)
     for rule in SAFETY_RULES:
         if rule.trigger(text):
             return SafetyDecision(
@@ -65,22 +75,9 @@ def safety_rule_inventory() -> tuple[SafetyRule, ...]:
 
 
 def _anaphylaxis(text: str) -> bool:
-    inactive_breathing = _has(
-        text,
-        "tung kho tho",
-        "tung bi kho tho",
-        "truoc day kho tho",
-        "truoc day bi kho tho",
-        "kho tho truoc day",
-        "da het kho tho",
-        "kho tho da het",
-        "khong con kho tho",
-        "hien khong kho tho",
-        "tho binh thuong",
-    )
+    breathing = ("kho tho", "kho khe", "nghet tho", "tho rit")
     return (
-        not inactive_breathing
-        and _has_unnegated(text, "kho tho", "kho khe", "nghet tho", "tho rit")
+        has_active_symptom(text, breathing)
         and _has_unnegated(
             text,
             "sung moi",
@@ -95,40 +92,8 @@ def _anaphylaxis(text: str) -> bool:
 
 
 def _breathing_after_medication(text: str) -> bool:
-    personal = bool(re.search(r"(?:^|\s)(?:toi|minh|em|tui)(?:\s|$)", text))
-    medication_timing = _has(
-        text,
-        "sau khi uong thuoc",
-        "uong thuoc xong",
-        "sau khi dung thuoc",
-        "dung thuoc xong",
-    )
-    current_symptom = _has(
-        text,
-        "dang kho tho",
-        "dang bi kho tho",
-        "thay kho tho",
-        "bi kho tho",
-        "dang hut hoi",
-        "dang bi hut hoi",
-        "thay hut hoi",
-        "bi hut hoi",
-    )
-    resolved_or_reported = _has(
-        text,
-        "tung doc",
-        "khong con kho tho",
-        "da het kho tho",
-        "gio het kho tho",
-        "khong lien quan thuoc",
-    )
-    return (
-        personal
-        and medication_timing
-        and current_symptom
-        and not resolved_or_reported
-        and _has_unnegated(text, "kho tho", "hut hoi")
-    )
+    breathing = ("kho tho", "hut hoi")
+    return has_medication_related_active_symptom(text, breathing)
 
 
 def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
@@ -164,47 +129,37 @@ def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
 
 
 def _chest_breathing_emergency(text: str) -> bool:
-    return _has_unnegated(text, "dau nguc", "tuc nguc", "nguc bi ep chat") and _has_unnegated(
-        text, "kho tho", "hut hoi", "tho khong ra hoi"
+    return has_active_symptom(text, ("dau nguc", "tuc nguc", "nguc bi ep chat")) and has_active_symptom(
+        text, ("kho tho", "hut hoi", "tho khong ra hoi")
     )
 
 
 def _self_harm(text: str) -> bool:
-    if _has(
-        text,
-        "toi khong muon tu sat",
-        "toi khong muon tu tu",
-        "toi khong muon lam hai ban than",
-        "toi chua bao gio muon tu sat",
-        "toi chua bao gio muon tu tu",
-        "i do not want to kill myself",
-        "i don t want to kill myself",
-        "i do not want to harm myself",
-        "i don t want to harm myself",
-    ):
-        return False
-    return _has(
-        text,
-        "toi muon tu sat",
-        "toi muon tu tu",
-        "toi dang nghi den viec tu sat",
-        "toi dang nghi den viec tu tu",
-        "toi dang nghi den tu sat",
-        "toi dang nghi den tu tu",
-        "toi muon tu lam hai ban than",
-        "toi muon lam hai ban than",
-        "toi sap lam hai ban than",
-        "toi se tu sat",
-        "toi se tu tu",
-        "toi sap tu sat",
-        "toi sap tu tu",
-        "i want to kill myself",
-        "i want to harm myself",
-        "i am going to kill myself",
-        "i m going to kill myself",
-        "i am thinking about suicide",
-        "i m thinking about suicide",
+    concepts = (
+        "tu sat",
+        "tu tu",
+        "lam hai ban than",
+        "suicide",
+        "kill myself",
+        "harm myself",
     )
+    if not has_active_symptom(text, concepts):
+        return False
+    if not has_first_person_reference(text, concepts):
+        return False
+    direct_intent = any(
+        contains_bounded_sequence(text, (intent, concept), max_gap=1)
+        for intent in ("muon", "sap", "se", "want", "going")
+        for concept in concepts
+    )
+    active_thought = any(
+        contains_bounded_sequence(text, ("dang", "nghi", concept), max_gap=4)
+        for concept in concepts
+    ) or any(
+        contains_bounded_sequence(text, ("thinking", "about", concept), max_gap=2)
+        for concept in concepts
+    )
+    return (direct_intent or active_thought) and not _has_reference_purpose(text, concepts)
 
 
 def _acne_fulminans(text: str) -> bool:
@@ -264,12 +219,7 @@ def _isotretinoin_neurologic(text: str) -> bool:
 
 
 def _prescription_execution(text: str) -> bool:
-    return bool(
-        re.search(
-            r"(?:^|\s)(ke don|ke thuoc|cho toi toa|cho toi don thuoc|chon lieu|cho toi lieu)(?:\s|$)",
-            text,
-        )
-    )
+    return is_prescription_execution_request(text)
 
 
 def _has(text: str, *phrases: str) -> bool:
@@ -277,24 +227,20 @@ def _has(text: str, *phrases: str) -> bool:
 
 
 def _has_unnegated(text: str, *phrases: str) -> bool:
-    # Chỉ nhìn tối đa hai token trước phrase. Đây là guard chống phủ định trực
-    # tiếp, không phải parser ngữ nghĩa hay mô hình nhận diện negation tổng quát.
-    for phrase in phrases:
-        for match in re.finditer(rf"(?:^|\s){re.escape(phrase)}(?:\s|$)", text):
-            prefix_tokens = text[: match.start()].split()[-2:]
-            if "khong" not in prefix_tokens and "not" not in prefix_tokens:
-                return True
-    return False
+    return has_unnegated_concept(text, phrases)
 
 
-def _fold(value: str) -> str:
-    # Accent/case folding làm phrase matching ổn định hơn nhưng cố ý không giữ
-    # ngữ nghĩa đầy đủ của câu; vì vậy inventory rule phải luôn hẹp.
-    normalized = unicodedata.normalize(
-        "NFD", str(value or "").casefold().replace("đ", "d")
+def _has_reference_purpose(text: str, concepts: tuple[str, ...]) -> bool:
+    reference_terms = r"(?:information|policy|prevention|research)"
+    return any(
+        re.search(
+            rf"(?:{reference_terms}(?:\s+\w+){{0,2}}\s+{re.escape(concept)}|"
+            rf"{re.escape(concept)}(?:\s+\w+){{0,2}}\s+{reference_terms})",
+            text,
+        )
+        is not None
+        for concept in concepts
     )
-    accentless = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", accentless).split())
 
 
 SAFETY_RULES: tuple[SafetyRule, ...] = (
@@ -387,4 +333,11 @@ SAFETY_RULES: tuple[SafetyRule, ...] = (
     ),
 )
 
-__all__ = ["SAFETY_RULES", "SafetyDecision", "SafetyRule", "evaluate_safety", "safety_rule_inventory"]
+__all__ = [
+    "SAFETY_POLICY_VERSION",
+    "SAFETY_RULES",
+    "SafetyDecision",
+    "SafetyRule",
+    "evaluate_safety",
+    "safety_rule_inventory",
+]

@@ -122,6 +122,9 @@ def build_observability_event(
                 "evidence_assessment": assessment,
                 "fallback_applied": result.get("fallback_applied", state.get("fallback_applied")),
                 "fallback_type": result.get("fallback_type", state.get("fallback_type")),
+                "fallback_reason_code": result.get(
+                    "fallback_reason_code", state.get("fallback_reason_code")
+                ),
                 "safety_severity": result.get("safety_severity", state.get("safety_severity")),
                 "pipeline_manifest": pipeline_manifest_summary(manifest),
                 "runtime_resilience": result.get("runtime_resilience", state.get("runtime_resilience")),
@@ -136,6 +139,12 @@ def build_observability_event(
         "fallback_applied": result.get("fallback_applied", state.get("fallback_applied")),
         "fallback_type": result.get("fallback_type", state.get("fallback_type")),
         "fallback_reason": result.get("fallback_reason", state.get("fallback_reason")),
+        "fallback_reason_code": result.get(
+            "fallback_reason_code", state.get("fallback_reason_code")
+        ),
+        "evidence_locality": _as_dict(
+            quality.get("metadata") if isinstance(quality, dict) else {}
+        ).get("evidence_locality"),
         "quality_issues": issues,
     }
     return ObservabilityEvent(

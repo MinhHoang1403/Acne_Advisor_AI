@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from src.agent.answer_formatting import assess_structural_quality
 
 
-SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v1"
+SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v2"
 
 FallbackType = Literal[
     "none",
@@ -20,6 +20,17 @@ FallbackType = Literal[
     "retrieval_error",
     "empty_generation",
     "invalid_generation",
+    "out_of_scope",
+    "cannot_safely_proceed",
+]
+
+FallbackReasonCode = Literal[
+    "provider_unavailable",
+    "out_of_scope",
+    "insufficient_evidence",
+    "cannot_safely_proceed",
+    "retrieval_unavailable",
+    "generation_unavailable",
 ]
 
 
@@ -125,6 +136,16 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
             "Mình chưa có đủ thông tin đáng tin cậy để trả lời chắc chắn câu hỏi này. "
             "Bạn có thể nêu cụ thể hơn điều muốn biết."
         )
+    if fallback_type == "out_of_scope":
+        return (
+            "Mình chỉ có thể hỗ trợ các câu hỏi về mụn và chăm sóc da liên quan. "
+            "Bạn có thể hỏi lại trong phạm vi này."
+        )
+    if fallback_type == "cannot_safely_proceed":
+        return (
+            "Mình chưa thể xử lý câu hỏi này một cách an toàn ở thời điểm hiện tại. "
+            "Bạn có thể viết lại câu hỏi rõ hơn hoặc thử lại sau."
+        )
     if fallback_type in {"empty_generation", "invalid_generation"}:
         return (
             "Mình chưa thể đưa ra câu trả lời đáng tin cậy từ thông tin hiện có. "
@@ -136,12 +157,36 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
     )
 
 
+def fallback_reason_code_from_agent_reason(reason_code: str | None) -> FallbackReasonCode:
+    """Ánh xạ reason của bounded Agent sang vocabulary fallback ổn định."""
+
+    return {
+        "out_of_scope": "out_of_scope",
+        "evidence_gap": "insufficient_evidence",
+        "cannot_safely_proceed": "cannot_safely_proceed",
+    }.get(str(reason_code or ""), "insufficient_evidence")  # type: ignore[return-value]
+
+
+def fallback_type_for_reason(reason_code: FallbackReasonCode) -> FallbackType:
+    return {
+        "provider_unavailable": "retrieval_error",
+        "out_of_scope": "out_of_scope",
+        "insufficient_evidence": "no_retrieval_evidence",
+        "cannot_safely_proceed": "cannot_safely_proceed",
+        "retrieval_unavailable": "retrieval_error",
+        "generation_unavailable": "invalid_generation",
+    }[reason_code]  # type: ignore[return-value]
+
+
 __all__ = [
     "SAFE_FALLBACK_FLOW_VERSION",
     "FallbackType",
+    "FallbackReasonCode",
     "SafeFallbackDecision",
     "build_safe_fallback_answer",
     "decide_generation_fallback",
+    "fallback_reason_code_from_agent_reason",
+    "fallback_type_for_reason",
     "is_usable_text",
     "sanitize_fallback_reason",
 ]

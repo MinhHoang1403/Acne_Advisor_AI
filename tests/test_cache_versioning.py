@@ -92,12 +92,29 @@ def test_legacy_cache_versions_are_promoted_to_v10() -> None:
     assert get_answer_cache_version({"CACHE_ANSWER_VERSION": "v10"}) == "v10"
 
 
-def test_legacy_answer_formatting_contract_is_promoted_to_v15() -> None:
+def test_legacy_answer_formatting_contract_is_promoted_to_v16() -> None:
     manifest = build_pipeline_version_manifest(
         {"ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8"}
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v15"
+    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v16"
+
+
+def test_changed_semantic_contract_versions_partition_cache_without_v11() -> None:
+    current = build_pipeline_version_manifest(
+        {
+            "CACHE_ANSWER_VERSION": "v10",
+            "ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v15",
+            "SAFE_FALLBACK_FLOW_VERSION": "safe_fallback_flow_v1",
+        }
+    )
+
+    assert current["answer_cache_version"] == "v10"
+    assert current["answer_formatting_contract_version"] == "answer_formatting_contract_v16"
+    assert current["safe_fallback_flow_version"] == "safe_fallback_flow_v2"
+    assert current["agent_decision_version"] == "minimal_agent_decision_v3"
+    assert current["safety_policy_version"] == "source_mapped_safety_policy_v3"
+    assert current["answer_validation_version"] == "structural_provenance_locality_validation_v2"
 
 
 def test_legacy_prompt_version_is_promoted_to_v6() -> None:

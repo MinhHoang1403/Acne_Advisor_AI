@@ -22,7 +22,11 @@ from src.agent.nodes.preparation import prepare_request_node
 from src.agent.source_presentation import build_source_allowlist
 from src.agent.safety_policy import evaluate_safety
 from src.agent.state import ClinicalState
-from src.quality.safe_fallback import sanitize_fallback_reason
+from src.quality.safe_fallback import (
+    fallback_reason_code_from_agent_reason,
+    fallback_type_for_reason,
+    sanitize_fallback_reason,
+)
 from src.retrieval.service import retrieve_evidence
 
 async def prepare_node(state: ClinicalState) -> dict[str, Any]:
@@ -93,7 +97,13 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
 
     attempt = state.get("retrieval_attempt", 0) + 1
     decision = state.get("agent_decision") or {}
-    question = str(decision.get("retrieval_query") or state.get("standalone_question") or "").strip()
+    question = str(
+        decision.get("retrieval_query")
+        or state.get("retrieval_query")
+        or state.get("standalone_question")
+        or state.get("normalized_question")
+        or ""
+    ).strip()
     retry_reason = str(decision.get("reason_code") or "needs_evidence")
 
     started = time.perf_counter()
@@ -137,6 +147,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "sources": [],
             "retrieval_status": "failed",
             "retrieval_error": error,
+            "fallback_reason_code": "retrieval_unavailable",
             "retrieval_trace": {"architecture": "dense_bm25_rrf", "error": error},
             "packed_context": None,
             "retry_history": [
@@ -206,12 +217,27 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
     """Tạo safe abstention rõ ràng khi retrieval budget không cho đủ evidence."""
 
     retrieval_error = state.get("retrieval_error")
-    reason = retrieval_error or "No provenance-complete source evidence after bounded retrieval."
+    decision_reason = str((state.get("agent_decision") or {}).get("reason_code") or "")
+    reason_code = state.get("fallback_reason_code") or (
+        "retrieval_unavailable"
+        if retrieval_error
+        else fallback_reason_code_from_agent_reason(decision_reason)
+    )
+    fallback_type = fallback_type_for_reason(reason_code)  # type: ignore[arg-type]
+    reason = retrieval_error or {
+        "provider_unavailable": "The configured action provider was unavailable.",
+        "out_of_scope": "The request is outside the supported acne-information scope.",
+        "insufficient_evidence": "Bounded retrieval did not establish sufficient evidence.",
+        "cannot_safely_proceed": "The bounded Agent could not establish a legal safe transition.",
+        "retrieval_unavailable": "The retrieval service was unavailable.",
+        "generation_unavailable": "The generation provider was unavailable.",
+    }[reason_code]
     fallback_state = {
         **state,
         "fallback_applied": True,
-        "fallback_type": "retrieval_error" if retrieval_error else "no_retrieval_evidence",
+        "fallback_type": fallback_type,
         "fallback_reason": reason,
+        "fallback_reason_code": reason_code,
         "fallback_cache_eligible": False,
     }
     return await safe_fallback_node(fallback_state)

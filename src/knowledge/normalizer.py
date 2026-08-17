@@ -1,9 +1,9 @@
 """Chuẩn hóa alias taxonomy để tạo knowledge assets deterministic.
 
 Normalizer đọc YAML, tạo EntityCards và mở rộng mentions phục vụ domain metadata
-trong knowledge preparation. Nó không nằm trong normal chat answer formatter hay
-Qdrant retrieval path. Vì vậy match taxonomy là structural normalization, không
-phải bằng chứng rằng một claim y khoa đúng.
+trong knowledge preparation. Runtime deterministic có thể dùng nó để nhận diện
+identity, nhưng normal Qdrant retrieval không dùng match này làm evidence. Vì vậy
+match taxonomy là structural normalization, không chứng minh một claim y khoa đúng.
 """
 
 from __future__ import annotations
