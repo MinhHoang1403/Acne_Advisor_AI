@@ -191,6 +191,22 @@ def test_medication_breathing_accepts_explicit_cross_sentence_continuation() -> 
 @pytest.mark.parametrize(
     "query",
     [
+        "Hôm qua sốt. Tôi vừa uống thuốc xong thì khó thở.",
+        "HÔM QUA SỐT; TÔI VỪA UỐNG THUỐC XONG THÌ KHÓ THỞ!",
+    ],
+)
+def test_medication_breathing_ignores_history_from_a_previous_clause(
+    query: str,
+) -> None:
+    decision = evaluate_safety(query)
+
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "Hôm qua tôi uống thuốc trị mụn. Hôm nay tôi khó thở vì chạy bộ.",
         "Trước đây tôi dùng thuốc trị mụn; hiện tôi khó thở sau khi chạy bộ.",
         "Tôi đang khó thở, còn hôm qua em tôi có uống thuốc trị mụn.",

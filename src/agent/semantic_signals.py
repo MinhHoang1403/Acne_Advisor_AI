@@ -360,8 +360,8 @@ def is_comparison_intent(text: str) -> bool:
 def _occurrence_is_active(tokens: list[str], start: int, end: int) -> bool:
     """Đánh giá state trong cửa sổ của đúng concept occurrence."""
 
-    prefix_start = max(0, start - 10)
-    direct_prefix = tokens[max(0, start - 5) : start]
+    prefix_start, suffix_stop = _local_occurrence_bounds(tokens, start, end)
+    direct_prefix = tokens[max(prefix_start, start - 5) : start]
     direct_prefix_text = " ".join(direct_prefix)
     if NEGATION_TOKENS.intersection(direct_prefix) or any(
         contraction in direct_prefix_text for contraction in ("don t", "doesn t")
@@ -392,7 +392,6 @@ def _occurrence_is_active(tokens: list[str], start: int, end: int) -> bool:
     if historical_end > current_end:
         return False
 
-    suffix_stop = min(len(tokens), end + 8)
     if _first_marker_start(
         tokens,
         RESOLVED_AFTER_MARKERS,
@@ -408,6 +407,28 @@ def _occurrence_is_active(tokens: list[str], start: int, end: int) -> bool:
     ) >= 0:
         return False
     return True
+
+
+def _local_occurrence_bounds(
+    tokens: list[str],
+    start: int,
+    end: int,
+) -> tuple[int, int]:
+    """Giới hạn state lookup ở mệnh đề chứa concept occurrence."""
+
+    boundaries = {CLAUSE_BOUNDARY, SOFT_CLAUSE_BOUNDARY}
+    prefix_start = max(0, start - 10)
+    for index in range(start - 1, prefix_start - 1, -1):
+        if tokens[index] in boundaries:
+            prefix_start = index + 1
+            break
+
+    suffix_stop = min(len(tokens), end + 8)
+    for index in range(end, suffix_stop):
+        if tokens[index] in boundaries:
+            suffix_stop = index
+            break
+    return prefix_start, suffix_stop
 
 
 def _latest_marker_end(

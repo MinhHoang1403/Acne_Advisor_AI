@@ -67,6 +67,31 @@ def test_active_symptom_state_is_local_to_each_concept_occurrence(
 
 
 @pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Hôm qua sốt. Tôi khó thở.", True),
+        ("Nếu sốt thì nghỉ; tôi khó thở.", True),
+        ("Tôi không đau đầu. Tôi khó thở.", True),
+        ("Buồn nôn đã hết. Tôi khó thở.", True),
+        ("Tôi khó thở. Buồn nôn đã hết.", True),
+        ("Hôm qua tôi khó thở.", False),
+        ("Hôm qua tôi khó thở; hiện tôi lại khó thở.", True),
+        ("Tôi không khó thở.", False),
+        ("Tôi khó thở nhưng đã hết.", False),
+        ("HOM QUA SOT; TOI KHO THO!", True),
+        ("Hôm qua sốt:\nHiện tôi KHÓ THỞ?", True),
+    ],
+)
+def test_active_symptom_state_is_bounded_to_the_local_clause(
+    text: str,
+    expected: bool,
+) -> None:
+    bounded_text = normalize_text(text, preserve_boundaries=True)
+
+    assert has_active_symptom(bounded_text, ("kho tho",)) is expected
+
+
+@pytest.mark.parametrize(
     "question",
     [
         "Kê đơn cho tôi.",
