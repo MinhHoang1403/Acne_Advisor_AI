@@ -58,7 +58,7 @@ not rebuild, re-embed, reindex, activate, or write to the knowledge indexes.
 
 ## Knowledge Preparation and Indexing
 
-The current validated build is `ec0a6de32d58ac181af6`:
+The current validated build is `94d613bc9b33628de3ef`:
 
 | Artifact | Count or contract |
 |---|---|

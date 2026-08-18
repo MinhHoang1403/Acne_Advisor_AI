@@ -3,7 +3,7 @@
 The canonical pipeline is implemented under `src/ingestion/` and exposed by
 `scripts/knowledge_build.py` through the `build`, `validate`, and `status` commands. The
 current validated build is recorded in `data/knowledge_build_manifest.json` as
-`ec0a6de32d58ac181af6`: four sources, 512 knowledge chunks, 32 EntityCards, and
+`94d613bc9b33628de3ef`: four sources, 512 knowledge chunks, 32 EntityCards, and
 a Neo4j graph with 32 nodes and 27 relationships.
 
 ## NICE Source Provenance

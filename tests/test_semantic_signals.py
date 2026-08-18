@@ -19,6 +19,41 @@ def test_normalization_is_accent_case_and_punctuation_stable() -> None:
     assert normalize_text("  KÊ ĐƠN, cho tôi! ") == "ke don cho toi"
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Hôm qua tôi bị hụt hơi.",
+        "Tối qua tôi bị hụt hơi.",
+        "Trước đây tôi bị hụt hơi.",
+        "Tôi đã từng bị hụt hơi.",
+        "Tôi từng bị hụt hơi.",
+    ],
+)
+def test_historical_state_markers_have_equivalent_prefix_semantics(text: str) -> None:
+    assert not has_active_symptom(text, BREATHING_DIFFICULTY_CONCEPTS)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Tôi hụt hơi nhưng đã hết.",
+        "Tôi hụt hơi nhưng giờ đã hết.",
+        "Tôi hụt hơi nhưng không còn nữa.",
+        "Tôi hụt hơi nhưng hiện giờ bình thường.",
+        "Tôi hụt hơi rồi trở lại bình thường.",
+    ],
+)
+def test_resolved_state_markers_have_equivalent_suffix_semantics(text: str) -> None:
+    assert not has_active_symptom(text, BREATHING_DIFFICULTY_CONCEPTS)
+
+
+def test_current_recurrence_overrides_an_earlier_historical_occurrence() -> None:
+    assert has_active_symptom(
+        "Tối qua tôi hụt hơi nhưng đã hết. Hiện giờ tôi lại đang khó thở.",
+        BREATHING_DIFFICULTY_CONCEPTS,
+    )
+
+
 def test_bounded_sequence_allows_narrow_modifiers_but_not_unbounded_distance() -> None:
     assert contains_bounded_sequence(
         "toi uong thuoc tri mun moi duoc hai muoi phut thi kho tho",
