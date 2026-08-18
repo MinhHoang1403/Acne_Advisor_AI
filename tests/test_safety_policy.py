@@ -555,6 +555,102 @@ def test_all_nine_rules_keep_negative_resolved_or_reference_boundaries(query: st
     assert evaluate_safety(query) is None
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tôi đang khó thở. Mẹ tôi bị sưng môi.",
+        "Tôi đau ngực. Bạn tôi đang khó thở.",
+        "Tôi vừa nặn mụn. Bạn tôi bị chảy máu nhiều.",
+        "Tôi bị mụn nang. Bạn tôi đang sốt và đau khớp.",
+        "Chị tôi đang dùng isotretinoin. Tôi đang mang thai.",
+        "Mẹ tôi dùng isotretinoin. Tôi đang đau đầu dữ dội và nhìn mờ.",
+    ],
+)
+def test_multi_concept_rules_do_not_compose_across_subjects(query: str) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    ("query", "rule_id"),
+    [
+        ("Tôi khó thở và đang bị sưng môi.", "anaphylaxis_like_emergency"),
+        ("Tôi đau ngực và đang khó thở.", "chest_pain_with_breathlessness"),
+        (
+            "Tôi vừa nặn mụn và bị chảy máu nhiều.",
+            "significant_bleeding_after_acne_manipulation",
+        ),
+        (
+            "Tôi bị mụn nang trợt loét, đang sốt và đau khớp.",
+            "acne_fulminans_systemic_features",
+        ),
+        ("Tôi đang dùng isotretinoin và hiện mang thai.", "isotretinoin_pregnancy"),
+        (
+            "Tôi dùng isotretinoin và đang đau đầu dữ dội kèm nhìn mờ.",
+            "isotretinoin_severe_headache_visual_symptoms",
+        ),
+    ],
+)
+def test_multi_concept_rules_preserve_same_subject_events(query: str, rule_id: str) -> None:
+    decision = evaluate_safety(query)
+    assert decision is not None
+    assert decision.rule_id == rule_id
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Tối qua sau khi dùng thuốc em có hụt hơi một lúc, nhưng hiện giờ thở hoàn toàn bình thường.",
+        "Tôi đang khó thở. Hôm qua tôi bị sưng môi nhưng đã hết.",
+        "Nếu mụn nang kèm sốt và đau khớp thì sao?",
+        "Isotretinoin có thể gây đau đầu dữ dội và nhìn mờ không?",
+        "Tôi bị mụn nang. Hôm qua sốt và đau khớp nhưng đã hết.",
+        "Tôi dùng isotretinoin và đang đau đầu dữ dội. Hôm qua nhìn mờ nhưng giờ đã hết.",
+    ],
+)
+def test_multi_concept_rules_do_not_mix_historical_resolved_or_hypothetical_state(
+    query: str,
+) -> None:
+    assert evaluate_safety(query) is None
+
+
+@pytest.mark.parametrize(
+    ("query", "rule_id"),
+    [
+        (
+            "Hôm qua chỗ khác đã ngừng chảy. Tôi vừa nặn mụn và máu vẫn chảy nhiều.",
+            "significant_bleeding_after_acne_manipulation",
+        ),
+        (
+            "Trước đây tôi đau đầu dữ dội nhưng đã hết. Hiện tôi dùng isotretinoin và lại đau đầu dữ dội kèm nhìn mờ.",
+            "isotretinoin_severe_headache_visual_symptoms",
+        ),
+        (
+            "Chị tôi không mang thai. Tôi đang dùng isotretinoin và hiện mang thai.",
+            "isotretinoin_pregnancy",
+        ),
+        (
+            "Tôi không mang thai. Chị tôi đang dùng isotretinoin và hiện mang thai.",
+            "isotretinoin_pregnancy",
+        ),
+        (
+            "Trước đây tôi không mang thai. Hiện tôi dùng isotretinoin và đang mang thai.",
+            "isotretinoin_pregnancy",
+        ),
+        (
+            "Tối qua tôi từng hụt hơi sau thuốc. Hôm nay tôi vừa dùng thuốc và hiện lại đang khó thở.",
+            "breathing_difficulty_after_medication",
+        ),
+    ],
+)
+def test_current_local_event_wins_over_unrelated_resolved_history(
+    query: str,
+    rule_id: str,
+) -> None:
+    decision = evaluate_safety(query)
+    assert decision is not None
+    assert decision.rule_id == rule_id
+
+
 @pytest.mark.asyncio
 async def test_safety_override_precedes_agent_and_is_not_cacheable() -> None:
     guarded = await guard_node(

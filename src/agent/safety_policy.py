@@ -21,14 +21,14 @@ from src.agent.semantic_signals import (
     contains_bounded_sequence,
     has_active_symptom,
     has_first_person_reference,
+    has_local_concept_groups,
     has_medication_related_active_symptom,
-    has_unnegated_concept,
     is_prescription_execution_request,
     normalize_text,
 )
 
 SafetySeverity = Literal["policy", "urgent", "emergency"]
-SAFETY_POLICY_VERSION = "source_mapped_safety_policy_v5"
+SAFETY_POLICY_VERSION = "source_mapped_safety_policy_locality_contract"
 
 
 @dataclass(frozen=True)
@@ -76,18 +76,20 @@ def safety_rule_inventory() -> tuple[SafetyRule, ...]:
 
 
 def _anaphylaxis(text: str) -> bool:
-    return (
-        has_active_symptom(text, BREATHING_DIFFICULTY_CONCEPTS)
-        and _has_unnegated(
-            text,
-            "sung moi",
-            "sung mieng",
-            "sung luoi",
-            "sung hong",
-            "noi me day",
-            "phat ban ngua lan nhanh",
-            "soc phan ve",
-        )
+    return has_local_concept_groups(
+        text,
+        (
+            BREATHING_DIFFICULTY_CONCEPTS,
+            (
+                "sung moi",
+                "sung mieng",
+                "sung luoi",
+                "sung hong",
+                "noi me day",
+                "phat ban ngua lan nhanh",
+                "soc phan ve",
+            ),
+        ),
     )
 
 
@@ -96,40 +98,31 @@ def _breathing_after_medication(text: str) -> bool:
 
 
 def _significant_bleeding_after_acne_manipulation(text: str) -> bool:
-    manipulation = _has(text, "nan mun", "bop mun", "choc mun")
-    personal_or_current = bool(
-        re.search(r"(?:^|\s)(?:toi|minh|em|tui)(?:\s|$)", text)
-    ) or _has(text, "cho nan mun dang", "vua nan mun", "mau van chay")
-    significant = _has(
+    return has_local_concept_groups(
         text,
-        "chay mau nhieu",
-        "mau chay nhieu",
-        "van chay nhieu",
-        "khong cam duoc",
-        "khong cam mau duoc",
-        "chay mai",
-        "chay khong dung",
-        "chay lien tuc",
-    )
-    resolved = _has(
-        text,
-        "da cam",
-        "da ngung chay",
-        "het chay mau",
-        "khong con chay mau",
-    )
-    return (
-        manipulation
-        and personal_or_current
-        and significant
-        and not resolved
-        and _has_unnegated(text, "chay mau", "mau chay", "mau van chay")
+        (
+            ("nan mun", "bop mun", "choc mun"),
+            (
+                "chay mau nhieu",
+                "mau chay nhieu",
+                "van chay nhieu",
+                "khong cam duoc",
+                "khong cam mau duoc",
+                "chay mai",
+                "chay khong dung",
+                "chay lien tuc",
+            ),
+        ),
     )
 
 
 def _chest_breathing_emergency(text: str) -> bool:
-    return has_active_symptom(text, ("dau nguc", "tuc nguc", "nguc bi ep chat")) and has_active_symptom(
-        text, BREATHING_DIFFICULTY_CONCEPTS
+    return has_local_concept_groups(
+        text,
+        (
+            ("dau nguc", "tuc nguc", "nguc bi ep chat"),
+            BREATHING_DIFFICULTY_CONCEPTS,
+        ),
     )
 
 
@@ -162,71 +155,67 @@ def _self_harm(text: str) -> bool:
 
 
 def _acne_fulminans(text: str) -> bool:
-    acne = _has(text, "mun", "acne")
-    systemic = _has_unnegated(text, "sot", "dau khop")
-    severe = _has_unnegated(
-        text, "loet", "trot loet", "mun cuc", "mun nang", "bung phat rat nhanh"
+    return has_local_concept_groups(
+        text,
+        (
+            ("mun", "acne"),
+            ("loet", "trot loet", "mun cuc", "mun nang", "bung phat rat nhanh"),
+            ("sot", "dau khop"),
+        ),
     )
-    return acne and systemic and severe
 
 
 def _isotretinoin_pregnancy(text: str) -> bool:
-    if _has(
-        text,
+    negative_pregnancy = (
         "khong mang thai",
         "khong co thai",
         "khong co bau",
         "khong dang mang thai",
         "not pregnant",
-    ):
-        return False
-    return "isotretinoin" in text and _has_unnegated(
+    )
+    concept_groups = (
+        ("isotretinoin",),
+        (
+            "mang thai",
+            "co thai",
+            "co bau",
+            "dang bau",
+            "du dinh mang thai",
+            "planning pregnancy",
+            "pregnant",
+        ),
+    )
+    if has_first_person_reference(text, negative_pregnancy):
+        return any(
+            has_local_concept_groups(
+                text,
+                concept_groups,
+                active_group_indexes=(1,),
+                required_owner=owner,
+            )
+            for owner in (True, False)
+        )
+    return has_local_concept_groups(
         text,
-        "mang thai",
-        "co thai",
-        "co bau",
-        "dang bau",
-        "du dinh mang thai",
-        "planning pregnancy",
-        "pregnant",
+        concept_groups,
+        active_group_indexes=(1,),
     )
 
 
 def _isotretinoin_neurologic(text: str) -> bool:
-    resolved_headache = _has(
+    return has_local_concept_groups(
         text,
-        "tung dau dau du doi",
-        "tung bi dau dau du doi",
-        "tung dau dau rat nang",
-        "truoc day dau dau du doi",
-        "da het dau dau du doi",
-        "dau dau du doi da het",
-        "khong con dau dau du doi",
-    )
-    severe_headache = _has_unnegated(
-        text, "dau dau du doi", "dau dau rat nang", "severe headache"
-    )
-    visual_or_gi = _has_unnegated(
-        text, "nhin mo", "mo mat", "blurred vision", "buon non", "non"
-    )
-    return (
-        "isotretinoin" in text
-        and not resolved_headache
-        and severe_headache
-        and visual_or_gi
+        (
+            ("isotretinoin",),
+            ("dau dau du doi", "dau dau rat nang", "severe headache"),
+            ("nhin mo", "mo mat", "blurred vision", "buon non", "non"),
+        ),
+        active_group_indexes=(1, 2),
     )
 
 
 def _prescription_execution(text: str) -> bool:
     return is_prescription_execution_request(text)
-
-
-def _has(text: str, *phrases: str) -> bool:
-    return any(phrase in text for phrase in phrases)
-
-
-def _has_unnegated(text: str, *phrases: str) -> bool:
-    return has_unnegated_concept(text, phrases)
 
 
 def _has_reference_purpose(text: str, concepts: tuple[str, ...]) -> bool:
