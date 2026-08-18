@@ -22,7 +22,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from src.retrieval.context_packer import pack_context
+from src.retrieval.context_packer import _render_block, pack_context
 from src.retrieval.contracts import NormalizedQuery
 from src.retrieval.rrf import reciprocal_rank_fusion
 from src.retrieval.service import (
@@ -113,6 +113,67 @@ def assess_retrieval_coverage(
     }
 
 
+def _channel_trace(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Render one read-only channel's rank and provider-native score."""
+
+    return [
+        {
+            "candidate_id": str(result.get("id") or result.get("chunk_id") or ""),
+            "rank": rank,
+            "native_score": result.get("score"),
+        }
+        for rank, result in enumerate(results, start=1)
+    ]
+
+
+def _fused_candidate_trace(
+    candidates: list[Any],
+    packed: Any,
+) -> list[dict[str, Any]]:
+    """Expose packer observations without changing its runtime selection policy.
+
+    This helper intentionally couples the diagnostic to the packer's existing
+    private renderer so character costs match the prompt blocks exactly. It is
+    diagnostic-only, not a retrieval API or a second selection implementation.
+    """
+
+    selected_ids = {item.item_id for item in packed.items}
+    drop_reasons = {
+        str(item.get("candidate_id") or ""): str(item.get("reason") or "")
+        for item in packed.debug.get("dropped", [])
+    }
+    selected_count = 0
+    rendered_chars = 0
+    trace: list[dict[str, Any]] = []
+    for candidate in candidates:
+        selection_index = selected_count + 1
+        separator_chars = 2 if selected_count else 0
+        rendered_length = len(_render_block(candidate, selection_index))
+        selected = candidate.candidate_id in selected_ids
+        trace.append(
+            {
+                "candidate_id": candidate.candidate_id,
+                "fused_rank": candidate.rank,
+                "dense_rank": candidate.debug.get("dense_rank"),
+                "bm25_rank": candidate.debug.get("bm25_rank"),
+                "fused_score": candidate.fused_score,
+                "source_id": candidate.payload.get("source_id"),
+                "section": candidate.payload.get("header")
+                or (candidate.payload.get("section_path") or [None])[-1],
+                "text_chars": len(candidate.text),
+                "rendered_chars": rendered_length,
+                "cumulative_chars_before": rendered_chars,
+                "remaining_chars_before": packed.debug["limits"]["max_chars"] - rendered_chars - separator_chars,
+                "packed": selected,
+                "drop_reason": drop_reasons.get(candidate.candidate_id),
+            }
+        )
+        if selected:
+            rendered_chars += separator_chars + rendered_length
+            selected_count += 1
+    return trace
+
+
 async def collect_live_retrieval_observation(
     retriever: EvidenceRetriever,
     case: dict[str, Any],
@@ -154,9 +215,19 @@ async def collect_live_retrieval_observation(
     return {
         **assessment,
         "channels": {"dense": len(dense_results), "bm25": len(sparse_results)},
+        "channel_trace": {
+            "dense": _channel_trace(dense_results),
+            "bm25": _channel_trace(sparse_results),
+        },
         "fused_candidate_count": len(candidates),
         "candidate_ids": [candidate.candidate_id for candidate in candidates],
         "packed_ids": [item.item_id for item in packed.items],
+        "fused_candidates": _fused_candidate_trace(candidates, packed),
+        "packer": {
+            "limits": packed.debug["limits"],
+            "context_chars": len(packed.context_text),
+            "selected_ids": packed.debug["selected_ids"],
+        },
         "packer_drops": packed.debug.get("dropped", []),
     }
 
@@ -168,6 +239,16 @@ async def run_live_retrieval_diagnostic(cases: list[dict[str, Any]]) -> list[dic
     observations: list[dict[str, Any]] = []
     try:
         for case in cases:
+            if case["assessment_mode"] == "source_scope_review":
+                observations.append(
+                    {
+                        "case_id": case["case_id"],
+                        "classification": "not_run",
+                        "reason": "source_scope_review does not treat analogous evidence as direct retrieval support.",
+                        "semantic_truth_checked": False,
+                    }
+                )
+                continue
             if case["assessment_mode"] != "retrieval_evidence":
                 observations.append(
                     {

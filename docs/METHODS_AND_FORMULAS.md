@@ -59,6 +59,17 @@ not a semantic sufficiency or entailment claim. The exact bounded
 `PackedContext.context_text` is the evidence sent to generation; full candidate
 text cannot bypass the configured character limit.
 
+### Diagnostic Evidence Scope
+
+The read-only answer-quality diagnostic distinguishes evidence presence from
+semantic or clinical truth. A historical mask-use question is retained as a
+source-scope review because the approved AAD source describes analogous acne
+mechanica from sports equipment or clothing, friction, heat, and sweat, but does
+not directly mention masks or face coverings. Its absence from retrieval is
+therefore not a retrieval-quality failure or a knowledge-gap claim. Diagnostic
+channel and packing traces can localize a candidate's rank, character cost, and
+drop reason; they do not add a reranker, entailment check, or medical verdict.
+
 Each Dense and BM25 channel is independently bounded by
 `RETRIEVAL_TIMEOUT_SECONDS`, and the agent remains bounded to two retrieval
 executions. These are engineering safety/latency policies. A timed-out channel

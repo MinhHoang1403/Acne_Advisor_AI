@@ -115,14 +115,14 @@
   },
   {
     "case_id": "historical_16",
-    "assessment_mode": "retrieval_evidence",
+    "assessment_mode": "source_scope_review",
     "question": "Đeo khẩu trang có thể làm mụn nặng hơn trong trường hợp nào?",
     "expected_entities": ["acne_mechanica"],
     "evidence_groups": [{"fact": "AAD describes acne mechanica from rubbing, heat, and sweat trapped by equipment or clothing.", "any_of": ["924442bd-1232-5173-b59b-8a62ea10f3fc"]}],
-    "required_facts": ["Relate mask use only through the source-supported friction, heat, and sweat mechanism."],
+    "required_facts": ["Do not treat equipment or clothing evidence as direct mask-specific support."],
     "acceptable_source_ids": ["web_aad_9b5e272fa150e083"],
-    "expected_behavior": "Recovered verbatim from the historical evaluation artifact.",
-    "review_notes": "The approved corpus has an analogous acne-mechanica passage; absence from candidates is a retrieval observation, not a knowledge-gap claim."
+    "expected_behavior": "Retain the historical question as a source-scope review rather than a retrieval pass/fail case.",
+    "review_notes": "Gold revalidation found only analogous acne-mechanica evidence: the approved AAD page discusses sports equipment or clothing, friction, heat, and sweat, not masks or face coverings. This is not direct mask-use support."
   },
   {
     "case_id": "conversation_adapalene_pregnancy",
