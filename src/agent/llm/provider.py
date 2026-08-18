@@ -108,6 +108,22 @@ def _safe_error_text(exc: BaseException) -> str:
     return sanitize_fallback_reason(exc)
 
 
+def _attach_fallback_trace(
+    exc: BaseException,
+    *,
+    requested_provider: str,
+    requested_model: str,
+    fallback_chain: list[dict[str, object]],
+) -> BaseException:
+    """Giữ trace provider đã sanitize khi caller phải xử lý failure cuối cùng."""
+
+    safe_exc = exc.__class__(_safe_error_text(exc))
+    safe_exc.requested_provider = requested_provider  # type: ignore[attr-defined]
+    safe_exc.requested_model = requested_model  # type: ignore[attr-defined]
+    safe_exc.fallback_chain = [dict(entry) for entry in fallback_chain]  # type: ignore[attr-defined]
+    return safe_exc
+
+
 async def _call_gemini(
     prompt: str,
     system_prompt: Optional[str],
@@ -391,14 +407,18 @@ async def generate_llm_response(
 
     if fallback_targets:
         logger.error("All LLM fallback targets failed.")
-        if isinstance(last_error, RuntimeResilienceError):
-            raise last_error
-        result["error"] = (
-            f"Primary ({_safe_error_text(primary_error)}) and "
-            f"Fallback ({_safe_error_text(last_error)}) both failed."
+        raise _attach_fallback_trace(
+            last_error,
+            requested_provider=requested_provider,
+            requested_model=requested_model,
+            fallback_chain=result["fallback_chain"],
         )
-        raise Exception(result["error"])
-    raise primary_error
+    raise _attach_fallback_trace(
+        primary_error,
+        requested_provider=requested_provider,
+        requested_model=requested_model,
+        fallback_chain=result["fallback_chain"],
+    )
 
 
 __all__ = [

@@ -92,6 +92,50 @@ async def test_gemini_429_falls_back_to_flash_lite(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_failed_quota_fallback_keeps_attempt_trace(monkeypatch):
+    calls: list[tuple[str, str]] = []
+
+    async def fake_call(**kwargs):
+        calls.append((kwargs["provider"], kwargs["model"]))
+        if kwargs["model"] == "gemini-3.5-flash":
+            raise ProviderQuotaError("Gemini daily project quota is exhausted (HTTP 429).")
+        raise ProviderUnavailableError("fallback provider unavailable")
+
+    monkeypatch.setenv("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")
+    monkeypatch.setattr(llm_provider, "_call_provider_resilient", fake_call)
+    monkeypatch.setattr(llm_provider, "list_ollama_models", _no_ollama_models)
+
+    with pytest.raises(ProviderUnavailableError) as caught:
+        await llm_provider.generate_llm_response(
+            prompt="x",
+            provider="gemini",
+            model="gemini-3.5-flash",
+            allow_fallback=True,
+            resilience_settings=_settings(),
+        )
+
+    assert calls == [("gemini", "gemini-3.5-flash"), ("gemini", "gemini-3.1-flash-lite")]
+    assert caught.value.requested_provider == "gemini"
+    assert caught.value.requested_model == "gemini-3.5-flash"
+    assert caught.value.fallback_chain == [
+        {
+            "provider": "gemini",
+            "model": "gemini-3.5-flash",
+            "role": "primary",
+            "status": "failed",
+            "reason": "quota_exhausted",
+        },
+        {
+            "provider": "gemini",
+            "model": "gemini-3.1-flash-lite",
+            "role": "fallback",
+            "status": "failed",
+            "reason": "provider_unavailable",
+        },
+    ]
+
+
+@pytest.mark.asyncio
 async def test_both_gemini_models_fail_then_ollama_success(monkeypatch):
     calls: list[tuple[str, str]] = []
 
