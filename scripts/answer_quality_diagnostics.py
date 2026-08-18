@@ -1,10 +1,10 @@
-"""Chạy chẩn đoán retrieval có evidence ID cho một tập case nhỏ.
+"""Chạy chẩn đoán source-grounded cho retrieval và Agent end-to-end.
 
 Script này không phải benchmark lâm sàng và không đánh giá entailment của câu trả
-lời. Nó chỉ ghi nhận một fact đã xác định có xuất hiện trong danh sách RRF và
-packed context hay không. Khi dùng ``--live-retrieval``, script gọi embedding
-query hiện hành và đọc Qdrant; nó không gọi generation, không ghi Redis và không
-thay đổi dữ liệu Phase 1.
+lời. Nó chỉ ghi nhận một fact đã xác định có xuất hiện trong danh sách RRF,
+packed context, hoặc evidence đưa vào generation hay không. ``--live-retrieval``
+chỉ đọc Qdrant; ``--live-agent`` gọi runtime với ``bypass_cache=True`` để thu
+trace đầy đủ. Cả hai chế độ không thay đổi dữ liệu Phase 1.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from src.retrieval.service import (
     _bounded_env,
     _to_candidate,
 )
+from src.agent.graph import run_clinical_agent
 
 
 DEFAULT_CASES_PATH = REPOSITORY_ROOT / "tests" / "fixtures" / (
@@ -275,6 +276,170 @@ async def run_live_retrieval_diagnostic(cases: list[dict[str, Any]]) -> list[dic
     return observations
 
 
+def _coverage_from_attempt(case: dict[str, Any], attempt: dict[str, Any]) -> dict[str, Any]:
+    candidates = attempt.get("candidate_trace") or {}
+    fused = candidates.get("fused") if isinstance(candidates, dict) else []
+    packed = attempt.get("packed_evidence") or []
+    return assess_retrieval_coverage(
+        case,
+        candidate_ids=[str(item.get("candidate_id")) for item in fused if isinstance(item, dict)],
+        packed_ids=[str(item.get("item_id")) for item in packed if isinstance(item, dict)],
+    )
+
+
+def _generation_coverage(case: dict[str, Any], result: dict[str, Any]) -> dict[str, Any] | None:
+    trace = result.get("generation_evidence_trace")
+    if not isinstance(trace, dict):
+        return None
+    evidence = trace.get("packed_evidence") or []
+    ids = [str(item.get("item_id")) for item in evidence if isinstance(item, dict)]
+    candidates = result.get("retrieval_attempt_traces") or []
+    final_candidates = []
+    if candidates and isinstance(candidates[-1], dict):
+        trace_candidates = candidates[-1].get("candidate_trace") or {}
+        final_candidates = trace_candidates.get("fused") or []
+    return assess_retrieval_coverage(
+        case,
+        candidate_ids=[str(item.get("candidate_id")) for item in final_candidates if isinstance(item, dict)],
+        packed_ids=ids,
+    )
+
+
+def _provider_execution(result: dict[str, Any]) -> dict[str, Any]:
+    """Return the existing provider contract without inferring missing fallback state."""
+
+    return {
+        "requested_provider": result.get("requested_provider"),
+        "requested_model": result.get("requested_model"),
+        "actual_provider": result.get("actual_provider"),
+        "actual_model": result.get("actual_model"),
+        "llm_fallback_used": result.get("llm_fallback_used"),
+        "fallback_provider": result.get("fallback_provider"),
+        "fallback_model": result.get("fallback_model"),
+        "fallback_chain": result.get("fallback_chain"),
+    }
+
+
+def _agent_observation(
+    case: dict[str, Any],
+    result: dict[str, Any],
+    *,
+    turn_index: int | None = None,
+) -> dict[str, Any]:
+    attempts = [
+        dict(attempt)
+        for attempt in result.get("retrieval_attempt_traces") or []
+        if isinstance(attempt, dict)
+    ]
+    generation_trace = result.get("generation_evidence_trace")
+    history_messages = (
+        generation_trace.get("conversation_history_messages", 0)
+        if isinstance(generation_trace, dict)
+        else 0
+    )
+    observation: dict[str, Any] = {
+        "case_id": case["case_id"],
+        "turn_index": turn_index,
+        "current_question": result.get("standalone_question") or result.get("retrieval_query"),
+        "conversation_history_messages": history_messages,
+        "action_decisions": result.get("agent_decision_history") or [],
+        "retrieval_attempt_count": result.get("retrieval_attempt", 0),
+        "retrieval_attempts": attempts,
+        "generation_evidence": generation_trace,
+        "provider_execution": _provider_execution(result),
+        "final_answer": result.get("answer"),
+        "safety_decision": result.get("safety_decision"),
+        "fallback_applied": result.get("fallback_applied", False),
+        "fallback_reason_code": result.get("fallback_reason_code"),
+        "semantic_truth_checked": False,
+        "answer_status": "requires_review",
+    }
+    if case["assessment_mode"] in {"retrieval_evidence", "conversation_contract"}:
+        observation["attempt_coverage"] = [_coverage_from_attempt(case, attempt) for attempt in attempts]
+        observation["generation_coverage"] = _generation_coverage(case, result)
+    if result.get("safety_decision"):
+        observation["classification"] = "safety_path"
+    elif result.get("fallback_applied"):
+        observation["classification"] = "safe_fallback"
+    elif not result.get("actual_provider"):
+        observation["classification"] = "provider_failure"
+    else:
+        observation["classification"] = "requires_review"
+    generation_coverage = observation.get("generation_coverage")
+    attempt_coverage = observation.get("attempt_coverage") or []
+    if isinstance(generation_coverage, dict) and generation_coverage.get("packed_complete"):
+        observation["evidence_path"] = (
+            "evidence_available_on_first_attempt"
+            if attempt_coverage and attempt_coverage[0].get("packed_complete")
+            else "evidence_recovered_by_retry"
+        )
+    elif attempt_coverage and any(item.get("candidate_complete") for item in attempt_coverage):
+        observation["evidence_path"] = "context_missing_required_fact"
+    elif attempt_coverage:
+        observation["evidence_path"] = "retrieval_miss"
+    return observation
+
+
+async def run_live_agent_diagnostic(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Execute selected fixture cases through the real bounded Agent with cache bypassed."""
+
+    observations: list[dict[str, Any]] = []
+    for case in cases:
+        mode = case["assessment_mode"]
+        if mode == "source_scope_review":
+            observations.append(
+                {
+                    "case_id": case["case_id"],
+                    "classification": "source_scope_review",
+                    "reason": "Analogical evidence remains outside direct retrieval gold coverage.",
+                    "semantic_truth_checked": False,
+                }
+            )
+            continue
+        questions = case.get("turns") if mode == "conversation_contract" else [case.get("question")]
+        if not isinstance(questions, list) or not all(isinstance(question, str) and question.strip() for question in questions):
+            observations.append(
+                {
+                    "case_id": case["case_id"],
+                    "classification": "invalid_case",
+                    "semantic_truth_checked": False,
+                }
+            )
+            continue
+        history: list[dict[str, str]] = []
+        turns: list[dict[str, Any]] = []
+        for turn_index, question in enumerate(questions, start=1):
+            try:
+                result = await run_clinical_agent(
+                    question,
+                    conversation_history=history,
+                    allow_model_fallback=True,
+                    bypass_cache=True,
+                )
+            except Exception as exc:
+                turns.append(
+                    {
+                        "case_id": case["case_id"],
+                        "turn_index": turn_index,
+                        "classification": "provider_failure",
+                        "error_type": type(exc).__name__,
+                        "semantic_truth_checked": False,
+                    }
+                )
+                break
+            turns.append(_agent_observation(case, result, turn_index=turn_index))
+            history.extend(
+                [
+                    {"role": "user", "content": question},
+                    {"role": "assistant", "content": str(result.get("answer") or "")},
+                ]
+            )
+        observations.append(
+            turns[0] if len(turns) == 1 else {"case_id": case["case_id"], "turns": turns, "semantic_truth_checked": False}
+        )
+    return observations
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read-only source-grounded retrieval diagnostic.")
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_PATH)
@@ -283,12 +448,30 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Call the configured query embedding provider and read Qdrant without generation or writes.",
     )
+    parser.add_argument(
+        "--live-agent",
+        action="store_true",
+        help="Run bounded Agent requests with bypass_cache=True and emit operational traces.",
+    )
+    parser.add_argument(
+        "--case-id",
+        action="append",
+        default=[],
+        help="Run only selected fixture case IDs; repeat for a small live batch.",
+    )
     return parser
 
 
 def main() -> int:
     args = _parser().parse_args()
     cases = load_diagnostic_cases(args.cases)
+    if args.live_agent and args.live_retrieval:
+        raise SystemExit("Choose either --live-retrieval or --live-agent, not both.")
+    if args.case_id:
+        requested_ids = set(args.case_id)
+        cases = [case for case in cases if case["case_id"] in requested_ids]
+        if requested_ids != {case["case_id"] for case in cases}:
+            raise SystemExit("One or more --case-id values are not present in the fixture.")
     report: dict[str, Any] = {
         "diagnostic": "source_grounded_retrieval_presence",
         "semantic_truth_checked": False,
@@ -300,6 +483,12 @@ def main() -> int:
     if args.live_retrieval:
         report["query_embedding_provider_called"] = True
         report["cases"] = asyncio.run(run_live_retrieval_diagnostic(cases))
+    elif args.live_agent:
+        report["diagnostic"] = "source_grounded_agent_execution_trace"
+        report["query_embedding_provider_called"] = True
+        report["generation_provider_called"] = True
+        report["cache_bypassed"] = True
+        report["cases"] = asyncio.run(run_live_agent_diagnostic(cases))
     else:
         report["query_embedding_provider_called"] = False
         report["cases"] = [

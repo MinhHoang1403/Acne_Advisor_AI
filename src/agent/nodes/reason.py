@@ -79,6 +79,12 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         system_prompt = build_medical_system_instruction(question)
         prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
+        generation_evidence_trace = {
+            "current_question": question,
+            "conversation_history_messages": len(conversation_history),
+            "answer_context_ids": [_context_id(context) for context in answer_contexts],
+            "packed_evidence": _packed_evidence_identity(packed_context),
+        }
         
         llm_provider = state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")
         llm_model = state.get("llm_model")
@@ -126,6 +132,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "fallback_reason": response_data.get("fallback_reason"),
             "fallback_chain": response_data.get("fallback_chain"),
             "prompt_budget": prompt_budget.model_dump(mode="json"),
+            "generation_evidence_trace": generation_evidence_trace,
             "runtime_resilience": {
                 **(state.get("runtime_resilience") or {}),
                 "llm": response_data.get("resilience"),
@@ -143,3 +150,31 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         safe_error = sanitize_fallback_reason(e)
         logger.error("LLM generation provider error: %s", safe_error)
         raise ProviderUnavailableError("LLM provider unavailable or returned an error.") from e
+
+
+def _context_id(context: dict[str, Any]) -> str | None:
+    value = context.get("id") or context.get("chunk_id")
+    return str(value) if value else None
+
+
+def _packed_evidence_identity(packed_context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Expose prompt evidence provenance without retaining text or prompt content."""
+
+    result: list[dict[str, Any]] = []
+    for item in packed_context.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else item
+        section_path = payload.get("section_path")
+        result.append(
+            {
+                "item_id": item.get("item_id") or item.get("id") or payload.get("chunk_id"),
+                "source_id": payload.get("source_id")
+                or payload.get("source_path")
+                or payload.get("source_file")
+                or payload.get("document_id"),
+                "section": payload.get("header")
+                or (section_path[-1] if isinstance(section_path, list) and section_path else None),
+            }
+        )
+    return result

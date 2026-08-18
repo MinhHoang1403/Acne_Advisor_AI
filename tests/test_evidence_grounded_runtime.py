@@ -101,7 +101,7 @@ async def test_generation_uses_true_system_instruction_and_canonical_packed_evid
 
     monkeypatch.setattr(reason, "generate_llm_response", fake_generate_llm_response)
     packed_text = "[Evidence 1 | source=source-a | chunk=chunk-1]\nCanonical evidence only."
-    await reason.generate_answer_node(
+    result = await reason.generate_answer_node(
         {
             **_state(""),
             "packed_context": {"context_text": packed_text},
@@ -114,6 +114,12 @@ async def test_generation_uses_true_system_instruction_and_canonical_packed_evid
     assert "<CURRENT_QUESTION>" in captured["prompt"]
     assert packed_text in captured["prompt"]
     assert MEDICAL_RAG_SYSTEM_PROMPT not in captured["prompt"]
+    assert result["generation_evidence_trace"] == {
+        "current_question": "Câu hỏi kiểm soát?",
+        "conversation_history_messages": 0,
+        "answer_context_ids": [None],
+        "packed_evidence": [],
+    }
 
 
 def test_packed_item_and_rendered_evidence_obey_actual_character_limit() -> None:

@@ -10,6 +10,7 @@ from scripts.answer_quality_diagnostics import (
     _fused_candidate_trace,
     assess_retrieval_coverage,
     load_diagnostic_cases,
+    run_live_agent_diagnostic,
     run_live_retrieval_diagnostic,
 )
 from src.retrieval.context_packer import pack_context
@@ -157,6 +158,121 @@ def test_source_scope_review_does_not_invoke_retrieval(monkeypatch) -> None:
             "semantic_truth_checked": False,
         }
     ]
+
+
+def test_agent_diagnostic_preserves_attempt_order_and_provider_trace(monkeypatch) -> None:
+    cases = {case["case_id"]: case for case in load_diagnostic_cases(CASES_PATH)}
+
+    async def fake_run_clinical_agent(*_args, **kwargs):
+        assert kwargs["bypass_cache"] is True
+        assert kwargs["allow_model_fallback"] is True
+        return {
+            "standalone_question": "Adapalene thuộc nhóm thuốc gì?",
+            "retrieval_attempt": 2,
+            "agent_decision_history": [{"action": "retrieve"}, {"action": "retry"}],
+            "retrieval_attempt_traces": [
+                {
+                    "attempt_index": 1,
+                    "candidate_trace": {"fused": [{"candidate_id": "unrelated"}]},
+                    "packed_evidence": [],
+                },
+                {
+                    "attempt_index": 2,
+                    "candidate_trace": {"fused": [{"candidate_id": "460222d6-c4ba-56f9-a26c-bf255b6afb39"}]},
+                    "packed_evidence": [
+                        {"item_id": "460222d6-c4ba-56f9-a26c-bf255b6afb39", "source_id": "source"}
+                    ],
+                },
+            ],
+            "generation_evidence_trace": {
+                "conversation_history_messages": 0,
+                "packed_evidence": [
+                    {"item_id": "460222d6-c4ba-56f9-a26c-bf255b6afb39", "source_id": "source"}
+                ],
+            },
+            "requested_provider": "gemini",
+            "requested_model": "configured",
+            "actual_provider": "gemini",
+            "actual_model": "fallback",
+            "llm_fallback_used": True,
+            "fallback_provider": "gemini",
+            "fallback_model": "fallback",
+            "fallback_chain": [{"status": "failed"}, {"status": "success"}],
+            "answer": "Câu trả lời cần review.",
+            "fallback_applied": False,
+            "safety_decision": None,
+        }
+
+    monkeypatch.setattr("scripts.answer_quality_diagnostics.run_clinical_agent", fake_run_clinical_agent)
+    observations = asyncio.run(run_live_agent_diagnostic([cases["adapalene_class"]]))
+
+    observation = observations[0]
+    assert observation["classification"] == "requires_review"
+    assert [item["attempt_index"] for item in observation["retrieval_attempts"]] == [1, 2]
+    assert observation["attempt_coverage"][0]["classification"] == "retrieval_miss"
+    assert observation["generation_coverage"]["classification"] == "evidence_packed"
+    assert observation["evidence_path"] == "evidence_recovered_by_retry"
+    assert observation["provider_execution"]["actual_model"] == "fallback"
+    assert observation["semantic_truth_checked"] is False
+
+
+def test_agent_diagnostic_keeps_source_scope_case_non_executing(monkeypatch) -> None:
+    cases = {case["case_id"]: case for case in load_diagnostic_cases(CASES_PATH)}
+
+    async def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("source scope review must not invoke the Agent")
+
+    monkeypatch.setattr("scripts.answer_quality_diagnostics.run_clinical_agent", fail_if_called)
+    observations = asyncio.run(run_live_agent_diagnostic([cases["historical_16"]]))
+
+    assert observations == [
+        {
+            "case_id": "historical_16",
+            "classification": "source_scope_review",
+            "reason": "Analogical evidence remains outside direct retrieval gold coverage.",
+            "semantic_truth_checked": False,
+        }
+    ]
+
+
+def test_agent_diagnostic_passes_prior_turns_as_bounded_history(monkeypatch) -> None:
+    cases = {case["case_id"]: case for case in load_diagnostic_cases(CASES_PATH)}
+    histories: list[list[dict[str, str]]] = []
+
+    async def fake_run_clinical_agent(question, **kwargs):
+        history = list(kwargs["conversation_history"])
+        histories.append(history)
+        return {
+            "standalone_question": question,
+            "retrieval_attempt": 0,
+            "agent_decision_history": [],
+            "retrieval_attempt_traces": [],
+            "generation_evidence_trace": {
+                "conversation_history_messages": len(history),
+                "packed_evidence": [],
+            },
+            "requested_provider": "mock",
+            "requested_model": "mock-model",
+            "actual_provider": "mock",
+            "actual_model": "mock-model",
+            "llm_fallback_used": False,
+            "fallback_provider": None,
+            "fallback_model": None,
+            "fallback_chain": [],
+            "answer": f"Answer for {question}",
+            "fallback_applied": False,
+            "safety_decision": None,
+        }
+
+    monkeypatch.setattr("scripts.answer_quality_diagnostics.run_clinical_agent", fake_run_clinical_agent)
+    observations = asyncio.run(run_live_agent_diagnostic([cases["conversation_adapalene_pregnancy"]]))
+
+    turns = observations[0]["turns"]
+    assert histories[0] == []
+    assert histories[1][0]["role"] == "user"
+    assert histories[1][1]["role"] == "assistant"
+    assert turns[1]["conversation_history_messages"] == 2
+    assert turns[1]["semantic_truth_checked"] is False
 
 
 def test_diagnostic_cli_runs_directly_from_repository_root() -> None:
