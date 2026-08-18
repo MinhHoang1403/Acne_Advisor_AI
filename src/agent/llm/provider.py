@@ -7,8 +7,8 @@ runtime settings cho phép, sử dụng phần ``DeadlineBudget`` còn lại.
 """
 
 import asyncio
-import logging
 import os
+import logging
 from typing import Optional
 
 from src.agent.llm.ollama_client import generate_ollama_response, list_ollama_models
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
 DEFAULT_GEMINI_FALLBACK_MODELS = ("gemini-3.1-flash-lite",)
 DEFAULT_OLLAMA_MODEL = "qwen3:8b"
-
 
 def _retry_policy(settings: RuntimeResilienceSettings) -> RetryPolicy:
     return RetryPolicy(
@@ -140,7 +139,6 @@ async def _call_gemini(
         request_timeout=request_timeout,
     )
 
-
 async def _call_gemini_sync(
     prompt: str,
     system_prompt: Optional[str],
@@ -149,7 +147,6 @@ async def _call_gemini_sync(
     request_timeout: float | None = None,
 ) -> str:
     """Đưa lời gọi Google GenAI đồng bộ sang worker thread có timeout."""
-
     def _generate_sync() -> str:
         return generate_text_sync(
             prompt=prompt,
@@ -236,7 +233,6 @@ async def _call_provider_resilient(
         retry_policy=_retry_policy(settings),
     )
 
-
 async def generate_llm_response(
     prompt: str,
     system_prompt: Optional[str] = None,
@@ -259,7 +255,7 @@ async def generate_llm_response(
     provider, model = _resolve_model(provider or "gemini", model)
     requested_provider = provider
     requested_model = model
-
+    
     result = {
         "text": "",
         "provider": provider,
@@ -281,7 +277,7 @@ async def generate_llm_response(
         "error": None,
         "resilience": None,
     }
-
+    
     try:
         # Primary target luôn được thử trước và được ghi ở đầu fallback_chain.
         text, resilience_meta = await _call_provider_resilient(
@@ -298,31 +294,32 @@ async def generate_llm_response(
         result["resilience"] = resilience_meta
         result["fallback_chain"][0]["status"] = "success"
         return result
-
+            
     except asyncio.CancelledError:
         raise
-    except PermanentProviderError as exc:
-        error_text = _safe_error_text(exc)
+    except PermanentProviderError as e:
+        error_text = _safe_error_text(e)
         logger.warning("Primary LLM (%s/%s) failed permanently: %s", provider, model, error_text)
         result["error"] = error_text
         raise
-    except RuntimeResilienceError as exc:
-        error_text = _safe_error_text(exc)
+    except RuntimeResilienceError as e:
+        error_text = _safe_error_text(e)
         logger.warning("Primary LLM (%s/%s) failed: %s", provider, model, error_text)
         if not allow_fallback:
             result["error"] = error_text
             raise
-        primary_error = exc
-    except Exception as exc:
-        error_text = _safe_error_text(exc)
+        primary_error = e
+    except Exception as e:
+        error_text = _safe_error_text(e)
         logger.warning("Primary LLM (%s/%s) failed: %s", provider, model, error_text)
-
+        
         # Chỉ chuẩn bị fallback khi caller bật; lỗi permanent không đi vào nhánh này.
         if not allow_fallback:
             logger.error("Fallback is disabled. Failing.")
             result["error"] = error_text
-            raise
-        primary_error = exc
+            raise e
+
+        primary_error = e
 
     result["fallback_chain"][0]["status"] = "failed"
     result["fallback_chain"][0]["reason"] = _fallback_reason_from_error(primary_error)
@@ -333,13 +330,9 @@ async def generate_llm_response(
             ("gemini", fallback_model)
             for fallback_model in parse_google_fallback_models(primary_model=model)
         )
-        available_models = await list_ollama_models(
-            timeout_seconds=min(5.0, budget.remaining_seconds())
-        )
+        available_models = await list_ollama_models(timeout_seconds=min(5.0, budget.remaining_seconds()))
         configured_model = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
-        configured_model = (
-            configured_model if ":" in configured_model else f"{configured_model}:latest"
-        )
+        configured_model = configured_model if ":" in configured_model else f"{configured_model}:latest"
         if configured_model in available_models:
             fallback_targets.append(("ollama", configured_model))
         elif DEFAULT_OLLAMA_MODEL in available_models:
@@ -388,38 +381,37 @@ async def generate_llm_response(
             chain_entry["status"] = "failed"
             chain_entry["reason"] = "permanent_provider_error"
             raise
-        except RuntimeResilienceError as fallback_error:
+        except RuntimeResilienceError as fb_err:
             chain_entry["status"] = "failed"
-            chain_entry["reason"] = _fallback_reason_from_error(fallback_error)
-            last_error = fallback_error
+            chain_entry["reason"] = _fallback_reason_from_error(fb_err)
+            last_error = fb_err
             logger.warning(
                 "Fallback %s/%s failed: %s",
                 fallback_provider,
                 fallback_model,
-                _safe_error_text(fallback_error),
+                _safe_error_text(fb_err),
             )
             continue
-        except Exception as fallback_error:
+        except Exception as fb_err:
             chain_entry["status"] = "failed"
-            chain_entry["reason"] = _fallback_reason_from_error(fallback_error)
-            last_error = fallback_error
+            chain_entry["reason"] = _fallback_reason_from_error(fb_err)
+            last_error = fb_err
             logger.warning(
                 "Fallback %s/%s failed: %s",
                 fallback_provider,
                 fallback_model,
-                _safe_error_text(fallback_error),
+                _safe_error_text(fb_err),
             )
             continue
 
-    traced_error = _attach_fallback_trace(
-        last_error,
-        requested_provider=requested_provider,
-        requested_model=requested_model,
-        fallback_chain=result["fallback_chain"],
-    )
     if fallback_targets:
         logger.error("All LLM fallback targets failed.")
-        raise traced_error
+        raise _attach_fallback_trace(
+            last_error,
+            requested_provider=requested_provider,
+            requested_model=requested_model,
+            fallback_chain=result["fallback_chain"],
+        )
     raise _attach_fallback_trace(
         primary_error,
         requested_provider=requested_provider,
