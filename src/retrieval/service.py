@@ -173,6 +173,17 @@ class EvidenceRetriever:
             },
             "fused_candidate_count": len(fused),
             "selected_ids": [item.item_id for item in packed.items],
+            "candidate_trace": {
+                "dense": _channel_candidate_trace(dense_results),
+                "bm25": _channel_candidate_trace(bm25_results),
+                "fused": _fused_candidate_trace(candidates, packed),
+            },
+            "packer": {
+                "limits": dict(packed.debug.get("limits") or {}),
+                "context_chars": len(packed.context_text),
+                "selected_ids": list(packed.debug.get("selected_ids") or []),
+                "dropped": list(packed.debug.get("dropped") or []),
+            },
             "warnings": [*warnings, *packed.warnings],
             "elapsed_ms": elapsed_ms,
         }
@@ -238,6 +249,54 @@ def _to_candidate(item: dict[str, Any], rank: int) -> RetrievedCandidate:
             "bm25_score": item.get("sparse_score"),
         },
     )
+
+
+def _channel_candidate_trace(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Expose bounded channel rank metadata without duplicating source text."""
+
+    return [
+        {
+            "candidate_id": str(item.get("id") or item.get("chunk_id") or f"candidate-{rank}"),
+            "rank": rank,
+            "native_score": item.get("score"),
+        }
+        for rank, item in enumerate(items, 1)
+    ]
+
+
+def _fused_candidate_trace(
+    candidates: list[RetrievedCandidate],
+    packed: Any,
+) -> list[dict[str, Any]]:
+    """Expose RRF and packer outcomes for diagnostics without changing selection."""
+
+    selected_ids = set(packed.debug.get("selected_ids") or [])
+    dropped_by_id = {
+        str(entry.get("candidate_id") or ""): str(entry.get("reason") or "")
+        for entry in packed.debug.get("dropped") or []
+        if isinstance(entry, dict)
+    }
+    trace: list[dict[str, Any]] = []
+    for candidate in candidates:
+        payload = candidate.payload
+        section_path = payload.get("section_path")
+        section = payload.get("header") or (
+            section_path[-1] if isinstance(section_path, list) and section_path else None
+        )
+        trace.append(
+            {
+                "candidate_id": candidate.candidate_id,
+                "rank": candidate.rank,
+                "fused_score": candidate.fused_score,
+                "dense_rank": candidate.debug.get("dense_rank"),
+                "bm25_rank": candidate.debug.get("bm25_rank"),
+                "source_id": _source_id(payload),
+                "section": section,
+                "packed": candidate.candidate_id in selected_ids,
+                "drop_reason": dropped_by_id.get(candidate.candidate_id),
+            }
+        )
+    return trace
 
 
 def _channel_or_warning(name: str, value: Any, warnings: list[str]) -> list[dict[str, Any]]:

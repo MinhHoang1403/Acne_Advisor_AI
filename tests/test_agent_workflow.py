@@ -104,8 +104,23 @@ async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: py
             "sources": ["guideline"],
             "metadata": {
                 "retrieval_status": "ok",
-                "retrieval_trace": {"selected_ids": ["chunk-1"]},
-                "packed_context": {"items": [{"item_id": "chunk-1"}]},
+                "retrieval_trace": {
+                    "selected_ids": ["chunk-1"],
+                    "candidate_trace": {
+                        "dense": [{"candidate_id": "chunk-1", "rank": 1}],
+                        "bm25": [],
+                        "fused": [{"candidate_id": "chunk-1", "rank": 1}],
+                    },
+                    "packer": {"limits": {"max_items": 8, "max_chars": 6000}},
+                },
+                "packed_context": {
+                    "items": [
+                        {
+                            "item_id": "chunk-1",
+                            "payload": {"source_id": "guideline", "header": "Treatment"},
+                        }
+                    ]
+                },
             },
         }
 
@@ -121,6 +136,13 @@ async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: py
     assert "graph_facts" not in result
     assert "graph_relation_found" not in result
     assert result["source_allowlist"][0]["source_id"] == "guideline"
+    trace = result["retrieval_attempt_traces"]
+    assert len(trace) == 1
+    assert trace[0]["attempt_index"] == 1
+    assert trace[0]["candidate_trace"]["dense"][0]["candidate_id"] == "chunk-1"
+    assert trace[0]["packed_evidence"] == [
+        {"item_id": "chunk-1", "source_id": "guideline", "section": "Treatment"}
+    ]
 
 
 @pytest.mark.asyncio
@@ -210,6 +232,12 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
     assert retrieve_calls == 2
     assert result["retrieval_attempt"] == 2
     assert result["agent_decision"]["action"] == "abstain"
+    assert [item["action"] for item in result["agent_decision_history"]] == [
+        "retrieve",
+        "retry",
+        "abstain",
+    ]
+    assert [item["attempt_index"] for item in result["retrieval_attempt_traces"]] == [1, 2]
     assert result["performance_timings"]["agent_decision_1"] >= 0
     assert result["performance_timings"]["agent_decision_2"] >= 0
     assert result["performance_timings"]["agent_decision_3"] >= 0

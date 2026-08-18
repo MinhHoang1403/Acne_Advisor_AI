@@ -46,6 +46,8 @@ class ClinicalState(TypedDict, total=False):
     evidence_assessment: dict[str, Any] | None
     retrieval_attempt: int
     retry_history: list[dict[str, Any]]
+    agent_decision_history: list[dict[str, Any]]
+    retrieval_attempt_traces: list[dict[str, Any]]
 
     # Bản nháp, câu trả lời trình bày cuối cùng và trạng thái fallback.
     draft_answer: str
@@ -85,6 +87,7 @@ class ClinicalState(TypedDict, total=False):
     runtime_resilience: dict[str, Any] | None
     performance_timings: dict[str, float]
     prompt_budget: dict[str, Any] | None
+    generation_evidence_trace: dict[str, Any] | None
     response_profile: str | None
     observability_exported: bool | None
 

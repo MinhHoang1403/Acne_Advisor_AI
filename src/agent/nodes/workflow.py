@@ -84,7 +84,25 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
 
     if state.get("safety_override") or state.get("cache_hit"):
         return {"next_action": "finalize"}
-    return await select_agent_action(state)
+    updates = await select_agent_action(state)
+    decision = updates.get("agent_decision") or {}
+    attempts_used = int(state.get("retrieval_attempt", 0) or 0)
+    action = str(decision.get("action") or updates.get("next_action") or "abstain")
+    return {
+        **updates,
+        "agent_decision_history": [
+            *(state.get("agent_decision_history") or []),
+            {
+                "action": action,
+                "reason_code": decision.get("reason_code"),
+                "retrieval_query": decision.get("retrieval_query"),
+                "retrieval_executions_used": attempts_used,
+                "remaining_retrieval_budget": max(0, MAX_RETRIEVAL_ATTEMPTS - attempts_used),
+                "retry_requested": action == "retry",
+                "abstain": action == "abstain",
+            },
+        ],
+    }
 
 
 async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
@@ -119,6 +137,15 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "reason": retry_reason,
             "selected_ids": trace.get("selected_ids", []),
         }
+        attempt_trace = _retrieval_attempt_trace(
+            attempt=attempt,
+            decision=decision,
+            current_question=state.get("normalized_question") or state.get("user_question") or "",
+            retrieval_query=question,
+            status=status,
+            trace=trace,
+            packed_context=metadata.get("packed_context"),
+        )
         return {
             "retrieval_attempt": attempt,
             "vector_contexts": payload.get("vector_contexts", []),
@@ -132,6 +159,10 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "retrieval_trace": trace,
             "packed_context": metadata.get("packed_context"),
             "retry_history": [*(state.get("retry_history") or []), history_entry],
+            "retrieval_attempt_traces": [
+                *(state.get("retrieval_attempt_traces") or []),
+                attempt_trace,
+            ],
             "performance_timings": {
                 **(state.get("performance_timings") or {}),
                 f"retrieval_attempt_{attempt}": round((time.perf_counter() - started) * 1000, 3),
@@ -141,6 +172,15 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         raise
     except Exception as exc:
         error = sanitize_fallback_reason(exc)
+        attempt_trace = _retrieval_attempt_trace(
+            attempt=attempt,
+            decision=decision,
+            current_question=state.get("normalized_question") or state.get("user_question") or "",
+            retrieval_query=question,
+            status="failed",
+            trace={"architecture": "dense_bm25_rrf", "error": error},
+            packed_context=None,
+        )
         return {
             "retrieval_attempt": attempt,
             "vector_contexts": [],
@@ -160,7 +200,66 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
                     "error": error,
                 },
             ],
+            "retrieval_attempt_traces": [
+                *(state.get("retrieval_attempt_traces") or []),
+                attempt_trace,
+            ],
         }
+
+
+def _retrieval_attempt_trace(
+    *,
+    attempt: int,
+    decision: dict[str, Any],
+    current_question: str,
+    retrieval_query: str,
+    status: str,
+    trace: dict[str, Any],
+    packed_context: Any,
+) -> dict[str, Any]:
+    """Preserve one bounded retrieval execution for internal diagnostics."""
+
+    packed = packed_context if isinstance(packed_context, dict) else {}
+    return {
+        "attempt_index": attempt,
+        "initiating_action": decision.get("action"),
+        "initiating_reason": decision.get("reason_code"),
+        "current_question": str(current_question),
+        "retrieval_query": retrieval_query,
+        "normalized_retrieval_query": trace.get("query") or retrieval_query,
+        "status": status,
+        "channels": dict(trace.get("channels") or {}),
+        "candidate_trace": dict(trace.get("candidate_trace") or {}),
+        "packed_evidence": _evidence_identity_trace(packed.get("items") or []),
+        "packer": dict(trace.get("packer") or {}),
+        "warnings": list(trace.get("warnings") or []),
+        "error": trace.get("error"),
+    }
+
+
+def _evidence_identity_trace(items: list[Any]) -> list[dict[str, Any]]:
+    """Return only provenance identifiers used to build a packed evidence block."""
+
+    result: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else item
+        section_path = payload.get("section_path")
+        section = payload.get("header") or (
+            section_path[-1] if isinstance(section_path, list) and section_path else None
+        )
+        result.append(
+            {
+                "item_id": item.get("item_id") or item.get("id") or payload.get("chunk_id"),
+                "source_id": payload.get("source_id")
+                or payload.get("source_path")
+                or payload.get("source_file")
+                or payload.get("document_id"),
+                "section": section,
+            }
+        )
+    return result
 
 
 async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
