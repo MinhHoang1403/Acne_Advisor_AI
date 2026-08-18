@@ -122,6 +122,25 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
     return system_prompt, json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
+def _provider_failure_metadata(exc: BaseException) -> dict[str, Any]:
+    """Lấy trace fallback đã sanitize từ provider failure, không lộ raw payload."""
+
+    metadata: dict[str, Any] = {"error": sanitize_fallback_reason(exc)}
+    fallback_chain = getattr(exc, "fallback_chain", None)
+    if isinstance(fallback_chain, list):
+        metadata["fallback_chain"] = [
+            dict(entry) for entry in fallback_chain if isinstance(entry, dict)
+        ]
+    requested_provider = getattr(exc, "requested_provider", None)
+    requested_model = getattr(exc, "requested_model", None)
+    if isinstance(requested_provider, str):
+        metadata["requested_provider"] = requested_provider
+    if isinstance(requested_model, str):
+        metadata["requested_model"] = requested_model
+    metadata["fallback_used"] = False
+    return metadata
+
+
 async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
     """Hỏi model một action rồi áp dụng các giới hạn deterministic bằng Python.
 
@@ -156,7 +175,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             retrieval_query=None,
             reason_code="cannot_safely_proceed",
         )
-        provider_metadata = {"error": sanitize_fallback_reason(exc)}
+        provider_metadata = _provider_failure_metadata(exc)
         fallback_reason_code = "provider_unavailable"
     else:
         try:
@@ -191,6 +210,12 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
         updates["retrieval_query"] = effective_query
     if fallback_reason_code:
         updates["fallback_reason_code"] = fallback_reason_code
+    if provider_metadata.get("fallback_chain") is not None:
+        updates["fallback_chain"] = provider_metadata["fallback_chain"]
+    if provider_metadata.get("requested_provider") is not None:
+        updates["requested_provider"] = provider_metadata["requested_provider"]
+    if provider_metadata.get("requested_model") is not None:
+        updates["requested_model"] = provider_metadata["requested_model"]
     return updates
 
 
