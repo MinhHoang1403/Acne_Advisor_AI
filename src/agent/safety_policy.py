@@ -28,7 +28,7 @@ from src.agent.semantic_signals import (
 )
 
 SafetySeverity = Literal["policy", "urgent", "emergency"]
-SAFETY_POLICY_VERSION = "source_mapped_safety_policy_v6"
+SAFETY_POLICY_VERSION = "source_mapped_safety_policy_locality_contract"
 
 
 @dataclass(frozen=True)
