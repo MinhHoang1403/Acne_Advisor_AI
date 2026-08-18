@@ -117,10 +117,11 @@ def _attach_fallback_trace(
 ) -> BaseException:
     """Giữ trace provider đã sanitize khi caller phải xử lý failure cuối cùng."""
 
-    exc.requested_provider = requested_provider  # type: ignore[attr-defined]
-    exc.requested_model = requested_model  # type: ignore[attr-defined]
-    exc.fallback_chain = [dict(entry) for entry in fallback_chain]  # type: ignore[attr-defined]
-    return exc
+    safe_exc = exc.__class__(_safe_error_text(exc))
+    safe_exc.requested_provider = requested_provider  # type: ignore[attr-defined]
+    safe_exc.requested_model = requested_model  # type: ignore[attr-defined]
+    safe_exc.fallback_chain = [dict(entry) for entry in fallback_chain]  # type: ignore[attr-defined]
+    return safe_exc
 
 
 async def _call_gemini(
