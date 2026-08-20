@@ -33,6 +33,13 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
     assert result["retrieval_query"] == "benzoyl peroxide acne"
     assert "standalone_question" not in result
     assert result["agent_decision"]["provider"] == "test"
+    assert result["agent_decision"]["model_decision"] == {
+        "action": "retrieve",
+        "retrieval_query": "benzoyl peroxide acne",
+        "reason_code": "needs_evidence",
+    }
+    assert result["agent_decision"]["topic_reset_applied"] is False
+    assert result["agent_decision"]["validation_changed"] is False
     assert result["performance_timings"]["agent_decision_1"] >= 0
 
 
@@ -299,8 +306,8 @@ async def test_invalid_schema_fails_closed(monkeypatch: pytest.MonkeyPatch) -> N
     await _model(monkeypatch, '{"action":"run_python","reason":"because"}')
     result = await select_agent_action({"normalized_question": "q", "retrieval_attempt": 0})
     assert result["next_action"] == "abstain"
-    assert result["agent_decision"]["reason_code"] == "cannot_safely_proceed"
-    assert result["fallback_reason_code"] == "cannot_safely_proceed"
+    assert result["agent_decision"]["reason_code"] == "evidence_gap"
+    assert result["fallback_reason_code"] == "insufficient_evidence"
 
 
 @pytest.mark.asyncio
@@ -351,7 +358,7 @@ def test_invalid_action_reason_pairs_fail_closed(
     assert result.model_dump() == {
         "action": "abstain",
         "retrieval_query": None,
-        "reason_code": "cannot_safely_proceed",
+        "reason_code": "evidence_gap",
     }
 
 
@@ -393,6 +400,184 @@ def test_decision_prompt_distinguishes_in_scope_evidence_gap_from_out_of_scope()
     assert "unrelated to acne or related skincare" in system_prompt
     assert "requested specificity is not supported by the evidence" in system_prompt
     assert "use evidence_gap with retry or abstain" in system_prompt
+    assert "demand absolute certainty, guarantees, or permanent outcomes" in system_prompt
+    assert "remain in scope" in system_prompt
+
+
+def test_decision_prompt_treats_repeated_history_as_context_not_evidence() -> None:
+    question = "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
+    system_prompt, payload = decision_module.build_agent_decision_prompt(
+        {
+            "normalized_question": question,
+            "conversation_context": {
+                "messages": [
+                    {"role": "user", "content": question},
+                    {"role": "assistant", "content": "Nên đi khám khi mụn nặng."},
+                ]
+            },
+            "retrieval_attempt": 0,
+        }
+    )
+
+    assert "never retrieval evidence" in system_prompt
+    assert "A repeated current question remains a normal request" in system_prompt
+    assert "repetition alone is not out_of_scope" in system_prompt
+    assert "is not cannot_safely_proceed" in system_prompt
+    parsed = json.loads(payload)
+    assert parsed["current_question"] == question
+    assert parsed["bounded_history"] == []
+    assert parsed["evidence_presence"] == {
+        "provenance_complete": False,
+        "item_count": 0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_unsupported_absolute_certainty_about_acne_stays_in_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _model(
+        monkeypatch,
+        '{"action":"retrieve","retrieval_query":"acne treatment outcomes evidence",'
+        '"reason_code":"needs_evidence"}',
+    )
+
+    result = await select_agent_action(
+        {
+            "normalized_question": (
+                "Theo tài liệu, phương pháp nào bảo đảm một kết quả trị mụn vĩnh viễn?"
+            ),
+            "retrieval_attempt": 0,
+        }
+    )
+
+    assert result["is_in_domain"] is True
+    assert result["next_action"] == "retrieve"
+    assert result["agent_decision"]["reason_code"] != "out_of_scope"
+
+    await _model(
+        monkeypatch,
+        '{"action":"abstain","retrieval_query":null,"reason_code":"evidence_gap"}',
+    )
+    unsupported = await select_agent_action(
+        {
+            "normalized_question": (
+                "Theo tài liệu, phương pháp nào bảo đảm một kết quả trị mụn vĩnh viễn?"
+            ),
+            "retrieval_attempt": 1,
+            "retrieval_status": "ok",
+            "evidence_assessment": {"usable": True},
+            "vector_contexts": [
+                {
+                    "id": "outcome-evidence",
+                    "source_id": "guideline",
+                    "text": "Điều trị mụn cần được lựa chọn theo tình trạng cụ thể.",
+                }
+            ],
+        }
+    )
+
+    assert unsupported["is_in_domain"] is True
+    assert unsupported["next_action"] == "abstain"
+    assert unsupported["agent_decision"]["reason_code"] == "evidence_gap"
+    assert unsupported["fallback_reason_code"] == "insufficient_evidence"
+
+
+@pytest.mark.asyncio
+async def test_repeated_referral_turns_do_not_require_safety_abstention_with_valid_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _model(
+        monkeypatch,
+        '{"action":"generate","retrieval_query":null,"reason_code":"evidence_sufficient"}',
+    )
+    question = "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
+    histories = [
+        [],
+        [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": "Nên đi khám khi mụn nặng."},
+        ],
+        [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": "Nên đi khám khi mụn nặng."},
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": "Nên đi khám khi tự chăm sóc không hiệu quả."},
+        ],
+    ]
+
+    for history in histories:
+        result = await select_agent_action(
+            {
+                "normalized_question": question,
+                "conversation_context": {"messages": history},
+                "retrieval_attempt": 1,
+                "retrieval_status": "ok",
+                "evidence_assessment": {"usable": True},
+                "vector_contexts": [
+                    {
+                        "id": "referral-evidence",
+                        "source_id": "guideline",
+                        "text": "Nên đi khám bác sĩ khi mụn nặng hoặc tự chăm sóc không hiệu quả.",
+                    }
+                ],
+            }
+        )
+
+        assert result["next_action"] == "generate"
+        assert result["agent_decision"]["reason_code"] == "evidence_sufficient"
+        assert result.get("fallback_reason_code") != "cannot_safely_proceed"
+
+
+@pytest.mark.asyncio
+async def test_validation_trace_distinguishes_model_decision_from_fail_closed_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _model(
+        monkeypatch,
+        '{"action":"generate","retrieval_query":null,"reason_code":"evidence_sufficient"}',
+    )
+
+    result = await select_agent_action(
+        {"normalized_question": "Mụn là gì?", "retrieval_attempt": 0}
+    )
+
+    assert result["agent_decision"]["model_decision"]["action"] == "generate"
+    assert result["agent_decision"]["model_decision"]["reason_code"] == "evidence_sufficient"
+    assert result["agent_decision"]["action"] == "abstain"
+    assert result["agent_decision"]["reason_code"] == "evidence_gap"
+    assert result["fallback_reason_code"] == "insufficient_evidence"
+    assert result["agent_decision"]["validation_changed"] is True
+
+
+def test_repeated_pronoun_question_keeps_earlier_entity_context() -> None:
+    question = "Nó có phải kháng sinh không?"
+    _, payload = decision_module.build_agent_decision_prompt(
+        {
+            "normalized_question": question,
+            "conversation_context": {
+                "messages": [
+                    {"role": "user", "content": "Benzoyl peroxide là gì?"},
+                    {
+                        "role": "assistant",
+                        "content": "Benzoyl peroxide là một hoạt chất bôi trị mụn.",
+                    },
+                    {"role": "user", "content": question},
+                    {
+                        "role": "assistant",
+                        "content": "Benzoyl peroxide không phải là kháng sinh.",
+                    },
+                ]
+            },
+            "retrieval_attempt": 0,
+        }
+    )
+
+    history = json.loads(payload)["bounded_history"]
+    assert [item["content"] for item in history] == [
+        "Benzoyl peroxide là gì?",
+        "Benzoyl peroxide là một hoạt chất bôi trị mụn.",
+    ]
 
 
 def test_decision_prompt_prioritizes_explicit_current_topic_switch() -> None:
@@ -449,6 +634,10 @@ async def test_explicit_topic_switch_cannot_restore_superseded_topic_in_initial_
 
     assert result["next_action"] == "retrieve"
     assert result["retrieval_query"] == "Benzoyl peroxide có gây kích ứng không?"
+    assert result["agent_decision"]["model_decision"]["retrieval_query"] == (
+        "adapalene benzoyl peroxide combination acne treatment"
+    )
+    assert result["agent_decision"]["topic_reset_applied"] is True
 
 
 @pytest.mark.asyncio
