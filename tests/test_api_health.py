@@ -217,6 +217,15 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
             "requested_model": "gemini-3.5-flash-lite",
             "actual_provider": "gemini",
             "actual_model": "gemini-3.1-flash-lite",
+            "generation_invoked": True,
+            "generation_provider": "gemini",
+            "generation_model": "gemini-3.1-flash-lite",
+            "agent_decision": {
+                "action": "generate",
+                "reason_code": "evidence_sufficient",
+                "provider": "gemini",
+                "model": "gemini-3.5-flash-lite",
+            },
             "llm_fallback_used": True,
             "fallback_provider": "gemini",
             "fallback_model": "gemini-3.1-flash-lite",
@@ -273,6 +282,12 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     assert metadata["fallback_reason"] == "quota_exhausted"
     assert metadata["fallback_chain"][1]["model"] == "gemini-3.1-flash-lite"
     assert metadata["response_origin"] == "llm"
+    assert metadata["response_status"] == "generated"
+    assert metadata["generation_invoked"] is True
+    assert metadata["decision_provider"] == "gemini"
+    assert metadata["decision_model"] == "gemini-3.5-flash-lite"
+    assert metadata["generation_provider"] == "gemini"
+    assert metadata["generation_model"] == "gemini-3.1-flash-lite"
     assert "guardrail_applied" not in metadata
     body = response.json()
     assert body["sources"] == ["Fixture Acne Guide"]
@@ -283,6 +298,72 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     assert timings["agent_total"] == 1.25
     assert timings["persistence"] >= 0
     assert timings["total_request"] >= timings["persistence"]
+
+
+@pytest.mark.asyncio
+async def test_chat_metadata_preserves_non_generation_reason_without_fake_model(monkeypatch):
+    persisted_metadata = []
+
+    async def fake_run_clinical_agent(**kwargs):
+        return {
+            "answer": (
+                "Mình chưa thể đưa ra câu trả lời đủ tin cậy cho câu hỏi này lúc này. "
+                "Bạn có thể thử diễn đạt cụ thể hơn hoặc thử lại sau."
+            ),
+            "session_id": kwargs["session_id"],
+            "sources": ["fixture.pdf"],
+            "vector_contexts": [
+                {"source_file": "fixture.pdf", "document_title": "Fixture Acne Guide"},
+            ],
+            "retrieval_status": "ok",
+            "fallback_applied": True,
+            "fallback_type": "no_retrieval_evidence",
+            "fallback_reason_code": "insufficient_evidence",
+            "fallback_cache_eligible": False,
+            "generation_invoked": False,
+            "generation_provider": None,
+            "generation_model": None,
+            "actual_provider": "system",
+            "actual_model": None,
+            "agent_decision": {
+                "action": "abstain",
+                "reason_code": "evidence_gap",
+                "provider": "gemini",
+                "model": "gemini-3.5-flash-lite",
+            },
+            "is_in_domain": True,
+            "pipeline_manifest": {"phase": "production", "answer_cache_version": "v10"},
+        }
+
+    async def fake_persist_chat_to_db(**kwargs):
+        persisted_metadata.append(kwargs["db_metadata"])
+
+    monkeypatch.setattr("src.api.app.run_clinical_agent", fake_run_clinical_agent)
+    monkeypatch.setattr("src.api.app._persist_chat_to_db", fake_persist_chat_to_db)
+    monkeypatch.setenv("RELEASE_READINESS_TEST_MODE", "")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.post(
+            "/chat",
+            json={"message": "Khi nào người bị mụn nên đi khám bác sĩ?"},
+        )
+
+    assert response.status_code == 200
+    metadata = response.json()["metadata"]
+    assert metadata["response_status"] == "not_generated"
+    assert metadata["generation_invoked"] is False
+    assert metadata["fallback_reason_code"] == "insufficient_evidence"
+    assert metadata["fallback_reason_label"] == "Chưa đủ bằng chứng"
+    assert metadata["decision_model"] == "gemini-3.5-flash-lite"
+    assert metadata.get("generation_provider") is None
+    assert metadata.get("generation_model") is None
+    assert metadata["provider"] == "system"
+    assert metadata.get("model") is None
+    assert response.json()["sources"] == ["Fixture Acne Guide"]
+    assert persisted_metadata[0]["fallback_reason_code"] == "insufficient_evidence"
+    assert persisted_metadata[0]["agent_decision"]["reason_code"] == "evidence_gap"
 
 
 @pytest.mark.asyncio

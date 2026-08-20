@@ -10,7 +10,30 @@ from pydantic import BaseModel, ConfigDict
 from src.agent.answer_formatting import assess_structural_quality
 
 
-SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v3"
+SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v4"
+
+GENERIC_NON_SAFETY_FALLBACK_ANSWER = (
+    "Mình chưa thể đưa ra câu trả lời đủ tin cậy cho câu hỏi này lúc này. "
+    "Bạn có thể thử diễn đạt cụ thể hơn hoặc thử lại sau."
+)
+
+_FALLBACK_REASON_LABELS: dict[str, str] = {
+    "provider_unavailable": "Dịch vụ mô hình tạm thời không khả dụng",
+    "out_of_scope": "Ngoài phạm vi hỗ trợ",
+    "insufficient_evidence": "Chưa đủ bằng chứng",
+    "cannot_safely_proceed": "Không thể tiếp tục an toàn",
+    "retrieval_unavailable": "Dịch vụ truy hồi tạm thời không khả dụng",
+    "generation_unavailable": "Không thể tạo câu trả lời đáng tin cậy",
+}
+
+_FALLBACK_REASON_BY_TYPE: dict[str, str] = {
+    "no_retrieval_evidence": "insufficient_evidence",
+    "insufficient_context": "insufficient_evidence",
+    "provider_error": "provider_unavailable",
+    "retrieval_error": "retrieval_unavailable",
+    "empty_generation": "generation_unavailable",
+    "invalid_generation": "generation_unavailable",
+}
 
 FallbackType = Literal[
     "none",
@@ -117,30 +140,29 @@ def decide_generation_fallback(value: Any) -> SafeFallbackDecision:
     )
 
 
-def build_safe_fallback_answer(fallback_type: str, query: str | None = None, reason: str | None = None) -> str:
+def build_safe_fallback_answer(
+    fallback_type: str,
+    query: str | None = None,
+    reason: str | None = None,
+    reason_code: str | None = None,
+) -> str:
     """Tạo infrastructure fallback mà không nhúng medical fact rules."""
 
     del query, reason
+
+    effective_reason = reason_code or _FALLBACK_REASON_BY_TYPE.get(fallback_type)
+    if effective_reason in {
+        "provider_unavailable",
+        "insufficient_evidence",
+        "retrieval_unavailable",
+        "generation_unavailable",
+    }:
+        return GENERIC_NON_SAFETY_FALLBACK_ANSWER
 
     if fallback_type == "empty_query":
         return (
             "Mình chưa nhận được câu hỏi đủ rõ. "
             "Bạn hãy nêu cụ thể điều muốn biết về mụn hoặc chăm sóc da."
-        )
-    if fallback_type == "retrieval_error":
-        return (
-            "Mình chưa thể lấy đủ thông tin đáng tin cậy để trả lời lúc này. "
-            "Bạn vui lòng thử lại sau ít phút hoặc viết câu hỏi cụ thể hơn."
-        )
-    if fallback_type == "provider_error":
-        return (
-            "Dịch vụ tạo câu trả lời hiện chưa sẵn sàng nên mình chưa thể hoàn tất yêu cầu. "
-            "Bạn vui lòng thử lại sau ít phút."
-        )
-    if fallback_type == "insufficient_context":
-        return (
-            "Mình chưa có đủ thông tin đáng tin cậy để trả lời chắc chắn câu hỏi này. "
-            "Bạn có thể nêu cụ thể hơn điều muốn biết."
         )
     if fallback_type == "out_of_scope":
         return (
@@ -152,15 +174,16 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
             "Mình chưa thể xử lý câu hỏi này một cách an toàn ở thời điểm hiện tại. "
             "Bạn có thể viết lại câu hỏi rõ hơn hoặc thử lại sau."
         )
-    if fallback_type in {"empty_generation", "invalid_generation"}:
-        return (
-            "Hệ thống chưa thể hoàn tất một câu trả lời đáng tin cậy ở lần xử lý này. "
-            "Bạn vui lòng thử lại sau."
-        )
     return (
         "Mình chưa có đủ thông tin đáng tin cậy để trả lời chính xác câu hỏi này. "
         "Bạn có thể nêu cụ thể hơn điều muốn biết."
     )
+
+
+def fallback_reason_label(reason_code: str | None) -> str | None:
+    """Trả nhãn UX ổn định mà không thay đổi reason code nội bộ."""
+
+    return _FALLBACK_REASON_LABELS.get(str(reason_code or ""))
 
 
 def fallback_reason_code_from_agent_reason(reason_code: str | None) -> FallbackReasonCode:
@@ -186,12 +209,14 @@ def fallback_type_for_reason(reason_code: FallbackReasonCode) -> FallbackType:
 
 __all__ = [
     "SAFE_FALLBACK_FLOW_VERSION",
+    "GENERIC_NON_SAFETY_FALLBACK_ANSWER",
     "FallbackType",
     "FallbackReasonCode",
     "SafeFallbackDecision",
     "build_safe_fallback_answer",
     "decide_generation_fallback",
     "fallback_reason_code_from_agent_reason",
+    "fallback_reason_label",
     "fallback_type_for_reason",
     "is_usable_text",
     "sanitize_fallback_reason",

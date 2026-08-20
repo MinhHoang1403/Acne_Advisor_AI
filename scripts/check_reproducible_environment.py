@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 REQUIRED_ENV_EXAMPLE_KEYS = {
     "GOOGLE_GENAI_SDK_VERSION": "google_genai_sdk_v1",
-    "SAFE_FALLBACK_FLOW_VERSION": "safe_fallback_flow_v3",
+    "SAFE_FALLBACK_FLOW_VERSION": "safe_fallback_flow_v4",
     "CACHE_ANSWER_VERSION": "v10",
     "EVIDENCE_GROUNDING_VERSION": "evidence_grounded_runtime_v2",
     "REPRODUCIBLE_ENVIRONMENT_VERSION": "reproducible_environment_v1",

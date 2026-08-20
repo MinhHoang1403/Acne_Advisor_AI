@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
+from src.agent import action_decision
 from src.agent import graph as graph_module
 from src.agent.nodes import reason, workflow
 from src.agent.nodes.quality import answer_quality_node
@@ -69,7 +70,21 @@ async def test_deterministic_prescription_boundary_reports_system_without_model(
 
 
 @pytest.mark.asyncio
-async def test_no_evidence_abstains_without_blind_second_attempt() -> None:
+async def test_no_evidence_abstains_without_blind_second_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def identical_retry(**_: object) -> dict:
+        return {
+            "text": (
+                '{"action":"retry","retrieval_query":"Câu hỏi giống nhau",'
+                '"reason_code":"evidence_gap"}'
+            ),
+            "provider": "test",
+            "model": "decision-model",
+            "fallback_used": False,
+        }
+
+    monkeypatch.setattr(action_decision, "generate_llm_response", identical_retry)
     state = {
         "is_in_domain": True,
         "user_question": "Câu hỏi giống nhau",

@@ -35,7 +35,10 @@ async def generation_fallback_decision_node(state: ClinicalState) -> dict[str, A
             "fallback_answer": None,
             "fallback_cache_eligible": True,
         }
-    answer = build_safe_fallback_answer(decision.fallback_type)
+    answer = build_safe_fallback_answer(
+        decision.fallback_type,
+        reason_code="generation_unavailable",
+    )
     return {
         "fallback_applied": True,
         "fallback_type": decision.fallback_type,
@@ -52,7 +55,10 @@ async def safe_fallback_node(state: ClinicalState) -> dict[str, Any]:
     fallback_type = state.get("fallback_type") or "no_retrieval_evidence"
     fallback_reason = state.get("fallback_reason")
     fallback_reason_code = state.get("fallback_reason_code")
-    fallback_answer = state.get("fallback_answer") or build_safe_fallback_answer(fallback_type)
+    fallback_answer = state.get("fallback_answer") or build_safe_fallback_answer(
+        fallback_type,
+        reason_code=fallback_reason_code,
+    )
     return {
         "draft_answer": fallback_answer,
         "sources": [],

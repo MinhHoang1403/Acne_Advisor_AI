@@ -75,6 +75,9 @@ class ClinicalState(TypedDict, total=False):
     requested_model: str | None
     actual_provider: str | None
     actual_model: str | None
+    generation_invoked: bool
+    generation_provider: str | None
+    generation_model: str | None
     llm_fallback_used: bool
     fallback_provider: str | None
     fallback_model: str | None

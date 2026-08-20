@@ -29,6 +29,7 @@ from src.agent.graph import run_clinical_agent
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
 from src.agent.text_encoding import repair_mojibake
 from src.observability.versioning import get_answer_cache_version
+from src.quality.safe_fallback import fallback_reason_label
 from src.resilience.exceptions import (
     AgentTimeoutError,
     ProviderTimeoutError,
@@ -247,7 +248,15 @@ class ChatMetadata(BaseModel):
     retrieval_status: Optional[str] = None
     fallback_applied: Optional[bool] = None
     fallback_type: Optional[str] = None
+    fallback_reason_code: Optional[str] = None
+    fallback_reason_label: Optional[str] = None
     fallback_cache_eligible: Optional[bool] = None
+    response_status: Optional[str] = None
+    generation_invoked: Optional[bool] = None
+    decision_provider: Optional[str] = None
+    decision_model: Optional[str] = None
+    generation_provider: Optional[str] = None
+    generation_model: Optional[str] = None
     cache: Optional[ChatCacheMetadata] = None
     cached_from_provider: Optional[str] = None
     cached_from_model: Optional[str] = None
@@ -287,6 +296,53 @@ def _response_origin(result: dict[str, Any], is_in_domain: Optional[bool]) -> st
     if result.get("actual_provider") == "system":
         return "deterministic"
     return "llm"
+
+
+def _response_execution_metadata(
+    result: dict[str, Any],
+    response_origin: str,
+    response_provider: str,
+    response_model: str | None,
+) -> dict[str, Any]:
+    """Mô tả execution trung thực mà không gán system fallback cho generation model."""
+
+    decision = result.get("agent_decision") or {}
+    explicit_generation_invoked = result.get("generation_invoked")
+    generation_invoked = (
+        bool(explicit_generation_invoked)
+        if explicit_generation_invoked is not None
+        else bool(
+            response_origin == "llm"
+            and not result.get("fallback_applied")
+            and response_provider != "system"
+        )
+    )
+    if response_origin == "cache":
+        response_status = "cached"
+    elif response_origin == "deterministic_safety":
+        response_status = "deterministic_safety"
+    elif result.get("fallback_applied"):
+        response_status = "generation_failed" if generation_invoked else "not_generated"
+    else:
+        response_status = "generated"
+
+    generation_provider = result.get("generation_provider")
+    generation_model = result.get("generation_model")
+    if generation_invoked and not generation_provider and response_provider != "system":
+        generation_provider = response_provider
+        generation_model = response_model
+
+    reason_code = result.get("fallback_reason_code")
+    return {
+        "response_status": response_status,
+        "generation_invoked": generation_invoked,
+        "fallback_reason_code": reason_code,
+        "fallback_reason_label": fallback_reason_label(reason_code),
+        "decision_provider": decision.get("provider"),
+        "decision_model": decision.get("model"),
+        "generation_provider": generation_provider,
+        "generation_model": generation_model,
+    }
 
 def _used_retrieval(result: dict[str, Any], is_in_domain: Optional[bool]) -> bool:
     """Chỉ báo retrieval khi request thực sự đi vào runtime path đó."""
@@ -740,6 +796,12 @@ async def chat_endpoint(request: ChatRequest):
             model_name,
         )
         response_origin = _response_origin(result, is_in_domain)
+        execution_metadata = _response_execution_metadata(
+            result,
+            response_origin,
+            response_provider,
+            response_model,
+        )
 
         # Build safe metadata dict for DB storage (no API keys, no raw exceptions)
         safe_db_metadata = {
@@ -759,6 +821,7 @@ async def chat_endpoint(request: ChatRequest):
             ),
             "is_in_domain": is_in_domain,
             "response_origin": response_origin,
+            **execution_metadata,
             "agent_decision": result.get("agent_decision"),
             "safety_decision": result.get("safety_decision"),
             "source_metadata": source_metadata,
@@ -877,7 +940,15 @@ async def chat_endpoint(request: ChatRequest):
                 retrieval_status=result.get("retrieval_status"),
                 fallback_applied=result.get("fallback_applied"),
                 fallback_type=result.get("fallback_type"),
+                fallback_reason_code=execution_metadata["fallback_reason_code"],
+                fallback_reason_label=execution_metadata["fallback_reason_label"],
                 fallback_cache_eligible=result.get("fallback_cache_eligible"),
+                response_status=execution_metadata["response_status"],
+                generation_invoked=execution_metadata["generation_invoked"],
+                decision_provider=execution_metadata["decision_provider"],
+                decision_model=execution_metadata["decision_model"],
+                generation_provider=execution_metadata["generation_provider"],
+                generation_model=execution_metadata["generation_model"],
                 cache=ChatCacheMetadata(
                     enabled=bool(result.get("cache_enabled", os.getenv("CACHE_ENABLED", "true").lower() == "true")),
                     checked=bool(result.get("cache_checked")),
