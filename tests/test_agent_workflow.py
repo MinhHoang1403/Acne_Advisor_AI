@@ -75,6 +75,63 @@ async def test_run_clinical_agent_returns_prompt_budget(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_generation_diagnostics_are_explicitly_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeGraph:
+        async def ainvoke(self, state):
+            return {
+                **state,
+                "draft_answer": "Raw grounded draft.",
+                "final_answer": "Presented grounded answer.",
+                "answer_quality_report": {
+                    "passed": True,
+                    "checked_answer": "Pre-verifier grounded answer.",
+                    "issues": [],
+                },
+            }
+
+    monkeypatch.setattr(graph_module, "clinical_graph", FakeGraph())
+
+    regular = await graph_module.run_clinical_agent("Question")
+    diagnostic = await graph_module.run_clinical_agent(
+        "Question",
+        include_generation_diagnostics=True,
+    )
+
+    assert "generation_diagnostics" not in regular
+    assert diagnostic["generation_diagnostics"] == {
+        "raw_generated_answer": "Raw grounded draft.",
+        "pre_verifier_answer": "Pre-verifier grounded answer.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_generation_diagnostics_fall_back_to_final_for_safety_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeGraph:
+        async def ainvoke(self, state):
+            return {
+                **state,
+                "draft_answer": "Deterministic safety draft.",
+                "final_answer": "Presented safety answer.",
+                "answer_quality_report": {"passed": True, "issues": []},
+            }
+
+    monkeypatch.setattr(graph_module, "clinical_graph", FakeGraph())
+
+    result = await graph_module.run_clinical_agent(
+        "Safety question",
+        include_generation_diagnostics=True,
+    )
+
+    assert result["generation_diagnostics"]["pre_verifier_answer"] == (
+        "Presented safety answer."
+    )
+
+
+@pytest.mark.asyncio
 async def test_assessment_requires_text_and_provenance() -> None:
     missing_source = await workflow.assess_evidence_node(
         {"vector_contexts": [{"text": "Medical text"}], "retrieval_attempt": 1}

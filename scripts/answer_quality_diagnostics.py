@@ -348,6 +348,13 @@ def _agent_observation(
         "retrieval_attempts": attempts,
         "generation_evidence": generation_trace,
         "provider_execution": _provider_execution(result),
+        "raw_generated_answer": (
+            (result.get("generation_diagnostics") or {}).get("raw_generated_answer")
+        ),
+        "pre_verifier_answer": (
+            (result.get("generation_diagnostics") or {}).get("pre_verifier_answer")
+        ),
+        "verifier_outcome": result.get("answer_quality_report"),
         "final_answer": result.get("answer"),
         "safety_decision": result.get("safety_decision"),
         "fallback_applied": result.get("fallback_applied", False),
@@ -465,6 +472,7 @@ async def run_live_agent_diagnostic(cases: list[dict[str, Any]]) -> list[dict[st
                     conversation_history=history,
                     allow_model_fallback=True,
                     bypass_cache=True,
+                    include_generation_diagnostics=True,
                 )
             except Exception as exc:
                 turns.append(
