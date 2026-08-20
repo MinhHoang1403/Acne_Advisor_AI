@@ -90,6 +90,84 @@ async def test_assessment_requires_text_and_provenance() -> None:
 
 
 @pytest.mark.asyncio
+async def test_decide_node_records_post_retrieval_decision_visible_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_select(_state: ClinicalState) -> dict:
+        return {
+            "next_action": "generate",
+            "agent_decision": {
+                "action": "generate",
+                "reason_code": "evidence_sufficient",
+                "retrieval_query": None,
+                "provider": "test",
+                "model": "decision-model",
+                "fallback_used": False,
+                "evidence_trace": {
+                    "packed_evidence_count": 2,
+                    "packed_evidence_ids": ["chunk-1", "chunk-2"],
+                    "decision_visible_evidence_count": 1,
+                    "decision_visible_evidence_ids": ["chunk-1"],
+                    "decision_visible_items": [
+                        {
+                            "item_id": "chunk-1",
+                            "source_id": "guideline",
+                            "section": "Treatment",
+                            "position_in_packed_context": 1,
+                            "original_text_length": 1400,
+                            "decision_visible_text_length": 1200,
+                            "truncated_for_decision": True,
+                        }
+                    ],
+                    "limits": {"max_items": 5, "max_chars_per_item": 1200},
+                },
+            },
+        }
+
+    monkeypatch.setattr(workflow, "select_agent_action", fake_select)
+    result = await workflow.decide_node(
+        {
+            "retrieval_attempt": 1,
+            "agent_decision_history": [{"action": "retrieve"}],
+            "agent_decision_evidence_traces": [],
+        }
+    )
+
+    assert result["agent_decision_evidence_traces"] == [
+        {
+            "decision_index": 2,
+            "retrieval_attempts_used": 1,
+            "packed_evidence_count": 2,
+            "packed_evidence_ids": ["chunk-1", "chunk-2"],
+            "decision_visible_evidence_count": 1,
+            "decision_visible_evidence_ids": ["chunk-1"],
+            "decision_visible_items": [
+                {
+                    "item_id": "chunk-1",
+                    "source_id": "guideline",
+                    "section": "Treatment",
+                    "position_in_packed_context": 1,
+                    "original_text_length": 1400,
+                    "decision_visible_text_length": 1200,
+                    "truncated_for_decision": True,
+                }
+            ],
+            "limits": {"max_items": 5, "max_chars_per_item": 1200},
+            "action": "generate",
+            "reason_code": "evidence_sufficient",
+            "retrieval_query": None,
+            "provider": "test",
+            "model": "decision-model",
+            "requested_provider": None,
+            "requested_model": None,
+            "provider_fallback_attempted": False,
+            "provider_fallback_used": False,
+            "fallback_reason_code": None,
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_ainvoke(_payload):
         return {

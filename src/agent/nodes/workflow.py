@@ -88,10 +88,31 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
     decision = updates.get("agent_decision") or {}
     attempts_used = int(state.get("retrieval_attempt", 0) or 0)
     action = str(decision.get("action") or updates.get("next_action") or "abstain")
+    decision_history = list(state.get("agent_decision_history") or [])
+    evidence_traces = list(state.get("agent_decision_evidence_traces") or [])
+    evidence_trace = decision.get("evidence_trace")
+    if attempts_used > 0 and isinstance(evidence_trace, dict):
+        evidence_traces.append(
+            {
+                "decision_index": len(decision_history) + 1,
+                "retrieval_attempts_used": attempts_used,
+                **evidence_trace,
+                "action": action,
+                "reason_code": decision.get("reason_code"),
+                "retrieval_query": decision.get("retrieval_query"),
+                "provider": decision.get("provider"),
+                "model": decision.get("model"),
+                "requested_provider": decision.get("requested_provider"),
+                "requested_model": decision.get("requested_model"),
+                "provider_fallback_attempted": bool(decision.get("fallback_chain")),
+                "provider_fallback_used": bool(decision.get("fallback_used")),
+                "fallback_reason_code": updates.get("fallback_reason_code"),
+            }
+        )
     return {
         **updates,
         "agent_decision_history": [
-            *(state.get("agent_decision_history") or []),
+            *decision_history,
             {
                 "action": action,
                 "reason_code": decision.get("reason_code"),
@@ -102,6 +123,7 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
                 "abstain": action == "abstain",
             },
         ],
+        "agent_decision_evidence_traces": evidence_traces,
     }
 
 

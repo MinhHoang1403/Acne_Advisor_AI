@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from src.agent import action_decision as decision_module
@@ -52,6 +54,54 @@ async def test_agent_chooses_generation_after_evidence(monkeypatch: pytest.Monke
     assert result["next_action"] == "generate"
     assert result["performance_timings"]["agent_decision_1"] == 1.25
     assert result["performance_timings"]["agent_decision_2"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_decision_evidence_trace_matches_bounded_prompt_view_without_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await _model(
+        monkeypatch,
+        '{"action":"generate","retrieval_query":null,"reason_code":"evidence_sufficient"}',
+    )
+    contexts = [
+        {
+            "id": f"chunk-{index}",
+            "source_id": "guideline",
+            "header": f"Section {index}",
+            "text": ("x" * 1300) if index == 1 else f"Evidence {index}",
+        }
+        for index in range(1, 8)
+    ]
+    state = {
+        "normalized_question": "Mụn là gì?",
+        "retrieval_attempt": 1,
+        "evidence_assessment": {"usable": True},
+        "vector_contexts": contexts,
+    }
+
+    _, prompt = decision_module.build_agent_decision_prompt(state)
+    result = await select_agent_action(state)
+    payload = json.loads(prompt)
+    trace = result["agent_decision"]["evidence_trace"]
+
+    assert len(payload["evidence_for_relevance_check"]) == 5
+    assert len(payload["evidence_for_relevance_check"][0]["text"]) == 1200
+    assert trace["packed_evidence_count"] == 7
+    assert trace["packed_evidence_ids"] == [f"chunk-{index}" for index in range(1, 8)]
+    assert trace["decision_visible_evidence_ids"] == [
+        f"chunk-{index}" for index in range(1, 6)
+    ]
+    assert trace["decision_visible_items"][0] == {
+        "item_id": "chunk-1",
+        "source_id": "guideline",
+        "section": "Section 1",
+        "position_in_packed_context": 1,
+        "original_text_length": 1300,
+        "decision_visible_text_length": 1200,
+        "truncated_for_decision": True,
+    }
+    assert all("text" not in item for item in trace["decision_visible_items"])
 
 
 @pytest.mark.asyncio
@@ -245,6 +295,16 @@ def test_action_reason_contract_accepts_only_legal_semantic_pairs(
 
     assert result.action == action
     assert result.reason_code == reason_code
+
+
+def test_decision_prompt_distinguishes_in_scope_evidence_gap_from_out_of_scope() -> None:
+    system_prompt, _ = decision_module.build_agent_decision_prompt(
+        {"normalized_question": "Mụn là gì?", "retrieval_attempt": 1}
+    )
+
+    assert "unrelated to acne or related skincare" in system_prompt
+    assert "requested specificity is not supported by the evidence" in system_prompt
+    assert "use evidence_gap with retry or abstain" in system_prompt
 
 
 @pytest.mark.asyncio

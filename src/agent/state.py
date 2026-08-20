@@ -47,6 +47,7 @@ class ClinicalState(TypedDict, total=False):
     retrieval_attempt: int
     retry_history: list[dict[str, Any]]
     agent_decision_history: list[dict[str, Any]]
+    agent_decision_evidence_traces: list[dict[str, Any]]
     retrieval_attempt_traces: list[dict[str, Any]]
 
     # Bản nháp, câu trả lời trình bày cuối cùng và trạng thái fallback.

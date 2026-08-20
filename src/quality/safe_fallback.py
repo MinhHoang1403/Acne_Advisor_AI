@@ -10,13 +10,14 @@ from pydantic import BaseModel, ConfigDict
 from src.agent.answer_formatting import assess_structural_quality
 
 
-SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v2"
+SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v3"
 
 FallbackType = Literal[
     "none",
     "empty_query",
     "no_retrieval_evidence",
     "insufficient_context",
+    "provider_error",
     "retrieval_error",
     "empty_generation",
     "invalid_generation",
@@ -131,6 +132,11 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
             "Mình chưa thể lấy đủ thông tin đáng tin cậy để trả lời lúc này. "
             "Bạn vui lòng thử lại sau ít phút hoặc viết câu hỏi cụ thể hơn."
         )
+    if fallback_type == "provider_error":
+        return (
+            "Dịch vụ tạo câu trả lời hiện chưa sẵn sàng nên mình chưa thể hoàn tất yêu cầu. "
+            "Bạn vui lòng thử lại sau ít phút."
+        )
     if fallback_type == "insufficient_context":
         return (
             "Mình chưa có đủ thông tin đáng tin cậy để trả lời chắc chắn câu hỏi này. "
@@ -148,8 +154,8 @@ def build_safe_fallback_answer(fallback_type: str, query: str | None = None, rea
         )
     if fallback_type in {"empty_generation", "invalid_generation"}:
         return (
-            "Mình chưa thể đưa ra câu trả lời đáng tin cậy từ thông tin hiện có. "
-            "Bạn vui lòng thử lại hoặc viết câu hỏi cụ thể hơn."
+            "Hệ thống chưa thể hoàn tất một câu trả lời đáng tin cậy ở lần xử lý này. "
+            "Bạn vui lòng thử lại sau."
         )
     return (
         "Mình chưa có đủ thông tin đáng tin cậy để trả lời chính xác câu hỏi này. "
@@ -169,7 +175,7 @@ def fallback_reason_code_from_agent_reason(reason_code: str | None) -> FallbackR
 
 def fallback_type_for_reason(reason_code: FallbackReasonCode) -> FallbackType:
     return {
-        "provider_unavailable": "retrieval_error",
+        "provider_unavailable": "provider_error",
         "out_of_scope": "out_of_scope",
         "insufficient_evidence": "no_retrieval_evidence",
         "cannot_safely_proceed": "cannot_safely_proceed",

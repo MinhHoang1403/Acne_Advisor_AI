@@ -19,6 +19,12 @@ facts or free-form reasoning. Invalid output, impossible transitions, repeated
 queries, or exhausted attempts fail closed to abstention. Formatting and
 whitespace normalization are not agent actions.
 
+Semantic abstention keeps two meanings separate: `out_of_scope` is reserved
+for questions unrelated to acne or related skincare, while `evidence_gap`
+means an in-scope request could not be supported at the requested specificity.
+Infrastructure failures remain safe fallbacks with provider, retrieval, or
+generation ownership; they are not presented as missing medical knowledge.
+
 `retrieve` calls the typed `retrieve_evidence` tool. `assess` proves only that at
 least one item has non-empty text and source identity. It does not prove medical
 relevance, completeness, or claim entailment. `retrieve` is legal only for the
@@ -74,7 +80,7 @@ sequenceDiagram
     API-->>User: UTF-8 JSON
 ```
 
-The graph schema is `ClinicalState` in `src/agent/state.py` with 58 fields.
+The graph schema is `ClinicalState` in `src/agent/state.py` with 64 fields.
 `src/agent/nodes/workflow.py` owns all eight semantic node functions and routing
 decisions; support modules do not create hidden graph actions.
 

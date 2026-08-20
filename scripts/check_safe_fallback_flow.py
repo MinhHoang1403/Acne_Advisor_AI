@@ -29,6 +29,7 @@ def _case(case_id: str, passed: bool, details: dict[str, Any] | None = None) -> 
 
 async def run_check() -> dict[str, Any]:
     no_evidence = await abstain_node({"retrieval_status": "no_evidence"})
+    provider_error = await abstain_node({"fallback_reason_code": "provider_unavailable"})
     retrieval_error = await abstain_node({"retrieval_error": "backend failed"})
     safety = evaluate_safety("Sau thuốc tôi khó thở, sưng môi và nổi mề đay")
     decision = await generation_fallback_decision_node({"draft_answer": ""})
@@ -36,6 +37,11 @@ async def run_check() -> dict[str, Any]:
     cases = [
         _case("empty_query", "chưa nhận được câu hỏi" in build_safe_fallback_answer("empty_query")),
         _case("no_source_evidence", no_evidence["fallback_type"] == "no_retrieval_evidence"),
+        _case(
+            "provider_error",
+            provider_error["fallback_type"] == "provider_error"
+            and "đủ thông tin" not in provider_error["draft_answer"].casefold(),
+        ),
         _case("retrieval_error", retrieval_error["fallback_type"] == "retrieval_error"),
         _case("empty_generation", decide_generation_fallback(" ").fallback_type == "empty_generation"),
         _case("invalid_generation", decide_generation_fallback(None).fallback_type == "invalid_generation"),

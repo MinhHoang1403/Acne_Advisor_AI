@@ -343,6 +343,7 @@ def _agent_observation(
         "current_question": result.get("standalone_question") or result.get("retrieval_query"),
         "conversation_history_messages": history_messages,
         "action_decisions": result.get("agent_decision_history") or [],
+        "decision_evidence": result.get("agent_decision_evidence_traces") or [],
         "retrieval_attempt_count": result.get("retrieval_attempt", 0),
         "retrieval_attempts": attempts,
         "generation_evidence": generation_trace,
@@ -357,6 +358,15 @@ def _agent_observation(
     if case["assessment_mode"] in {"retrieval_evidence", "conversation_contract"}:
         observation["attempt_coverage"] = [_coverage_from_attempt(case, attempt) for attempt in attempts]
         observation["generation_coverage"] = _generation_coverage(case, result)
+        observation["decision_coverage"] = [
+            assess_retrieval_coverage(
+                case,
+                candidate_ids=[str(item_id) for item_id in trace.get("decision_visible_evidence_ids") or []],
+                packed_ids=[str(item_id) for item_id in trace.get("decision_visible_evidence_ids") or []],
+            )
+            for trace in result.get("agent_decision_evidence_traces") or []
+            if isinstance(trace, dict)
+        ]
     if result.get("safety_decision"):
         observation["classification"] = "safety_path"
     elif result.get("fallback_applied"):
@@ -365,6 +375,7 @@ def _agent_observation(
         observation["classification"] = "provider_failure"
     else:
         observation["classification"] = "requires_review"
+    observation["routing_classification"] = _routing_classification(result, observation)
     generation_coverage = observation.get("generation_coverage")
     attempt_coverage = observation.get("attempt_coverage") or []
     if isinstance(generation_coverage, dict) and generation_coverage.get("packed_complete"):
@@ -378,6 +389,45 @@ def _agent_observation(
     elif attempt_coverage:
         observation["evidence_path"] = "retrieval_miss"
     return observation
+
+
+def _routing_classification(
+    result: dict[str, Any],
+    observation: dict[str, Any],
+) -> str:
+    """Distinguish evidence abstention from typed infrastructure outcomes."""
+
+    if result.get("safety_decision"):
+        return "SAFETY_OVERRIDE"
+    if not result.get("fallback_applied"):
+        return "REQUIRES_REVIEW"
+
+    reason_code = str(result.get("fallback_reason_code") or "")
+    if reason_code == "out_of_scope":
+        return "CORRECT_ABSTENTION_OUT_OF_SCOPE"
+    if reason_code == "provider_unavailable":
+        return "PROVIDER_SAFE_FALLBACK"
+    if reason_code == "retrieval_unavailable":
+        return "RETRIEVAL_SAFE_FALLBACK"
+    if reason_code == "generation_unavailable":
+        return "GENERATION_SAFE_FALLBACK"
+    if reason_code == "cannot_safely_proceed":
+        return "RUNTIME_SAFE_FALLBACK"
+    if reason_code != "insufficient_evidence":
+        return "REQUIRES_REVIEW"
+
+    decision_coverage = observation.get("decision_coverage") or []
+    if decision_coverage and decision_coverage[-1].get("packed_complete"):
+        return "FALSE_ABSTENTION"
+
+    attempt_coverage = observation.get("attempt_coverage") or []
+    if attempt_coverage and attempt_coverage[-1].get("packed_complete"):
+        return "DECISION_VIEW_LOSS_FALSE_ABSTENTION"
+    if attempt_coverage and attempt_coverage[-1].get("candidate_complete"):
+        return "CONTEXT_LOSS"
+    if attempt_coverage:
+        return "RETRIEVAL_MISS"
+    return "CORRECT_ABSTENTION_INSUFFICIENT_EVIDENCE"
 
 
 async def run_live_agent_diagnostic(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
