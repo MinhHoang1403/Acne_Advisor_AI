@@ -64,7 +64,15 @@ def test_diagnostic_cases_have_traceable_evidence_and_required_case_groups() -> 
         "db4632c5-44ed-5dea-80c2-addb0a2534b3"
     ]
     assert by_id["adapalene_class"]["evidence_groups"][0]["any_of"] == [
-        "460222d6-c4ba-56f9-a26c-bf255b6afb39"
+        "460222d6-c4ba-56f9-a26c-bf255b6afb39",
+        "850609c9-471a-54cc-934f-478ad48d826d",
+    ]
+    assert by_id["clindamycin_monotherapy"]["evidence_groups"][0]["any_of"] == [
+        "f675512f-93f5-572a-b705-35132a1445b7"
+    ]
+    assert by_id["paraphrase_referral"]["evidence_groups"][0]["any_of"] == [
+        "2326dc1b-cf4b-520b-8798-f9617fafc0b0",
+        "0564b723-4643-5aa0-ae71-c322c9871dd7",
     ]
 
 

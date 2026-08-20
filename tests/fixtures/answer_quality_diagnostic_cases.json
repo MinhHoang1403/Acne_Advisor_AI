@@ -15,22 +15,22 @@
     "assessment_mode": "retrieval_evidence",
     "question": "Adapalene thuộc nhóm thuốc gì?",
     "expected_entities": ["adapalene", "topical_retinoid"],
-    "evidence_groups": [{"fact": "Adapalene is listed as a topical retinoid.", "any_of": ["460222d6-c4ba-56f9-a26c-bf255b6afb39"]}],
+    "evidence_groups": [{"fact": "Adapalene is listed as a topical retinoid.", "any_of": ["460222d6-c4ba-56f9-a26c-bf255b6afb39", "850609c9-471a-54cc-934f-478ad48d826d"]}],
     "required_facts": ["Identify adapalene as a topical retinoid."],
-    "acceptable_source_ids": ["vn_moh_dermatology_4416_2023_acne"],
+    "acceptable_source_ids": ["vn_moh_dermatology_4416_2023_acne", "aad_acne_guideline_2024"],
     "expected_behavior": "Keep adapalene as the primary entity.",
-    "review_notes": "Classification fact is anchored to a source chunk."
+    "review_notes": "Classification fact is anchored to direct Ministry of Health and AAD topical-retinoid chunks."
   },
   {
     "case_id": "clindamycin_monotherapy",
     "assessment_mode": "retrieval_evidence",
     "question": "Có nên dùng clindamycin đơn độc không?",
     "expected_entities": ["clindamycin", "topical_antibiotic"],
-    "evidence_groups": [{"fact": "Antibiotics should not be used as monotherapy for acne.", "any_of": ["dbeb735c-2e0e-57a5-af78-eb38ecdc0a24"]}],
+    "evidence_groups": [{"fact": "Topical antibiotics should not be used as monotherapy for acne.", "any_of": ["f675512f-93f5-572a-b705-35132a1445b7"]}],
     "required_facts": ["Do not recommend topical antibiotic monotherapy."],
-    "acceptable_source_ids": ["vn_moh_dermatology_4416_2023_acne"],
+    "acceptable_source_ids": ["aad_acne_guideline_2024", "nice_ng198_2026_08"],
     "expected_behavior": "Start with an unambiguous recommendation polarity.",
-    "review_notes": "This is a treatment-policy fact, not a dose-selection test."
+    "review_notes": "AAD directly excludes topical-antibiotic monotherapy; NICE identifies the topical clindamycin combination."
   },
   {
     "case_id": "adapalene_bp_comparison",
@@ -38,7 +38,7 @@
     "question": "Adapalene và benzoyl peroxide khác nhau thế nào?",
     "expected_entities": ["adapalene", "benzoyl_peroxide"],
     "evidence_groups": [
-      {"fact": "Adapalene is a topical retinoid.", "any_of": ["460222d6-c4ba-56f9-a26c-bf255b6afb39"]},
+      {"fact": "Adapalene is a topical retinoid.", "any_of": ["460222d6-c4ba-56f9-a26c-bf255b6afb39", "850609c9-471a-54cc-934f-478ad48d826d"]},
       {"fact": "Benzoyl peroxide is an antimicrobial topical agent.", "any_of": ["db4632c5-44ed-5dea-80c2-addb0a2534b3"]},
       {"fact": "A fixed adapalene and benzoyl peroxide combination exists in the source material.", "any_of": ["66d47093-ac23-5331-8955-8867287370cb", "12259038-373a-5ead-a76c-6e536aef00b9"]}
     ],
@@ -162,11 +162,11 @@
     "assessment_mode": "retrieval_evidence",
     "question": "Những trường hợp mụn nào nên được chuyển khám chuyên khoa da liễu?",
     "expected_entities": ["acne", "dermatologist_referral"],
-    "evidence_groups": [{"fact": "NICE provides explicit specialist-referral criteria.", "any_of": ["2326dc1b-cf4b-520b-8798-f9617fafc0b0"]}],
+    "evidence_groups": [{"fact": "Approved sources provide explicit dermatologist-referral criteria.", "any_of": ["2326dc1b-cf4b-520b-8798-f9617fafc0b0", "0564b723-4643-5aa0-ae71-c322c9871dd7"]}],
     "required_facts": ["Include at least one explicit source-backed specialist-referral criterion."],
-    "acceptable_source_ids": ["nice_ng198_2026_08"],
+    "acceptable_source_ids": ["nice_ng198_2026_08", "web_aad_502603ec115bf029"],
     "expected_behavior": "Summarize source-backed referral criteria without a generic referral-only answer.",
-    "review_notes": "Unseen paraphrase anchored to the NICE specialist-referral section."
+    "review_notes": "Unseen paraphrase anchored to direct NICE and AAD specialist-referral sections."
   },
   {
     "case_id": "historical_16",
