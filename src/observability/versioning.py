@@ -62,7 +62,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
-        "agent_decision_version": "minimal_agent_decision_v4",
+        "agent_decision_version": "minimal_agent_decision_v5",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
             value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),

@@ -85,12 +85,12 @@ async def test_decision_evidence_trace_matches_bounded_prompt_view_without_text(
     payload = json.loads(prompt)
     trace = result["agent_decision"]["evidence_trace"]
 
-    assert len(payload["evidence_for_relevance_check"]) == 5
+    assert len(payload["evidence_for_relevance_check"]) == 7
     assert len(payload["evidence_for_relevance_check"][0]["text"]) == 1200
     assert trace["packed_evidence_count"] == 7
     assert trace["packed_evidence_ids"] == [f"chunk-{index}" for index in range(1, 8)]
     assert trace["decision_visible_evidence_ids"] == [
-        f"chunk-{index}" for index in range(1, 6)
+        f"chunk-{index}" for index in range(1, 8)
     ]
     assert trace["decision_visible_items"][0] == {
         "item_id": "chunk-1",
@@ -102,6 +102,94 @@ async def test_decision_evidence_trace_matches_bounded_prompt_view_without_text(
         "truncated_for_decision": True,
     }
     assert all("text" not in item for item in trace["decision_visible_items"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("conversation_context", "referral_position"),
+    [
+        ({"messages": [], "message_count": 0}, 5),
+        (
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Adapalene và benzoyl peroxide khác nhau thế nào?",
+                    },
+                    {"role": "assistant", "content": "Hai hoạt chất có cơ chế khác nhau."},
+                    {
+                        "role": "user",
+                        "content": "Clindamycin bôi có nên dùng một mình không?",
+                    },
+                    {"role": "assistant", "content": "Không nên dùng đơn trị liệu."},
+                ],
+                "message_count": 4,
+            },
+            6,
+        ),
+    ],
+)
+async def test_referral_evidence_remains_visible_for_standalone_and_multiturn_decisions(
+    monkeypatch: pytest.MonkeyPatch,
+    conversation_context: dict[str, object],
+    referral_position: int,
+) -> None:
+    async def evidence_aware_model(**kwargs: object) -> dict:
+        payload = json.loads(str(kwargs["prompt"]))
+        visible_text = " ".join(
+            item["text"] for item in payload["evidence_for_relevance_check"]
+        )
+        if "đi khám bác sĩ da liễu" in visible_text:
+            decision = {
+                "action": "generate",
+                "retrieval_query": None,
+                "reason_code": "evidence_sufficient",
+            }
+        else:
+            decision = {
+                "action": "retry",
+                "retrieval_query": "chỉ định đi khám bác sĩ điều trị mụn",
+                "reason_code": "evidence_gap",
+            }
+        return {
+            "text": json.dumps(decision, ensure_ascii=False),
+            "provider": "test",
+            "model": "decision-model",
+            "fallback_used": False,
+        }
+
+    monkeypatch.setattr(decision_module, "generate_llm_response", evidence_aware_model)
+    contexts = [
+        {
+            "id": f"chunk-{index}",
+            "source_id": "guideline",
+            "text": (
+                "Người bị mụn nên đi khám bác sĩ da liễu khi tự chăm sóc không hiệu quả."
+                if index == referral_position
+                else f"Thông tin mụn chung {index}."
+            ),
+        }
+        for index in range(1, 9)
+    ]
+
+    result = await select_agent_action(
+        {
+            "normalized_question": (
+                "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
+            ),
+            "conversation_context": conversation_context,
+            "retrieval_attempt": 1,
+            "retrieval_status": "ok",
+            "evidence_assessment": {"usable": True},
+            "vector_contexts": contexts,
+        }
+    )
+
+    assert result["next_action"] == "generate"
+    assert result["agent_decision"]["reason_code"] == "evidence_sufficient"
+    assert result["agent_decision"]["evidence_trace"]["decision_visible_evidence_ids"] == [
+        f"chunk-{index}" for index in range(1, 9)
+    ]
 
 
 @pytest.mark.asyncio
@@ -305,6 +393,62 @@ def test_decision_prompt_distinguishes_in_scope_evidence_gap_from_out_of_scope()
     assert "unrelated to acne or related skincare" in system_prompt
     assert "requested specificity is not supported by the evidence" in system_prompt
     assert "use evidence_gap with retry or abstain" in system_prompt
+
+
+def test_decision_prompt_prioritizes_explicit_current_topic_switch() -> None:
+    system_prompt, payload = decision_module.build_agent_decision_prompt(
+        {
+            "normalized_question": (
+                "Bỏ qua adapalene. Benzoyl peroxide có gây kích ứng không?"
+            ),
+            "conversation_context": {
+                "messages": [
+                    {"role": "user", "content": "Adapalene là gì?"},
+                    {"role": "assistant", "content": "Adapalene là một retinoid bôi."},
+                ]
+            },
+            "retrieval_attempt": 0,
+        }
+    )
+
+    assert "Treat the current question as authoritative" in system_prompt
+    assert "do not carry the superseded topic into the retrieval query" in system_prompt
+    parsed = json.loads(payload)
+    assert parsed["current_question"] == "Benzoyl peroxide có gây kích ứng không?"
+    assert parsed["bounded_history"][0]["content"] == "Adapalene là gì?"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reset_prefix", ["Bỏ qua adapalene.", "Ignore adapalene;"])
+async def test_explicit_topic_switch_cannot_restore_superseded_topic_in_initial_query(
+    monkeypatch: pytest.MonkeyPatch,
+    reset_prefix: str,
+) -> None:
+    await _model(
+        monkeypatch,
+        (
+            '{"action":"retrieve","retrieval_query":'
+            '"adapalene benzoyl peroxide combination acne treatment",'
+            '"reason_code":"needs_evidence"}'
+        ),
+    )
+    result = await select_agent_action(
+        {
+            "normalized_question": (
+                f"{reset_prefix} Benzoyl peroxide có gây kích ứng không?"
+            ),
+            "conversation_context": {
+                "messages": [
+                    {"role": "user", "content": "Adapalene là gì?"},
+                    {"role": "assistant", "content": "Adapalene là một retinoid bôi."},
+                ]
+            },
+            "retrieval_attempt": 0,
+        }
+    )
+
+    assert result["next_action"] == "retrieve"
+    assert result["retrieval_query"] == "Benzoyl peroxide có gây kích ứng không?"
 
 
 @pytest.mark.asyncio
