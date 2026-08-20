@@ -15,7 +15,7 @@ from typing import Any, Mapping
 
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
-DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v2"
+DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v3"
 DEFAULT_PROMPT_VERSION = "medical_prompt_v6"
 DEFAULT_EVIDENCE_GROUNDING_VERSION = "evidence_grounded_runtime_v2"
 DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
@@ -62,7 +62,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
-        "agent_decision_version": "minimal_agent_decision_v3",
+        "agent_decision_version": "minimal_agent_decision_v4",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
             value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),
@@ -79,7 +79,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "safety_policy_version": "source_mapped_safety_policy_locality_contract",
         "safe_fallback_flow_version": _effective_contract_version(
             value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
-            legacy={"safe_fallback_flow_v1"},
+            legacy={"safe_fallback_flow_v1", "safe_fallback_flow_v2"},
             default=DEFAULT_SAFE_FALLBACK_FLOW_VERSION,
         ),
         "runtime_resilience_version": "bounded_retry_runtime_v1",

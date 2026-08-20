@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from scripts.answer_quality_diagnostics import (
+    _agent_observation,
     _channel_trace,
     _fused_candidate_trace,
     assess_retrieval_coverage,
@@ -170,6 +171,26 @@ def test_agent_diagnostic_preserves_attempt_order_and_provider_trace(monkeypatch
             "standalone_question": "Adapalene thuộc nhóm thuốc gì?",
             "retrieval_attempt": 2,
             "agent_decision_history": [{"action": "retrieve"}, {"action": "retry"}],
+            "agent_decision_evidence_traces": [
+                {
+                    "decision_index": 3,
+                    "retrieval_attempts_used": 2,
+                    "packed_evidence_ids": ["460222d6-c4ba-56f9-a26c-bf255b6afb39"],
+                    "decision_visible_evidence_ids": [
+                        "460222d6-c4ba-56f9-a26c-bf255b6afb39"
+                    ],
+                    "decision_visible_items": [
+                        {
+                            "item_id": "460222d6-c4ba-56f9-a26c-bf255b6afb39",
+                            "source_id": "source",
+                            "position_in_packed_context": 1,
+                            "original_text_length": 900,
+                            "decision_visible_text_length": 900,
+                            "truncated_for_decision": False,
+                        }
+                    ],
+                }
+            ],
             "retrieval_attempt_traces": [
                 {
                     "attempt_index": 1,
@@ -213,7 +234,61 @@ def test_agent_diagnostic_preserves_attempt_order_and_provider_trace(monkeypatch
     assert observation["generation_coverage"]["classification"] == "evidence_packed"
     assert observation["evidence_path"] == "evidence_recovered_by_retry"
     assert observation["provider_execution"]["actual_model"] == "fallback"
+    assert observation["decision_evidence"][0]["decision_index"] == 3
+    assert "text" not in observation["decision_evidence"][0]["decision_visible_items"][0]
     assert observation["semantic_truth_checked"] is False
+    assert observation["routing_classification"] == "REQUIRES_REVIEW"
+
+
+def test_agent_diagnostic_identifies_decision_view_loss_false_abstention() -> None:
+    cases = {case["case_id"]: case for case in load_diagnostic_cases(CASES_PATH)}
+    gold_id = "db4632c5-44ed-5dea-80c2-addb0a2534b3"
+    result = {
+        "retrieval_attempt": 2,
+        "agent_decision_history": [{"action": "abstain", "reason_code": "evidence_gap"}],
+        "agent_decision_evidence_traces": [
+            {
+                "decision_visible_evidence_ids": ["unrelated-visible"],
+                "decision_visible_items": [],
+            }
+        ],
+        "retrieval_attempt_traces": [
+            {
+                "candidate_trace": {"fused": [{"candidate_id": gold_id}]},
+                "packed_evidence": [{"item_id": gold_id}],
+            }
+        ],
+        "fallback_applied": True,
+        "fallback_reason_code": "insufficient_evidence",
+        "fallback_type": "no_retrieval_evidence",
+        "actual_provider": "system",
+        "safety_decision": None,
+    }
+
+    observation = _agent_observation(cases["bp_antibiotic"], result)
+
+    assert observation["routing_classification"] == "DECISION_VIEW_LOSS_FALSE_ABSTENTION"
+    assert observation["decision_coverage"][-1]["packed_complete"] is False
+    assert observation["attempt_coverage"][-1]["packed_complete"] is True
+
+
+def test_agent_diagnostic_distinguishes_provider_fallback_from_evidence_gap() -> None:
+    cases = {case["case_id"]: case for case in load_diagnostic_cases(CASES_PATH)}
+    result = {
+        "retrieval_attempt": 0,
+        "agent_decision_history": [{"action": "abstain"}],
+        "agent_decision_evidence_traces": [],
+        "retrieval_attempt_traces": [],
+        "fallback_applied": True,
+        "fallback_reason_code": "provider_unavailable",
+        "fallback_type": "provider_error",
+        "actual_provider": "system",
+        "safety_decision": None,
+    }
+
+    observation = _agent_observation(cases["bp_antibiotic"], result)
+
+    assert observation["routing_classification"] == "PROVIDER_SAFE_FALLBACK"
 
 
 def test_agent_diagnostic_keeps_source_scope_case_non_executing(monkeypatch) -> None:

@@ -60,7 +60,7 @@ async def test_abstention_never_manufactures_evidence_or_cache_eligibility() -> 
 @pytest.mark.parametrize(
     ("reason_code", "expected_type"),
     [
-        ("provider_unavailable", "retrieval_error"),
+        ("provider_unavailable", "provider_error"),
         ("out_of_scope", "out_of_scope"),
         ("insufficient_evidence", "no_retrieval_evidence"),
         ("cannot_safely_proceed", "cannot_safely_proceed"),
@@ -91,7 +91,12 @@ async def test_out_of_scope_fallback_does_not_claim_missing_provenance() -> None
 
 
 def test_safe_fallback_answers_are_generic_infrastructure_messages() -> None:
-    for fallback_type in ("no_retrieval_evidence", "retrieval_error", "invalid_generation"):
+    for fallback_type in (
+        "no_retrieval_evidence",
+        "provider_error",
+        "retrieval_error",
+        "invalid_generation",
+    ):
         answer = build_safe_fallback_answer(fallback_type)
         assert answer
         assert "isotretinoin" not in answer.casefold()
@@ -99,6 +104,17 @@ def test_safe_fallback_answers_are_generic_infrastructure_messages() -> None:
         assert "retrieval" not in answer.casefold()
         assert "truy xuất" not in answer.casefold()
         assert "context" not in answer.casefold()
+
+
+def test_infrastructure_fallback_messages_do_not_claim_missing_knowledge() -> None:
+    provider_answer = build_safe_fallback_answer("provider_error").casefold()
+    generation_answer = build_safe_fallback_answer("invalid_generation").casefold()
+    retrieval_answer = build_safe_fallback_answer("retrieval_error").casefold()
+
+    assert "đủ thông tin" not in provider_answer
+    assert "thông tin hiện có" not in generation_answer
+    assert "dịch vụ" in provider_answer
+    assert "lấy đủ thông tin" in retrieval_answer
 
 
 def test_graph_routes_all_bounded_actions_and_compiles() -> None:
