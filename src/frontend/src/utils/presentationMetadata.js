@@ -6,6 +6,7 @@ export function answerModelDisplayName(data) {
 
   const cachedModel = metadata.cache?.hit ? metadata.cached_from_model : null;
   const model = cachedModel || metadata.model || '';
+  if (model.includes('gemini-3.5-flash-lite')) return 'Gemini 3.5 Flash-Lite';
   if (model.includes('gemini-3.5')) return 'Gemini 3.5 Flash';
   if (model.includes('gemini-3.1-flash-lite')) return 'Gemini 3.1 Flash-Lite';
   if (model.includes('qwen3:8b')) return 'Qwen3 8B Local';

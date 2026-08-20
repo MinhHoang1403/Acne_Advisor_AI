@@ -26,7 +26,7 @@ from src.resilience.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 DEFAULT_GEMINI_FALLBACK_MODELS = ("gemini-3.1-flash-lite",)
 DEFAULT_OLLAMA_MODEL = "qwen3:8b"
 

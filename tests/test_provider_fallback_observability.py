@@ -14,11 +14,11 @@ async def test_agent_decision_preserves_failed_provider_fallback_trace(
 
     error = ProviderUnavailableError("fallback provider unavailable")
     error.requested_provider = "gemini"  # type: ignore[attr-defined]
-    error.requested_model = "gemini-3.5-flash"  # type: ignore[attr-defined]
+    error.requested_model = "gemini-3.5-flash-lite"  # type: ignore[attr-defined]
     error.fallback_chain = [  # type: ignore[attr-defined]
         {
             "provider": "gemini",
-            "model": "gemini-3.5-flash",
+            "model": "gemini-3.5-flash-lite",
             "role": "primary",
             "status": "failed",
             "reason": "quota_exhausted",
@@ -48,6 +48,6 @@ async def test_agent_decision_preserves_failed_provider_fallback_trace(
     assert result["next_action"] == "abstain"
     assert result["fallback_reason_code"] == "provider_unavailable"
     assert result["requested_provider"] == "gemini"
-    assert result["requested_model"] == "gemini-3.5-flash"
+    assert result["requested_model"] == "gemini-3.5-flash-lite"
     assert [entry["status"] for entry in result["fallback_chain"]] == ["failed", "failed"]
     assert result["agent_decision"]["fallback_chain"] == result["fallback_chain"]

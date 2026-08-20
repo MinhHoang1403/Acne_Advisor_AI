@@ -158,7 +158,7 @@ async def _run_release_readiness_agent_override(request: "ChatRequest", session_
         "cache_reason": "safe_fallback_no_retrieval_evidence" if fallback_applied else "bypassed",
         "cache_metadata": {},
         "actual_provider": "ollama" if llm_fallback_used else ("system" if fallback_applied else "gemini"),
-        "actual_model": os.getenv("OLLAMA_MODEL", "qwen3:8b") if llm_fallback_used else (None if fallback_applied else os.getenv("GOOGLE_MODEL", "gemini-3.5-flash")),
+        "actual_model": os.getenv("OLLAMA_MODEL", "qwen3:8b") if llm_fallback_used else (None if fallback_applied else os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")),
         "llm_fallback_used": llm_fallback_used,
         "fallback_provider": "ollama" if llm_fallback_used else None,
         "fallback_model": os.getenv("OLLAMA_MODEL", "qwen3:8b") if llm_fallback_used else None,
@@ -619,6 +619,7 @@ async def list_models():
 
 def _display_name_for_model(model_id: str) -> str:
     aliases = {
+        "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite",
         "gemini-3.5-flash": "Gemini 3.5 Flash",
         "gemini-3.1-flash-lite": "Gemini 3.1 Flash-Lite",
         "gemini-2.5-flash": "Gemini 2.5 Flash",
@@ -693,9 +694,9 @@ async def chat_endpoint(request: ChatRequest):
                 bypass_cache=request.bypass_cache
             )
         
-        model_name = os.getenv("GOOGLE_MODEL", "gemini-3.5-flash")
+        model_name = os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
         if model_name == "gemini-1.5-flash":
-            model_name = "gemini-3.5-flash"
+            model_name = "gemini-3.5-flash-lite"
             
         is_in_domain = result.get("is_in_domain")
         used_retrieval = _used_retrieval(result, is_in_domain)

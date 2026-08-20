@@ -69,6 +69,28 @@ async def test_generate_text_async_uses_google_genai_method_and_config() -> None
     assert capture["config"].http_options.retry_options.attempts == 1
 
 
+@pytest.mark.asyncio
+async def test_flash_lite_request_omits_deprecated_sampling_parameters() -> None:
+    capture: dict = {}
+    client = _FakeClient(capture, SimpleNamespace(text="Xin chào"))
+
+    text = await google_genai.generate_text_async(
+        prompt="Nội dung hỏi",
+        system_prompt="System instruction",
+        model_name="gemini-3.5-flash-lite",
+        temperature=0.3,
+        request_timeout=3,
+        client=client,
+    )
+
+    config = capture["config"].model_dump(exclude_unset=True)
+    assert text == "Xin chào"
+    assert "temperature" not in config
+    assert "top_p" not in config
+    assert "top_k" not in config
+    assert capture["config"].system_instruction == "System instruction"
+
+
 def test_generate_text_sync_uses_google_genai_method_and_config() -> None:
     capture: dict = {}
     client = _FakeClient(capture, SimpleNamespace(text="sync text"))
@@ -87,6 +109,26 @@ def test_generate_text_sync_uses_google_genai_method_and_config() -> None:
     assert capture["contents"] == "Prompt"
     assert capture["config"].temperature == 0.1
     assert capture["config"].http_options.retry_options.attempts == 1
+
+
+def test_flash_lite_sync_request_omits_deprecated_sampling_parameters() -> None:
+    capture: dict = {}
+    client = _FakeClient(capture, SimpleNamespace(text="sync text"))
+
+    text = google_genai.generate_text_sync(
+        prompt="Prompt",
+        system_prompt=None,
+        model_name="gemini-3.5-flash-lite",
+        temperature=0.1,
+        request_timeout=5,
+        client=client,
+    )
+
+    config = capture["config"].model_dump(exclude_unset=True)
+    assert text == "sync text"
+    assert "temperature" not in config
+    assert "top_p" not in config
+    assert "top_k" not in config
 
 
 @pytest.mark.parametrize("response", [SimpleNamespace(text=None), object()])

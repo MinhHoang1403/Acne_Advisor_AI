@@ -50,13 +50,17 @@ def build_google_genai_client(
 
 def _generation_config(
     *,
+    model_name: str,
     temperature: float,
     system_prompt: str | None = None,
 ) -> types.GenerateContentConfig:
     kwargs: dict[str, Any] = {
-        "temperature": temperature,
         "http_options": types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=1)),
     }
+    # Gemini 3.5 Flash-Lite deprecates sampling parameters and may reject them
+    # in future API generations. Older fallback models retain their contract.
+    if model_name != "gemini-3.5-flash-lite":
+        kwargs["temperature"] = temperature
     if system_prompt:
         kwargs["system_instruction"] = system_prompt
     return types.GenerateContentConfig(**kwargs)
@@ -79,6 +83,7 @@ async def generate_text_async(
             model=model_name,
             contents=prompt,
             config=_generation_config(
+                model_name=model_name,
                 temperature=temperature,
                 system_prompt=system_prompt,
             ),
@@ -114,6 +119,7 @@ def generate_text_sync(
             model=model_name,
             contents=prompt,
             config=_generation_config(
+                model_name=model_name,
                 temperature=temperature,
                 system_prompt=system_prompt,
             ),

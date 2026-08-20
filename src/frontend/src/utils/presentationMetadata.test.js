@@ -5,8 +5,8 @@ import { answerModelDisplayName, sourceDisplayLabels } from './presentationMetad
 
 test('answerModelDisplayName uses the actual answering model without routing details', () => {
   assert.equal(
-    answerModelDisplayName({ metadata: { provider: 'gemini', model: 'gemini-3.5-flash' } }),
-    'Gemini 3.5 Flash',
+    answerModelDisplayName({ metadata: { provider: 'gemini', model: 'gemini-3.5-flash-lite' } }),
+    'Gemini 3.5 Flash-Lite',
   );
   assert.equal(
     answerModelDisplayName({ metadata: { provider: 'ollama', model: 'qwen3:8b' } }),
@@ -16,7 +16,7 @@ test('answerModelDisplayName uses the actual answering model without routing det
     answerModelDisplayName({
       metadata: {
         provider: 'gemini',
-        model: 'gemini-3.5-flash',
+        model: 'gemini-3.5-flash-lite',
         cache: { hit: true },
         cached_from_provider: 'ollama',
         cached_from_model: 'qwen3:8b',
@@ -33,7 +33,7 @@ test('answerModelDisplayName omits deterministic safety and missing model identi
         provider: 'system',
         model: null,
         requested_provider: 'gemini',
-        requested_model: 'gemini-3.5-flash',
+        requested_model: 'gemini-3.5-flash-lite',
         response_origin: 'deterministic_safety',
       },
     }),
@@ -44,16 +44,16 @@ test('answerModelDisplayName omits deterministic safety and missing model identi
 });
 
 test('answer details support sources with model, either one alone, or neither', () => {
-  const modelData = { metadata: { provider: 'gemini', model: 'gemini-3.5-flash' } };
+  const modelData = { metadata: { provider: 'gemini', model: 'gemini-3.5-flash-lite' } };
   const sourceData = {
     source_metadata: [{ source_id: 'source-1', display_name: 'Tài liệu tiếng Việt về mụn trứng cá' }],
   };
   const combinedData = { ...modelData, ...sourceData };
 
   assert.deepEqual(sourceDisplayLabels(combinedData), ['Tài liệu tiếng Việt về mụn trứng cá']);
-  assert.equal(answerModelDisplayName(combinedData), 'Gemini 3.5 Flash');
+  assert.equal(answerModelDisplayName(combinedData), 'Gemini 3.5 Flash-Lite');
   assert.deepEqual(sourceDisplayLabels(modelData), []);
-  assert.equal(answerModelDisplayName(modelData), 'Gemini 3.5 Flash');
+  assert.equal(answerModelDisplayName(modelData), 'Gemini 3.5 Flash-Lite');
   assert.deepEqual(sourceDisplayLabels(sourceData), ['Tài liệu tiếng Việt về mụn trứng cá']);
   assert.equal(answerModelDisplayName(sourceData), '');
   assert.deepEqual(sourceDisplayLabels(null), []);
