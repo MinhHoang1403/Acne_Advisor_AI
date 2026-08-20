@@ -132,12 +132,12 @@ test('sendChatMessage sends selected provider and model id', async (t) => {
     message: 'Bốn cơ chế chính gây mụn là gì?',
     sessionId: 'session-1',
     llmProvider: 'gemini',
-    llmModel: 'gemini-3.5-flash',
+    llmModel: 'gemini-3.5-flash-lite',
     allowModelFallback: true,
   });
 
   assert.equal(capturedBody.llm_provider, 'gemini');
-  assert.equal(capturedBody.llm_model, 'gemini-3.5-flash');
+  assert.equal(capturedBody.llm_model, 'gemini-3.5-flash-lite');
   assert.equal(capturedBody.allow_model_fallback, true);
 });
 
@@ -150,12 +150,12 @@ test('fetchModels accepts Gemini 3.1 Flash-Lite catalog entries', async (t) => {
   globalThis.fetch = async () =>
     jsonResponse(200, {
       default_provider: 'gemini',
-      default_model: 'gemini-3.5-flash',
+      default_model: 'gemini-3.5-flash-lite',
       models: [
         {
           provider: 'gemini',
-          model_id: 'gemini-3.5-flash',
-          display_name: 'Gemini 3.5 Flash',
+          model_id: 'gemini-3.5-flash-lite',
+          display_name: 'Gemini 3.5 Flash-Lite',
           available: true,
           is_default: true,
         },

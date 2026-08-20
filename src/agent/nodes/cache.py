@@ -27,7 +27,7 @@ def _resolve_cache_model_key(state: ClinicalState) -> tuple[str, str]:
     provider = (state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")).lower()
     model = state.get("llm_model")
     if provider == "gemini":
-        return provider, model or os.getenv("GOOGLE_MODEL", "gemini-3.5-flash")
+        return provider, model or os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
     if provider in {"ollama", "local"}:
         resolved = model or os.getenv("OLLAMA_MODEL", "qwen3:8b")
         return "ollama", resolved if ":" in resolved else f"{resolved}:latest"

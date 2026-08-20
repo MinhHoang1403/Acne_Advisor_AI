@@ -165,7 +165,7 @@ async def test_models_exposes_current_qwen3_8b_default(monkeypatch):
     async def fake_list_ollama_models():
         return ["qwen3:8b"]
 
-    monkeypatch.setenv("GOOGLE_MODEL", "gemini-3.5-flash")
+    monkeypatch.setenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
     monkeypatch.setenv("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")
     monkeypatch.setattr(
         "src.agent.llm.ollama_client.list_ollama_models",
@@ -180,9 +180,9 @@ async def test_models_exposes_current_qwen3_8b_default(monkeypatch):
     assert response.status_code == 200
     models = response.json()["models"]
     by_model = {item["model"]: item for item in models}
-    assert response.json()["default_model"] == "gemini-3.5-flash"
-    assert by_model["gemini-3.5-flash"]["display_name"] == "Gemini 3.5 Flash"
-    assert by_model["gemini-3.5-flash"]["is_default"] is True
+    assert response.json()["default_model"] == "gemini-3.5-flash-lite"
+    assert by_model["gemini-3.5-flash-lite"]["display_name"] == "Gemini 3.5 Flash-Lite"
+    assert by_model["gemini-3.5-flash-lite"]["is_default"] is True
     assert by_model["gemini-3.1-flash-lite"]["display_name"] == "Gemini 3.1 Flash-Lite"
     assert by_model["gemini-3.1-flash-lite"]["is_default"] is False
     assert by_model["qwen3:8b"]["available"] is True
@@ -194,7 +194,7 @@ async def test_models_exposes_current_qwen3_8b_default(monkeypatch):
 async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     async def fake_run_clinical_agent(**kwargs):
         assert kwargs["llm_provider"] == "gemini"
-        assert kwargs["llm_model"] == "gemini-3.5-flash"
+        assert kwargs["llm_model"] == "gemini-3.5-flash-lite"
         return {
             "answer": "Benzoyl peroxide không phải là kháng sinh.",
             "session_id": kwargs["session_id"],
@@ -214,7 +214,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
             "cache_reason": "miss",
             "cache_metadata": {},
             "requested_provider": "gemini",
-            "requested_model": "gemini-3.5-flash",
+            "requested_model": "gemini-3.5-flash-lite",
             "actual_provider": "gemini",
             "actual_model": "gemini-3.1-flash-lite",
             "llm_fallback_used": True,
@@ -224,7 +224,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
             "fallback_chain": [
                 {
                     "provider": "gemini",
-                    "model": "gemini-3.5-flash",
+                    "model": "gemini-3.5-flash-lite",
                     "role": "primary",
                     "status": "failed",
                     "reason": "quota_exhausted",
@@ -258,7 +258,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
             json={
                 "message": "Benzoyl peroxide có phải kháng sinh không?",
                 "llm_provider": "gemini",
-                "llm_model": "gemini-3.5-flash",
+                "llm_model": "gemini-3.5-flash-lite",
                 "allow_model_fallback": True,
             },
         )
@@ -268,7 +268,7 @@ async def test_chat_metadata_exposes_requested_and_actual_model(monkeypatch):
     assert metadata["provider"] == "gemini"
     assert metadata["model"] == "gemini-3.1-flash-lite"
     assert metadata["requested_provider"] == "gemini"
-    assert metadata["requested_model"] == "gemini-3.5-flash"
+    assert metadata["requested_model"] == "gemini-3.5-flash-lite"
     assert metadata["fallback_used"] is True
     assert metadata["fallback_reason"] == "quota_exhausted"
     assert metadata["fallback_chain"][1]["model"] == "gemini-3.1-flash-lite"
@@ -333,7 +333,7 @@ async def test_chat_prefers_client_history_and_uses_recent_db_fallback(monkeypat
             "fallback_applied": False,
             "fallback_type": "none",
             "actual_provider": "gemini",
-            "actual_model": "gemini-3.5-flash",
+            "actual_model": "gemini-3.5-flash-lite",
             "pipeline_manifest": {"phase": "production", "answer_cache_version": "v10"},
         }
 

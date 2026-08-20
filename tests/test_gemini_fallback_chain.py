@@ -30,12 +30,12 @@ async def _qwen3_ollama_model(**_: object) -> list[str]:
 
 def test_parse_google_fallback_models_default_and_cleanup(monkeypatch):
     monkeypatch.delenv("GOOGLE_FALLBACK_MODELS", raising=False)
-    assert llm_provider.parse_google_fallback_models(primary_model="gemini-3.5-flash") == [
+    assert llm_provider.parse_google_fallback_models(primary_model="gemini-3.5-flash-lite") == [
         "gemini-3.1-flash-lite"
     ]
     assert llm_provider.parse_google_fallback_models(
-        " gemini-3.1-flash-lite, gemini-3.5-flash, another-model, gemini-3.1-flash-lite ",
-        primary_model="gemini-3.5-flash",
+        " gemini-3.1-flash-lite, gemini-3.5-flash-lite, another-model, gemini-3.1-flash-lite ",
+        primary_model="gemini-3.5-flash-lite",
     ) == ["gemini-3.1-flash-lite", "another-model"]
 
 
@@ -51,11 +51,11 @@ async def test_primary_gemini_success_does_not_call_fallback(monkeypatch):
     result = await llm_provider.generate_llm_response(
         prompt="x",
         provider="gemini",
-        model="gemini-3.5-flash",
+        model="gemini-3.5-flash-lite",
         allow_fallback=True,
         resilience_settings=_settings(),
     )
-    assert calls == [("gemini", "gemini-3.5-flash")]
+    assert calls == [("gemini", "gemini-3.5-flash-lite")]
     assert result["fallback_used"] is False
 
 
@@ -65,7 +65,7 @@ async def test_gemini_429_falls_back_to_flash_lite(monkeypatch):
 
     async def fake_call(**kwargs):
         calls.append((kwargs["provider"], kwargs["model"]))
-        if kwargs["model"] == "gemini-3.5-flash":
+        if kwargs["model"] == "gemini-3.5-flash-lite":
             raise ProviderQuotaError("Gemini daily project quota is exhausted (HTTP 429).")
         return "flash-lite ok", {"provider_name": f'{kwargs["provider"]}:{kwargs["model"]}'}
 
@@ -75,13 +75,13 @@ async def test_gemini_429_falls_back_to_flash_lite(monkeypatch):
     result = await llm_provider.generate_llm_response(
         prompt="x",
         provider="gemini",
-        model="gemini-3.5-flash",
+        model="gemini-3.5-flash-lite",
         allow_fallback=True,
         resilience_settings=_settings(),
     )
-    assert calls == [("gemini", "gemini-3.5-flash"), ("gemini", "gemini-3.1-flash-lite")]
+    assert calls == [("gemini", "gemini-3.5-flash-lite"), ("gemini", "gemini-3.1-flash-lite")]
     assert result["requested_provider"] == "gemini"
-    assert result["requested_model"] == "gemini-3.5-flash"
+    assert result["requested_model"] == "gemini-3.5-flash-lite"
     assert result["provider"] == "gemini"
     assert result["model"] == "gemini-3.1-flash-lite"
     assert result["fallback_used"] is True
@@ -97,7 +97,7 @@ async def test_failed_quota_fallback_keeps_attempt_trace(monkeypatch):
 
     async def fake_call(**kwargs):
         calls.append((kwargs["provider"], kwargs["model"]))
-        if kwargs["model"] == "gemini-3.5-flash":
+        if kwargs["model"] == "gemini-3.5-flash-lite":
             raise ProviderQuotaError("Gemini daily project quota is exhausted (HTTP 429).")
         raise ProviderUnavailableError("fallback provider unavailable")
 
@@ -109,18 +109,18 @@ async def test_failed_quota_fallback_keeps_attempt_trace(monkeypatch):
         await llm_provider.generate_llm_response(
             prompt="x",
             provider="gemini",
-            model="gemini-3.5-flash",
+            model="gemini-3.5-flash-lite",
             allow_fallback=True,
             resilience_settings=_settings(),
         )
 
-    assert calls == [("gemini", "gemini-3.5-flash"), ("gemini", "gemini-3.1-flash-lite")]
+    assert calls == [("gemini", "gemini-3.5-flash-lite"), ("gemini", "gemini-3.1-flash-lite")]
     assert caught.value.requested_provider == "gemini"
-    assert caught.value.requested_model == "gemini-3.5-flash"
+    assert caught.value.requested_model == "gemini-3.5-flash-lite"
     assert caught.value.fallback_chain == [
         {
             "provider": "gemini",
-            "model": "gemini-3.5-flash",
+            "model": "gemini-3.5-flash-lite",
             "role": "primary",
             "status": "failed",
             "reason": "quota_exhausted",
@@ -151,12 +151,12 @@ async def test_both_gemini_models_fail_then_ollama_success(monkeypatch):
     result = await llm_provider.generate_llm_response(
         prompt="x",
         provider="gemini",
-        model="gemini-3.5-flash",
+        model="gemini-3.5-flash-lite",
         allow_fallback=True,
         resilience_settings=_settings(),
     )
     assert calls == [
-        ("gemini", "gemini-3.5-flash"),
+        ("gemini", "gemini-3.5-flash-lite"),
         ("gemini", "gemini-3.1-flash-lite"),
         ("ollama", "qwen3:8b"),
     ]
@@ -185,11 +185,11 @@ async def test_fallback_disabled_does_not_call_secondary(monkeypatch):
         await llm_provider.generate_llm_response(
             prompt="x",
             provider="gemini",
-            model="gemini-3.5-flash",
+            model="gemini-3.5-flash-lite",
             allow_fallback=False,
             resilience_settings=_settings(),
         )
-    assert calls == [("gemini", "gemini-3.5-flash")]
+    assert calls == [("gemini", "gemini-3.5-flash-lite")]
 
 
 @pytest.mark.asyncio
@@ -205,8 +205,8 @@ async def test_permanent_provider_error_does_not_fallback(monkeypatch):
         await llm_provider.generate_llm_response(
             prompt="x",
             provider="gemini",
-            model="gemini-3.5-flash",
+            model="gemini-3.5-flash-lite",
             allow_fallback=True,
             resilience_settings=_settings(),
         )
-    assert calls == [("gemini", "gemini-3.5-flash")]
+    assert calls == [("gemini", "gemini-3.5-flash-lite")]

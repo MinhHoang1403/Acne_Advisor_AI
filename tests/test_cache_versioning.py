@@ -86,6 +86,16 @@ def test_provider_fallback_contract_partitions_cache_identity() -> None:
     assert compute_pipeline_fingerprint(baseline) != compute_pipeline_fingerprint(changed)
 
 
+def test_primary_gemini_model_partitions_cache_identity() -> None:
+    previous = build_pipeline_version_manifest({"GOOGLE_MODEL": "gemini-3.5-flash"})
+    current = build_pipeline_version_manifest(
+        {"GOOGLE_MODEL": "gemini-3.5-flash-lite"}
+    )
+
+    assert current["google_model"] == "gemini-3.5-flash-lite"
+    assert compute_pipeline_fingerprint(previous) != compute_pipeline_fingerprint(current)
+
+
 def test_legacy_cache_versions_are_promoted_to_v10() -> None:
     for version in ("", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"):
         assert get_answer_cache_version({"CACHE_ANSWER_VERSION": version}) == "v10"
@@ -200,7 +210,7 @@ async def test_cache_store_metadata_has_production_fingerprint_and_v10(
             "final_answer": "Mụn đầu đen là dạng nhân mụn mở liên quan bít tắc nang lông.",
             "sources": ["source.pdf"],
             "actual_provider": "gemini",
-            "actual_model": "gemini-3.5-flash",
+            "actual_model": "gemini-3.5-flash-lite",
             "answer_quality_report": {"passed": True, "issues": []},
             "pipeline_manifest": manifest,
             "pipeline_fingerprint": "abc123fingerprint",

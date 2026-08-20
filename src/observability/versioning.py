@@ -87,7 +87,8 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
             "LLM_FALLBACK_POLICY_VERSION", "llm_fallback_policy_v3"
         ),
         "google_genai_sdk_version": value("GOOGLE_GENAI_SDK_VERSION", "google_genai_sdk_v1"),
-        "google_model": value("GOOGLE_MODEL", "gemini-3.5-flash") or "gemini-3.5-flash",
+        "google_model": value("GOOGLE_MODEL", "gemini-3.5-flash-lite")
+        or "gemini-3.5-flash-lite",
         "google_fallback_models": _csv_list(
             value("GOOGLE_FALLBACK_MODELS", "gemini-3.1-flash-lite")
         ),

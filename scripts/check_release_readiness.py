@@ -428,7 +428,7 @@ async def check_ollama(*, generate: bool = False) -> dict[str, Any]:
 
 async def check_gemini_live() -> dict[str, Any]:
     key_configured = bool(os.getenv("GOOGLE_API_KEY"))
-    model = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash")
+    model = os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
     if not key_configured:
         return {"passed": False, "blocked": True, "model": model, "key_configured": False, "request_count": 0}
 
