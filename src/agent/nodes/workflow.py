@@ -326,12 +326,22 @@ async def generate_node(state: ClinicalState) -> dict[str, Any]:
     """Sinh một lần từ packed evidence rồi quyết định fallback cho provider output."""
 
     generated = await generate_answer_node(state)
+    generation_metadata = {
+        "generation_invoked": True,
+        "generation_provider": generated.get("actual_provider"),
+        "generation_model": generated.get("actual_model"),
+    }
     merged = {**state, **generated}
     decision = await generation_fallback_decision_node(merged)
     merged.update(decision)
     if decision.get("fallback_applied"):
-        return {**generated, **decision, **(await safe_fallback_node(merged))}
-    return {**generated, **decision}
+        return {
+            **generated,
+            **decision,
+            **(await safe_fallback_node(merged)),
+            **generation_metadata,
+        }
+    return {**generated, **decision, **generation_metadata}
 
 
 async def abstain_node(state: ClinicalState) -> dict[str, Any]:

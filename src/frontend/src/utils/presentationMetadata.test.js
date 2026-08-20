@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { answerModelDisplayName, sourceDisplayLabels } from './presentationMetadata.js';
+import {
+  answerModelDisplayName,
+  nonGeneratedResponseDetails,
+  sourceDisplayLabels,
+} from './presentationMetadata.js';
 
 test('answerModelDisplayName uses the actual answering model without routing details', () => {
   assert.equal(
@@ -41,6 +45,45 @@ test('answerModelDisplayName omits deterministic safety and missing model identi
   );
   assert.equal(answerModelDisplayName({ metadata: {} }), '');
   assert.equal(answerModelDisplayName(null), '');
+});
+
+test('nonGeneratedResponseDetails presents a human reason and decision model only', () => {
+  const data = {
+    metadata: {
+      provider: 'system',
+      model: null,
+      response_status: 'not_generated',
+      generation_invoked: false,
+      fallback_reason_code: 'insufficient_evidence',
+      fallback_reason_label: 'Chưa đủ bằng chứng',
+      decision_model: 'gemini-3.5-flash-lite',
+      generation_model: null,
+    },
+  };
+
+  assert.equal(answerModelDisplayName(data), '');
+  assert.deepEqual(nonGeneratedResponseDetails(data), {
+    status: 'Không tạo câu trả lời',
+    reason: 'Chưa đủ bằng chứng',
+    decisionModel: 'Gemini 3.5 Flash-Lite',
+  });
+  assert.equal(nonGeneratedResponseDetails({ metadata: { response_status: 'generated' } }), null);
+});
+
+test('nonGeneratedResponseDetails does not fabricate unavailable decision identity', () => {
+  assert.deepEqual(
+    nonGeneratedResponseDetails({
+      metadata: {
+        response_status: 'not_generated',
+        fallback_reason_label: 'Dịch vụ mô hình tạm thời không khả dụng',
+      },
+    }),
+    {
+      status: 'Không tạo câu trả lời',
+      reason: 'Dịch vụ mô hình tạm thời không khả dụng',
+      decisionModel: '',
+    },
+  );
 });
 
 test('answer details support sources with model, either one alone, or neither', () => {

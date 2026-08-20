@@ -1,6 +1,10 @@
 import { useId, useState } from 'react';
 import { formatText } from '../utils/markdown.js';
-import { answerModelDisplayName, sourceDisplayLabels } from '../utils/presentationMetadata.js';
+import {
+  answerModelDisplayName,
+  nonGeneratedResponseDetails,
+  sourceDisplayLabels,
+} from '../utils/presentationMetadata.js';
 
 export default function ChatMessage({ msg }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -9,7 +13,9 @@ export default function ChatMessage({ msg }) {
   const data = msg.data || null;
   const sourceLabels = sourceDisplayLabels(data);
   const answerModelName = answerModelDisplayName(data);
-  const hasAnswerDetails = sourceLabels.length > 0 || Boolean(answerModelName);
+  const nonGeneratedDetails = nonGeneratedResponseDetails(data);
+  const hasAnswerDetails =
+    sourceLabels.length > 0 || Boolean(answerModelName) || Boolean(nonGeneratedDetails);
 
   return (
     <div className={`chat-message ${isUser ? 'chat-message-user' : 'chat-message-assistant'}`}>
@@ -60,6 +66,17 @@ export default function ChatMessage({ msg }) {
                           {answerModelName && (
                             <div className="chat-meta-info">
                               <span title="Mô hình trả lời">{answerModelName}</span>
+                            </div>
+                          )}
+                          {nonGeneratedDetails && (
+                            <div className="chat-meta-info">
+                              <span>Trạng thái: {nonGeneratedDetails.status}</span>
+                              {nonGeneratedDetails.reason && (
+                                <span>Lý do: {nonGeneratedDetails.reason}</span>
+                              )}
+                              {nonGeneratedDetails.decisionModel && (
+                                <span>Model quyết định: {nonGeneratedDetails.decisionModel}</span>
+                              )}
                             </div>
                           )}
                         </div>

@@ -86,7 +86,11 @@ test('source details and markdown table presentation remain accessible', () => {
   assert.match(chatMessage, /detailsOpen &&/);
   assert.match(chatMessage, /Tài liệu tham khảo/);
   assert.match(chatMessage, /Mô hình trả lời/);
-  assert.match(chatMessage, /sourceLabels\.length > 0 \|\| Boolean\(answerModelName\)/);
+  assert.match(chatMessage, /Boolean\(nonGeneratedDetails\)/);
+  assert.match(chatMessage, /Trạng thái: \{nonGeneratedDetails\.status\}/);
+  assert.match(chatMessage, /Lý do: \{nonGeneratedDetails\.reason\}/);
+  assert.match(chatMessage, /Model quyết định: \{nonGeneratedDetails\.decisionModel\}/);
+  assert.doesNotMatch(chatMessage, /fallback_reason_code|evidence_gap/);
   assert.doesNotMatch(chatMessage, /Nguồn đã truy hồi|responseBadgeLabel|metadata\.retrieval|dense_bm25_rrf/);
   assert.match(chatMessage, /chat-meta-source-list/);
   assert.doesNotMatch(chatMessage, /sourceLabels\.join\(', '\)/);

@@ -15,7 +15,7 @@ from typing import Any, Mapping
 
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
-DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v3"
+DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v4"
 DEFAULT_PROMPT_VERSION = "medical_prompt_v6"
 DEFAULT_EVIDENCE_GROUNDING_VERSION = "evidence_grounded_runtime_v2"
 DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
@@ -79,7 +79,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "safety_policy_version": "source_mapped_safety_policy_locality_contract",
         "safe_fallback_flow_version": _effective_contract_version(
             value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
-            legacy={"safe_fallback_flow_v1", "safe_fallback_flow_v2"},
+            legacy={"safe_fallback_flow_v1", "safe_fallback_flow_v2", "safe_fallback_flow_v3"},
             default=DEFAULT_SAFE_FALLBACK_FLOW_VERSION,
         ),
         "runtime_resilience_version": "bounded_retry_runtime_v1",
