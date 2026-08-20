@@ -90,12 +90,14 @@ async def run_clinical_agent(
     llm_model: str | None = None,
     allow_model_fallback: bool = False,
     bypass_cache: bool = False,
+    include_generation_diagnostics: bool = False,
 ) -> dict[str, Any]:
     """Chạy một request trong deadline chung và trả contract ổn định cho API.
 
     State khởi tạo ở đây là dữ liệu trao đổi giữa các node. ``DeadlineBudget``
     dùng cùng một mốc thời gian cho toàn request, nên timeout con không làm mới
-    tổng ngân sách. Hàm chỉ chọn các field public sau khi graph hoàn tất.
+    tổng ngân sách. Hàm chỉ chọn các field public sau khi graph hoàn tất; raw
+    generation data chỉ được trả khi diagnostic caller chủ động yêu cầu.
     """
 
     started = time.perf_counter()
@@ -168,7 +170,7 @@ async def run_clinical_agent(
         **(final.get("performance_timings") or {}),
         "agent_total": round((time.perf_counter() - started) * 1000, 3),
     }
-    return {
+    result = {
         "answer": final.get("final_answer", ""),
         "user_id": final.get("user_id"),
         "session_id": final.get("session_id"),
@@ -218,6 +220,17 @@ async def run_clinical_agent(
         "fallback_model": final.get("fallback_model"),
         "fallback_chain": final.get("fallback_chain"),
     }
+    if include_generation_diagnostics:
+        quality_report = final.get("answer_quality_report")
+        result["generation_diagnostics"] = {
+            "raw_generated_answer": final.get("draft_answer", ""),
+            "pre_verifier_answer": (
+                quality_report.get("checked_answer") or final.get("final_answer", "")
+                if isinstance(quality_report, dict)
+                else final.get("final_answer", "")
+            ),
+        }
+    return result
 
 
 __all__ = ["build_clinical_graph", "clinical_graph", "route_agent_action", "run_clinical_agent"]

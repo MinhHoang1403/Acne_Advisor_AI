@@ -36,6 +36,11 @@ def test_diagnostic_cases_have_traceable_evidence_and_required_case_groups() -> 
         "historical_02",
         "historical_03",
         "historical_04",
+        "paraphrase_bp_classification",
+        "paraphrase_adapalene_class",
+        "paraphrase_comedone_difference",
+        "paraphrase_inflammatory_lesions",
+        "paraphrase_referral",
         "historical_16",
         "conversation_adapalene_pregnancy",
         "conversation_entity_reference",
@@ -54,6 +59,13 @@ def test_diagnostic_cases_have_traceable_evidence_and_required_case_groups() -> 
     historical_mask = by_id["historical_16"]
     assert historical_mask["assessment_mode"] == "source_scope_review"
     assert "not masks or face coverings" in historical_mask["review_notes"]
+
+    assert by_id["bp_antibiotic"]["evidence_groups"][0]["any_of"] == [
+        "db4632c5-44ed-5dea-80c2-addb0a2534b3"
+    ]
+    assert by_id["adapalene_class"]["evidence_groups"][0]["any_of"] == [
+        "460222d6-c4ba-56f9-a26c-bf255b6afb39"
+    ]
 
 
 def test_retrieval_coverage_classifies_candidate_and_context_loss_without_semantic_claims() -> None:
@@ -167,6 +179,7 @@ def test_agent_diagnostic_preserves_attempt_order_and_provider_trace(monkeypatch
     async def fake_run_clinical_agent(*_args, **kwargs):
         assert kwargs["bypass_cache"] is True
         assert kwargs["allow_model_fallback"] is True
+        assert kwargs["include_generation_diagnostics"] is True
         return {
             "standalone_question": "Adapalene thuộc nhóm thuốc gì?",
             "retrieval_attempt": 2,
@@ -219,6 +232,11 @@ def test_agent_diagnostic_preserves_attempt_order_and_provider_trace(monkeypatch
             "fallback_provider": "gemini",
             "fallback_model": "fallback",
             "fallback_chain": [{"status": "failed"}, {"status": "success"}],
+            "generation_diagnostics": {
+                "raw_generated_answer": "Raw answer.",
+                "pre_verifier_answer": "Presented answer.",
+            },
+            "answer_quality_report": {"passed": True, "issues": []},
             "answer": "Câu trả lời cần review.",
             "fallback_applied": False,
             "safety_decision": None,
@@ -234,6 +252,9 @@ def test_agent_diagnostic_preserves_attempt_order_and_provider_trace(monkeypatch
     assert observation["generation_coverage"]["classification"] == "evidence_packed"
     assert observation["evidence_path"] == "evidence_recovered_by_retry"
     assert observation["provider_execution"]["actual_model"] == "fallback"
+    assert observation["raw_generated_answer"] == "Raw answer."
+    assert observation["pre_verifier_answer"] == "Presented answer."
+    assert observation["verifier_outcome"]["passed"] is True
     assert observation["decision_evidence"][0]["decision_index"] == 3
     assert "text" not in observation["decision_evidence"][0]["decision_visible_items"][0]
     assert observation["semantic_truth_checked"] is False
