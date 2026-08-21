@@ -7,7 +7,7 @@ import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -22,7 +22,10 @@ from evaluation.formal_evaluation_support import (
     CALIBRATION_RESULTS_PATH,
     CALIBRATION_REVIEW_REQUIRED,
     CASE_METRICS_PATH,
+    CHECKING_REASONING_EFFORT,
+    EVALUATOR_MODEL,
     EvaluationBlocked,
+    EXTRACTION_REASONING_EFFORT,
     MANIFEST_PATH,
     METRICS_SUMMARY_PATH,
     RAW_RESULTS_PATH,
@@ -43,6 +46,7 @@ from evaluation.formal_evaluation_support import (
     run_calibration_once,
     run_formal_cases,
     save_calibration_results,
+    score_ragchecker,
     validate_benchmark,
     write_pretty_json,
 )
@@ -698,6 +702,12 @@ def test_calibration_result_and_run_metadata_are_auditable(
     assert load_json(output) == payload
     assert payload["final_calibration_decision"] == CALIBRATION_READY
     assert payload["calibration_dataset_sha256"] == canonical_json_file_sha256(CALIBRATION_PATH)
+    expected_request_configuration = {
+        "extraction": {"model": EVALUATOR_MODEL, "reasoning_effort": "medium"},
+        "checking": {"model": EVALUATOR_MODEL, "reasoning_effort": "low"},
+    }
+    assert payload["evaluator_request_configuration"] == expected_request_configuration
+    assert run_metadata["evaluator_request_configuration"] == expected_request_configuration
     assert {
         "benchmark_sha256",
         "evaluation_base_sha",
@@ -734,6 +744,176 @@ def test_evaluator_adapter_fails_closed_without_key(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(EvaluationBlocked, match="OPENAI_API_KEY"):
         build_openai_batch_adapter()
+
+
+def _ragchecker_role_prompts() -> tuple[list[str], str]:
+    from refchecker.checker.checker_prompts import JOINT_CHECKING_PROMPT_Q
+    from refchecker.extractor.extractor_prompts import (
+        LLM_Triplet_To_Claim_PROMPT_Q,
+        LLM_TRIPLET_EXTRACTION_PROMPT_Q,
+    )
+
+    extraction_prompts = [
+        LLM_TRIPLET_EXTRACTION_PROMPT_Q.format(q="What is acne?", a="Acne is inflammatory."),
+        LLM_Triplet_To_Claim_PROMPT_Q.format(q="What is acne?", r="[1] Acne is inflammatory."),
+    ]
+    checking_prompt = (
+        JOINT_CHECKING_PROMPT_Q.replace("[QUESTION]", "What is acne?")
+        .replace("[REFERENCE]", "Acne is inflammatory.")
+        .replace("[CLAIMS]", '("Acne", "is", "inflammatory")')
+    )
+    return extraction_prompts, checking_prompt
+
+
+def test_evaluator_adapter_routes_stage_specific_reasoning_without_changing_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict] = []
+    extraction_prompts, checking_prompt = _ragchecker_role_prompts()
+
+    class FakeResponses:
+        def create(self, **request):
+            calls.append(request)
+            return SimpleNamespace(output_text=f"result-{len(calls)}")
+
+    class FakeOpenAI:
+        def __init__(self, *, api_key: str) -> None:
+            assert api_key == "offline-test-key"
+            self.responses = FakeResponses()
+
+    openai_module = ModuleType("openai")
+    openai_module.OpenAI = FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", openai_module)
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
+
+    adapter = build_openai_batch_adapter()
+    extraction_outputs = adapter(extraction_prompts)
+    checking_outputs = adapter([checking_prompt])
+
+    assert extraction_outputs == ["result-1", "result-2"]
+    assert checking_outputs == ["result-3"]
+    assert [call["reasoning"] for call in calls] == [
+        {"effort": EXTRACTION_REASONING_EFFORT},
+        {"effort": EXTRACTION_REASONING_EFFORT},
+        {"effort": CHECKING_REASONING_EFFORT},
+    ]
+    assert {call["model"] for call in calls} == {EVALUATOR_MODEL}
+    assert all(call["store"] is False for call in calls)
+
+
+@pytest.mark.parametrize("prompts", [[], ["unknown evaluator prompt"]])
+def test_evaluator_adapter_fails_closed_for_unknown_prompt_batches(
+    monkeypatch: pytest.MonkeyPatch,
+    prompts: list[str],
+) -> None:
+    provider_calls = 0
+
+    class FakeResponses:
+        def create(self, **_request):
+            nonlocal provider_calls
+            provider_calls += 1
+            return SimpleNamespace(output_text="must not be returned")
+
+    class FakeOpenAI:
+        def __init__(self, *, api_key: str) -> None:
+            assert api_key == "offline-test-key"
+            self.responses = FakeResponses()
+
+    openai_module = ModuleType("openai")
+    openai_module.OpenAI = FakeOpenAI
+    monkeypatch.setitem(sys.modules, "openai", openai_module)
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
+
+    with pytest.raises(EvaluationBlocked, match="RAGCHECKER_PROMPT"):
+        build_openai_batch_adapter()(prompts)
+
+    assert provider_calls == 0
+
+
+def test_evaluator_adapter_fails_closed_for_mixed_prompt_roles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    extraction_prompts, checking_prompt = _ragchecker_role_prompts()
+    openai_module = ModuleType("openai")
+    openai_module.OpenAI = lambda **_kwargs: SimpleNamespace(
+        responses=SimpleNamespace(create=lambda **_request: pytest.fail("provider must not run"))
+    )
+    monkeypatch.setitem(sys.modules, "openai", openai_module)
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
+
+    with pytest.raises(EvaluationBlocked, match="MIXED_ROLES"):
+        build_openai_batch_adapter()([extraction_prompts[0], checking_prompt])
+
+
+def test_formal_scoring_keeps_official_ragchecker_metric_requirements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeRAGResult:
+        def __init__(self, **values) -> None:
+            self.__dict__.update(values)
+            self.gt_answer_claims = None
+            self.response_claims = None
+
+    class FakeRAGResults:
+        def __init__(self, *, results) -> None:
+            self.results = results
+
+    class FakeRAGChecker:
+        def __init__(self, **configuration) -> None:
+            captured["configuration"] = configuration
+
+        def evaluate(self, results, *, metrics, save_path) -> None:
+            captured["metrics"] = metrics
+            captured["save_path"] = save_path
+            assert all(result.gt_answer_claims is None for result in results.results)
+            assert all(result.response_claims is None for result in results.results)
+
+    class FakeRetrievedDoc:
+        def __init__(self, *, doc_id, text) -> None:
+            self.doc_id = doc_id
+            self.text = text
+
+    ragchecker_module = ModuleType("ragchecker")
+    ragchecker_module.RAGChecker = FakeRAGChecker
+    ragchecker_module.RAGResult = FakeRAGResult
+    ragchecker_module.RAGResults = FakeRAGResults
+    container_module = ModuleType("ragchecker.container")
+    container_module.RetrievedDoc = FakeRetrievedDoc
+    metrics_module = ModuleType("ragchecker.metrics")
+    metrics_module.claim_recall = "claim_recall"
+    metrics_module.context_precision = "context_precision"
+    metrics_module.faithfulness = "faithfulness"
+    metrics_module.f1 = "f1"
+    monkeypatch.setitem(sys.modules, "ragchecker", ragchecker_module)
+    monkeypatch.setitem(sys.modules, "ragchecker.container", container_module)
+    monkeypatch.setitem(sys.modules, "ragchecker.metrics", metrics_module)
+    def adapter(prompts: list[str]) -> list[str]:
+        return ["unused" for _ in prompts]
+
+    score_ragchecker(
+        {
+            "cases": [{
+                "case_id": "ANS-001",
+                "family": "answerable_definition",
+                "query": "Mụn là gì?",
+                "gold_answer": "Mụn là bệnh viêm.",
+                "gold_claims": [{"text": "Mụn là bệnh viêm."}],
+            }],
+        },
+        {
+            "records": [{
+                "case_id": "ANS-001",
+                "answer": "Mụn là bệnh viêm.",
+                "packed_contexts": [{"chunk_id": "chunk-1", "text": "Mụn là bệnh viêm."}],
+            }],
+        },
+        adapter,
+    )
+
+    assert captured["metrics"] == ["claim_recall", "context_precision", "faithfulness", "f1"]
+    assert captured["configuration"]["custom_llm_api_func"] is adapter
 
 
 def test_formal_runtime_helper_requires_manual_and_calibration_gates() -> None:

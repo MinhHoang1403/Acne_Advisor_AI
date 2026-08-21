@@ -41,12 +41,24 @@ EXPECTED_BASE_SHA = "6a1809c4ddedbccab986ec76eb730321686ff3ff"
 EXPECTED_KB_BUILD_ID = "94d613bc9b33628de3ef"
 EVALUATOR_MODEL = "gpt-5.4-mini-2026-03-17"
 RAGCHECKER_VERSION = "0.1.9"
+EXTRACTION_REASONING_EFFORT = "medium"
+CHECKING_REASONING_EFFORT = "low"
 CALIBRATION_READY = "CALIBRATION_READY_FOR_FORMAL_RUN"
 CALIBRATION_REVIEW_REQUIRED = "CALIBRATION_REVIEW_REQUIRED"
 CALIBRATION_BLOCKED = "BLOCKED_BY_EVALUATOR_CALIBRATION"
 
 _ENGLISH_STOPWORDS = frozenset({"a", "an", "and", "are", "be", "is", "of", "the", "to"})
 _STEMMER = LancasterStemmer()
+_RAGCHECKER_EXTRACTION_PROMPT_PREFIXES = (
+    "Given a question and a response to the question, please extract a KG",
+    "Given a question and a candidate answer to the question, please extract a KG",
+    "Given an input text, please extract a KG",
+    "You are an AI assistant, you can help to extract claims",
+)
+_RAGCHECKER_CHECKING_PROMPT_PREFIXES = (
+    "I have a list of claims that made by a language model",
+    "I have a claim that made by a language model",
+)
 
 
 class EvaluationBlocked(RuntimeError):
@@ -284,8 +296,37 @@ def _normalize(text: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", text))
 
 
+def _ragchecker_prompt_role(prompt: str) -> str:
+    candidate = prompt.lstrip()
+    if any(candidate.startswith(prefix) for prefix in _RAGCHECKER_EXTRACTION_PROMPT_PREFIXES):
+        if "this is an EXTRACTION task" not in candidate:
+            raise EvaluationBlocked("RAGCHECKER_EXTRACTION_PROMPT_CONTRACT_MISMATCH")
+        return "extraction"
+    if any(candidate.startswith(prefix) for prefix in _RAGCHECKER_CHECKING_PROMPT_PREFIXES):
+        if "checking whether" not in candidate or "DO NOT use your own knowledge" not in candidate:
+            raise EvaluationBlocked("RAGCHECKER_CHECKING_PROMPT_CONTRACT_MISMATCH")
+        return "checking"
+    raise EvaluationBlocked("RAGCHECKER_PROMPT_ROLE_UNKNOWN")
+
+
+def _ragchecker_batch_role(prompts: list[str]) -> str:
+    if not prompts or any(not isinstance(prompt, str) or not prompt.strip() for prompt in prompts):
+        raise EvaluationBlocked("RAGCHECKER_PROMPT_BATCH_INVALID")
+    roles = {_ragchecker_prompt_role(prompt) for prompt in prompts}
+    if len(roles) != 1:
+        raise EvaluationBlocked("RAGCHECKER_PROMPT_BATCH_MIXED_ROLES")
+    return roles.pop()
+
+
+def _evaluator_request_configuration() -> dict[str, Any]:
+    return {
+        "extraction": {"model": EVALUATOR_MODEL, "reasoning_effort": EXTRACTION_REASONING_EFFORT},
+        "checking": {"model": EVALUATOR_MODEL, "reasoning_effort": CHECKING_REASONING_EFFORT},
+    }
+
+
 def build_openai_batch_adapter(model: str = EVALUATOR_MODEL) -> Callable[[list[str]], list[str]]:
-    """Return RAGChecker's documented custom batch callback using Responses API."""
+    """Return a fail-closed RAGChecker callback with stage-specific reasoning effort."""
 
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
@@ -295,12 +336,16 @@ def build_openai_batch_adapter(model: str = EVALUATOR_MODEL) -> Callable[[list[s
     client = OpenAI(api_key=api_key)
 
     def invoke(prompts: list[str]) -> list[str]:
+        role = _ragchecker_batch_role(prompts)
+        reasoning_effort = (
+            EXTRACTION_REASONING_EFFORT if role == "extraction" else CHECKING_REASONING_EFFORT
+        )
         outputs: list[str] = []
         for prompt in prompts:
             response = client.responses.create(
                 model=model,
                 input=prompt,
-                reasoning={"effort": "low"},
+                reasoning={"effort": reasoning_effort},
                 store=False,
             )
             outputs.append(response.output_text)
@@ -586,6 +631,7 @@ def save_calibration_results(
 
     payload = {
         "evaluator_model": EVALUATOR_MODEL,
+        "evaluator_request_configuration": _evaluator_request_configuration(),
         "run_timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         "calibration_dataset_sha256": canonical_json_file_sha256(CALIBRATION_PATH),
         "calibration_schema_version": calibration.get("schema_version"),
@@ -622,6 +668,7 @@ def _formal_run_metadata(*, allow_model_fallback: bool, researcher_review_approv
         "spacy_version": _installed_version("spacy"),
         "spacy_model_identifier": "en_core_web_sm",
         "evaluator_model": EVALUATOR_MODEL,
+        "evaluator_request_configuration": _evaluator_request_configuration(),
         "observed_production_requested_model_configuration": {
             "provider": os.getenv("LLM_PROVIDER", "gemini"),
             "google_model": os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite"),
@@ -954,7 +1001,9 @@ __all__ = [
     "CALIBRATION_RESULTS_PATH",
     "CALIBRATION_REVIEW_REQUIRED",
     "CASE_METRICS_PATH",
+    "CHECKING_REASONING_EFFORT",
     "EVALUATOR_MODEL",
+    "EXTRACTION_REASONING_EFFORT",
     "EvaluationBlocked",
     "MANIFEST_PATH",
     "METRICS_SUMMARY_PATH",
