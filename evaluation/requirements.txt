@@ -1,0 +1,6 @@
+-r ../requirements.txt
+
+# Notebook execution and the fixed evaluator adapter.
+jupyterlab>=4.4,<5
+openai>=2.0,<3
+ragchecker==0.1.9

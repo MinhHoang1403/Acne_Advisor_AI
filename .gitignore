@@ -1,15 +1,16 @@
 # =============================================================================
-# .gitignore  –  12-Factor App / Python / Node.js / Docker
+# .gitignore – 12-Factor App / Python / Node.js / Docker
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Environment & Secrets  (12-Factor: config in environment)
+# Environment & Secrets
 # ---------------------------------------------------------------------------
 .env
-.env.*_backup
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 .envrc
+
 *.pem
 *.key
 *.crt
@@ -54,17 +55,22 @@ htmlcov/
 nosetests.xml
 *.cover
 
-# Type checking
+# Type checking / lint caches
 .mypy_cache/
 .ruff_cache/
 .dmypy.json
 dmypy.json
 .pytype/
 
+# ---------------------------------------------------------------------------
 # Jupyter
+# ---------------------------------------------------------------------------
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
+
+# Ignore notebooks by default, but keep the formal evaluation notebook
 *.ipynb
+!evaluation/formal_evaluation.ipynb
 
 # Local notebook recovery backups
 local_notebook_backups/
@@ -99,20 +105,24 @@ src/frontend/dist/
 # yarn.lock
 
 # ---------------------------------------------------------------------------
-# Data & Knowledge (keep structure, exclude large/sensitive files)
+# Data & Knowledge
+# Keep selected reproducibility metadata, exclude large/generated data
 # ---------------------------------------------------------------------------
 data/*
 data/raw/
 data/processed/
 data/embeddings/
 data/cache/
+
 !data/method_sources.json
 !data/knowledge_build_manifest.json
+
 !data/sources/
 data/sources/*
 !data/sources/manifest.yaml
 !data/sources/web_records.yaml
 !data/sources/claim_exclusions.yaml
+
 !data/taxonomy/
 data/taxonomy/*
 !data/taxonomy/drug_aliases.yaml
@@ -148,7 +158,9 @@ logs/
 log/
 reports/
 
+# ---------------------------------------------------------------------------
 # Local thesis/report artifacts
+# ---------------------------------------------------------------------------
 /output/
 /FINAL_KL_Acne_Rag.docx
 /.audit_work/
@@ -162,10 +174,12 @@ reports/
 .vscode/
 !.vscode/extensions.json
 !.vscode/settings.json.example
+
 .idea/
 *.swp
 *.swo
 *~
+
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -189,3 +203,15 @@ ehthumbs.db
 .cache/
 tmp/
 temp/
+
+# ---------------------------------------------------------------------------
+# Formal evaluation runtime outputs
+# These are created only when the researcher runs the evaluation notebook.
+# Keep the methodology/package in Git, but keep runtime outputs local.
+# ---------------------------------------------------------------------------
+evaluation/results/*
+
+# Keep the figures directory structure only
+!evaluation/results/figures/
+evaluation/results/figures/*
+!evaluation/results/figures/.gitkeep

@@ -1,0 +1,563 @@
+from __future__ import annotations
+
+import ast
+import asyncio
+import json
+import subprocess
+from collections import Counter
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+import evaluation.build_formal_package as package_builder
+import evaluation.formal_evaluation_support as evaluation_support
+from evaluation.create_formal_notebook import build_notebook
+from evaluation.formal_evaluation_support import (
+    BENCHMARK_PATH,
+    CALIBRATION_BLOCKED,
+    CALIBRATION_PATH,
+    CALIBRATION_READY,
+    CALIBRATION_RESULTS_PATH,
+    CALIBRATION_REVIEW_REQUIRED,
+    CASE_METRICS_PATH,
+    EvaluationBlocked,
+    MANIFEST_PATH,
+    METRICS_SUMMARY_PATH,
+    RAW_RESULTS_PATH,
+    atomic_write_json,
+    canonical_json_file_sha256,
+    canonical_json_sha256,
+    _checker_label,
+    _extraction_assessment,
+    _ratio_to_percent,
+    _validate_aggregate_percent,
+    build_openai_batch_adapter,
+    evaluate_calibration_runs,
+    export_metrics,
+    load_evaluation_artifacts,
+    load_json,
+    negative_rejection_rate,
+    run_formal_cases,
+    save_calibration_results,
+    validate_benchmark,
+    write_pretty_json,
+)
+EXPECTED_CATEGORIES = {
+    "adverse_effects_precautions": 9,
+    "comparison_integration": 10,
+    "definition_classification": 10,
+    "explicit_topic_switch": 3,
+    "follow_up_continuity": 4,
+    "mechanism_role": 8,
+    "pronoun_coreference": 5,
+    "referral_care_seeking": 6,
+    "repeated_question_history_isolation": 3,
+    "treatment_use_combination": 12,
+    "unsupported_absolute_certainty_guarantee": 10,
+    "unsupported_comparison_relationship_specificity": 10,
+    "unsupported_exact_quantity_time": 10,
+}
+
+
+def test_formal_benchmark_contract_and_hash() -> None:
+    benchmark, manifest, calibration = load_evaluation_artifacts()
+
+    report = validate_benchmark(benchmark, manifest, calibration)
+
+    assert report["total"] == 100
+    assert report["answerable"] == 70
+    assert report["evidence_gap"] == 30
+    assert report["family_counts"] == {
+        "answerable_multi_turn": 15,
+        "answerable_single_turn": 55,
+        "evidence_gap": 30,
+    }
+    assert report["category_counts"] == EXPECTED_CATEGORIES
+    assert manifest["benchmark_sha256"] == canonical_json_file_sha256(BENCHMARK_PATH)
+    assert manifest["benchmark_sha256"] == "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b"
+    assert manifest["evaluation_base_sha"] == "6a1809c4ddedbccab986ec76eb730321686ff3ff"
+    assert manifest["active_kb_build_id"] == "94d613bc9b33628de3ef"
+    assert manifest["researcher_review_status"] == "pending"
+    assert manifest["ragchecker"]["per_case_metric_scale"] == "ratio_0_1"
+    assert manifest["ragchecker"]["aggregate_metric_scale"] == "percent_0_100"
+    assert manifest["ragchecker"]["headline_reporting_scale"] == "percent_0_100"
+    assert benchmark["researcher_review_status"] == "pending"
+    assert benchmark["anti_contamination"]["internal_query_near_duplicates_at_or_above_0_80"] == 0
+    assert benchmark["anti_contamination"]["manual_pattern_matches_at_or_above_0_86"] == 0
+    assert benchmark["anti_contamination"]["registry_source_paths"] == ["tests", "docs", "scripts"]
+    assert benchmark["anti_contamination"]["repeated_gold_claim_sets"] >= 0
+
+
+def test_answerable_gold_provenance_is_self_contained() -> None:
+    benchmark = json.loads(BENCHMARK_PATH.read_text(encoding="utf-8"))
+
+    for case in benchmark["cases"]:
+        if not case["family"].startswith("answerable"):
+            continue
+        provenance = case["provenance"]
+        provenance_by_id = {item["chunk_id"]: item for item in provenance}
+        provenance_ids = set(provenance_by_id)
+        assert provenance_ids
+        assert len(provenance_by_id) == len(provenance)
+        for item in provenance:
+            assert item["source_id"]
+            assert item["source_title"]
+            assert item["source_authority"]
+            assert item["source_url"]
+            assert item["excerpt"]
+        for claim in case["gold_claims"]:
+            assert set(claim["source_chunk_ids"]) <= provenance_ids
+            assert claim["annotation_status"] == "source_annotated_pending_researcher_review"
+            assert claim["evidence_snippets"]
+            for snippet in claim["evidence_snippets"]:
+                assert snippet["chunk_id"] in claim["source_chunk_ids"]
+                assert evaluation_support._normalize(snippet["text"])
+        assert case["gold_answer"] == " ".join(claim["text"] for claim in case["gold_claims"])
+
+
+def test_package_builder_validates_evidence_snippets_against_source_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claim_key = "synthetic_claim"
+    claim = {"chunks": ["chunk-1"]}
+    records = {"chunk-1": {"text": "The source supports this evidence claim."}}
+    monkeypatch.setitem(
+        package_builder.CLAIM_EVIDENCE,
+        claim_key,
+        [("chunk-1", "supports this evidence")],
+    )
+
+    assert package_builder._claim_evidence_snippets(claim_key, claim, records) == [
+        {"chunk_id": "chunk-1", "text": "supports this evidence"}
+    ]
+
+    monkeypatch.setitem(
+        package_builder.CLAIM_EVIDENCE,
+        claim_key,
+        [("chunk-1", "unsupported evidence")],
+    )
+    with pytest.raises(RuntimeError, match="Evidence snippet is not present in frozen chunk"):
+        package_builder._claim_evidence_snippets(claim_key, claim, records)
+
+
+def test_evidence_gap_audits_are_corpus_wide_and_read_only() -> None:
+    benchmark = json.loads(BENCHMARK_PATH.read_text(encoding="utf-8"))
+    gaps = [case for case in benchmark["cases"] if case["family"] == "evidence_gap"]
+
+    assert len(gaps) == 30
+    for case in gaps:
+        audit = case["absence_verification"]
+        assert case["expected"] == {"action": "abstain", "reason": "evidence_gap"}
+        assert audit["scope"] == "entire_active_frozen_corpus"
+        assert audit["lexical_corpus_scan"]["records_scanned"] == 512
+        assert audit["candidate_search_completed"] is True
+        assert audit["absence_review_status"] == "pending_researcher_review"
+        assert audit["unsupported_factual_requirement"]
+        assert audit["bm25_candidate_search"]["engine"] == "qdrant_native_bm25_read_only"
+        assert len(audit["bm25_candidate_search"]["candidate_chunk_ids"]) == 20
+        assert audit["bm25_candidate_search"]["review_candidates"]
+        assert audit["related_topic_dense_probe"]["engine"] == "qdrant_cosine_read_only"
+        assert audit["related_topic_dense_probe"]["probe_method"] == "cached_related_source_chunk_vector_not_query_embedding"
+        assert len(audit["related_topic_dense_probe"]["candidate_chunk_ids"]) == 20
+        assert audit["related_topic_dense_probe"]["review_candidates"]
+        assert (
+            audit["related_topic_dense_probe"]["cached_vectors_available"]
+            + audit["related_topic_dense_probe"]["cached_vectors_missing"]
+            == 512
+        )
+        assert audit["provider_calls"] == 0
+        assert audit["datastore_writes"] == 0
+
+
+def test_calibration_matrix_is_predeclared_and_balanced() -> None:
+    calibration = json.loads(CALIBRATION_PATH.read_text(encoding="utf-8"))
+    extraction = calibration["claim_extraction"]
+    checking = calibration["claim_checking"]
+
+    assert Counter(item["category"] for item in extraction) == {
+        "simple_factual": 2,
+        "qualifier_sensitive": 2,
+        "multi_clause_treatment": 2,
+        "comparison_mixed_terminology": 2,
+    }
+    assert Counter(item["expected_label"] for item in checking) == {
+        "SUPPORTED": 6,
+        "NOT_SUPPORTED": 6,
+    }
+    assert Counter(item["language_direction"] for item in checking) == {
+        "vi_to_vi": 6,
+        "en_to_vi": 6,
+    }
+    vietnamese_marks = set("ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ")
+    assert all(
+        any(char.casefold() in vietnamese_marks for char in item["evidence"])
+        for item in checking
+        if item["language_direction"] == "vi_to_vi"
+    )
+    dimensions = {dimension for item in checking for dimension in item["critical_dimensions"]}
+    assert {
+        "negation",
+        "qualifier_modality",
+        "exact_number",
+        "exact_time",
+        "unsupported_comparison",
+        "entity_distinction",
+        "cross_language_entailment",
+    } <= dimensions
+    assert all(item["reference_claims"] for item in extraction)
+    assert all(
+        len(item["reference_claims"]) > 1
+        for item in extraction
+        if item["item_id"] in {"CAL-EXT-05", "CAL-EXT-06", "CAL-EXT-07", "CAL-EXT-08"}
+    )
+
+
+def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
+    notebook_path = Path("evaluation/formal_evaluation.ipynb")
+    notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
+    expected = build_notebook()
+
+    assert notebook == expected
+    code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
+    assert len(code_cells) == 5
+    assert all(cell["execution_count"] is None and cell["outputs"] == [] for cell in code_cells)
+    all_source = "\n".join("".join(cell["source"]) for cell in notebook["cells"])
+    assert "RESEARCHER_REVIEW_APPROVED = False" in all_source
+    assert "CALIBRATION_BLOCKED" in all_source
+    assert "CALIBRATION_REVIEW_REQUIRED" in all_source
+    assert CALIBRATION_BLOCKED == "BLOCKED_BY_EVALUATOR_CALIBRATION"
+    assert "## Thuật ngữ" in all_source
+    assert "gpt-5.4-mini-2026-03-17" not in all_source  # Imported from the fixed helper contract.
+    for cell in code_cells:
+        compile("".join(cell["source"]), "<notebook-cell>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+
+
+def test_formal_outputs_are_not_precreated() -> None:
+    assert MANIFEST_PATH.is_file()
+    assert BENCHMARK_PATH.is_file()
+    assert CALIBRATION_PATH.is_file()
+    for path in (RAW_RESULTS_PATH, CASE_METRICS_PATH, METRICS_SUMMARY_PATH, CALIBRATION_RESULTS_PATH):
+        assert not path.exists()
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", str(RAW_RESULTS_PATH), str(CASE_METRICS_PATH), str(METRICS_SUMMARY_PATH), str(CALIBRATION_RESULTS_PATH)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert tracked == ""
+
+
+def test_research_json_is_pretty_and_identity_is_format_independent(tmp_path: Path) -> None:
+    for path in (BENCHMARK_PATH, MANIFEST_PATH, CALIBRATION_PATH):
+        text = path.read_text(encoding="utf-8")
+        assert text.endswith("\n")
+        assert "\n  \"" in text
+        assert load_json(path)
+
+    benchmark = load_json(BENCHMARK_PATH)
+    pretty_path = tmp_path / "pretty.json"
+    compact_path = tmp_path / "compact.json"
+    write_pretty_json(pretty_path, benchmark)
+    compact_path.write_text(
+        json.dumps(benchmark, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+
+    expected = "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b"
+    assert canonical_json_sha256(benchmark) == expected
+    assert canonical_json_file_sha256(pretty_path) == expected
+    assert canonical_json_file_sha256(compact_path) == expected
+
+
+def test_nrr_uses_structured_action_and_reason_only() -> None:
+    records = [
+        {
+            "case_id": f"GAP-{index:03d}",
+            "case_family": "evidence_gap",
+            "actual_action": "abstain" if index <= 27 else "generate",
+            "actual_reason": "evidence_gap" if index != 27 else "other_reason",
+        }
+        for index in range(1, 31)
+    ]
+
+    score, correct = negative_rejection_rate({"records": records})
+
+    assert correct == 26
+    assert score == pytest.approx((26 / 30) * 100)
+
+
+def test_atomic_extraction_accepts_paraphrase_but_rejects_merged_claims() -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == "CAL-EXT-05")
+
+    merged_status, merged_reasons = _extraction_assessment(item, [item["input_text"]])
+    paraphrase_status, paraphrase_reasons = _extraction_assessment(
+        item,
+        [
+            "Kháng sinh bôi không nên dùng một mình.",
+            "Benzoyl peroxide giúp giảm nguy cơ kháng kháng sinh.",
+        ],
+    )
+
+    assert merged_status == "rejected"
+    assert "atomicity:independent_references_merged" in merged_reasons
+    assert paraphrase_status == "accepted"
+    assert paraphrase_reasons == []
+
+
+def test_atomic_extraction_detects_missing_qualifier_and_invention() -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == "CAL-EXT-03")
+    first_reference = item["reference_claims"][0]["text"]
+
+    missing_status, missing_reasons = _extraction_assessment(
+        item,
+        [first_reference, "Chế độ ăn tải đường huyết thấp giảm mụn."],
+    )
+    invention_status, invention_reasons = _extraction_assessment(
+        item,
+        [
+            first_reference,
+            item["reference_claims"][1]["text"] + " Chế độ này chắc chắn chữa khỏi mụn.",
+        ],
+    )
+
+    assert missing_status == "rejected"
+    assert "missing_qualifier:R02" in missing_reasons
+    assert invention_status == "rejected"
+    assert any(reason.startswith("forbidden_invention:") for reason in invention_reasons)
+
+
+def test_unresolved_extraction_paraphrase_requires_researcher_review() -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == "CAL-EXT-01")
+
+    status, reasons = _extraction_assessment(
+        item,
+        ["Tình trạng này là một tiến trình lâu dài có viêm ở cấu trúc sinh lông và tiết dầu."],
+    )
+
+    assert status == "review_required"
+    assert reasons == ["missing_reference:R01"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("Entailment", "SUPPORTED"),
+        ("Contradiction", "NOT_SUPPORTED"),
+        ("Neutral", "NOT_SUPPORTED"),
+        ("Supported", "SUPPORTED"),
+        ("Not supported", "NOT_SUPPORTED"),
+        ("unexpected text", "UNPARSEABLE"),
+    ],
+)
+def test_checker_label_parser_uses_exact_normalized_contract(raw: str, expected: str) -> None:
+    assert _checker_label(raw) == expected
+
+
+def _clean_calibration_runs() -> tuple[dict, dict]:
+    extraction = [
+        {"item_id": f"EXT-{index}", "status": "accepted", "acceptable": True, "reasons": [], "claims": ["claim"]}
+        for index in range(8)
+    ]
+    checking = [
+        {
+            "item_id": f"CHK-{index}",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": True,
+            "critical_dimensions": ["negation"],
+        }
+        for index in range(12)
+    ]
+    payload = {"extraction": extraction, "checking": checking}
+    return json.loads(json.dumps(payload)), json.loads(json.dumps(payload))
+
+
+def test_calibration_decision_distinguishes_ready_review_and_blocked() -> None:
+    first, second = _clean_calibration_runs()
+    assert evaluate_calibration_runs(first, second)["decision"] == CALIBRATION_READY
+
+    first, second = _clean_calibration_runs()
+    second["checking"][0].update(actual="UNPARSEABLE", agreement=False)
+    assert evaluate_calibration_runs(first, second)["decision"] == CALIBRATION_REVIEW_REQUIRED
+
+    first, second = _clean_calibration_runs()
+    first["checking"][0].update(actual="NOT_SUPPORTED", agreement=False)
+    second["checking"][0].update(actual="NOT_SUPPORTED", agreement=False)
+    assert evaluate_calibration_runs(first, second)["decision"] == CALIBRATION_BLOCKED
+
+
+def test_metrics_export_normalizes_all_headlines_to_percent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    benchmark = load_json(BENCHMARK_PATH)
+    records = []
+    rag_items = []
+    for case in benchmark["cases"]:
+        is_gap = case["family"] == "evidence_gap"
+        is_single_nrr_miss = case["case_id"] == "GAP-ABS-010"
+        records.append({
+            "case_id": case["case_id"],
+            "case_family": case["family"],
+            "actual_action": "generate" if not is_gap or is_single_nrr_miss else "abstain",
+            "actual_reason": None if not is_gap or is_single_nrr_miss else "evidence_gap",
+            "infrastructure_error": None,
+        })
+        if not is_gap:
+            rag_items.append(SimpleNamespace(
+                query_id=case["case_id"],
+                metrics={"claim_recall": 0.5, "context_precision": 0.6, "faithfulness": 0.7, "f1": 0.8},
+            ))
+    rag_results = SimpleNamespace(
+        results=rag_items,
+        metrics={
+            "retriever_metrics": {"claim_recall": 50.0, "context_precision": 60.0},
+            "generator_metrics": {"faithfulness": 70.0},
+            "overall_metrics": {"f1": 80.0},
+        },
+    )
+    monkeypatch.setattr(evaluation_support, "CASE_METRICS_PATH", tmp_path / "case_metrics.csv")
+    monkeypatch.setattr(evaluation_support, "METRICS_SUMMARY_PATH", tmp_path / "metrics_summary.csv")
+
+    case_rows, summary = export_metrics(benchmark, {"records": records}, rag_results)
+
+    assert {row["Unit"] for row in summary} == {"percent_0_100"}
+    assert [row["Score"] for row in summary[:4]] == [50.0, 60.0, 70.0, 80.0]
+    assert summary[4]["Score"] == pytest.approx((29 / 30) * 100)
+    assert next(row for row in case_rows if row["case_family"] != "evidence_gap")["Claim Recall (%)"] == 50.0
+
+
+def test_ragchecker_metric_scales_are_explicit_and_validated() -> None:
+    assert _ratio_to_percent(0.614) == pytest.approx(61.4)
+    assert _validate_aggregate_percent(61.4) == pytest.approx(61.4)
+    with pytest.raises(EvaluationBlocked, match="per-case metric outside ratio 0-1"):
+        _ratio_to_percent(1.1)
+    with pytest.raises(EvaluationBlocked, match="aggregate metric outside percent 0-100"):
+        _validate_aggregate_percent(101)
+
+
+def test_targeted_gold_mappings_are_minimal_and_query_aligned() -> None:
+    benchmark = load_json(BENCHMARK_PATH)
+    cases = {case["case_id"]: case for case in benchmark["cases"]}
+
+    assert "bít hoàn toàn" not in cases["ANS-DEF-003"]["gold_answer"]
+    assert "mặt hoặc thân mình" not in cases["ANS-DEF-002"]["gold_answer"]
+    assert "kháng sinh uống" not in cases["ANS-TRT-003"]["gold_answer"]
+    assert "không kê đơn" not in cases["ANS-TRT-009"]["gold_answer"]
+    assert "không kê đơn" not in cases["ANS-MEC-001"]["gold_answer"]
+    assert "rối loạn sắc tố" not in cases["ANS-MEC-002"]["gold_answer"]
+    assert "duy trì" not in cases["ANS-MEC-002"]["gold_answer"]
+    assert "không kê đơn" not in cases["ANS-MEC-006"]["gold_answer"]
+    assert "bã nhờn" not in cases["ANS-MUL-002"]["gold_answer"]
+
+    assert len(cases["ANS-DEF-010"]["gold_claims"]) == 1
+    assert "khác" not in cases["ANS-DEF-010"]["query"].casefold()
+    assert "kháng sinh" not in cases["ANS-CMP-003"]["gold_answer"].split(".")[0].casefold()
+    assert "khác gì về thời gian" not in cases["ANS-CMP-005"]["query"].casefold()
+    assert "lymecycline" in cases["ANS-CMP-007"]["gold_answer"].casefold()
+    assert "doxycycline" in cases["ANS-CMP-007"]["gold_answer"].casefold()
+    assert "cơ chế và hình thái" not in cases["ANS-CMP-010"]["query"].casefold()
+    assert "không kê đơn" not in cases["ANS-CMP-004"]["gold_answer"]
+    assert "retinoid" not in cases["ANS-MUL-012"]["gold_answer"].casefold()
+
+
+def test_pronoun_history_identifies_clascoterone_without_leaking_target_answer() -> None:
+    benchmark = load_json(BENCHMARK_PATH)
+    case = next(case for case in benchmark["cases"] if case["case_id"] == "ANS-MUL-001")
+    history = " ".join(message["content"] for message in case["history"]).casefold()
+
+    assert "clascoterone" in history
+    assert "chẹn androgen" not in history
+    assert "kháng androgen" not in history
+    assert "tác động lên androgen" not in history
+
+
+def test_calibration_result_and_run_metadata_are_auditable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    first, second = _clean_calibration_runs()
+    decision = evaluate_calibration_runs(first, second)
+    output = tmp_path / "evaluator_calibration_results.json"
+    monkeypatch.setattr(evaluation_support, "CALIBRATION_RESULTS_PATH", output)
+
+    payload = save_calibration_results(calibration, first, second, decision)
+    run_metadata = evaluation_support._formal_run_metadata(
+        allow_model_fallback=True,
+        researcher_review_approved=True,
+    )
+
+    assert load_json(output) == payload
+    assert payload["final_calibration_decision"] == CALIBRATION_READY
+    assert payload["calibration_dataset_sha256"] == canonical_json_file_sha256(CALIBRATION_PATH)
+    assert {
+        "benchmark_sha256",
+        "evaluation_base_sha",
+        "current_git_head",
+        "active_kb_build_id",
+        "run_timestamp",
+        "python_version",
+        "ragchecker_version",
+        "openai_package_version",
+        "spacy_version",
+        "spacy_model_identifier",
+        "evaluator_model",
+        "observed_production_requested_model_configuration",
+        "observed_fallback_model_configuration",
+        "allow_model_fallback",
+        "researcher_review_approved",
+    } <= set(run_metadata)
+
+
+def test_atomic_result_serialization_round_trip(tmp_path: Path) -> None:
+    path = tmp_path / "checkpoint.json"
+    payload = {
+        "benchmark_sha256": "abc",
+        "records": [{"case_id": "CASE-001", "answer": "Tiếng Việt chuẩn"}],
+    }
+
+    atomic_write_json(path, payload)
+
+    assert load_json(path) == payload
+
+
+def test_evaluator_adapter_fails_closed_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(EvaluationBlocked, match="OPENAI_API_KEY"):
+        build_openai_batch_adapter()
+
+
+def test_formal_runtime_helper_requires_manual_and_calibration_gates() -> None:
+    with pytest.raises(EvaluationBlocked, match="RESEARCHER_REVIEW_REQUIRED"):
+        asyncio.run(
+            run_formal_cases(
+                {"cases": []},
+                "hash",
+                researcher_review_approved=False,
+                calibration_decision=None,
+            )
+        )
+
+    with pytest.raises(EvaluationBlocked, match="BLOCKED_BY_EVALUATOR_CALIBRATION"):
+        asyncio.run(
+            run_formal_cases(
+                {"cases": []},
+                "hash",
+                researcher_review_approved=True,
+                calibration_decision={"blocked": True},
+            )
+        )
+
+    with pytest.raises(EvaluationBlocked, match="CALIBRATION_REVIEW_REQUIRED"):
+        asyncio.run(
+            run_formal_cases(
+                {"cases": []},
+                "hash",
+                researcher_review_approved=True,
+                calibration_decision={"decision": CALIBRATION_REVIEW_REQUIRED},
+            )
+        )

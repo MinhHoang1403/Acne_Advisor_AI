@@ -1,0 +1,52 @@
+{
+  "schema_version": "formal_benchmark_manifest_contract",
+  "evaluation_base_sha": "6a1809c4ddedbccab986ec76eb730321686ff3ff",
+  "active_kb_build_id": "94d613bc9b33628de3ef",
+  "benchmark_sha256": "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b",
+  "benchmark_counts": {
+    "total": 100,
+    "answerable": 70,
+    "single_turn": 55,
+    "multi_turn": 15,
+    "evidence_gap": 30
+  },
+  "category_counts": {
+    "adverse_effects_precautions": 9,
+    "comparison_integration": 10,
+    "definition_classification": 10,
+    "explicit_topic_switch": 3,
+    "follow_up_continuity": 4,
+    "mechanism_role": 8,
+    "pronoun_coreference": 5,
+    "referral_care_seeking": 6,
+    "repeated_question_history_isolation": 3,
+    "treatment_use_combination": 12,
+    "unsupported_absolute_certainty_guarantee": 10,
+    "unsupported_comparison_relationship_specificity": 10,
+    "unsupported_exact_quantity_time": 10
+  },
+  "evaluator_model": "gpt-5.4-mini-2026-03-17",
+  "ragchecker": {
+    "version": "0.1.9",
+    "commit": "9017b3263b82ea5354948c4db40a65bba94d779e",
+    "package": "ragchecker==0.1.9",
+    "repository": "https://github.com/amazon-science/RAGChecker",
+    "paper": "https://arxiv.org/abs/2408.08067",
+    "checker_output_contract": [
+      "Entailment",
+      "Neutral",
+      "Contradiction"
+    ],
+    "per_case_metric_scale": "ratio_0_1",
+    "aggregate_metric_scale": "percent_0_100",
+    "headline_reporting_scale": "percent_0_100"
+  },
+  "negative_rejection_reference": {
+    "method": "RGB-inspired structured-action adaptation",
+    "paper": "https://doi.org/10.1609/aaai.v38i16.29728",
+    "arxiv": "https://arxiv.org/abs/2309.01431"
+  },
+  "generated_at": "2026-08-21T18:21:54+00:00",
+  "researcher_review_status": "pending",
+  "production_behavior_changed": false
+}
