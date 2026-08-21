@@ -22,6 +22,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from nltk.stem import LancasterStemmer
+
 
 ROOT = Path(__file__).resolve().parents[1]
 EVALUATION_DIR = ROOT / "evaluation"
@@ -42,6 +44,9 @@ RAGCHECKER_VERSION = "0.1.9"
 CALIBRATION_READY = "CALIBRATION_READY_FOR_FORMAL_RUN"
 CALIBRATION_REVIEW_REQUIRED = "CALIBRATION_REVIEW_REQUIRED"
 CALIBRATION_BLOCKED = "BLOCKED_BY_EVALUATOR_CALIBRATION"
+
+_ENGLISH_STOPWORDS = frozenset({"a", "an", "and", "are", "be", "is", "of", "the", "to"})
+_STEMMER = LancasterStemmer()
 
 
 class EvaluationBlocked(RuntimeError):
@@ -226,6 +231,11 @@ def validate_benchmark(
             for reference in references
         ):
             errors.append(f"{item.get('item_id')}: invalid atomic reference structure")
+    for item in calibration.get("claim_checking", []):
+        try:
+            _checker_claim_triplets(item)
+        except ValueError as exc:
+            errors.append(str(exc))
     if errors:
         raise EvaluationBlocked("Benchmark validation failed:\n- " + "\n- ".join(errors))
     return {
@@ -315,27 +325,29 @@ def _make_ragchecker(adapter: Callable[[list[str]], list[str]]):
 
 def _concept_group_present(text: str, alternatives: list[str]) -> bool:
     normalized = _normalize(text)
-    return any(_normalize(alternative) in normalized for alternative in alternatives)
+    if any(_normalize(alternative) in normalized for alternative in alternatives):
+        return True
 
-
-def _one_to_one_assignment(candidates: list[list[int]]) -> list[int] | None:
-    """Find distinct extracted claims for each independent reference claim."""
-
-    assignment = [-1] * len(candidates)
-
-    def visit(reference_index: int, used: set[int]) -> bool:
-        if reference_index == len(candidates):
+    text_tokens = [
+        _STEMMER.stem(token)
+        for token in normalized.split()
+        if token not in _ENGLISH_STOPWORDS
+    ]
+    for alternative in alternatives:
+        alternative_tokens = [
+            _STEMMER.stem(token)
+            for token in _normalize(alternative).split()
+            if token not in _ENGLISH_STOPWORDS
+        ]
+        if not alternative_tokens:
+            continue
+        width = len(alternative_tokens)
+        if any(
+            text_tokens[index : index + width] == alternative_tokens
+            for index in range(len(text_tokens) - width + 1)
+        ):
             return True
-        for claim_index in candidates[reference_index]:
-            if claim_index in used:
-                continue
-            assignment[reference_index] = claim_index
-            if visit(reference_index + 1, used | {claim_index}):
-                return True
-        assignment[reference_index] = -1
-        return False
-
-    return assignment if visit(0, set()) else None
+    return False
 
 
 def _extraction_assessment(item: dict[str, Any], claims: list[str]) -> tuple[str, list[str]]:
@@ -347,26 +359,48 @@ def _extraction_assessment(item: dict[str, Any], claims: list[str]) -> tuple[str
         return "rejected", ["invalid_or_empty_claim_structure"]
 
     references = item["reference_claims"]
-    candidate_sets: list[list[int]] = []
+    mapped_claims: set[int] = set()
+    complete_references_by_claim = [set() for _ in clean_claims]
     for reference in references:
         required = reference["required_concept_groups"]
         qualifiers = reference.get("qualifier_concept_groups") or []
-        factual_candidates = [
+        reference_id = reference["reference_id"]
+        anchor_claims = {
             index
             for index, claim in enumerate(clean_claims)
-            if all(_concept_group_present(claim, group) for group in required)
+            if _concept_group_present(claim, required[0])
+        }
+        required_matches = [
+            {
+                index
+                for index in anchor_claims
+                if _concept_group_present(clean_claims[index], group)
+            }
+            for group in required
         ]
-        qualified_candidates = [
-            index
-            for index in factual_candidates
-            if all(_concept_group_present(clean_claims[index], group) for group in qualifiers)
-        ]
-        reference_id = reference["reference_id"]
-        if not factual_candidates:
+        if not anchor_claims or any(not matches for matches in required_matches):
             reasons.append(f"missing_reference:{reference_id}")
-        elif qualifiers and not qualified_candidates:
+            continue
+
+        qualifier_matches = [
+            {
+                index
+                for index in anchor_claims
+                if _concept_group_present(clean_claims[index], group)
+            }
+            for group in qualifiers
+        ]
+        if any(not matches for matches in qualifier_matches):
             reasons.append(f"missing_qualifier:{reference_id}")
-        candidate_sets.append(qualified_candidates)
+            continue
+
+        contributing_claims = set().union(*required_matches[1:], *qualifier_matches)
+        if not contributing_claims:
+            contributing_claims = set(anchor_claims)
+        mapped_claims.update(contributing_claims)
+        for index in anchor_claims:
+            if all(index in matches for matches in required_matches + qualifier_matches):
+                complete_references_by_claim[index].add(reference_id)
 
     joined = " ".join(clean_claims)
     for marker in item["acceptance"].get("forbidden_inventions", []):
@@ -382,10 +416,9 @@ def _extraction_assessment(item: dict[str, Any], claims: list[str]) -> tuple[str
             return "rejected", reasons
         return "review_required", reasons
 
-    assignment = _one_to_one_assignment(candidate_sets)
-    if assignment is None:
+    if any(len(reference_ids) > 1 for reference_ids in complete_references_by_claim):
         return "rejected", ["atomicity:independent_references_merged"]
-    unassigned = sorted(set(range(len(clean_claims))) - set(assignment))
+    unassigned = sorted(set(range(len(clean_claims))) - mapped_claims)
     if unassigned:
         return "review_required", [f"unmapped_claims:{','.join(map(str, unassigned))}"]
     return "accepted", []
@@ -398,7 +431,7 @@ def _extraction_acceptable(item: dict[str, Any], claims: list[str]) -> tuple[boo
 
 def _checker_label(raw: Any) -> str:
     values = raw if isinstance(raw, list) else [raw]
-    labels = []
+    labels: list[str] = []
     for value in values:
         normalized = re.sub(r"[^a-z_ ]+", "", str(value).strip().casefold()).replace("_", " ")
         normalized = " ".join(normalized.split())
@@ -408,7 +441,26 @@ def _checker_label(raw: Any) -> str:
             labels.append("NOT_SUPPORTED")
         else:
             labels.append("UNPARSEABLE")
-    return labels[0] if labels and len(set(labels)) == 1 else "UNPARSEABLE"
+    if not labels or "UNPARSEABLE" in labels:
+        return "UNPARSEABLE"
+    return "SUPPORTED" if all(label == "SUPPORTED" for label in labels) else "NOT_SUPPORTED"
+
+
+def _checker_claim_triplets(item: dict[str, Any]) -> list[list[str]]:
+    triplets = item.get("claim_triplets")
+    valid = (
+        isinstance(triplets, list)
+        and bool(triplets)
+        and all(
+            isinstance(triplet, list)
+            and len(triplet) == 3
+            and all(isinstance(part, str) and part.strip() for part in triplet)
+            for triplet in triplets
+        )
+    )
+    if not valid:
+        raise ValueError(f"Calibration checker item requires atomic claim_triplets: {item.get('item_id')}")
+    return [[part.strip() for part in triplet] for triplet in triplets]
 
 
 def run_calibration_once(calibration: dict[str, Any], adapter: Callable[[list[str]], list[str]]) -> dict[str, Any]:
@@ -448,7 +500,7 @@ def run_calibration_once(calibration: dict[str, Any], adapter: Callable[[list[st
             gt_answer=item["evidence"],
             response=item["claim"],
             retrieved_context=[],
-            response_claims=[item["claim"]],
+            response_claims=_checker_claim_triplets(item),
         )
         for item in checking_rows
     ])

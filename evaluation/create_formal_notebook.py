@@ -167,22 +167,6 @@ print(f"• Kiểm tra calibration: {calibration['counts']['claim_extraction']} 
 category_lines = ["| Nhóm tình huống | Số lượng |", "|---|---:|"]
 category_lines.extend(f"| {name} | {count} |" for name, count in benchmark_report["category_counts"].items())
 display(Markdown("### Phân bố tình huống\\n\\n" + "\\n".join(category_lines)))
-
-def _table_text(value):
-    return " ".join(str(value).split()).replace("|", "/")
-
-review_lines = [
-    "| Case | Câu hỏi | Yêu cầu chưa có đủ bằng chứng | Đoạn ứng viên cần xem | Trạng thái |",
-    "|---|---|---|---|---|",
-]
-for row in benchmark_report["evidence_gap_review_rows"]:
-    snippets = " / ".join(_table_text(item) for item in row["top_candidate_snippets"])
-    status = "Chờ người nghiên cứu xác nhận" if row["absence_review_status"] == "pending_researcher_review" else row["absence_review_status"]
-    review_lines.append(
-        f"| {row['case_id']} | {_table_text(row['query'])} | "
-        f"{_table_text(row['unsupported_requirement'])} | {snippets} | {status} |"
-    )
-display(Markdown("### Bảng đối chiếu 30 trường hợp thiếu bằng chứng\\n\\n" + "\\n".join(review_lines)))
 """
         ),
         markdown("## 3. Kiểm tra mô hình chấm điểm"),
