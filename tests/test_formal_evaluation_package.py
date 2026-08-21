@@ -345,6 +345,13 @@ def test_atomic_extraction_accepts_paraphrase_but_rejects_merged_claims() -> Non
                 "A low glycemic load suggests a possible reduction of acne.",
             ],
         ),
+        (
+            "CAL-EXT-04",
+            [
+                "Maintenance therapy is not invariably required.",
+                "Maintenance treatment may be considered for recurrent episodes.",
+            ],
+        ),
     ],
 )
 def test_extraction_accepts_distributed_and_multilingual_semantic_equivalence(
@@ -400,6 +407,30 @@ def test_extraction_detects_actual_missing_reference() -> None:
 
     assert status == "review_required"
     assert "missing_reference:R02" in reasons
+
+
+@pytest.mark.parametrize("item_id", ["CAL-EXT-03", "CAL-EXT-05"])
+def test_extraction_bilingual_matching_does_not_hide_genuine_omissions(item_id: str) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == item_id)
+
+    status, reasons = _extraction_assessment(item, [item["reference_claims"][1]["text"]])
+
+    assert status == "review_required"
+    assert "missing_reference:R01" in reasons
+
+
+def test_extraction_bilingual_matching_rejects_missing_maintenance_claim() -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == "CAL-EXT-04")
+
+    status, reasons = _extraction_assessment(
+        item,
+        ["Maintenance treatment may be considered for frequent recurrence."],
+    )
+
+    assert status == "review_required"
+    assert "missing_reference:R01" in reasons
 
 
 def test_atomic_extraction_detects_missing_qualifier_and_invention() -> None:
