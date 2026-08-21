@@ -4,6 +4,7 @@ import ast
 import asyncio
 import json
 import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
@@ -479,9 +480,22 @@ def test_calibration_checker_uses_atomic_triplets_without_provider(
                 label = "Entailment" if item["expected_label"] == "SUPPORTED" else "Neutral"
                 result.answer2response = [label] * len(result.response_claims)
 
+    class FakeRAGResult:
+        def __init__(self, **values) -> None:
+            self.__dict__.update(values)
+
+    class FakeRAGResults:
+        def __init__(self, *, results) -> None:
+            self.results = results
+
     def provider_must_not_run(_prompts: list[str]) -> list[str]:
         pytest.fail("offline calibration regression attempted to call the provider adapter")
 
+    monkeypatch.setitem(
+        sys.modules,
+        "ragchecker",
+        SimpleNamespace(RAGResult=FakeRAGResult, RAGResults=FakeRAGResults),
+    )
     monkeypatch.setattr(evaluation_support, "_make_ragchecker", lambda _adapter: FakeEvaluator())
 
     result = run_calibration_once(calibration, provider_must_not_run)
