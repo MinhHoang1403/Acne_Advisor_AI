@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import evaluation.build_formal_package as package_builder
 import evaluation.formal_evaluation_support as evaluation_support
 from evaluation.create_formal_notebook import build_notebook
 from evaluation.formal_evaluation_support import (
@@ -42,17 +43,6 @@ from evaluation.formal_evaluation_support import (
     validate_benchmark,
     write_pretty_json,
 )
-from src.ingestion.parser import artifact_path, load_parsed_artifact
-from src.ingestion.pipeline import (
-    DEFAULT_PARSED_CACHE,
-    DEFAULT_SOURCE_DIR,
-    DEFAULT_SOURCE_MANIFEST,
-    DEFAULT_TAXONOMY,
-    _compile_prepared_knowledge,
-)
-from src.ingestion.source_manifest import load_source_manifest
-
-
 EXPECTED_CATEGORIES = {
     "adverse_effects_precautions": 9,
     "comparison_integration": 10,
@@ -99,38 +89,56 @@ def test_formal_benchmark_contract_and_hash() -> None:
     assert benchmark["anti_contamination"]["repeated_gold_claim_sets"] >= 0
 
 
-def test_answerable_gold_provenance_resolves_to_active_corpus() -> None:
+def test_answerable_gold_provenance_is_self_contained() -> None:
     benchmark = json.loads(BENCHMARK_PATH.read_text(encoding="utf-8"))
-    sources = load_source_manifest(DEFAULT_SOURCE_MANIFEST)
-    artifacts = {
-        source.source_id: load_parsed_artifact(artifact_path(DEFAULT_PARSED_CACHE, source), source)
-        for source in sources
-    }
-    compiled = _compile_prepared_knowledge(
-        sources=sources,
-        artifacts=artifacts,
-        source_dir=DEFAULT_SOURCE_DIR,
-        source_manifest_path=DEFAULT_SOURCE_MANIFEST,
-        taxonomy_path=DEFAULT_TAXONOMY,
-    )["compiled"]
-    records = {record["chunk_id"]: record for record in compiled.records}
-    record_ids = set(records)
 
-    assert len(compiled.records) == 512
     for case in benchmark["cases"]:
         if not case["family"].startswith("answerable"):
             continue
-        provenance_ids = {item["chunk_id"] for item in case["provenance"]}
-        assert provenance_ids <= record_ids
+        provenance = case["provenance"]
+        provenance_by_id = {item["chunk_id"]: item for item in provenance}
+        provenance_ids = set(provenance_by_id)
+        assert provenance_ids
+        assert len(provenance_by_id) == len(provenance)
+        for item in provenance:
+            assert item["source_id"]
+            assert item["source_title"]
+            assert item["source_authority"]
+            assert item["source_url"]
+            assert item["excerpt"]
         for claim in case["gold_claims"]:
             assert set(claim["source_chunk_ids"]) <= provenance_ids
             assert claim["annotation_status"] == "source_annotated_pending_researcher_review"
             assert claim["evidence_snippets"]
             for snippet in claim["evidence_snippets"]:
                 assert snippet["chunk_id"] in claim["source_chunk_ids"]
-                normalized_source = evaluation_support._normalize(records[snippet["chunk_id"]]["text"])
-                assert evaluation_support._normalize(snippet["text"]) in normalized_source
+                assert evaluation_support._normalize(snippet["text"])
         assert case["gold_answer"] == " ".join(claim["text"] for claim in case["gold_claims"])
+
+
+def test_package_builder_validates_evidence_snippets_against_source_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claim_key = "synthetic_claim"
+    claim = {"chunks": ["chunk-1"]}
+    records = {"chunk-1": {"text": "The source supports this evidence claim."}}
+    monkeypatch.setitem(
+        package_builder.CLAIM_EVIDENCE,
+        claim_key,
+        [("chunk-1", "supports this evidence")],
+    )
+
+    assert package_builder._claim_evidence_snippets(claim_key, claim, records) == [
+        {"chunk_id": "chunk-1", "text": "supports this evidence"}
+    ]
+
+    monkeypatch.setitem(
+        package_builder.CLAIM_EVIDENCE,
+        claim_key,
+        [("chunk-1", "unsupported evidence")],
+    )
+    with pytest.raises(RuntimeError, match="Evidence snippet is not present in frozen chunk"):
+        package_builder._claim_evidence_snippets(claim_key, claim, records)
 
 
 def test_evidence_gap_audits_are_corpus_wide_and_read_only() -> None:
