@@ -747,20 +747,20 @@ def test_evaluator_adapter_fails_closed_without_key(monkeypatch: pytest.MonkeyPa
 
 
 def _ragchecker_role_prompts() -> tuple[list[str], str]:
-    from refchecker.checker.checker_prompts import JOINT_CHECKING_PROMPT_Q
-    from refchecker.extractor.extractor_prompts import (
-        LLM_Triplet_To_Claim_PROMPT_Q,
-        LLM_TRIPLET_EXTRACTION_PROMPT_Q,
-    )
-
+    # Stable task markers from the audited RefChecker prompts bundled with RAGChecker 0.1.9.
     extraction_prompts = [
-        LLM_TRIPLET_EXTRACTION_PROMPT_Q.format(q="What is acne?", a="Acne is inflammatory."),
-        LLM_Triplet_To_Claim_PROMPT_Q.format(q="What is acne?", r="[1] Acne is inflammatory."),
+        (
+            "Given a question and a candidate answer to the question, please extract a KG "
+            "from the candidate answer. Please note that this is an EXTRACTION task."
+        ),
+        (
+            "Given a question and a response to the question, please extract a KG from the "
+            "response. Please note that this is an EXTRACTION task."
+        ),
     ]
     checking_prompt = (
-        JOINT_CHECKING_PROMPT_Q.replace("[QUESTION]", "What is acne?")
-        .replace("[REFERENCE]", "Acne is inflammatory.")
-        .replace("[CLAIMS]", '("Acne", "is", "inflammatory")')
+        "I have a list of claims that made by a language model to a question, please help me "
+        "for checking whether the claims can be entailed. Please DO NOT use your own knowledge."
     )
     return extraction_prompts, checking_prompt
 
