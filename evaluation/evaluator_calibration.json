@@ -185,11 +185,17 @@
           "text": "Điều trị duy trì không phải lúc nào cũng cần.",
           "required_concept_groups": [
             [
-              "điều trị duy trì"
+              "điều trị duy trì",
+              "maintenance treatment",
+              "maintenance therapy"
             ],
             [
               "không phải lúc nào cũng cần",
-              "không luôn cần"
+              "không luôn cần",
+              "not always necessary",
+              "not always required",
+              "not invariably necessary",
+              "not invariably required"
             ]
           ],
           "qualifier_concept_groups": []
@@ -199,17 +205,27 @@
           "text": "Có thể cân nhắc điều trị duy trì khi thường xuyên tái phát.",
           "required_concept_groups": [
             [
-              "điều trị duy trì"
+              "điều trị duy trì",
+              "maintenance treatment",
+              "maintenance therapy"
             ],
             [
               "tái phát thường xuyên",
-              "thường xuyên tái phát"
+              "thường xuyên tái phát",
+              "frequent recurrence",
+              "frequent relapse",
+              "recurring frequently",
+              "frequently recurring",
+              "recurrent episodes"
             ]
           ],
           "qualifier_concept_groups": [
             [
               "có thể cân nhắc",
-              "cân nhắc"
+              "cân nhắc",
+              "can be considered",
+              "may be considered",
+              "consider"
             ]
           ]
         }
