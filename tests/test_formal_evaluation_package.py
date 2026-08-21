@@ -4,6 +4,7 @@ import ast
 import asyncio
 import json
 import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,6 +29,7 @@ from evaluation.formal_evaluation_support import (
     atomic_write_json,
     canonical_json_file_sha256,
     canonical_json_sha256,
+    _checker_claim_triplets,
     _checker_label,
     _extraction_assessment,
     _ratio_to_percent,
@@ -38,6 +40,7 @@ from evaluation.formal_evaluation_support import (
     load_evaluation_artifacts,
     load_json,
     negative_rejection_rate,
+    run_calibration_once,
     run_formal_cases,
     save_calibration_results,
     validate_benchmark,
@@ -207,6 +210,16 @@ def test_calibration_matrix_is_predeclared_and_balanced() -> None:
     } <= dimensions
     assert all(item["reference_claims"] for item in extraction)
     assert all(
+        item["claim_triplets"]
+        and all(
+            isinstance(triplet, list)
+            and len(triplet) == 3
+            and all(isinstance(part, str) and part.strip() for part in triplet)
+            for triplet in item["claim_triplets"]
+        )
+        for item in checking
+    )
+    assert all(
         len(item["reference_claims"]) > 1
         for item in extraction
         if item["item_id"] in {"CAL-EXT-05", "CAL-EXT-06", "CAL-EXT-07", "CAL-EXT-08"}
@@ -228,16 +241,18 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert "CALIBRATION_REVIEW_REQUIRED" in all_source
     assert CALIBRATION_BLOCKED == "BLOCKED_BY_EVALUATOR_CALIBRATION"
     assert "## Thuật ngữ" in all_source
+    assert "### Bảng đối chiếu 30 trường hợp thiếu bằng chứng" not in all_source
+    assert "evidence_gap_review_rows" not in all_source
     assert "gpt-5.4-mini-2026-03-17" not in all_source  # Imported from the fixed helper contract.
     for cell in code_cells:
         compile("".join(cell["source"]), "<notebook-cell>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
 
 
-def test_formal_outputs_are_not_precreated() -> None:
+def test_formal_outputs_are_not_precreated_or_tracked() -> None:
     assert MANIFEST_PATH.is_file()
     assert BENCHMARK_PATH.is_file()
     assert CALIBRATION_PATH.is_file()
-    for path in (RAW_RESULTS_PATH, CASE_METRICS_PATH, METRICS_SUMMARY_PATH, CALIBRATION_RESULTS_PATH):
+    for path in (RAW_RESULTS_PATH, CASE_METRICS_PATH, METRICS_SUMMARY_PATH):
         assert not path.exists()
     tracked = subprocess.run(
         ["git", "ls-files", "--", str(RAW_RESULTS_PATH), str(CASE_METRICS_PATH), str(METRICS_SUMMARY_PATH), str(CALIBRATION_RESULTS_PATH)],
@@ -306,6 +321,87 @@ def test_atomic_extraction_accepts_paraphrase_but_rejects_merged_claims() -> Non
     assert paraphrase_reasons == []
 
 
+@pytest.mark.parametrize(
+    ("item_id", "claims"),
+    [
+        (
+            "CAL-EXT-01",
+            [
+                "Mụn trứng cá là bệnh viêm mạn tính.",
+                "Mụn trứng cá thuộc đơn vị nang lông tuyến bã.",
+            ],
+        ),
+        (
+            "CAL-EXT-02",
+            [
+                "Benzoyl peroxide is an antibacterial intended for topical application.",
+                "Benzoyl peroxide has a mild comedolytic action.",
+            ],
+        ),
+        (
+            "CAL-EXT-03",
+            [
+                "Evidence concerning a low glycemic load is conflicting.",
+                "A low glycemic load suggests a possible reduction of acne.",
+            ],
+        ),
+    ],
+)
+def test_extraction_accepts_distributed_and_multilingual_semantic_equivalence(
+    item_id: str,
+    claims: list[str],
+) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == item_id)
+
+    assert _extraction_assessment(item, claims) == ("accepted", [])
+
+
+def test_extraction_preserves_negation_and_entity_ownership() -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    items = {row["item_id"]: row for row in calibration["claim_extraction"]}
+
+    accepted = _extraction_assessment(
+        items["CAL-EXT-08"],
+        [
+            "Benzoyl peroxide is antimicrobial.",
+            "Benzoyl peroxide is not a topical antibiotic.",
+            "Clindamycin is a topical antibiotic.",
+        ],
+    )
+    wrong_polarity = _extraction_assessment(
+        items["CAL-EXT-08"],
+        [
+            "Benzoyl peroxide is antimicrobial.",
+            "Benzoyl peroxide is a topical antibiotic.",
+            "Clindamycin is a topical antibiotic.",
+        ],
+    )
+    wrong_entity = _extraction_assessment(
+        items["CAL-EXT-02"],
+        [
+            "Clindamycin is an antibacterial intended for topical application.",
+            "Benzoyl peroxide has a mild comedolytic action.",
+        ],
+    )
+
+    assert accepted == ("accepted", [])
+    assert wrong_polarity[0] == "rejected"
+    assert "missing_qualifier:R02" in wrong_polarity[1]
+    assert wrong_entity[0] == "review_required"
+    assert "missing_reference:R01" in wrong_entity[1]
+
+
+def test_extraction_detects_actual_missing_reference() -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_extraction"] if row["item_id"] == "CAL-EXT-05")
+
+    status, reasons = _extraction_assessment(item, ["Kháng sinh bôi không nên dùng một mình."])
+
+    assert status == "review_required"
+    assert "missing_reference:R02" in reasons
+
+
 def test_atomic_extraction_detects_missing_qualifier_and_invention() -> None:
     calibration = load_json(CALIBRATION_PATH)
     item = next(row for row in calibration["claim_extraction"] if row["item_id"] == "CAL-EXT-03")
@@ -350,11 +446,89 @@ def test_unresolved_extraction_paraphrase_requires_researcher_review() -> None:
         ("Neutral", "NOT_SUPPORTED"),
         ("Supported", "SUPPORTED"),
         ("Not supported", "NOT_SUPPORTED"),
+        (["Entailment", "Entailment"], "SUPPORTED"),
+        (["Entailment", "Neutral"], "NOT_SUPPORTED"),
+        (["Entailment", "Contradiction"], "NOT_SUPPORTED"),
+        (["Entailment", "unknown"], "UNPARSEABLE"),
         ("unexpected text", "UNPARSEABLE"),
     ],
 )
 def test_checker_label_parser_uses_exact_normalized_contract(raw: str, expected: str) -> None:
     assert _checker_label(raw) == expected
+
+
+def test_calibration_checker_uses_atomic_triplets_without_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    extraction_by_id = {item["item_id"]: item for item in calibration["claim_extraction"]}
+    checking_by_id = {item["item_id"]: item for item in calibration["claim_checking"]}
+    captured_triplets: dict[str, list[list[str]]] = {}
+
+    class FakeEvaluator:
+        def extract_claims(self, results, extract_type: str) -> None:
+            assert extract_type == "gt_answer"
+            for result in results:
+                item = extraction_by_id[result.query_id]
+                result.gt_answer_claims = [reference["text"] for reference in item["reference_claims"]]
+
+        def check_claims(self, results, check_type: str) -> None:
+            assert check_type == "answer2response"
+            for result in results.results:
+                item = checking_by_id[result.query_id]
+                captured_triplets[result.query_id] = result.response_claims
+                label = "Entailment" if item["expected_label"] == "SUPPORTED" else "Neutral"
+                result.answer2response = [label] * len(result.response_claims)
+
+    class FakeRAGResult:
+        def __init__(self, **values) -> None:
+            self.__dict__.update(values)
+
+    class FakeRAGResults:
+        def __init__(self, *, results) -> None:
+            self.results = results
+
+    def provider_must_not_run(_prompts: list[str]) -> list[str]:
+        pytest.fail("offline calibration regression attempted to call the provider adapter")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "ragchecker",
+        SimpleNamespace(RAGResult=FakeRAGResult, RAGResults=FakeRAGResults),
+    )
+    monkeypatch.setattr(evaluation_support, "_make_ragchecker", lambda _adapter: FakeEvaluator())
+
+    result = run_calibration_once(calibration, provider_must_not_run)
+
+    assert len(result["extraction"]) == 8
+    assert all(row["agreement"] for row in result["checking"])
+    assert captured_triplets == {
+        item["item_id"]: _checker_claim_triplets(item)
+        for item in calibration["claim_checking"]
+    }
+
+
+def test_calibration_checker_rejects_malformed_triplets() -> None:
+    item = {"item_id": "CAL-BAD", "claim_triplets": [["subject", "predicate"]]}
+
+    with pytest.raises(ValueError, match="requires atomic claim_triplets"):
+        _checker_claim_triplets(item)
+
+
+@pytest.mark.parametrize(
+    ("item_id", "dimension"),
+    [
+        ("CAL-CHK-04", "exact_number"),
+        ("CAL-CHK-10", "unsupported_comparison"),
+        ("CAL-CHK-12", "unsupported_comparison"),
+    ],
+)
+def test_negative_checker_cases_preserve_critical_dimensions(item_id: str, dimension: str) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    item = next(row for row in calibration["claim_checking"] if row["item_id"] == item_id)
+
+    assert item["expected_label"] == "NOT_SUPPORTED"
+    assert dimension in item["critical_dimensions"]
 
 
 def _clean_calibration_runs() -> tuple[dict, dict]:

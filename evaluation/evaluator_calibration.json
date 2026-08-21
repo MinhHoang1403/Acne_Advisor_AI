@@ -45,7 +45,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -64,9 +64,14 @@
               "benzoyl peroxide"
             ],
             [
-              "kháng khuẩn bôi",
-              "kháng khuẩn dùng tại chỗ",
-              "topical antimicrobial"
+              "kháng khuẩn",
+              "antimicrobial",
+              "antibacterial"
+            ],
+            [
+              "bôi",
+              "tại chỗ",
+              "topical"
             ]
           ],
           "qualifier_concept_groups": []
@@ -86,6 +91,7 @@
           "qualifier_concept_groups": [
             [
               "nhẹ",
+              "mild",
               "mildly"
             ]
           ]
@@ -99,7 +105,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -146,7 +152,8 @@
             [
               "có thể",
               "khả năng",
-              "may"
+              "may",
+              "possible"
             ]
           ]
         }
@@ -162,7 +169,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -217,7 +224,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -277,7 +284,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -340,7 +347,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -388,7 +395,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -401,24 +408,40 @@
       "reference_claims": [
         {
           "reference_id": "R01",
-          "text": "Benzoyl peroxide là antimicrobial, không phải topical antibiotic.",
+          "text": "Benzoyl peroxide là antimicrobial.",
           "required_concept_groups": [
             [
               "benzoyl peroxide"
             ],
             [
               "antimicrobial",
+              "antibacterial",
               "kháng khuẩn"
-            ],
-            [
-              "không phải topical antibiotic",
-              "không phải kháng sinh bôi"
             ]
           ],
           "qualifier_concept_groups": []
         },
         {
           "reference_id": "R02",
+          "text": "Benzoyl peroxide không phải topical antibiotic.",
+          "required_concept_groups": [
+            [
+              "benzoyl peroxide"
+            ],
+            [
+              "topical antibiotic",
+              "kháng sinh bôi"
+            ]
+          ],
+          "qualifier_concept_groups": [
+            [
+              "không phải",
+              "is not"
+            ]
+          ]
+        },
+        {
+          "reference_id": "R03",
           "text": "Clindamycin là kháng sinh bôi.",
           "required_concept_groups": [
             [
@@ -440,7 +463,7 @@
           "no_invention",
           "qualifier_preservation"
         ],
-        "automatic_decision_scope": "reference-aware lexical concepts with one-to-one atomic matching",
+        "automatic_decision_scope": "anchor-scoped atomic coverage with independent-reference merge rejection",
         "unresolved_semantic_cases": "pending_researcher_review"
       },
       "annotation_status": "source_annotated_pending_researcher_review"
@@ -453,6 +476,13 @@
       "language_direction": "vi_to_vi",
       "evidence": "- Tránh các yếu tố khởi động, kích thích làm bệnh nặng lên như stress, thức khuya, làm việc quá sức, ăn uống quá nhiều đường, sữa. - Sử dụng sản phẩm chăm sóc da phù hợp: sản phẩm rửa mặt, dưỡng ẩm kiềm dầu. ```",
       "claim": "Người bị mụn được khuyên dùng sản phẩm rửa mặt và dưỡng ẩm phù hợp.",
+      "claim_triplets": [
+        [
+          "Người bị mụn",
+          "được khuyên dùng",
+          "sản phẩm rửa mặt và dưỡng ẩm phù hợp"
+        ]
+      ],
       "expected_label": "SUPPORTED",
       "critical_dimensions": [
         "entity_distinction"
@@ -465,6 +495,13 @@
       "language_direction": "vi_to_vi",
       "evidence": "Lựa chọn một trong các hoạt chất sau: - Adapalen (0,1%, 0,3% kem hoặc lotion 0,1%) - Retinoic acid (0,025 - 0,1% dạng kem, gel) - Tazaroten (0,05%, 0,1% kem, gel hoặc bọt) - Trifaroten **Cách dùng:** Bôi thuốc mỏng 1 lần/ngày vào buổi tối. Có thể giảm tần suất bôi trong một vài tuần đầu (bôi cách ngày hoặc sau dưỡng ẩm để hạn chế kích ứng). **Lưu ý:** - Tác dụng phụ như khô, kích ứng, bong da, tăng nhạy cảm ánh sáng thường gặp trong 2 tuần đầu. Tretinoin không sử dụng cùng lúc hoặc kết hợp với benzoyl peroxide (BP). - Tazaroten không chỉ định cho phụ nữ mang thai. - Adapalen, tazaroten được FDA chấp thuận cho bệnh nhân ≥ 12 tuổi và tretinoin cho bệnh nhân ≥ 10 tuổi.",
       "claim": "Có thể giảm tần suất retinoid bôi trong vài tuần đầu để hạn chế kích ứng.",
+      "claim_triplets": [
+        [
+          "Tần suất retinoid bôi",
+          "có thể giảm trong vài tuần đầu",
+          "để hạn chế kích ứng"
+        ]
+      ],
       "expected_label": "SUPPORTED",
       "critical_dimensions": [
         "qualifier_modality"
@@ -477,6 +514,13 @@
       "language_direction": "vi_to_vi",
       "evidence": "- Thời gian sử dụng không quá 3 - 4 tháng, không sử dụng điều trị duy trì, không dùng kháng sinh như biện pháp điều trị đơn độc, không phối hợp với kháng sinh tại chỗ. - Nên sử dụng kết hợp với retinoid và/hoặc BP tại chỗ. - Không dùng doxycyclin, minocyclin, tetracyclin và trimethoprim/sulfamethoxazol cho phụ nữ mang thai, cho con bú và trẻ em &#x3C; 8 tuổi. - Azithromycin chỉ định được cho phụ nữ có thai và trẻ em.",
       "claim": "Nguồn không khuyến nghị dùng kháng sinh làm điều trị đơn độc.",
+      "claim_triplets": [
+        [
+          "Nguồn",
+          "không khuyến nghị",
+          "dùng kháng sinh làm điều trị đơn độc"
+        ]
+      ],
       "expected_label": "SUPPORTED",
       "critical_dimensions": [
         "negation"
@@ -489,6 +533,13 @@
       "language_direction": "vi_to_vi",
       "evidence": "- **Tổn thương da**: các tổn thương phân bố điển hình ở vùng có nhiều tuyến bã như mặt, cổ, ngực, lưng trên, cánh tay trên. Bao gồm một hoặc nhiều dạng tổn thương: + **Mụn nhân đóng (closed comedone)** hay mụn đầu trắng: kích thước &#x3C; 5mm, sẩn có màu da, trắng hoặc xám hình vòm, nhẵn hơi nhô cao hơn mặt da. + **Mụn nhân mở (open comedone)** hay mụn đầu đen: sẩn kích thước &#x3C; 5mm, trung tâm có lỗ mở chứa chất sừng xám, nâu hoặc đen. + **Mụn mủ (pustule)**: đường kính tổn thương dưới 5mm, chứa đầu mủ màu trắng hoặc vàng ở trung tâm nền đỏ. + **Sẩn mủ (papulopustular)**: sẩn và mụn mủ tương đối nông ở bề mặt, đường kính &#x3C; 5 mm.",
       "claim": "Mọi nhân mụn đóng đều có kích thước chính xác 4 mm.",
+      "claim_triplets": [
+        [
+          "Mọi nhân mụn đóng",
+          "có kích thước chính xác",
+          "4 mm"
+        ]
+      ],
       "expected_label": "NOT_SUPPORTED",
       "critical_dimensions": [
         "exact_number"
@@ -501,6 +552,13 @@
       "language_direction": "vi_to_vi",
       "evidence": "- **Dạng chế phẩm**: Gel, kem, xà phòng rửa (nồng độ 2,5 - 10%). - **Cách dùng**: Bôi ngày 1 lần vào buổi tối sau khi rửa mặt. - **Lưu ý**: - **Tác dụng phụ**: Kích ứng, thay đổi màu sắc áo, tóc, nhạy cảm ánh sáng. - **Khuyến cáo thai kỳ**: tuy nhiên tỷ lệ hấp thu toàn thân rất thấp, cân nhắc chỉ định ở phụ nữ mang thai. - **Chưa chứng minh an toàn và hiệu quả** ở trẻ em &#x3C;12 tuổi.",
       "claim": "Benzoyl peroxide chắc chắn không bao giờ gây kích ứng.",
+      "claim_triplets": [
+        [
+          "Benzoyl peroxide",
+          "chắc chắn không bao giờ gây",
+          "kích ứng"
+        ]
+      ],
       "expected_label": "NOT_SUPPORTED",
       "critical_dimensions": [
         "negation",
@@ -514,6 +572,13 @@
       "language_direction": "vi_to_vi",
       "evidence": "- Lựa chọn thuốc tác động vào một hoặc nhiều hơn trong bốn yếu tố: sừng hóa cổ nang lông, sản xuất bã nhờn, vi khuẩn C.acnes, yếu tố viêm. - Điều trị sớm tránh biến chứng. - Điều trị bệnh theo mức độ. - Cần điều trị duy trì để tránh tái phát.",
       "claim": "Mọi người đều bắt buộc dùng điều trị duy trì suốt đời.",
+      "claim_triplets": [
+        [
+          "Mọi người",
+          "bắt buộc dùng điều trị duy trì",
+          "suốt đời"
+        ]
+      ],
       "expected_label": "NOT_SUPPORTED",
       "critical_dimensions": [
         "qualifier_modality",
@@ -527,6 +592,13 @@
       "language_direction": "en_to_vi",
       "evidence": "Acne vulgaris is a chronic, inflammatory skin disease of the pilosebaceous unit. Acne primarily presents with open or closed comedones, papules, pustules, or nodules on the face or trunk and may result in pain, erythema, hyperpigmentation, or scars.",
       "claim": "Mụn trứng cá là bệnh viêm mạn tính của đơn vị nang lông - tuyến bã.",
+      "claim_triplets": [
+        [
+          "Mụn trứng cá",
+          "là",
+          "bệnh viêm mạn tính của đơn vị nang lông - tuyến bã"
+        ]
+      ],
       "expected_label": "SUPPORTED",
       "critical_dimensions": [
         "cross_language_entailment"
@@ -539,6 +611,18 @@
       "language_direction": "en_to_vi",
       "evidence": "- **Type**: Over-the-counter topical antimicrobial agent. - **Mechanism**: Releases free oxygen radicals and is mildly comedolytic. - **Efficacy**: Recommended for acne treatment based on moderate certainty evidence from 8 studies. - **Adverse Effects**: Can cause burning sensation, stinging, dryness, erythema, pain, peeling, irritation, fabric staining, and bleaching. - **Resistance**: No resistance of *C. acnes* to BP has been reported.",
       "claim": "Benzoyl peroxide là hoạt chất kháng khuẩn bôi và có thể làm bạc màu vải.",
+      "claim_triplets": [
+        [
+          "Benzoyl peroxide",
+          "là",
+          "hoạt chất kháng khuẩn bôi"
+        ],
+        [
+          "Benzoyl peroxide",
+          "có thể làm",
+          "bạc màu vải"
+        ]
+      ],
       "expected_label": "SUPPORTED",
       "critical_dimensions": [
         "entity_distinction",
@@ -552,6 +636,13 @@
       "language_direction": "en_to_vi",
       "evidence": "> 1.4.1 Urgently refer people with acne fulminans on the same day to the on-call hospital dermatology team, to be assessed within 24 hours. > 1.4.2 Refer people to a consultant dermatologist-led team or a nationally accredited GP with an Extended Role (GPwER) working within a consultant dermatologist- agreed pathway if any of the following apply: • there is diagnostic uncertainty about their acne • they have acne conglobata • they have nodulo-cystic acne. > © NICE 2026. All rights reserved. Subject to Notice of rights (https://www.nice.org.uk/terms-and-conditions#notice-of-rights). > Page 8 of 56 1.4.3 Consider referring people to a consultant dermatologist-led team or a nationally accredite",
       "claim": "Mụn fulminans cần được đánh giá trong vòng 24 giờ.",
+      "claim_triplets": [
+        [
+          "Mụn fulminans",
+          "cần được đánh giá trong vòng",
+          "24 giờ"
+        ]
+      ],
       "expected_label": "SUPPORTED",
       "critical_dimensions": [
         "exact_time",
@@ -565,6 +656,13 @@
       "language_direction": "en_to_vi",
       "evidence": "- **Description**: Salicylic acid is a topical comedolytic agent available over the counter, with concentrations ranging from 0.5% to 2%. - **Recommendation**: We conditionally recommend salicylic acid for acne treatment based on moderate certainty evidence from 1 RCT, showing: - 25% greater reduction in inflammatory lesions - 11% greater reduction in open comedones - No difference in closed comedones with 0.5% salicylic acid use compared to vehicle at 12 weeks. - **FDA Approval**: Salicylic acid is approved for ages 9 years and above.",
       "claim": "Salicylic acid diệt C. acnes mạnh hơn benzoyl peroxide.",
+      "claim_triplets": [
+        [
+          "Salicylic acid",
+          "diệt C. acnes mạnh hơn",
+          "benzoyl peroxide"
+        ]
+      ],
       "expected_label": "NOT_SUPPORTED",
       "critical_dimensions": [
         "unsupported_comparison",
@@ -578,6 +676,13 @@
       "language_direction": "en_to_vi",
       "evidence": "Topical retinoids are vitamin A derivatives and serve as the cornerstone of acne treatment since they are comedolytic and anti-inflammatory, improve dyspigmentation, and enable maintenance of acne clearance. Four types of topical retinoids, including: - Topical tretinoin - Adapalene - Tazarotene - Trifarotene are FDA-approved for acne treatment in the US. Each retinoid binds to a different set of retinoic acid receptors and confers modest differences in activity, tolerability, and efficacy. We recommend topical retinoids for acne treatment based on moderate certainty evidence from 20 studies. Compared to vehicle at 12 weeks, a greater proportion of patients treated with topical retinoids ach",
       "claim": "Adapalene chắc chắn làm sạch toàn bộ mụn trong đúng 3 ngày.",
+      "claim_triplets": [
+        [
+          "Adapalene",
+          "chắc chắn làm sạch toàn bộ mụn trong đúng",
+          "3 ngày"
+        ]
+      ],
       "expected_label": "NOT_SUPPORTED",
       "critical_dimensions": [
         "exact_time",
@@ -591,6 +696,13 @@
       "language_direction": "en_to_vi",
       "evidence": "Formulation with either of these 2 concentrations: • 15% azelaic acid > © NICE 2026. All rights reserved. Subject to Notice of rights (https://www.nice.org.uk/terms-and-conditions#notice-of-rights). > Page 28 of 56 • 20% azelaic acid.",
       "claim": "Azelaic acid 20% luôn hiệu quả gấp đôi azelaic acid 15%.",
+      "claim_triplets": [
+        [
+          "Azelaic acid 20%",
+          "luôn hiệu quả gấp đôi",
+          "azelaic acid 15%"
+        ]
+      ],
       "expected_label": "NOT_SUPPORTED",
       "critical_dimensions": [
         "exact_number",
