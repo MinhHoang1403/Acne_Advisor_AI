@@ -18,6 +18,7 @@ import re
 import subprocess
 import unicodedata
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -31,14 +32,12 @@ RESULTS_DIR = EVALUATION_DIR / "results"
 BENCHMARK_PATH = EVALUATION_DIR / "benchmark_100.json"
 MANIFEST_PATH = EVALUATION_DIR / "benchmark_manifest.json"
 CALIBRATION_PATH = EVALUATION_DIR / "evaluator_calibration.json"
-CALIBRATION_RESULTS_PATH = RESULTS_DIR / "evaluator_calibration_results.json"
-RAW_RESULTS_PATH = RESULTS_DIR / "raw_results.json"
-CASE_METRICS_PATH = RESULTS_DIR / "case_metrics.csv"
-METRICS_SUMMARY_PATH = RESULTS_DIR / "metrics_summary.csv"
-RAGCHECKER_CHECKPOINT_PATH = RESULTS_DIR / "ragchecker_checkpoint.json"
 
 EXPECTED_BASE_SHA = "6a1809c4ddedbccab986ec76eb730321686ff3ff"
+SYSTEM_UNDER_TEST_SHA = "47b10954d217de91cf8919650b31dc7569ec1f0e"
 EXPECTED_KB_BUILD_ID = "94d613bc9b33628de3ef"
+EXPECTED_PIPELINE_FINGERPRINT = "5991f3c8effb67091fd6274c"
+POST_IMPROVEMENT_RUN_ID = "post_improvement_47b10954"
 EVALUATOR_MODEL = "gpt-5.4-mini-2026-03-17"
 RAGCHECKER_VERSION = "0.1.9"
 EXTRACTION_REASONING_EFFORT = "medium"
@@ -46,6 +45,59 @@ CHECKING_REASONING_EFFORT = "low"
 CALIBRATION_READY = "CALIBRATION_READY_FOR_FORMAL_RUN"
 CALIBRATION_REVIEW_REQUIRED = "CALIBRATION_REVIEW_REQUIRED"
 CALIBRATION_BLOCKED = "BLOCKED_BY_EVALUATOR_CALIBRATION"
+
+
+@dataclass(frozen=True)
+class EvaluationRunPaths:
+    """Writable artifacts owned by one formal evaluation run."""
+
+    run_id: str
+    directory: Path
+    calibration_results: Path
+    raw_results: Path
+    case_metrics: Path
+    metrics_summary: Path
+    ragchecker_checkpoint: Path
+
+
+def build_evaluation_run_paths(run_id: str) -> EvaluationRunPaths:
+    directory = RESULTS_DIR / run_id
+    return EvaluationRunPaths(
+        run_id=run_id,
+        directory=directory,
+        calibration_results=directory / "evaluator_calibration_results.json",
+        raw_results=directory / "raw_results.json",
+        case_metrics=directory / "case_metrics.csv",
+        metrics_summary=directory / "metrics_summary.csv",
+        ragchecker_checkpoint=directory / "ragchecker_checkpoint.json",
+    )
+
+
+BASELINE_RESULTS_DIR = RESULTS_DIR / "formal_run_baseline"
+BASELINE_METRICS_SUMMARY_PATH = BASELINE_RESULTS_DIR / "metrics_summary.csv"
+POST_IMPROVEMENT_PATHS = build_evaluation_run_paths(POST_IMPROVEMENT_RUN_ID)
+CALIBRATION_RESULTS_PATH = POST_IMPROVEMENT_PATHS.calibration_results
+RAW_RESULTS_PATH = POST_IMPROVEMENT_PATHS.raw_results
+CASE_METRICS_PATH = POST_IMPROVEMENT_PATHS.case_metrics
+METRICS_SUMMARY_PATH = POST_IMPROVEMENT_PATHS.metrics_summary
+RAGCHECKER_CHECKPOINT_PATH = POST_IMPROVEMENT_PATHS.ragchecker_checkpoint
+
+PRODUCTION_SENSITIVE_PATHS = (
+    "src",
+    "scripts",
+    "sample_data",
+    "data/sources",
+    "data/taxonomy",
+    "data/knowledge_build_manifest.json",
+    "data/method_sources.json",
+    "pyproject.toml",
+    ".python-version",
+    "requirements.txt",
+    "requirements.lock.txt",
+    "docker-compose.yml",
+    "Dockerfile",
+    ".env.example",
+)
 
 _ENGLISH_STOPWORDS = frozenset({"a", "an", "and", "are", "be", "is", "of", "the", "to"})
 _STEMMER = LancasterStemmer()
@@ -151,6 +203,45 @@ def validate_baseline(manifest: dict[str, Any]) -> dict[str, Any]:
     if not all(value is True or value == [] for value in checks.values()):
         raise EvaluationBlocked(f"Baseline không khớp: {checks}")
     return {"current_head": head, **checks}
+
+
+def validate_system_under_test(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Validate the frozen production checkpoint while allowing evaluation-only commits."""
+
+    head = _git("rev-parse", "HEAD")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", SYSTEM_UNDER_TEST_SHA, head],
+        cwd=ROOT,
+        check=False,
+    ).returncode == 0
+    production_diff = _git(
+        "diff",
+        "--name-only",
+        SYSTEM_UNDER_TEST_SHA,
+        head,
+        "--",
+        *PRODUCTION_SENSITIVE_PATHS,
+    ).splitlines()
+    knowledge_manifest = load_json(ROOT / "data" / "knowledge_build_manifest.json")
+    checks = {
+        "benchmark_reference_base_sha": manifest.get("evaluation_base_sha") == EXPECTED_BASE_SHA,
+        "benchmark_sha256": manifest.get("benchmark_sha256")
+        == canonical_json_file_sha256(BENCHMARK_PATH),
+        "system_under_test_is_ancestor": ancestor,
+        "production_diff_after_system_under_test": production_diff,
+        "active_kb_build_id": knowledge_manifest.get("build_id") == EXPECTED_KB_BUILD_ID,
+        "phase1_frozen": knowledge_manifest.get("phase1_frozen") is True,
+        "manifest_status": knowledge_manifest.get("status") == "activated",
+        "benchmark_manifest_kb": manifest.get("active_kb_build_id") == EXPECTED_KB_BUILD_ID,
+    }
+    if not all(value is True or value == [] for value in checks.values()):
+        raise EvaluationBlocked(f"System under test không khớp: {checks}")
+    return {
+        "repository_head": head,
+        "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
+        "expected_pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
+        **checks,
+    }
 
 
 def validate_benchmark(
@@ -287,6 +378,16 @@ def require_researcher_review(approved: bool) -> None:
         raise EvaluationBlocked(
             "RESEARCHER_REVIEW_REQUIRED: Hãy đối chiếu benchmark và calibration, sau đó "
             "đổi RESEARCHER_REVIEW_APPROVED = True để kiểm tra mô hình chấm điểm và chạy đánh giá."
+        )
+
+
+def require_run_authorization(authorized: bool) -> None:
+    """Require local execution authorization without claiming completed human review."""
+
+    if not authorized:
+        raise EvaluationBlocked(
+            "RUN_AUTHORIZATION_REQUIRED: Đặt RUN_AUTHORIZED=True trên máy nghiên cứu để "
+            "cho phép thực hiện lần đánh giá."
         )
 
 
@@ -655,9 +756,14 @@ def _installed_version(package: str) -> str:
         return "missing"
 
 
-def _formal_run_metadata(*, allow_model_fallback: bool, researcher_review_approved: bool) -> dict[str, Any]:
+def _formal_run_metadata(*, allow_model_fallback: bool, run_authorized: bool) -> dict[str, Any]:
     return {
+        "run_id": POST_IMPROVEMENT_RUN_ID,
         "benchmark_sha256": canonical_json_file_sha256(BENCHMARK_PATH),
+        "benchmark_reference_base_sha": EXPECTED_BASE_SHA,
+        "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
+        "repository_head_at_run": _git("rev-parse", "HEAD"),
+        "expected_pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
         "evaluation_base_sha": EXPECTED_BASE_SHA,
         "current_git_head": _git("rev-parse", "HEAD"),
         "active_kb_build_id": EXPECTED_KB_BUILD_ID,
@@ -679,7 +785,8 @@ def _formal_run_metadata(*, allow_model_fallback: bool, researcher_review_approv
             "ollama_model": os.getenv("OLLAMA_MODEL", "qwen3:8b"),
         },
         "allow_model_fallback": allow_model_fallback,
-        "researcher_review_approved": researcher_review_approved,
+        "execution_authorization_state": "authorized" if run_authorized else "not_authorized",
+        "run_authorized": run_authorized,
     }
 
 
@@ -757,44 +864,83 @@ def _safe_runtime_record(case: dict[str, Any], result: dict[str, Any]) -> dict[s
     }
 
 
+def _expected_run_identity(benchmark_sha256: str) -> dict[str, str]:
+    return {
+        "run_id": POST_IMPROVEMENT_RUN_ID,
+        "benchmark_sha256": benchmark_sha256,
+        "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
+        "active_kb_build_id": EXPECTED_KB_BUILD_ID,
+    }
+
+
+def _validate_resume_identity(payload: dict[str, Any], benchmark_sha256: str) -> None:
+    expected = _expected_run_identity(benchmark_sha256)
+    actual = {key: payload.get(key) for key in expected}
+    if actual != expected:
+        raise EvaluationBlocked(
+            f"FORMAL_RUN_IDENTITY_MISMATCH: expected={expected}, actual={actual}"
+        )
+
+
+def _validate_pipeline_fingerprints(records: Iterable[dict[str, Any]]) -> None:
+    mismatches = [
+        {
+            "case_id": record.get("case_id"),
+            "pipeline_fingerprint": record.get("pipeline_fingerprint"),
+        }
+        for record in records
+        if not record.get("infrastructure_error")
+        and record.get("pipeline_fingerprint") != EXPECTED_PIPELINE_FINGERPRINT
+    ]
+    if mismatches:
+        raise EvaluationBlocked(
+            f"FORMAL_RUN_PIPELINE_FINGERPRINT_MISMATCH: expected="
+            f"{EXPECTED_PIPELINE_FINGERPRINT}, records={mismatches}"
+        )
+
+
 async def run_formal_cases(
     benchmark: dict[str, Any],
     benchmark_sha256: str,
     *,
-    researcher_review_approved: bool,
+    run_authorized: bool,
     calibration_decision: dict[str, Any] | None,
     allow_model_fallback: bool = True,
 ) -> dict[str, Any]:
     """Run each fixed case once, checkpointing without selecting better outputs."""
 
-    require_researcher_review(researcher_review_approved)
+    require_run_authorization(run_authorized)
     decision = (calibration_decision or {}).get("decision")
     if decision != CALIBRATION_READY:
         raise EvaluationBlocked(decision or CALIBRATION_BLOCKED)
 
-    from src.agent.graph import run_clinical_agent
-
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    RAW_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     if RAW_RESULTS_PATH.exists():
         payload = load_json(RAW_RESULTS_PATH)
-        if payload.get("benchmark_sha256") != benchmark_sha256:
-            raise EvaluationBlocked("Checkpoint benchmark SHA không khớp; không được resume.")
+        _validate_resume_identity(payload, benchmark_sha256)
+        _validate_pipeline_fingerprints(payload.get("records") or [])
     else:
         run_metadata = _formal_run_metadata(
             allow_model_fallback=allow_model_fallback,
-            researcher_review_approved=researcher_review_approved,
+            run_authorized=run_authorized,
         )
         if run_metadata["benchmark_sha256"] != benchmark_sha256:
             raise EvaluationBlocked("Benchmark SHA changed before formal execution.")
         payload = {
+            "run_id": POST_IMPROVEMENT_RUN_ID,
             "benchmark_sha256": benchmark_sha256,
+            "benchmark_reference_base_sha": EXPECTED_BASE_SHA,
+            "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
             "evaluation_base_sha": EXPECTED_BASE_SHA,
             "active_kb_build_id": EXPECTED_KB_BUILD_ID,
+            "expected_pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
             "run_metadata": run_metadata,
             "records": [],
         }
     completed = {record["case_id"] for record in payload["records"]}
     cases = benchmark["cases"]
+    from src.agent.graph import run_clinical_agent
+
     for index, case in enumerate(cases, start=1):
         if case["case_id"] in completed:
             print(f"[{index:03d}/100] {case['case_id']} RESUMED")
@@ -808,7 +954,10 @@ async def run_formal_cases(
                 include_generation_diagnostics=False,
             )
             record = _safe_runtime_record(case, result)
+            _validate_pipeline_fingerprints([record])
             status = "OK"
+        except EvaluationBlocked:
+            raise
         except Exception as exc:  # Preserve the failure; never rerun for a prettier output.
             record = {
                 "case_id": case["case_id"],
@@ -838,7 +987,9 @@ async def run_formal_cases(
 
 
 def require_complete_formal_run(raw: dict[str, Any], benchmark_sha256: str) -> None:
+    _validate_resume_identity(raw, benchmark_sha256)
     records = raw.get("records") or []
+    _validate_pipeline_fingerprints(records)
     failures = [record["case_id"] for record in records if record.get("infrastructure_error")]
     if raw.get("benchmark_sha256") != benchmark_sha256 or len(records) != 100 or failures:
         raise EvaluationBlocked(
@@ -852,6 +1003,8 @@ def score_ragchecker(
     adapter: Callable[[list[str]], list[str]],
 ):
     """Use official RAGChecker metrics without changing their semantics."""
+
+    _validate_pipeline_fingerprints(raw.get("records") or [])
 
     from ragchecker import RAGChecker, RAGResult, RAGResults
     from ragchecker.container import RetrievedDoc
@@ -980,6 +1133,38 @@ def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
+def build_baseline_comparison(
+    post_improvement_summary: Iterable[dict[str, Any]],
+    baseline_path: Path = BASELINE_METRICS_SUMMARY_PATH,
+) -> list[dict[str, Any]] | None:
+    """Build a presentation-only baseline comparison from an existing CSV."""
+
+    if not baseline_path.is_file():
+        return None
+    with baseline_path.open(encoding="utf-8-sig", newline="") as handle:
+        baseline = {row["Metric"]: row for row in csv.DictReader(handle)}
+
+    comparison: list[dict[str, Any]] = []
+    for row in post_improvement_summary:
+        metric = str(row["Metric"])
+        baseline_row = baseline.get(metric)
+        if baseline_row is None:
+            raise EvaluationBlocked(f"BASELINE_METRIC_MISSING: {metric}")
+        try:
+            baseline_score = float(baseline_row["Score"])
+            post_score = float(row["Score"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise EvaluationBlocked(f"BASELINE_METRIC_INVALID: {metric}") from exc
+        comparison.append({
+            "Metric": metric,
+            "N": int(row["N cases"]),
+            "Formal Run baseline (%)": baseline_score,
+            "Post-improvement (%)": post_score,
+            "Chênh lệch điểm %": post_score - baseline_score,
+        })
+    return comparison
+
+
 def vietnamese_analysis(summary: Iterable[dict[str, Any]]) -> str:
     values = {row["Metric"]: row["Score"] for row in summary}
     rendered = ", ".join(
@@ -994,6 +1179,8 @@ def vietnamese_analysis(summary: Iterable[dict[str, Any]]) -> str:
 
 
 __all__ = [
+    "BASELINE_METRICS_SUMMARY_PATH",
+    "BASELINE_RESULTS_DIR",
     "BENCHMARK_PATH",
     "CALIBRATION_BLOCKED",
     "CALIBRATION_PATH",
@@ -1003,12 +1190,21 @@ __all__ = [
     "CASE_METRICS_PATH",
     "CHECKING_REASONING_EFFORT",
     "EVALUATOR_MODEL",
+    "EXPECTED_BASE_SHA",
+    "EXPECTED_KB_BUILD_ID",
+    "EXPECTED_PIPELINE_FINGERPRINT",
     "EXTRACTION_REASONING_EFFORT",
     "EvaluationBlocked",
     "MANIFEST_PATH",
     "METRICS_SUMMARY_PATH",
+    "POST_IMPROVEMENT_PATHS",
+    "POST_IMPROVEMENT_RUN_ID",
+    "PRODUCTION_SENSITIVE_PATHS",
     "RAGCHECKER_VERSION",
     "RAW_RESULTS_PATH",
+    "SYSTEM_UNDER_TEST_SHA",
+    "build_baseline_comparison",
+    "build_evaluation_run_paths",
     "build_openai_batch_adapter",
     "canonical_json_bytes",
     "canonical_json_file_sha256",
@@ -1019,12 +1215,14 @@ __all__ = [
     "negative_rejection_rate",
     "require_complete_formal_run",
     "require_researcher_review",
+    "require_run_authorization",
     "run_calibration_once",
     "run_formal_cases",
     "save_calibration_results",
     "score_ragchecker",
     "validate_baseline",
     "validate_benchmark",
+    "validate_system_under_test",
     "vietnamese_analysis",
     "write_pretty_json",
 ]

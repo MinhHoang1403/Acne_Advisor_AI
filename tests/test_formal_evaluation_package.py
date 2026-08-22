@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import csv
 import json
 import subprocess
 import sys
@@ -15,6 +16,7 @@ import evaluation.build_formal_package as package_builder
 import evaluation.formal_evaluation_support as evaluation_support
 from evaluation.create_formal_notebook import build_notebook
 from evaluation.formal_evaluation_support import (
+    BASELINE_RESULTS_DIR,
     BENCHMARK_PATH,
     CALIBRATION_BLOCKED,
     CALIBRATION_PATH,
@@ -24,11 +26,16 @@ from evaluation.formal_evaluation_support import (
     CASE_METRICS_PATH,
     CHECKING_REASONING_EFFORT,
     EVALUATOR_MODEL,
+    EXPECTED_KB_BUILD_ID,
+    EXPECTED_PIPELINE_FINGERPRINT,
     EvaluationBlocked,
     EXTRACTION_REASONING_EFFORT,
     MANIFEST_PATH,
     METRICS_SUMMARY_PATH,
+    POST_IMPROVEMENT_PATHS,
+    POST_IMPROVEMENT_RUN_ID,
     RAW_RESULTS_PATH,
+    SYSTEM_UNDER_TEST_SHA,
     atomic_write_json,
     canonical_json_file_sha256,
     canonical_json_sha256,
@@ -38,16 +45,20 @@ from evaluation.formal_evaluation_support import (
     _ratio_to_percent,
     _validate_aggregate_percent,
     build_openai_batch_adapter,
+    build_baseline_comparison,
+    build_evaluation_run_paths,
     evaluate_calibration_runs,
     export_metrics,
     load_evaluation_artifacts,
     load_json,
     negative_rejection_rate,
+    require_complete_formal_run,
     run_calibration_once,
     run_formal_cases,
     save_calibration_results,
     score_ragchecker,
     validate_benchmark,
+    validate_system_under_test,
     write_pretty_json,
 )
 EXPECTED_CATEGORIES = {
@@ -240,7 +251,9 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert len(code_cells) == 5
     assert all(cell["execution_count"] is None and cell["outputs"] == [] for cell in code_cells)
     all_source = "\n".join("".join(cell["source"]) for cell in notebook["cells"])
-    assert "RESEARCHER_REVIEW_APPROVED = False" in all_source
+    assert "RUN_AUTHORIZED = False" in all_source
+    assert "chỉ cho phép thực hiện lần đánh giá" in all_source
+    assert "không có nghĩa toàn bộ benchmark hoặc calibration" in all_source
     assert "CALIBRATION_BLOCKED" in all_source
     assert "CALIBRATION_REVIEW_REQUIRED" in all_source
     assert CALIBRATION_BLOCKED == "BLOCKED_BY_EVALUATOR_CALIBRATION"
@@ -248,6 +261,13 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert "### Bảng đối chiếu 30 trường hợp thiếu bằng chứng" not in all_source
     assert "evidence_gap_review_rows" not in all_source
     assert "gpt-5.4-mini-2026-03-17" not in all_source  # Imported from the fixed helper contract.
+    assert "Phiên bản hệ thống: {manifest['evaluation_base_sha']}" not in all_source
+    assert "Mốc tham chiếu của bộ đánh giá" in all_source
+    assert "Hệ thống được đánh giá" in all_source
+    assert "Pipeline fingerprint kỳ vọng" in all_source
+    assert "Post-improvement score (%)" in all_source
+    assert "So sánh với Formal Run baseline" in all_source
+    assert "post_improvement_47b10954" not in all_source  # Imported from the fixed helper contract.
     for cell in code_cells:
         compile("".join(cell["source"]), "<notebook-cell>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
 
@@ -265,6 +285,98 @@ def test_formal_outputs_are_not_precreated_or_tracked() -> None:
         text=True,
     ).stdout.strip()
     assert tracked == ""
+
+
+def test_post_improvement_output_paths_are_isolated_from_baseline() -> None:
+    paths = build_evaluation_run_paths(POST_IMPROVEMENT_RUN_ID)
+    writable = {
+        paths.raw_results,
+        paths.case_metrics,
+        paths.metrics_summary,
+        paths.calibration_results,
+        paths.ragchecker_checkpoint,
+    }
+
+    assert paths == POST_IMPROVEMENT_PATHS
+    assert all(path.parent == paths.directory for path in writable)
+    assert paths.directory.parent == BASELINE_RESULTS_DIR.parent
+    assert paths.directory != BASELINE_RESULTS_DIR
+    assert all(BASELINE_RESULTS_DIR not in path.parents for path in writable)
+
+
+@pytest.mark.parametrize(
+    ("production_diff", "should_pass"),
+    [
+        ("", True),
+        ("src/agent/graph.py", False),
+    ],
+)
+def test_system_under_test_validation_blocks_only_production_sensitive_diff(
+    monkeypatch: pytest.MonkeyPatch,
+    production_diff: str,
+    should_pass: bool,
+) -> None:
+    manifest = load_json(MANIFEST_PATH)
+
+    def fake_git(*args: str) -> str:
+        if args[:2] == ("rev-parse", "HEAD"):
+            return "evaluation-only-head"
+        if args[:2] == ("diff", "--name-only"):
+            assert "evaluation" not in args
+            assert "tests" not in args
+            return production_diff
+        raise AssertionError(args)
+
+    monkeypatch.setattr(evaluation_support, "_git", fake_git)
+    monkeypatch.setattr(
+        evaluation_support.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
+    )
+
+    if should_pass:
+        report = validate_system_under_test(manifest)
+        assert report["system_under_test_is_ancestor"] is True
+        assert report["production_diff_after_system_under_test"] == []
+    else:
+        with pytest.raises(EvaluationBlocked, match="System under test"):
+            validate_system_under_test(manifest)
+
+
+def test_system_under_test_validation_fails_when_checkpoint_is_not_ancestor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        evaluation_support,
+        "_git",
+        lambda *args: "head" if args[:2] == ("rev-parse", "HEAD") else "",
+    )
+    monkeypatch.setattr(
+        evaluation_support.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1),
+    )
+
+    with pytest.raises(EvaluationBlocked, match="System under test"):
+        validate_system_under_test(load_json(MANIFEST_PATH))
+
+
+def test_baseline_comparison_reads_csv_and_calculates_descriptive_delta(tmp_path: Path) -> None:
+    baseline = tmp_path / "metrics_summary.csv"
+    with baseline.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["Metric", "N cases", "Score"])
+        writer.writeheader()
+        writer.writerow({"Metric": "Claim Recall", "N cases": 70, "Score": 60.0})
+    post = [{"Metric": "Claim Recall", "N cases": 70, "Score": 62.5}]
+
+    assert build_baseline_comparison(post, baseline) == [{
+        "Metric": "Claim Recall",
+        "N": 70,
+        "Formal Run baseline (%)": 60.0,
+        "Post-improvement (%)": 62.5,
+        "Chênh lệch điểm %": 2.5,
+    }]
+    assert build_baseline_comparison(post, tmp_path / "missing.csv") is None
 
 
 def test_research_json_is_pretty_and_identity_is_format_independent(tmp_path: Path) -> None:
@@ -696,7 +808,7 @@ def test_calibration_result_and_run_metadata_are_auditable(
     payload = save_calibration_results(calibration, first, second, decision)
     run_metadata = evaluation_support._formal_run_metadata(
         allow_model_fallback=True,
-        researcher_review_approved=True,
+        run_authorized=True,
     )
 
     assert load_json(output) == payload
@@ -710,6 +822,11 @@ def test_calibration_result_and_run_metadata_are_auditable(
     assert run_metadata["evaluator_request_configuration"] == expected_request_configuration
     assert {
         "benchmark_sha256",
+        "benchmark_reference_base_sha",
+        "system_under_test_sha",
+        "repository_head_at_run",
+        "expected_pipeline_fingerprint",
+        "run_id",
         "evaluation_base_sha",
         "current_git_head",
         "active_kb_build_id",
@@ -723,7 +840,8 @@ def test_calibration_result_and_run_metadata_are_auditable(
         "observed_production_requested_model_configuration",
         "observed_fallback_model_configuration",
         "allow_model_fallback",
-        "researcher_review_approved",
+        "execution_authorization_state",
+        "run_authorized",
     } <= set(run_metadata)
 
 
@@ -907,6 +1025,7 @@ def test_formal_scoring_keeps_official_ragchecker_metric_requirements(
                 "case_id": "ANS-001",
                 "answer": "Mụn là bệnh viêm.",
                 "packed_contexts": [{"chunk_id": "chunk-1", "text": "Mụn là bệnh viêm."}],
+                "pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
             }],
         },
         adapter,
@@ -916,13 +1035,180 @@ def test_formal_scoring_keeps_official_ragchecker_metric_requirements(
     assert captured["configuration"]["custom_llm_api_func"] is adapter
 
 
+def _patch_formal_run_paths(
+    monkeypatch: pytest.MonkeyPatch, root: Path
+) -> evaluation_support.EvaluationRunPaths:
+    paths = evaluation_support.EvaluationRunPaths(
+        run_id=POST_IMPROVEMENT_RUN_ID,
+        directory=root / POST_IMPROVEMENT_RUN_ID,
+        calibration_results=root / POST_IMPROVEMENT_RUN_ID / "evaluator_calibration_results.json",
+        raw_results=root / POST_IMPROVEMENT_RUN_ID / "raw_results.json",
+        case_metrics=root / POST_IMPROVEMENT_RUN_ID / "case_metrics.csv",
+        metrics_summary=root / POST_IMPROVEMENT_RUN_ID / "metrics_summary.csv",
+        ragchecker_checkpoint=root / POST_IMPROVEMENT_RUN_ID / "ragchecker_checkpoint.json",
+    )
+    monkeypatch.setattr(evaluation_support, "RAW_RESULTS_PATH", paths.raw_results)
+    monkeypatch.setattr(evaluation_support, "CALIBRATION_RESULTS_PATH", paths.calibration_results)
+    monkeypatch.setattr(evaluation_support, "CASE_METRICS_PATH", paths.case_metrics)
+    monkeypatch.setattr(evaluation_support, "METRICS_SUMMARY_PATH", paths.metrics_summary)
+    monkeypatch.setattr(evaluation_support, "RAGCHECKER_CHECKPOINT_PATH", paths.ragchecker_checkpoint)
+    return paths
+
+
+def _synthetic_formal_case() -> dict:
+    return {
+        "case_id": "SYNTHETIC-001",
+        "family": "answerable_single_turn",
+        "category": "synthetic",
+        "query": "Synthetic offline query",
+        "history": [],
+        "expected": {"action": "generate", "reason": None},
+    }
+
+
+def _install_fake_agent(monkeypatch: pytest.MonkeyPatch, agent) -> None:
+    graph_module = ModuleType("src.agent.graph")
+    graph_module.run_clinical_agent = agent
+    monkeypatch.setitem(sys.modules, "src.agent.graph", graph_module)
+
+
+def test_post_improvement_execution_writes_only_to_its_run_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _patch_formal_run_paths(monkeypatch, tmp_path)
+    provider_calls = 0
+
+    async def fake_agent(**_kwargs):
+        nonlocal provider_calls
+        provider_calls += 1
+        return {
+            "answer": "Synthetic answer",
+            "agent_decision": {"action": "generate", "reason_code": None},
+            "pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
+        }
+
+    _install_fake_agent(monkeypatch, fake_agent)
+    benchmark_sha = canonical_json_file_sha256(BENCHMARK_PATH)
+    result = asyncio.run(
+        run_formal_cases(
+            {"cases": [_synthetic_formal_case()]},
+            benchmark_sha,
+            run_authorized=True,
+            calibration_decision={"decision": CALIBRATION_READY},
+        )
+    )
+
+    assert provider_calls == 1  # Fake production adapter only; no model provider was called.
+    assert result["run_id"] == POST_IMPROVEMENT_RUN_ID
+    assert paths.raw_results.is_file()
+    assert not (tmp_path / "formal_run_baseline").exists()
+    assert not (tmp_path / "raw_results.json").exists()
+
+
+def test_same_benchmark_with_old_system_identity_cannot_resume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _patch_formal_run_paths(monkeypatch, tmp_path)
+    paths.directory.mkdir(parents=True)
+    benchmark_sha = canonical_json_file_sha256(BENCHMARK_PATH)
+    atomic_write_json(paths.raw_results, {
+        "run_id": POST_IMPROVEMENT_RUN_ID,
+        "benchmark_sha256": benchmark_sha,
+        "system_under_test_sha": "old-system",
+        "active_kb_build_id": EXPECTED_KB_BUILD_ID,
+        "records": [],
+    })
+
+    with pytest.raises(EvaluationBlocked, match="FORMAL_RUN_IDENTITY_MISMATCH"):
+        asyncio.run(
+            run_formal_cases(
+                {"cases": []},
+                benchmark_sha,
+                run_authorized=True,
+                calibration_decision={"decision": CALIBRATION_READY},
+            )
+        )
+
+
+def test_matching_post_improvement_checkpoint_can_resume_without_rerunning_case(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _patch_formal_run_paths(monkeypatch, tmp_path)
+    paths.directory.mkdir(parents=True)
+    benchmark_sha = canonical_json_file_sha256(BENCHMARK_PATH)
+    case = _synthetic_formal_case()
+    payload = {
+        "run_id": POST_IMPROVEMENT_RUN_ID,
+        "benchmark_sha256": benchmark_sha,
+        "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
+        "active_kb_build_id": EXPECTED_KB_BUILD_ID,
+        "records": [{
+            "case_id": case["case_id"],
+            "case_family": case["family"],
+            "pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
+            "infrastructure_error": None,
+        }],
+    }
+    atomic_write_json(paths.raw_results, payload)
+
+    async def unexpected_agent(**_kwargs):
+        pytest.fail("a completed matching case must not be rerun")
+
+    _install_fake_agent(monkeypatch, unexpected_agent)
+    resumed = asyncio.run(
+        run_formal_cases(
+            {"cases": [case]},
+            benchmark_sha,
+            run_authorized=True,
+            calibration_decision={"decision": CALIBRATION_READY},
+        )
+    )
+
+    assert resumed == payload
+
+
+def test_pipeline_fingerprint_mismatch_blocks_completion_and_scoring(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    benchmark_sha = canonical_json_file_sha256(BENCHMARK_PATH)
+    records = [
+        {
+            "case_id": f"CASE-{index:03d}",
+            "pipeline_fingerprint": (
+                "mixed-fingerprint" if index == 100 else EXPECTED_PIPELINE_FINGERPRINT
+            ),
+            "infrastructure_error": None,
+        }
+        for index in range(1, 101)
+    ]
+    raw = {
+        "run_id": POST_IMPROVEMENT_RUN_ID,
+        "benchmark_sha256": benchmark_sha,
+        "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
+        "active_kb_build_id": EXPECTED_KB_BUILD_ID,
+        "records": records,
+    }
+    provider_calls = 0
+
+    def adapter(_prompts: list[str]) -> list[str]:
+        nonlocal provider_calls
+        provider_calls += 1
+        return []
+
+    with pytest.raises(EvaluationBlocked, match="PIPELINE_FINGERPRINT_MISMATCH"):
+        require_complete_formal_run(raw, benchmark_sha)
+    with pytest.raises(EvaluationBlocked, match="PIPELINE_FINGERPRINT_MISMATCH"):
+        score_ragchecker({"cases": []}, raw, adapter)
+    assert provider_calls == 0
+
+
 def test_formal_runtime_helper_requires_manual_and_calibration_gates() -> None:
-    with pytest.raises(EvaluationBlocked, match="RESEARCHER_REVIEW_REQUIRED"):
+    with pytest.raises(EvaluationBlocked, match="RUN_AUTHORIZATION_REQUIRED"):
         asyncio.run(
             run_formal_cases(
                 {"cases": []},
                 "hash",
-                researcher_review_approved=False,
+                run_authorized=False,
                 calibration_decision=None,
             )
         )
@@ -932,7 +1218,7 @@ def test_formal_runtime_helper_requires_manual_and_calibration_gates() -> None:
             run_formal_cases(
                 {"cases": []},
                 "hash",
-                researcher_review_approved=True,
+                run_authorized=True,
                 calibration_decision={"blocked": True},
             )
         )
@@ -942,7 +1228,7 @@ def test_formal_runtime_helper_requires_manual_and_calibration_gates() -> None:
             run_formal_cases(
                 {"cases": []},
                 "hash",
-                researcher_review_approved=True,
+                run_authorized=True,
                 calibration_decision={"decision": CALIBRATION_REVIEW_REQUIRED},
             )
         )
