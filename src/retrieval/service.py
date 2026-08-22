@@ -1,7 +1,7 @@
-"""Điều phối retrieval evidence bằng Dense, Qdrant-native BM25 và RRF.
+"""Điều phối Dense/BM25, RRF, local reranking và whole-chunk packing.
 
 Data flow của một lần retrieval:
-``query -> Dense và BM25 song song -> RRF -> context packer -> evidence + trace``.
+``query -> Dense và BM25 song song -> RRF -> reranker -> packer -> evidence``.
 Project gửi query tới Gemini để nhận Dense vector; Qdrant thực thi cosine search
 và BM25 search; Python hợp nhất rank và áp resource budget cho context.
 
@@ -12,7 +12,7 @@ truth và không dùng EntityCards hay Neo4j để grounding câu trả lời th
 Điểm thường cần chỉnh sửa:
 - RRF defaults: các hằng số ``RRF_*`` trong module này.
 - Candidate/context/timeout budgets: các biến môi trường đọc trong ``retrieve``.
-- Packing/truncation: ``src/retrieval/context_packer.py``.
+- Whole-chunk packing: ``src/retrieval/context_packer.py``.
 """
 
 from __future__ import annotations
@@ -31,6 +31,12 @@ from src.database.vector_store import QdrantVectorStore, embed_query
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.retrieval.context_packer import pack_context, packed_context_to_response_contexts
 from src.retrieval.contracts import NormalizedQuery, RetrievedCandidate
+from src.retrieval.reranker import (
+    CandidateReranker,
+    CandidateScorer,
+    RerankerSettings,
+    rerank_candidates,
+)
 from src.retrieval.rrf import reciprocal_rank_fusion
 
 logger = logging.getLogger(__name__)
@@ -57,15 +63,33 @@ class RetrieveEvidenceInput(BaseModel):
 
 
 class EvidenceRetriever:
-    """Owner của request-time Dense + BM25 + RRF evidence retrieval.
+    """Owner của request-time hybrid retrieval và bounded context packing.
 
     Instance dùng adapter Qdrant để chạy hai search channel, sau đó trả
-    ``RetrievalResult`` có packed evidence và trace. Class không generate answer,
-    không đánh giá medical truth và không có post-RRF reranker.
+    ``RetrievalResult`` có packed evidence và trace. Class không generate answer
+    hoặc đánh giá medical truth.
     """
 
-    def __init__(self, vector_store: QdrantVectorStore | None = None) -> None:
+    def __init__(
+        self,
+        vector_store: QdrantVectorStore | None = None,
+        *,
+        reranker: CandidateScorer | None = None,
+        reranker_enabled: bool | None = None,
+    ) -> None:
         self._vector_store = vector_store or QdrantVectorStore()
+        settings = RerankerSettings.from_env()
+        enabled = settings.enabled if reranker_enabled is None else reranker_enabled
+        if reranker is not None and reranker_enabled is None:
+            enabled = True
+        self._reranker_settings = RerankerSettings(
+            enabled=enabled,
+            model_name=settings.model_name,
+            device=settings.device,
+            batch_size=settings.batch_size,
+            timeout_seconds=settings.timeout_seconds,
+        )
+        self._reranker = reranker
 
     async def retrieve(
         self,
@@ -129,13 +153,33 @@ class EvidenceRetriever:
             k=rrf_k,
         )
         candidates = [_to_candidate(item, rank) for rank, item in enumerate(fused, 1)]
+        scorer = self._reranker
+        if self._reranker_settings.enabled and scorer is None:
+            scorer = CandidateReranker(self._reranker_settings)
+            self._reranker = scorer
+        rerank_outcome = await rerank_candidates(
+            clean_query,
+            candidates,
+            scorer=scorer,
+            enabled=self._reranker_settings.enabled,
+            configured_model=self._reranker_settings.model_name,
+        )
+        if rerank_outcome.fallback_used:
+            warnings.append(
+                "Local reranker unavailable; exact RRF order was preserved "
+                f"({rerank_outcome.fallback_reason})."
+            )
+            logger.warning(
+                "Local reranker fallback preserved RRF order: %s",
+                rerank_outcome.fallback_reason,
+            )
         normalized = NormalizedQuery(
             original_query=query,
             normalized_text=clean_query,
         )
         packed = pack_context(
             normalized,
-            candidates,
+            rerank_outcome.candidates,
             max_items=context_items,
             max_chars=context_chars,
         )
@@ -158,7 +202,11 @@ class EvidenceRetriever:
             retrieval_status = "no_evidence"
 
         trace = {
-            "architecture": "dense_bm25_rrf",
+            "architecture": (
+                "dense_bm25_rrf_local_reranker"
+                if self._reranker_settings.enabled
+                else "dense_bm25_rrf"
+            ),
             "status": retrieval_status,
             "query": clean_query,
             "channels": {
@@ -172,11 +220,21 @@ class EvidenceRetriever:
                 "formula": "sum(weight / (k + one_indexed_rank))",
             },
             "fused_candidate_count": len(fused),
+            "reranker": {
+                "enabled": rerank_outcome.enabled,
+                "status": rerank_outcome.status,
+                "model": rerank_outcome.model_name,
+                "fallback_used": rerank_outcome.fallback_used,
+                "fallback_reason": rerank_outcome.fallback_reason,
+                "elapsed_ms": rerank_outcome.elapsed_ms,
+                "batch_size": self._reranker_settings.batch_size,
+                "timeout_seconds": self._reranker_settings.timeout_seconds,
+            },
             "selected_ids": [item.item_id for item in packed.items],
             "candidate_trace": {
                 "dense": _channel_candidate_trace(dense_results),
                 "bm25": _channel_candidate_trace(bm25_results),
-                "fused": _fused_candidate_trace(candidates, packed),
+                "fused": _fused_candidate_trace(rerank_outcome.candidates, packed),
             },
             "packer": {
                 "limits": dict(packed.debug.get("limits") or {}),
@@ -195,7 +253,10 @@ class EvidenceRetriever:
                 "retrieval_trace": trace,
                 "packed_context": packed.model_dump(mode="json"),
                 "retrieval_status": retrieval_status,
-                "timings": {"retrieval_total_ms": elapsed_ms},
+                "timings": {
+                    "retrieval_total_ms": elapsed_ms,
+                    "reranker_ms": rerank_outcome.elapsed_ms,
+                },
             },
         )
 
@@ -287,7 +348,10 @@ def _fused_candidate_trace(
             {
                 "candidate_id": candidate.candidate_id,
                 "rank": candidate.rank,
+                "rrf_rank": candidate.rank,
                 "fused_score": candidate.fused_score,
+                "rerank_rank": candidate.rerank_rank,
+                "rerank_score": candidate.rerank_score,
                 "dense_rank": candidate.debug.get("dense_rank"),
                 "bm25_rank": candidate.debug.get("bm25_rank"),
                 "source_id": _source_id(payload),

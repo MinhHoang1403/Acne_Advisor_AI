@@ -24,8 +24,8 @@ def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
     assert len(compute_pipeline_fingerprint(manifest)) == 24
 
 
-def test_manifest_describes_only_the_frozen_runtime_architecture() -> None:
-    manifest = build_pipeline_version_manifest()
+def test_manifest_describes_stage1_retrieval_contract() -> None:
+    manifest = build_pipeline_version_manifest({"RERANKER_ENABLED": "false"})
     serialized = str(manifest).casefold()
 
     assert manifest["architecture_version"] == ARCHITECTURE_VERSION
@@ -36,9 +36,25 @@ def test_manifest_describes_only_the_frozen_runtime_architecture() -> None:
     assert manifest["rrf_dense_weight"] == 1.0
     assert manifest["rrf_bm25_weight"] == 1.0
     assert manifest["max_retrieval_attempts"] == 2
-    assert "rerank" not in serialized
+    assert manifest["reranker"] == {"enabled": False, "model": None}
+    assert manifest["context_packer_version"] == "bounded_whole_chunk_admission"
     assert "candidate_policy" not in serialized
     assert "claim_shadow" not in serialized
+
+
+def test_reranker_configuration_partitions_pipeline_fingerprint() -> None:
+    disabled = build_pipeline_version_manifest({"RERANKER_ENABLED": "false"})
+    enabled = build_pipeline_version_manifest(
+        {"RERANKER_ENABLED": "true", "RERANKER_MODEL": "BAAI/bge-reranker-v2-m3"}
+    )
+    other_model = build_pipeline_version_manifest(
+        {"RERANKER_ENABLED": "true", "RERANKER_MODEL": "local/other-reranker"}
+    )
+
+    assert enabled["retrieval_architecture"] == "dense_bm25_rrf_local_reranker"
+    assert enabled["reranker"]["model"] == "BAAI/bge-reranker-v2-m3"
+    assert compute_pipeline_fingerprint(disabled) != compute_pipeline_fingerprint(enabled)
+    assert compute_pipeline_fingerprint(enabled) != compute_pipeline_fingerprint(other_model)
 
 
 def test_retrieval_limits_partition_cache_identity() -> None:

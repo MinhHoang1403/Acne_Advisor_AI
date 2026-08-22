@@ -119,6 +119,7 @@ def build_observability_event(
         metadata=sanitize_for_observability(
             {
                 "retrieval_status": result.get("retrieval_status", state.get("retrieval_status")),
+                "reranker": _as_dict(retrieval.get("reranker")),
                 "evidence_assessment": assessment,
                 "fallback_applied": result.get("fallback_applied", state.get("fallback_applied")),
                 "fallback_type": result.get("fallback_type", state.get("fallback_type")),

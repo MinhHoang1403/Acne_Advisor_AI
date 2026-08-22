@@ -64,17 +64,73 @@ def test_packer_enforces_explicit_item_and_character_limits() -> None:
         _query(),
         [
             _candidate("chunk-1", "A" * 500, 1),
-            _candidate("chunk-2", "B" * 500, 2),
+            _candidate("chunk-2", "Small evidence", 2),
             _candidate("chunk-3", "C" * 500, 3),
         ],
         max_items=2,
         max_chars=300,
     )
 
-    assert len(packed.items) == 1
+    assert [item.item_id for item in packed.items] == ["chunk-2"]
     assert len(packed.context_text) <= 300
+    assert "A" * 100 not in packed.context_text
     assert packed.debug["limits"] == {"max_items": 2, "max_chars": 300}
     assert any(item["reason"] == "character_limit" for item in packed.debug["dropped"])
+
+
+def test_packer_never_slices_oversized_first_candidate() -> None:
+    oversized = _candidate("oversized", "qualifier " * 100, 1)
+
+    packed = pack_context(_query(), [oversized], max_chars=300)
+
+    assert packed.items == []
+    assert "qualifier" not in packed.context_text
+    assert packed.debug["dropped"] == [
+        {"candidate_id": "oversized", "reason": "character_limit"}
+    ]
+
+
+def test_packer_item_limit_keeps_exact_supplied_order() -> None:
+    candidates = [_candidate(f"chunk-{index}", "short", index) for index in range(1, 11)]
+
+    packed = pack_context(_query(), candidates, max_items=8, max_chars=6000)
+
+    assert [item.item_id for item in packed.items] == [
+        "chunk-1",
+        "chunk-2",
+        "chunk-3",
+        "chunk-4",
+        "chunk-5",
+        "chunk-6",
+        "chunk-7",
+        "chunk-8",
+    ]
+
+
+def test_packer_is_deterministic_for_identical_ordered_input() -> None:
+    candidates = [
+        _candidate("too-large", "X" * 500, 1),
+        _candidate("fits", "Whole evidence", 2),
+    ]
+
+    first = pack_context(_query(), candidates, max_chars=300)
+    second = pack_context(_query(), candidates, max_chars=300)
+
+    assert first.model_dump() == second.model_dump()
+
+
+def test_reranked_direct_evidence_survives_whole_chunk_pack() -> None:
+    direct = _candidate("direct", "Direct supporting evidence", 4)
+    direct.rerank_score = 0.9
+    direct.rerank_rank = 1
+    broad = [_candidate(f"broad-{index}", "B" * 500, index) for index in range(1, 4)]
+
+    packed = pack_context(_query(), [direct, *broad], max_items=1, max_chars=300)
+
+    assert [item.item_id for item in packed.items] == ["direct"]
+    assert packed.items[0].reason == "rerank_rank"
+    assert packed.items[0].rank == 4
+    assert packed.items[0].rerank_rank == 1
 
 
 def test_packer_deduplicates_only_by_stable_candidate_id() -> None:
@@ -95,6 +151,8 @@ def test_response_context_adapter_retains_internal_source_identifiers() -> None:
     assert context["source_path"] == "sample_data/source-a.pdf"
     assert context["context_role"] == "medical_evidence"
     assert context["context_pack_reason"] == "rrf_rank"
+    assert context["rerank_score"] is None
+    assert context["rerank_rank"] is None
 
 
 def test_empty_or_missing_source_text_is_not_prompt_evidence() -> None:

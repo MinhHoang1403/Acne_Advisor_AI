@@ -18,8 +18,14 @@ def test_retrieval_trace_and_packed_context_have_one_obvious_contract() -> None:
     )
     packed = pack_context(query, [candidate])
     trace = {
-        "architecture": "dense_bm25_rrf",
+        "architecture": "dense_bm25_rrf_local_reranker",
         "channels": {"dense": {"count": 1}, "bm25": {"count": 1}},
+        "reranker": {
+            "enabled": True,
+            "status": "succeeded",
+            "model": "fake-reranker",
+            "fallback_used": False,
+        },
         "selected_ids": ["chunk-1"],
         "warnings": [],
         "elapsed_ms": 3.0,
@@ -38,4 +44,4 @@ def test_retrieval_trace_and_packed_context_have_one_obvious_contract() -> None:
     assert event.summary.retrieval_candidates_count == 2
     assert event.summary.packed_context_items_count == 1
     assert event.summary.evidence_usable is True
-    assert "rerank" not in event.model_dump_json().lower()
+    assert event.summary.metadata["reranker"] == trace["reranker"]
