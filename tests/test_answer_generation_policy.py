@@ -63,3 +63,25 @@ def test_system_policy_keeps_cross_drug_claims_local_and_forbids_disclaimer_leak
     assert '"không có vi khuẩn"' in policy
     assert "Nếu các evidence block xung đột" in policy
     assert "Không tự thêm disclaimer boilerplate chung" in policy
+
+
+def test_generation_scope_contract_covers_all_requested_parts_without_broad_expansion() -> None:
+    policy = MEDICAL_RAG_SYSTEM_PROMPT
+    folded = policy.casefold()
+
+    assert "tất cả phần yêu cầu" in policy
+    assert "được EVIDENCE hỗ trợ" in policy
+    assert "phương án điều trị khác" in policy
+    assert "routine chăm sóc da" in policy
+    assert "lối sống" in policy
+    assert "kế hoạch theo dõi" in policy
+    assert "dừng khi nhu cầu thông tin hiện tại đã được đáp ứng đủ" in folded
+    assert "không giới hạn máy móc" in policy
+
+
+def test_generation_scope_allows_necessary_grounded_explanation_and_safety() -> None:
+    policy = MEDICAL_RAG_SYSTEM_PROMPT
+
+    assert "cần thiết để giải thích trực tiếp" in policy
+    assert "cần thiết cho an toàn" in policy
+    assert "không suy đoán" in policy

@@ -28,7 +28,7 @@ from src.agent.semantic_signals import (
 )
 
 SafetySeverity = Literal["policy", "urgent", "emergency"]
-SAFETY_POLICY_VERSION = "source_mapped_safety_policy_locality_contract"
+SAFETY_POLICY_VERSION = "source_mapped_composite_safety_policy"
 
 
 @dataclass(frozen=True)
@@ -214,6 +214,32 @@ def _isotretinoin_neurologic(text: str) -> bool:
     )
 
 
+def _isotretinoin_pregnancy_and_mental_health(text: str) -> bool:
+    return has_local_concept_groups(
+        text,
+        (
+            ("isotretinoin",),
+            (
+                "mang thai",
+                "co thai",
+                "co bau",
+                "thai ky",
+                "pregnancy",
+                "pregnant",
+            ),
+            (
+                "suc khoe tam than",
+                "nguy co tam than",
+                "tam than",
+                "tram cam",
+                "lo au",
+                "mental health",
+                "psychiatric",
+            ),
+        ),
+    )
+
+
 def _prescription_execution(text: str) -> bool:
     return is_prescription_execution_request(text)
 
@@ -287,6 +313,15 @@ SAFETY_RULES: tuple[SafetyRule, ...] = (
         "same_day_urgent_dermatology_referral",
         "**Cần khám khẩn trong ngày**\nMụn bùng phát nặng với tổn thương cục/nang hoặc trợt loét kèm sốt hay đau khớp phù hợp với dấu hiệu cần loại trừ acne fulminans. Hãy đến cơ sở y tế trong ngày để được đánh giá; không tự bắt đầu thuốc kê đơn.",
         ("NICE_NG198_RECOMMENDATION_1_4_1",),
+        ("https://www.nice.org.uk/guidance/ng198/chapter/Recommendations",),
+    ),
+    SafetyRule(
+        "isotretinoin_pregnancy_and_mental_health",
+        "urgent",
+        _isotretinoin_pregnancy_and_mental_health,
+        "avoid_pregnancy_and_monitor_mental_health",
+        "**Cần quản lý cả nguy cơ thai kỳ và sức khỏe tâm thần**\nIsotretinoin có thể gây tổn hại nghiêm trọng cho thai nhi, vì vậy người có khả năng mang thai cần tránh thai và tuân thủ chương trình phòng ngừa thai. Trước và trong điều trị, người dùng cũng cần được tư vấn, đánh giá và theo dõi sức khỏe tâm thần theo hướng dẫn MHRA; hãy báo cho bác sĩ kê đơn nếu có thay đổi đáng lo về tâm trạng hoặc sức khỏe tâm thần.",
+        ("NICE_NG198_RECOMMENDATION_1_5_22",),
         ("https://www.nice.org.uk/guidance/ng198/chapter/Recommendations",),
     ),
     SafetyRule(

@@ -95,6 +95,7 @@ class ClinicalState(TypedDict, total=False):
     prompt_budget: dict[str, Any] | None
     generation_evidence_trace: dict[str, Any] | None
     response_profile: str | None
+    response_contract: str | None
     observability_exported: bool | None
 
 __all__ = ["AgentAction", "ClinicalState"]

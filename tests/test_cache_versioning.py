@@ -147,15 +147,15 @@ def test_changed_semantic_contract_versions_partition_cache_without_v11() -> Non
     assert current["answer_cache_version"] == "v10"
     assert current["answer_formatting_contract_version"] == "answer_formatting_contract_v16"
     assert current["safe_fallback_flow_version"] == "safe_fallback_flow_v4"
-    assert current["agent_decision_version"] == "proposition_grounded_action_decision"
-    assert current["safety_policy_version"] == "source_mapped_safety_policy_locality_contract"
+    assert current["agent_decision_version"] == "direct_evidence_cited_action_decision"
+    assert current["safety_policy_version"] == "source_mapped_composite_safety_policy"
     assert current["answer_validation_version"] == "structural_provenance_locality_validation_v2"
 
 
-def test_legacy_prompt_version_is_promoted_to_v6() -> None:
+def test_legacy_prompt_version_is_promoted_to_requested_scope_contract() -> None:
     manifest = build_pipeline_version_manifest({"PROMPT_VERSION": "medical_prompt_v3"})
 
-    assert manifest["prompt_version"] == "medical_prompt_v6"
+    assert manifest["prompt_version"] == "requested_scope_medical_prompt"
 
 
 def test_changed_runtime_contract_owners_partition_cache_without_answer_version_bump() -> None:

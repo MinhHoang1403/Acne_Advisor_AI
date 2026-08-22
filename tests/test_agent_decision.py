@@ -45,6 +45,7 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
         "retrieval_query": "benzoyl peroxide acne",
         "missing_evidence": None,
         "reason_code": "needs_evidence",
+        "direct_supporting_evidence_ids": None,
     }
     assert result["agent_decision"]["topic_reset_applied"] is False
     assert result["agent_decision"]["validation_changed"] is False
@@ -56,14 +57,21 @@ async def test_agent_chooses_generation_after_evidence(monkeypatch: pytest.Monke
     await _model(
         monkeypatch,
         '{"action":"generate","retrieval_query":null,"missing_evidence":null,'
-        '"reason_code":"evidence_sufficient"}',
+        '"reason_code":"evidence_sufficient",'
+        '"direct_supporting_evidence_ids":["source-evidence"]}',
     )
     result = await select_agent_action(
         {
             "normalized_question": "Mụn đầu đen là gì?",
             "retrieval_attempt": 1,
             "evidence_assessment": {"usable": True},
-            "vector_contexts": [{"text": "source text", "source_file": "source.pdf"}],
+            "vector_contexts": [
+                {
+                    "id": "source-evidence",
+                    "text": "source text",
+                    "source_file": "source.pdf",
+                }
+            ],
             "performance_timings": {"agent_decision_1": 1.25},
         }
     )
@@ -181,6 +189,7 @@ async def test_referral_evidence_remains_visible_for_standalone_and_multiturn_de
                 "retrieval_query": None,
                 "missing_evidence": None,
                 "reason_code": "evidence_sufficient",
+                "direct_supporting_evidence_ids": [f"chunk-{referral_position}"],
             }
         else:
             decision = {
@@ -299,6 +308,7 @@ def test_retrieval_transition_contract_enforces_action_and_budget() -> None:
         retrieval_query=None,
         missing_evidence=None,
         reason_code="evidence_sufficient",
+        direct_supporting_evidence_ids=["evidence-1"],
     )
 
     first = validate_agent_decision(retrieve, {"retrieval_attempt": 0})
@@ -318,7 +328,13 @@ def test_retrieval_transition_contract_enforces_action_and_budget() -> None:
     )
     exhausted_generate = validate_agent_decision(
         generate,
-        {"retrieval_attempt": 2, "evidence_assessment": {"usable": True}},
+        {
+            "retrieval_attempt": 2,
+            "evidence_assessment": {"usable": True},
+            "vector_contexts": [
+                {"id": "evidence-1", "source_id": "guideline", "text": "Supported."}
+            ],
+        },
     )
 
     assert first.action == "retrieve"
@@ -399,6 +415,7 @@ def test_generate_fails_closed_when_missing_evidence_remains() -> None:
         "retrieval_query": None,
         "missing_evidence": None,
         "reason_code": "evidence_gap",
+        "direct_supporting_evidence_ids": None,
     }
 
 
@@ -407,12 +424,16 @@ def test_semantic_gap_choice_remains_with_model_under_structural_validation() ->
         "retrieval_attempt": 1,
         "evidence_assessment": {"usable": True},
         "retry_history": [{"query": "benzoyl peroxide antimicrobial action"}],
+        "vector_contexts": [
+            {"id": "evidence-1", "source_id": "guideline", "text": "Supported."}
+        ],
     }
     supported = AgentDecision(
         action="generate",
         retrieval_query=None,
         missing_evidence=None,
         reason_code="evidence_sufficient",
+        direct_supporting_evidence_ids=["evidence-1"],
     )
     unsupported_aspect = AgentDecision(
         action="retry",
@@ -488,6 +509,7 @@ def test_invalid_action_reason_pairs_fail_closed(
         "retrieval_query": None,
         "missing_evidence": None,
         "reason_code": "evidence_gap",
+        "direct_supporting_evidence_ids": None,
     }
 
 
@@ -513,12 +535,18 @@ def test_action_reason_contract_accepts_only_legal_semantic_pairs(
         "evidence_assessment": {"usable": action in {"retry", "generate"}},
         "retrieval_status": "no_evidence",
         "retry_history": [{"query": "original query"}],
+        "vector_contexts": [
+            {"id": "evidence-1", "source_id": "guideline", "text": "Supported."}
+        ],
     }
     decision = AgentDecision(
         action=action,
         retrieval_query=query,
         missing_evidence=missing_evidence,
         reason_code=reason_code,
+        direct_supporting_evidence_ids=(
+            ["evidence-1"] if action == "generate" else None
+        ),
     )
 
     result = validate_agent_decision(decision, state)
@@ -544,7 +572,7 @@ def test_decision_prompt_encodes_proposition_grounding_and_epistemic_boundaries(
         {"normalized_question": "Benzoyl peroxide có hạn chế kháng thuốc không?"}
     )
 
-    assert "directly supports the requested factual propositions" in system_prompt
+    assert "directly supports the requested factual propositions in full" in system_prompt
     assert "Sharing the same topic" in system_prompt
     assert "is not sufficient by itself" in system_prompt
     assert "Absence of supporting evidence is not evidence that a proposition is false" in system_prompt
@@ -643,7 +671,8 @@ async def test_repeated_referral_turns_do_not_require_safety_abstention_with_val
     await _model(
         monkeypatch,
         '{"action":"generate","retrieval_query":null,"missing_evidence":null,'
-        '"reason_code":"evidence_sufficient"}',
+        '"reason_code":"evidence_sufficient",'
+        '"direct_supporting_evidence_ids":["referral-evidence"]}',
     )
     question = "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
     histories = [

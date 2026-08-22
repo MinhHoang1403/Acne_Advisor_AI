@@ -71,7 +71,9 @@ Notebook được commit với `RUN_AUTHORIZED = False` và `CALIBRATION_REVIEW_
         markdown("## 1. Cấu hình, môi trường và dữ liệu"),
         code(
             """from pathlib import Path
+from contextlib import redirect_stdout
 import importlib.metadata
+import io
 import os
 import sys
 
@@ -152,46 +154,25 @@ if missing:
 benchmark, manifest, calibration = load_evaluation_artifacts()
 system_report = validate_system_under_test(manifest)
 print("✓ Môi trường đánh giá đã sẵn sàng")
-print(f"✓ RAGChecker {RAGCHECKER_VERSION}")
-print("✓ spaCy model en_core_web_sm đã sẵn sàng")
-print("✓ OpenAI API key đã được cấu hình" if os.getenv("OPENAI_API_KEY", "").strip() else "• OpenAI API key chưa được cấu hình")
-print(f"Mốc tham chiếu của bộ đánh giá: {EXPECTED_BASE_SHA}")
-print(f"Hệ thống được đánh giá: {SYSTEM_UNDER_TEST_SHA}")
-print(f"Git HEAD khi chạy: {system_report['repository_head']}")
-print(f"Pipeline fingerprint kỳ vọng: {EXPECTED_PIPELINE_FINGERPRINT}")
-print(f"Kho kiến thức tham chiếu: {EXPECTED_KB_BUILD_ID}")
-print(f"Benchmark SHA: {manifest['benchmark_sha256']}")
+print("✓ Tính toàn vẹn cấu hình đánh giá đã được xác nhận")
 print(f"Evaluator: {EVALUATOR_MODEL}")
-print(f"Thư mục kết quả: {POST_IMPROVEMENT_PATHS.directory.relative_to(ROOT)}")
-print(f"Cho phép model fallback: {ALLOW_MODEL_FALLBACK}")
-print(f"Reranker local được bật theo cấu hình: {os.getenv('RERANKER_ENABLED', 'false')}")
+print(f"RAGChecker: {RAGCHECKER_VERSION}")
+print(f"Production generator: {os.getenv('LLM_PROVIDER', 'gemini')} / {os.getenv('GOOGLE_MODEL', 'gemini-3.5-flash-lite')}")
+print(f"Reranker: {os.getenv('SEMANTIC_RERANK_MODEL_PATH', 'local model')}")
 """
         ),
         markdown("## 2. Kiểm tra bộ dữ liệu đánh giá"),
         code(
             """benchmark_report = validate_benchmark(benchmark, manifest, calibration)
 
-print("✓ Benchmark SHA canonical phù hợp")
-print("✓ Kho kiến thức đang kích hoạt phù hợp")
-print("✓ Mốc hệ thống được đánh giá là ancestor của Git HEAD hiện tại")
-print("✓ Không có thay đổi production-sensitive sau mốc hệ thống được đánh giá")
-print("✓ Các commit chuẩn bị chỉ thuộc lớp evaluation/test")
-print(f"✓ Baseline chỉ đọc: {BASELINE_RESULTS_DIR.relative_to(ROOT)}")
-print(f"✓ Output hiện tại: {POST_IMPROVEMENT_PATHS.directory.relative_to(ROOT)}")
-print("✓ Cấu trúc benchmark hợp lệ")
-print(f"• Tổng số: {benchmark_report['total']}")
-print(f"• Có đáp án tham chiếu: {benchmark_report['answerable']}")
-print(f"• Thiếu bằng chứng: {benchmark_report['evidence_gap']}")
-print(f"• Đơn lượt: {benchmark_report['family_counts']['answerable_single_turn']}")
-print(f"• Đa lượt: {benchmark_report['family_counts']['answerable_multi_turn']}")
-print(f"• Tính toàn vẹn nguồn: {benchmark_report['provenance_reference_integrity']}")
-print(f"• Trạng thái duyệt mệnh đề tham chiếu: {benchmark_report['gold_semantic_source_review']}")
-print(f"• Tìm kiếm ứng viên cho evidence gap: {benchmark_report['evidence_gap_candidate_searches']}")
-print(f"• Kiểm tra calibration: {calibration['counts']['claim_extraction']} extraction + {calibration['counts']['claim_checking']} checking")
+print("✓ Bộ dữ liệu đánh giá hợp lệ")
+print(f"Tổng số tình huống: {benchmark_report['total']}")
+print(f"Có đáp án tham chiếu: {benchmark_report['answerable']}")
+print(f"Thiếu bằng chứng: {benchmark_report['evidence_gap']}")
+print(f"Đơn lượt: {benchmark_report['family_counts']['answerable_single_turn']}")
+print(f"Đa lượt: {benchmark_report['family_counts']['answerable_multi_turn']}")
+print("Tính toàn vẹn benchmark và nguồn tham chiếu: đạt")
 
-category_lines = ["| Nhóm tình huống | Số lượng |", "|---|---:|"]
-category_lines.extend(f"| {name} | {count} |" for name, count in benchmark_report["category_counts"].items())
-display(Markdown("### Phân bố tình huống\\n\\n" + "\\n".join(category_lines)))
 """
         ),
         markdown("## 3. Kiểm tra mô hình chấm điểm"),
@@ -203,8 +184,7 @@ evaluator_adapter = None
 
 saved_calibration = load_saved_calibration_results(calibration)
 if saved_calibration is not None:
-    print("✓ Đã tìm thấy kết quả calibration đã lưu của run hiện tại.")
-    print("Không gọi lại evaluator; sử dụng kết quả đã lưu để tránh chọn lại kết quả ngẫu nhiên.")
+    print("✓ Sử dụng kết quả calibration đã lưu của lần chạy hiện tại")
     calibration_first = saved_calibration["payload"]["run_1"]
     calibration_second = saved_calibration["payload"]["run_2"]
     automatic_calibration_decision = saved_calibration["automatic_decision"]
@@ -243,14 +223,10 @@ if automatic_calibration_decision is not None:
 
     review_evidence = calibration_review_items(calibration, automatic_calibration_decision)
     if review_evidence:
-        print("Calibration cần người nghiên cứu đối chiếu thủ công.")
+        print("Các điểm chưa thống nhất cần người nghiên cứu đối chiếu:")
         for item in review_evidence:
-            print(f"\\nItem ID: {item['item_id']}")
-            print(f"Type: {item['type']}")
-            print(f"Automatic reason: {item['automatic_reasons']}")
-            print(f"Run 1 status/output: {item['run_1_result']}")
-            print(f"Run 2 status/output: {item['run_2_result']}")
-            print(f"Expected/reference information: {item['reference_information']}")
+            reasons = ", ".join(item["automatic_reasons"])
+            print(f"• {item['item_id']} ({item['type']}): {reasons}")
         print(
             "Sau khi đối chiếu, điền từng item vào CALIBRATION_REVIEW_DECISIONS "
             "với giá trị 'approve' hoặc 'reject', rồi Run All lại."
@@ -280,7 +256,7 @@ if automatic_calibration_decision is not None:
             automatic_calibration_decision,
             calibration_resolution,
         )
-        print(f"✓ Đã lưu adjudication riêng tại: {CALIBRATION_ADJUDICATION_PATH}")
+        print("✓ Đã lưu quyết định đối chiếu của người nghiên cứu")
 
     print(f"Automatic calibration decision: {calibration_resolution['automatic_decision']}")
     print(f"Researcher adjudication: {calibration_resolution['researcher_adjudication']}")
@@ -310,26 +286,46 @@ elif (
 ):
     print("Chưa chạy 100 tình huống vì mô hình chấm điểm chưa sẵn sàng.")
 else:
-    raw_results = await run_formal_cases(
-        benchmark,
-        manifest["benchmark_sha256"],
-        run_authorized=RUN_AUTHORIZED,
-        calibration_decision=effective_calibration_decision,
-        allow_model_fallback=ALLOW_MODEL_FALLBACK,
-    )
+    execution_log = io.StringIO()
+    try:
+        with redirect_stdout(execution_log):
+            raw_results = await run_formal_cases(
+                benchmark,
+                manifest["benchmark_sha256"],
+                run_authorized=RUN_AUTHORIZED,
+                calibration_decision=effective_calibration_decision,
+                allow_model_fallback=ALLOW_MODEL_FALLBACK,
+            )
+    except Exception:
+        print(execution_log.getvalue())
+        raise
+
+    infrastructure_failures = [
+        record for record in raw_results["records"] if record.get("infrastructure_error")
+    ]
+    if infrastructure_failures:
+        print("Chi tiết lỗi hạ tầng:")
+        for record in infrastructure_failures:
+            print(f"• {record['case_id']}: {record['infrastructure_error']}")
     require_complete_formal_run(raw_results, manifest["benchmark_sha256"])
+    fallback_cases = sum(
+        bool(record.get("llm_fallback_used")) for record in raw_results["records"]
+    )
+    print(f"Evaluation: {len(raw_results['records'])}/100")
     print("✓ Hoàn tất 100 tình huống")
+    print(f"Provider fallback được dùng: {fallback_cases} tình huống")
+    print(f"Lỗi hạ tầng: {len(infrastructure_failures)}")
 
     if evaluator_adapter is None:
         raise RuntimeError("Evaluator adapter must be available before RAGChecker scoring.")
     rag_results = score_ragchecker(benchmark, raw_results, evaluator_adapter)
-    print("✓ Hoàn tất RAGChecker")
+    print("✓ RAGChecker hoàn tất")
 
     nrr_score, nrr_correct = negative_rejection_rate(raw_results)
-    print(f"✓ Hoàn tất Negative Rejection Rate: {nrr_correct}/30 = {nrr_score:.4f}%")
+    print(f"Negative Rejection Rate: {nrr_correct}/30 = {nrr_score:.4f}%")
 
     case_metric_rows, metric_summary_rows = export_metrics(benchmark, raw_results, rag_results)
-    print("✓ Đã xuất các file kết quả")
+    print("✓ Đã lưu các artifact kết quả")
 """
         ),
         markdown("## 5. Kết quả, phân tích và kết luận"),
@@ -372,30 +368,8 @@ else:
             )
         display(Markdown("### So sánh với Formal Run baseline\\n\\n" + "\\n".join(comparison_lines)))
 
-    print("Các file post-improvement:")
-    for path in (
-        RAW_RESULTS_PATH,
-        CASE_METRICS_PATH,
-        METRICS_SUMMARY_PATH,
-        CALIBRATION_RESULTS_PATH,
-        CALIBRATION_ADJUDICATION_PATH,
-        POST_IMPROVEMENT_PATHS.ragchecker_checkpoint,
-    ):
-        print("•", path)
-    print("Thư mục Formal Run baseline (chỉ đọc):", BASELINE_RESULTS_DIR)
     print("\\nPhân tích:")
     print(vietnamese_analysis(metric_summary_rows))
-    print("\\nKết luận:")
-    print(
-        "Kết quả trên mô tả chất lượng truy hồi, sinh câu trả lời và khả năng từ chối "
-        "khi thiếu bằng chứng trên bộ dữ liệu của nghiên cứu."
-    )
-    print("\\nHạn chế:")
-    print("• Đáp án tham chiếu phản ánh kho kiến thức được sử dụng trong nghiên cứu, không đại diện toàn bộ y văn.")
-    print("• Các trường hợp thiếu bằng chứng chỉ được sử dụng sau khi người nghiên cứu xác nhận kết quả đối chiếu.")
-    print("• RAGChecker sử dụng evaluator LLM nên calibration không loại bỏ hoàn toàn sai số chấm điểm.")
-    print("• NRR là RGB-inspired structured-action adaptation, không phải metric RGB nguyên bản.")
-    print("• Kết quả không phải đánh giá hoặc chứng nhận lâm sàng.")
 """
         ),
     ]

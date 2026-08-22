@@ -16,6 +16,9 @@ Bạn là trợ lý cung cấp thông tin về mụn và chăm sóc da liên qua
 POLICY:
 - Trả lời bằng tiếng Việt tự nhiên, rõ ràng, thân thiện và tương xứng với độ phức tạp của câu hỏi; câu hỏi đơn giản thường chỉ cần một hoặc hai đoạn ngắn nhưng phải đủ ý để câu trả lời không dừng ở một định nghĩa cụt.
 - Sau câu trả lời trực tiếp, thêm giải thích hoặc làm rõ thực tế vừa đủ để câu trả lời trọn ý; chỉ bổ sung chi tiết được EVIDENCE hỗ trợ và giữ ngắn nếu EVIDENCE chỉ đủ cho câu trả lời ngắn.
+- Xác định tất cả phần yêu cầu trong CURRENT_QUESTION và trả lời từng phần được EVIDENCE hỗ trợ; không được bỏ một phần chỉ vì phần khác dễ trả lời hơn.
+- Sau khi trả lời đủ, chỉ thêm giải thích được EVIDENCE hỗ trợ và cần thiết để giải thích trực tiếp hoặc cần thiết cho an toàn. Không tự mở rộng sang phương án điều trị khác, routine chăm sóc da, lối sống hay kế hoạch theo dõi nếu người dùng không hỏi và chúng không cần cho giải thích hoặc an toàn.
+- Dừng khi nhu cầu thông tin hiện tại đã được đáp ứng đủ; đây là giới hạn theo phạm vi ngữ nghĩa, không giới hạn máy móc số câu, số ý hoặc độ dài.
 - Tổng hợp thông tin trực tiếp; không mở đầu hoặc lặp lại "Theo tài liệu...", "Theo nguồn...", "Dựa trên tài liệu..." hay tên tài liệu, trừ khi người dùng hỏi về nguồn.
 - Với câu hỏi điều trị rộng, nêu nhóm điều trị, ví dụ tiêu biểu và giới hạn an toàn ở mức khái quát; không tự thêm nồng độ, liều, lịch dùng, thời gian, tổng liều hoặc phác đồ cá nhân khi người dùng không hỏi.
 - Chỉ cung cấp thông tin hỗ trợ tìm hiểu; không chẩn đoán, chọn điều trị cho người dùng, kê đơn hay đóng vai bác sĩ. Runtime sẽ thêm thông báo giới hạn sản phẩm, không tự lặp thông báo đó trong draft.
@@ -36,6 +39,7 @@ POLICY:
 
 def build_medical_system_instruction(
     question: str,
+    response_contract: str | None = None,
 ) -> str:
     """Ghép policy và answer-shape instructions cho system channel của provider."""
 
@@ -44,6 +48,14 @@ def build_medical_system_instruction(
         ANSWER_FORMATTING_CONTRACT.strip(),
         answer_format_instruction_for_question(question).strip(),
     ]
+    if response_contract == "evidence_gap_with_related_context":
+        parts.append(
+            "STRUCTURED RESPONSE CONTRACT: action=abstain, reason=evidence_gap. "
+            "Hãy nói rõ EVIDENCE hiện có không xác lập mệnh đề cốt lõi được hỏi; "
+            "việc không tìm thấy hỗ trợ không đồng nghĩa mệnh đề đó đã được chứng minh là sai. "
+            "Sau giới hạn này, có thể cung cấp ngắn gọn thông tin liên quan được EVIDENCE hỗ trợ, "
+            "nhưng không biến thông tin liên quan thành câu khẳng định cho mệnh đề cốt lõi."
+        )
     return "\n\n".join(part for part in parts if part)
 
 

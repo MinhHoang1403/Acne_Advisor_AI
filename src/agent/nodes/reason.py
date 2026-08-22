@@ -76,7 +76,10 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             available_sources=source_allowlist,
             packed_context_text=packed_context_text,
         )
-        system_prompt = build_medical_system_instruction(question)
+        system_prompt = build_medical_system_instruction(
+            question,
+            response_contract=state.get("response_contract"),
+        )
         prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         generation_evidence_trace = {

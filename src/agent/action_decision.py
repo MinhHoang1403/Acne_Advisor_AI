@@ -31,7 +31,7 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVAL_ATTEMPTS = 2
-AGENT_DECISION_VERSION = "proposition_grounded_action_decision"
+AGENT_DECISION_VERSION = "direct_evidence_cited_action_decision"
 DECISION_EVIDENCE_MAX_ITEMS = 8
 _EXPLICIT_TOPIC_RESET = re.compile(
     r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b[^.!?;\n]*[.!?;\n]+\s*(?P<question>.+)$",
@@ -67,6 +67,7 @@ class AgentDecision(BaseModel):
     retrieval_query: str | None = None
     missing_evidence: str | None
     reason_code: DecisionReason
+    direct_supporting_evidence_ids: list[str] | None = None
 
 
 def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
@@ -84,7 +85,7 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
     system_prompt = (
         "You are the action selector for a bounded acne-information RAG agent. "
         "Return exactly one JSON object with keys action, retrieval_query, missing_evidence, "
-        "and reason_code. "
+        "reason_code, and direct_supporting_evidence_ids. "
         "Allowed actions are retrieve, retry, generate, abstain. "
         "Allowed reason_code values are needs_evidence, evidence_sufficient, evidence_gap, "
         "out_of_scope, cannot_safely_proceed. Use only these action/reason_code pairs: "
@@ -103,9 +104,12 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
         "improved query targets that gap. Generic text such as 'need more evidence', 'need more "
         "information', 'not enough context', or 'search again' is not a valid missing_evidence. "
         "Choose generate only when the packed evidence directly supports the requested factual "
-        "propositions, including their polarity and material qualifiers. Sharing the same topic, "
+        "propositions in full, including their polarity and material qualifiers. Sharing the same topic, "
         "medication, disease, or guideline is not sufficient by itself. For generate, set "
-        "missing_evidence and retrieval_query to null. Otherwise choose a purposeful retry or "
+        "missing_evidence and retrieval_query to null and set direct_supporting_evidence_ids to "
+        "the non-empty list of evidence IDs that directly establish those propositions. Cite only "
+        "IDs present in evidence_for_relevance_check. For retrieve, retry, and abstain, set "
+        "direct_supporting_evidence_ids to null. Otherwise choose a purposeful retry or "
         "abstain. For abstain, set retrieval_query to null; an evidence_gap abstention may retain "
         "the specific missing_evidence. At the maximum "
         "retrieval attempts, choose only generate with usable evidence or abstain. "
@@ -397,32 +401,59 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
     """Loại action bất khả thi mà không thay model bằng heuristic ngữ nghĩa.
 
     ``retrieve`` chỉ hợp lệ ở lần đầu; các lần lấy evidence tiếp theo phải là
-    ``retry`` với query khác. ``generate`` cần evidence đã qua kiểm tra hiện diện
-    và provenance. Điều này không khẳng định evidence đủ về mặt y khoa: model vẫn
-    chịu trách nhiệm đánh giá mức liên quan trước khi chọn ``generate``.
+    ``retry`` với query khác. ``generate`` cần evidence đã qua kiểm tra hiện diện,
+    provenance và ít nhất một ID mà semantic decision đã xác nhận hỗ trợ trực
+    tiếp. Python kiểm identity; model vẫn sở hữu đánh giá quan hệ ngữ nghĩa.
     """
 
     attempt = int(state.get("retrieval_attempt", 0) or 0)
     has_evidence = bool((state.get("evidence_assessment") or {}).get("usable"))
     query = " ".join(str(decision.retrieval_query or "").split()) or None
     missing_evidence = " ".join(str(decision.missing_evidence or "").split()) or None
+    direct_support_ids = list(
+        dict.fromkeys(
+            str(item).strip()
+            for item in decision.direct_supporting_evidence_ids or []
+            if str(item).strip()
+        )
+    )
 
     if decision.reason_code not in LEGAL_REASONS_BY_ACTION[decision.action]:
         return _invalid_action_abstention()
 
     if decision.action == "abstain":
         return decision.model_copy(
-            update={"retrieval_query": None, "missing_evidence": missing_evidence}
+            update={
+                "retrieval_query": None,
+                "missing_evidence": missing_evidence,
+                "direct_supporting_evidence_ids": None,
+            }
         )
     if decision.action == "generate":
-        if has_evidence and missing_evidence is None:
-            return decision.model_copy(update={"retrieval_query": None, "missing_evidence": None})
+        visible_ids = set(_decision_evidence_view(state)[2]["decision_visible_evidence_ids"])
+        if (
+            has_evidence
+            and missing_evidence is None
+            and direct_support_ids
+            and set(direct_support_ids).issubset(visible_ids)
+        ):
+            return decision.model_copy(
+                update={
+                    "retrieval_query": None,
+                    "missing_evidence": None,
+                    "direct_supporting_evidence_ids": direct_support_ids,
+                }
+            )
         return _invalid_action_abstention()
 
     if decision.action == "retrieve":
         if attempt == 0 and not has_evidence and query and missing_evidence is None:
             return decision.model_copy(
-                update={"retrieval_query": query, "missing_evidence": None}
+                update={
+                    "retrieval_query": query,
+                    "missing_evidence": None,
+                    "direct_supporting_evidence_ids": None,
+                }
             )
         return _invalid_action_abstention()
 
@@ -445,7 +476,11 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
     if not current_key or current_key in previous:
         return _invalid_action_abstention()
     return decision.model_copy(
-        update={"retrieval_query": query, "missing_evidence": missing_evidence}
+        update={
+            "retrieval_query": query,
+            "missing_evidence": missing_evidence,
+            "direct_supporting_evidence_ids": None,
+        }
     )
 
 
