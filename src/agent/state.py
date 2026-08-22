@@ -44,6 +44,7 @@ class ClinicalState(TypedDict, total=False):
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
     packed_context: dict[str, Any] | None
+    retained_retrieval_candidates: list[dict[str, Any]]
     evidence_assessment: dict[str, Any] | None
     retrieval_attempt: int
     retry_history: list[dict[str, Any]]

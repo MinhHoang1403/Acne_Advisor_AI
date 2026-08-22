@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -60,6 +61,9 @@ class RetrievalResult:
 class RetrieveEvidenceInput(BaseModel):
     query: str = Field(min_length=1, max_length=4000)
     top_k: int = Field(default=8, ge=1, le=20)
+    retained_retrieval_candidates: list[dict[str, Any]] = Field(default_factory=list)
+    rerank_query: str | None = Field(default=None, max_length=4000)
+    retrieval_attempt: int = Field(default=1, ge=1, le=2)
 
 
 class EvidenceRetriever:
@@ -98,6 +102,9 @@ class EvidenceRetriever:
         dense_weight: float = RRF_DENSE_WEIGHT,
         sparse_weight: float = RRF_BM25_WEIGHT,
         rrf_k: int = RRF_K,
+        retained_retrieval_candidates: Sequence[RetrievedCandidate | dict[str, Any]] | None = None,
+        rerank_query: str | None = None,
+        retrieval_attempt: int = 1,
         **_: Any,
     ) -> RetrievalResult:
         """Chạy hai channel độc lập, hợp nhất rank và đóng gói source evidence.
@@ -115,6 +122,10 @@ class EvidenceRetriever:
         candidate_limit = _bounded_env("RETRIEVAL_CANDIDATE_LIMIT", 16, 1, 50)
         context_items = min(top_k, _bounded_env("RETRIEVAL_CONTEXT_MAX_ITEMS", 8, 1, 20))
         context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 6000, 512, 20000)
+        retained_candidates = _load_retained_candidates(
+            retained_retrieval_candidates,
+            limit=candidate_limit * 2,
+        )
 
         timeout_seconds = _bounded_float_env("RETRIEVAL_TIMEOUT_SECONDS", 20.0, 0.1, 120.0)
         # Dense và BM25 độc lập nên chạy đồng thời. Mỗi coroutine được bọc bằng
@@ -152,30 +163,41 @@ class EvidenceRetriever:
             sparse_weight=sparse_weight,
             k=rrf_k,
         )
-        candidates = [_to_candidate(item, rank) for rank, item in enumerate(fused, 1)]
+        acquired_candidates = [_to_candidate(item, rank) for rank, item in enumerate(fused, 1)]
+        candidates, duplicate_ids = merge_retrieval_candidates(
+            retained_candidates,
+            acquired_candidates,
+            retrieval_attempt=retrieval_attempt,
+        )
+        effective_rerank_query = " ".join((rerank_query or clean_query).split()) or clean_query
         scorer = self._reranker
         if self._reranker_settings.enabled and scorer is None:
             scorer = CandidateReranker(self._reranker_settings)
             self._reranker = scorer
         rerank_outcome = await rerank_candidates(
-            clean_query,
+            effective_rerank_query,
             candidates,
             scorer=scorer,
             enabled=self._reranker_settings.enabled,
             configured_model=self._reranker_settings.model_name,
         )
         if rerank_outcome.fallback_used:
+            preserved_order = (
+                "exact RRF order"
+                if not retained_candidates
+                else "deterministic within-attempt rank order"
+            )
             warnings.append(
-                "Local reranker unavailable; exact RRF order was preserved "
+                f"Local reranker unavailable; {preserved_order} was preserved "
                 f"({rerank_outcome.fallback_reason})."
             )
             logger.warning(
-                "Local reranker fallback preserved RRF order: %s",
+                "Local reranker fallback preserved deterministic candidate order: %s",
                 rerank_outcome.fallback_reason,
             )
         normalized = NormalizedQuery(
-            original_query=query,
-            normalized_text=clean_query,
+            original_query=rerank_query or query,
+            normalized_text=effective_rerank_query,
         )
         packed = pack_context(
             normalized,
@@ -209,6 +231,7 @@ class EvidenceRetriever:
             ),
             "status": retrieval_status,
             "query": clean_query,
+            "rerank_query": effective_rerank_query,
             "channels": {
                 "dense": {"count": len(dense_results), "error": _error_name(dense_result)},
                 "bm25": {"count": len(bm25_results), "error": _error_name(bm25_result)},
@@ -220,6 +243,7 @@ class EvidenceRetriever:
                 "formula": "sum(weight / (k + one_indexed_rank))",
             },
             "fused_candidate_count": len(fused),
+            "eligible_candidate_count": len(candidates),
             "reranker": {
                 "enabled": rerank_outcome.enabled,
                 "status": rerank_outcome.status,
@@ -235,6 +259,24 @@ class EvidenceRetriever:
                 "dense": _channel_candidate_trace(dense_results),
                 "bm25": _channel_candidate_trace(bm25_results),
                 "fused": _fused_candidate_trace(rerank_outcome.candidates, packed),
+            },
+            "retry_evidence": {
+                "retrieval_attempt": retrieval_attempt,
+                "retained_candidate_ids": [
+                    candidate.candidate_id for candidate in retained_candidates
+                ],
+                "acquired_candidate_ids": [
+                    candidate.candidate_id for candidate in acquired_candidates
+                ],
+                "duplicate_candidate_ids": duplicate_ids,
+                "eligible_candidate_ids": [candidate.candidate_id for candidate in candidates],
+                "reranked_candidate_ids": [
+                    candidate.candidate_id for candidate in rerank_outcome.candidates
+                ],
+                "packed_candidate_ids": [item.item_id for item in packed.items],
+                "fallback_ordering": (
+                    "within_attempt_rank_then_first_seen_attempt_then_candidate_id"
+                ),
             },
             "packer": {
                 "limits": dict(packed.debug.get("limits") or {}),
@@ -253,6 +295,9 @@ class EvidenceRetriever:
                 "retrieval_trace": trace,
                 "packed_context": packed.model_dump(mode="json"),
                 "retrieval_status": retrieval_status,
+                "retained_retrieval_candidates": [
+                    candidate.model_dump(mode="json") for candidate in candidates
+                ],
                 "timings": {
                     "retrieval_total_ms": elapsed_ms,
                     "reranker_ms": rerank_outcome.elapsed_ms,
@@ -276,12 +321,24 @@ class EvidenceRetriever:
 # Đây là evidence tool duy nhất mà Agent gọi. LangChain dùng docstring bên dưới
 # làm tool description, vì vậy nội dung tiếng Anh của docstring được giữ nguyên.
 @tool(args_schema=RetrieveEvidenceInput)
-async def retrieve_evidence(query: str, top_k: int = 8) -> dict[str, Any]:
+async def retrieve_evidence(
+    query: str,
+    top_k: int = 8,
+    retained_retrieval_candidates: list[dict[str, Any]] | None = None,
+    rerank_query: str | None = None,
+    retrieval_attempt: int = 1,
+) -> dict[str, Any]:
     """Retrieve bounded medical source evidence with Dense + BM25 + RRF."""
 
     retriever = EvidenceRetriever()
     try:
-        result = await retriever.retrieve(query, top_k=top_k)
+        result = await retriever.retrieve(
+            query,
+            top_k=top_k,
+            retained_retrieval_candidates=retained_retrieval_candidates,
+            rerank_query=rerank_query,
+            retrieval_attempt=retrieval_attempt,
+        )
         return {
             "vector_contexts": result.vector_contexts,
             "sources": result.sources,
@@ -309,6 +366,128 @@ def _to_candidate(item: dict[str, Any], rank: int) -> RetrievedCandidate:
             "dense_score": item.get("dense_score"),
             "bm25_score": item.get("sparse_score"),
         },
+    )
+
+
+def merge_retrieval_candidates(
+    retained_candidates: Sequence[RetrievedCandidate],
+    acquired_candidates: Sequence[RetrievedCandidate],
+    *,
+    retrieval_attempt: int,
+) -> tuple[list[RetrievedCandidate], list[str]]:
+    """Deduplicate candidates by stable ID and preserve bounded attempt metadata.
+
+    RRF ranks from different queries are not treated as calibrated scores. The
+    pre-reranker order uses only each candidate's within-attempt rank, first-seen
+    attempt, and stable ID so reranker fallback remains deterministic.
+    """
+
+    previous_attempt = max(1, retrieval_attempt - 1)
+    prepared_retained = [
+        _candidate_with_attempt_metadata(candidate, previous_attempt)
+        for candidate in retained_candidates
+    ]
+    prepared_acquired = [
+        _candidate_with_attempt_metadata(candidate, retrieval_attempt)
+        for candidate in acquired_candidates
+    ]
+    merged_by_id: dict[str, RetrievedCandidate] = {}
+    duplicate_ids: list[str] = []
+    for candidate in [*prepared_retained, *prepared_acquired]:
+        existing = merged_by_id.get(candidate.candidate_id)
+        if existing is None:
+            merged_by_id[candidate.candidate_id] = candidate
+            continue
+        merged_by_id[candidate.candidate_id] = existing.model_copy(
+            update={"debug": _merge_candidate_debug(existing.debug, candidate.debug)}
+        )
+        if candidate.candidate_id not in duplicate_ids:
+            duplicate_ids.append(candidate.candidate_id)
+
+    merged = sorted(merged_by_id.values(), key=_cross_attempt_fallback_key)
+    return merged, duplicate_ids
+
+
+def _load_retained_candidates(
+    values: Sequence[RetrievedCandidate | dict[str, Any]] | None,
+    *,
+    limit: int,
+) -> list[RetrievedCandidate]:
+    return [
+        value if isinstance(value, RetrievedCandidate) else RetrievedCandidate.model_validate(value)
+        for value in list(values or [])[:limit]
+    ]
+
+
+def _candidate_with_attempt_metadata(
+    candidate: RetrievedCandidate,
+    retrieval_attempt: int,
+) -> RetrievedCandidate:
+    debug = dict(candidate.debug)
+    seen = {
+        int(value)
+        for value in debug.get("seen_in_attempts", [])
+        if str(value).isdigit()
+    }
+    seen.add(retrieval_attempt)
+    ranks = {
+        str(key): int(value)
+        for key, value in dict(debug.get("rank_by_attempt") or {}).items()
+        if str(value).isdigit()
+    }
+    if candidate.rank is not None:
+        ranks.setdefault(str(retrieval_attempt), candidate.rank)
+    debug.update(
+        {
+            "seen_in_attempts": sorted(seen),
+            "rank_by_attempt": ranks,
+            "first_seen_attempt": min(seen),
+        }
+    )
+    return candidate.model_copy(
+        update={"debug": debug, "rerank_score": None, "rerank_rank": None}
+    )
+
+
+def _merge_candidate_debug(first: dict[str, Any], duplicate: dict[str, Any]) -> dict[str, Any]:
+    debug = dict(first)
+    seen = {
+        int(value)
+        for value in [
+            *first.get("seen_in_attempts", []),
+            *duplicate.get("seen_in_attempts", []),
+        ]
+        if str(value).isdigit()
+    }
+    ranks = {
+        **dict(first.get("rank_by_attempt") or {}),
+        **dict(duplicate.get("rank_by_attempt") or {}),
+    }
+    debug.update(
+        {
+            "seen_in_attempts": sorted(seen),
+            "rank_by_attempt": ranks,
+            "first_seen_attempt": min(seen),
+        }
+    )
+    return debug
+
+
+def _cross_attempt_fallback_key(candidate: RetrievedCandidate) -> tuple[int, int, str]:
+    ranks = [
+        int(value)
+        for value in dict(candidate.debug.get("rank_by_attempt") or {}).values()
+        if str(value).isdigit()
+    ]
+    seen = [
+        int(value)
+        for value in candidate.debug.get("seen_in_attempts", [])
+        if str(value).isdigit()
+    ]
+    return (
+        min(ranks, default=candidate.rank or 1_000_000),
+        min(seen, default=1_000_000),
+        candidate.candidate_id,
     )
 
 
@@ -354,6 +533,8 @@ def _fused_candidate_trace(
                 "rerank_score": candidate.rerank_score,
                 "dense_rank": candidate.debug.get("dense_rank"),
                 "bm25_rank": candidate.debug.get("bm25_rank"),
+                "seen_in_attempts": list(candidate.debug.get("seen_in_attempts") or []),
+                "rank_by_attempt": dict(candidate.debug.get("rank_by_attempt") or {}),
                 "source_id": _source_id(payload),
                 "section": section,
                 "packed": candidate.candidate_id in selected_ids,
@@ -407,4 +588,9 @@ def _bounded_float_env(name: str, default: float, minimum: float, maximum: float
     return min(maximum, max(minimum, value))
 
 
-__all__ = ["EvidenceRetriever", "RetrievalResult", "retrieve_evidence"]
+__all__ = [
+    "EvidenceRetriever",
+    "RetrievalResult",
+    "merge_retrieval_candidates",
+    "retrieve_evidence",
+]

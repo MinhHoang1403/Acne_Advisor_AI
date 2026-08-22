@@ -147,10 +147,20 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         or ""
     ).strip()
     retry_reason = str(decision.get("reason_code") or "needs_evidence")
+    rerank_query = _overall_information_need(state, question, attempt)
+    retained_candidates = list(state.get("retained_retrieval_candidates") or [])
 
     started = time.perf_counter()
     try:
-        payload = await retrieve_evidence.ainvoke({"query": question, "top_k": 8})
+        payload = await retrieve_evidence.ainvoke(
+            {
+                "query": question,
+                "top_k": 8,
+                "retained_retrieval_candidates": retained_candidates,
+                "rerank_query": rerank_query,
+                "retrieval_attempt": attempt,
+            }
+        )
         metadata = payload.get("metadata") or {}
         trace = metadata.get("retrieval_trace") or {}
         status = metadata.get("retrieval_status") or ("ok" if payload.get("vector_contexts") else "no_evidence")
@@ -182,6 +192,9 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "retrieval_error": None,
             "retrieval_trace": trace,
             "packed_context": metadata.get("packed_context"),
+            "retained_retrieval_candidates": metadata.get(
+                "retained_retrieval_candidates", []
+            ),
             "retry_history": [*(state.get("retry_history") or []), history_entry],
             "retrieval_attempt_traces": [
                 *(state.get("retrieval_attempt_traces") or []),
@@ -214,6 +227,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "fallback_reason_code": "retrieval_unavailable",
             "retrieval_trace": {"architecture": "dense_bm25_rrf", "error": error},
             "packed_context": None,
+            "retained_retrieval_candidates": retained_candidates,
             "retry_history": [
                 *(state.get("retry_history") or []),
                 {
@@ -229,6 +243,21 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
                 attempt_trace,
             ],
         }
+
+
+def _overall_information_need(
+    state: ClinicalState,
+    acquisition_query: str,
+    retrieval_attempt: int,
+) -> str:
+    """Use the first self-contained retrieval query to rerank retry evidence."""
+
+    if retrieval_attempt > 1:
+        for entry in state.get("retry_history") or []:
+            query = str(entry.get("query") or "").strip()
+            if query:
+                return query
+    return acquisition_query
 
 
 def _retrieval_attempt_trace(
@@ -251,9 +280,11 @@ def _retrieval_attempt_trace(
         "current_question": str(current_question),
         "retrieval_query": retrieval_query,
         "normalized_retrieval_query": trace.get("query") or retrieval_query,
+        "rerank_query": trace.get("rerank_query") or retrieval_query,
         "status": status,
         "channels": dict(trace.get("channels") or {}),
         "candidate_trace": dict(trace.get("candidate_trace") or {}),
+        "retry_evidence": dict(trace.get("retry_evidence") or {}),
         "packed_evidence": _evidence_identity_trace(packed.get("items") or []),
         "packer": dict(trace.get("packer") or {}),
         "warnings": list(trace.get("warnings") or []),
