@@ -392,6 +392,13 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
     async def fake_fallback(_state: ClinicalState) -> dict:
         return {"draft_answer": "Không đủ bằng chứng nguồn.", "fallback_applied": True}
 
+    async def fake_answer(_state: ClinicalState) -> dict:
+        return {
+            "draft_answer": "Bằng chứng hiện có chưa xác lập yêu cầu cụ thể.",
+            "actual_provider": "test",
+            "actual_model": "answer-model",
+        }
+
     async def fake_finalize(state: ClinicalState) -> dict:
         return {"final_answer": state.get("draft_answer", "")}
 
@@ -406,6 +413,7 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
     monkeypatch.setattr(workflow, "cache_lookup_node", fake_cache_lookup)
     monkeypatch.setattr(workflow, "retrieve_evidence", FakeTool())
     monkeypatch.setattr(workflow, "safe_fallback_node", fake_fallback)
+    monkeypatch.setattr(workflow, "generate_answer_node", fake_answer)
     monkeypatch.setattr(workflow, "finalize_response_node", fake_finalize)
     monkeypatch.setattr(workflow, "answer_quality_node", no_updates)
     monkeypatch.setattr(workflow, "cache_store_node", no_updates)
