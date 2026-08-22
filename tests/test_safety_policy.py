@@ -501,7 +501,7 @@ def test_bleeding_rule_rejects_minor_resolved_hypothetical_or_negated_queries(
 
 def test_rule_inventory_has_unique_ids_and_specific_source_mapping() -> None:
     rules = safety_rule_inventory()
-    assert len(rules) == 9
+    assert len(rules) == 10
     assert len({rule.rule_id for rule in rules}) == len(rules)
     anaphylaxis = next(rule for rule in rules if rule.rule_id == "anaphylaxis_like_emergency")
     neurologic = next(
@@ -659,7 +659,29 @@ async def test_safety_override_precedes_agent_and_is_not_cacheable() -> None:
     assert guarded["safety_override"] is True
     assert guarded["fallback_cache_eligible"] is False
     assert guarded["sources"] == []
+    assert guarded["agent_decision"]["action"] == "generate"
+    assert guarded["agent_decision"]["reason_code"] == "evidence_sufficient"
+    assert guarded["agent_decision_history"][-1]["action"] == "generate"
+    assert guarded["generation_invoked"] is False
     assert (await decide_node(guarded))["next_action"] == "finalize"
+
+
+def test_isotretinoin_combined_safety_need_covers_pregnancy_and_mental_health() -> None:
+    decision = evaluate_safety(
+        "Tôi cần hiểu đồng thời nguy cơ mang thai và sức khỏe tâm thần khi dùng isotretinoin."
+    )
+
+    assert decision is not None
+    assert decision.rule_id == "isotretinoin_pregnancy_and_mental_health"
+    folded = decision.response.casefold()
+    assert "thai" in folded
+    assert "sức khỏe tâm thần" in folded
+    assert "đánh giá" in folded
+    assert "theo dõi" in folded
+
+
+def test_combined_isotretinoin_safety_rule_does_not_capture_ordinary_information() -> None:
+    assert evaluate_safety("Isotretinoin tác động lên tuyến bã như thế nào?") is None
 
 
 @pytest.mark.asyncio

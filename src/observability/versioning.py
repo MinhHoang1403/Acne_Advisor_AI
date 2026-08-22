@@ -16,14 +16,14 @@ from typing import Any, Mapping
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
 DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v4"
-DEFAULT_PROMPT_VERSION = "medical_prompt_v6"
+DEFAULT_PROMPT_VERSION = "requested_scope_medical_prompt"
 DEFAULT_EVIDENCE_GROUNDING_VERSION = "evidence_grounded_runtime_v2"
 DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
 LEGACY_ANSWER_CACHE_VERSIONS = {f"v{version}" for version in range(1, 10)}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
     f"answer_formatting_contract_v{version}" for version in range(1, 16)
 }
-LEGACY_PROMPT_VERSIONS = {f"medical_prompt_v{version}" for version in range(1, 6)}
+LEGACY_PROMPT_VERSIONS = {f"medical_prompt_v{version}" for version in range(1, 7)}
 ARCHITECTURE_VERSION = "minimal_agentic_rag_v1"
 ARCHITECTURE_FROZEN = True
 
@@ -71,7 +71,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
         "retry_evidence_policy": "retain_deduplicate_rerank_repack",
-        "agent_decision_version": "proposition_grounded_action_decision",
+        "agent_decision_version": "direct_evidence_cited_action_decision",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
             value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),
@@ -85,7 +85,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
                 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION,
             )
         ),
-        "safety_policy_version": "source_mapped_safety_policy_locality_contract",
+        "safety_policy_version": "source_mapped_composite_safety_policy",
         "safe_fallback_flow_version": _effective_contract_version(
             value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
             legacy={"safe_fallback_flow_v1", "safe_fallback_flow_v2", "safe_fallback_flow_v3"},

@@ -17,7 +17,11 @@ from src.agent.nodes.observability import observability_export_node
 from src.agent.nodes.quality import answer_quality_node
 from src.agent.nodes.reason import generate_answer_node
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.action_decision import MAX_RETRIEVAL_ATTEMPTS, select_agent_action
+from src.agent.action_decision import (
+    AGENT_DECISION_VERSION,
+    MAX_RETRIEVAL_ATTEMPTS,
+    select_agent_action,
+)
 from src.agent.nodes.preparation import prepare_request_node
 from src.agent.source_presentation import build_source_allowlist
 from src.agent.safety_policy import evaluate_safety
@@ -50,6 +54,20 @@ async def guard_node(state: ClinicalState) -> dict[str, Any]:
     question = state.get("normalized_question") or state.get("user_question") or ""
     safety = evaluate_safety(question)
     if safety is not None:
+        structured_decision = {
+            "version": AGENT_DECISION_VERSION,
+            "action": "generate",
+            "retrieval_query": None,
+            "missing_evidence": None,
+            "reason_code": "evidence_sufficient",
+            "direct_supporting_evidence_ids": list(safety.source_ids),
+            "provider": "system",
+            "model": None,
+            "fallback_used": False,
+            "model_decision": None,
+            "topic_reset_applied": False,
+            "validation_changed": False,
+        }
         updates = {
             "safety_override": True,
             "safety_decision": {
@@ -65,6 +83,20 @@ async def guard_node(state: ClinicalState) -> dict[str, Any]:
             "source_allowlist": [],
             "actual_provider": "system",
             "actual_model": None,
+            "agent_decision": structured_decision,
+            "agent_decision_history": [
+                {
+                    "action": "generate",
+                    "reason_code": "evidence_sufficient",
+                    "retrieval_query": None,
+                    "missing_evidence": None,
+                    "retrieval_executions_used": 0,
+                    "remaining_retrieval_budget": MAX_RETRIEVAL_ATTEMPTS,
+                    "retry_requested": False,
+                    "abstain": False,
+                }
+            ],
+            "generation_invoked": False,
             "fallback_cache_eligible": False,
             "cache_reason": "deterministic_safety_override",
         }
@@ -382,6 +414,31 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
 
     retrieval_error = state.get("retrieval_error")
     decision_reason = str((state.get("agent_decision") or {}).get("reason_code") or "")
+    evidence_usable = bool((state.get("evidence_assessment") or {}).get("usable"))
+    if decision_reason == "evidence_gap" and evidence_usable and not retrieval_error:
+        generated = await generate_answer_node(
+            {**state, "response_contract": "evidence_gap_with_related_context"}
+        )
+        generation_metadata = {
+            "generation_invoked": True,
+            "generation_provider": generated.get("actual_provider"),
+            "generation_model": generated.get("actual_model"),
+        }
+        fallback_decision = await generation_fallback_decision_node({**state, **generated})
+        if not fallback_decision.get("fallback_applied"):
+            return {
+                **generated,
+                **fallback_decision,
+                **generation_metadata,
+                "fallback_cache_eligible": False,
+            }
+        return {
+            **generated,
+            **fallback_decision,
+            **(await safe_fallback_node({**state, **generated, **fallback_decision})),
+            **generation_metadata,
+        }
+
     reason_code = state.get("fallback_reason_code") or (
         "retrieval_unavailable"
         if retrieval_error

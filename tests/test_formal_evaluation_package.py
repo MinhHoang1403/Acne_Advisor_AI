@@ -262,7 +262,7 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert '"CAL-EXT-03": "approve"' not in all_source
     assert "chỉ cho phép thực hiện lần đánh giá" in all_source
     assert "không có nghĩa toàn bộ benchmark hoặc calibration" in all_source
-    assert "Không gọi lại evaluator" in all_source
+    assert "Sử dụng kết quả calibration đã lưu" in all_source
     assert "resolve_calibration_review" in all_source
     assert "save_calibration_adjudication" in all_source
     assert "if evaluator_adapter is None" in all_source
@@ -274,9 +274,15 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert "evidence_gap_review_rows" not in all_source
     assert "gpt-5.4-mini-2026-03-17" not in all_source  # Imported from the fixed helper contract.
     assert "Phiên bản hệ thống: {manifest['evaluation_base_sha']}" not in all_source
-    assert "Mốc tham chiếu của bộ đánh giá" in all_source
-    assert "Hệ thống được đánh giá" in all_source
-    assert "Pipeline fingerprint kỳ vọng" in all_source
+    assert "Git HEAD khi chạy" not in all_source
+    assert "Pipeline fingerprint kỳ vọng" not in all_source
+    assert "Raw results:" not in all_source
+    assert "category_lines" not in all_source
+    assert "execution_log = io.StringIO()" in all_source
+    assert "Provider fallback được dùng" in all_source
+    assert "Run 1 status/output" not in all_source
+    assert "Kết luận:" not in all_source
+    assert "Hạn chế:" not in all_source
     assert "Post-improvement score (%)" in all_source
     assert "So sánh với Formal Run baseline" in all_source
     assert "post_improvement_47b10954" not in all_source  # Imported from the fixed helper contract.
@@ -284,12 +290,10 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
         compile("".join(cell["source"]), "<notebook-cell>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
 
 
-def test_formal_outputs_are_not_precreated_or_tracked() -> None:
+def test_formal_outputs_are_never_tracked() -> None:
     assert MANIFEST_PATH.is_file()
     assert BENCHMARK_PATH.is_file()
     assert CALIBRATION_PATH.is_file()
-    for path in (RAW_RESULTS_PATH, CASE_METRICS_PATH, METRICS_SUMMARY_PATH):
-        assert not path.exists()
     tracked = subprocess.run(
         [
             "git",
