@@ -26,6 +26,39 @@ async def _model(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
     monkeypatch.setattr(decision_module, "generate_llm_response", fake_generate)
 
 
+def _direct_support_fields(
+    evidence_id: str = "evidence-1",
+    requirement: str = "requested acne-information proposition",
+) -> dict[str, object]:
+    return {
+        "direct_supporting_evidence_ids": [evidence_id],
+        "core_requirements_complete": True,
+        "core_requirement_support": [
+            {
+                "requirement": requirement,
+                "support_status": "directly_supported",
+                "evidence_ids": [evidence_id],
+            }
+        ],
+    }
+
+
+def _generate_payload(
+    evidence_id: str = "evidence-1",
+    requirement: str = "requested acne-information proposition",
+) -> str:
+    return json.dumps(
+        {
+            "action": "generate",
+            "retrieval_query": None,
+            "missing_evidence": None,
+            "reason_code": "evidence_sufficient",
+            **_direct_support_fields(evidence_id, requirement),
+        },
+        ensure_ascii=False,
+    )
+
+
 @pytest.mark.asyncio
 async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     await _model(
@@ -46,6 +79,8 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
         "missing_evidence": None,
         "reason_code": "needs_evidence",
         "direct_supporting_evidence_ids": None,
+        "core_requirements_complete": None,
+        "core_requirement_support": None,
     }
     assert result["agent_decision"]["topic_reset_applied"] is False
     assert result["agent_decision"]["validation_changed"] is False
@@ -56,9 +91,7 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
 async def test_agent_chooses_generation_after_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     await _model(
         monkeypatch,
-        '{"action":"generate","retrieval_query":null,"missing_evidence":null,'
-        '"reason_code":"evidence_sufficient",'
-        '"direct_supporting_evidence_ids":["source-evidence"]}',
+        _generate_payload("source-evidence", "definition of blackheads"),
     )
     result = await select_agent_action(
         {
@@ -189,7 +222,10 @@ async def test_referral_evidence_remains_visible_for_standalone_and_multiturn_de
                 "retrieval_query": None,
                 "missing_evidence": None,
                 "reason_code": "evidence_sufficient",
-                "direct_supporting_evidence_ids": [f"chunk-{referral_position}"],
+                **_direct_support_fields(
+                    f"chunk-{referral_position}",
+                    "when acne requires dermatologist evaluation",
+                ),
             }
         else:
             decision = {
@@ -308,7 +344,7 @@ def test_retrieval_transition_contract_enforces_action_and_budget() -> None:
         retrieval_query=None,
         missing_evidence=None,
         reason_code="evidence_sufficient",
-        direct_supporting_evidence_ids=["evidence-1"],
+        **_direct_support_fields(),
     )
 
     first = validate_agent_decision(retrieve, {"retrieval_attempt": 0})
@@ -416,6 +452,8 @@ def test_generate_fails_closed_when_missing_evidence_remains() -> None:
         "missing_evidence": None,
         "reason_code": "evidence_gap",
         "direct_supporting_evidence_ids": None,
+        "core_requirements_complete": None,
+        "core_requirement_support": None,
     }
 
 
@@ -433,7 +471,7 @@ def test_semantic_gap_choice_remains_with_model_under_structural_validation() ->
         retrieval_query=None,
         missing_evidence=None,
         reason_code="evidence_sufficient",
-        direct_supporting_evidence_ids=["evidence-1"],
+        **_direct_support_fields(),
     )
     unsupported_aspect = AgentDecision(
         action="retry",
@@ -510,6 +548,8 @@ def test_invalid_action_reason_pairs_fail_closed(
         "missing_evidence": None,
         "reason_code": "evidence_gap",
         "direct_supporting_evidence_ids": None,
+        "core_requirements_complete": None,
+        "core_requirement_support": None,
     }
 
 
@@ -547,6 +587,12 @@ def test_action_reason_contract_accepts_only_legal_semantic_pairs(
         direct_supporting_evidence_ids=(
             ["evidence-1"] if action == "generate" else None
         ),
+        core_requirements_complete=True if action == "generate" else None,
+        core_requirement_support=(
+            _direct_support_fields()["core_requirement_support"]
+            if action == "generate"
+            else None
+        ),
     )
 
     result = validate_agent_decision(decision, state)
@@ -572,9 +618,12 @@ def test_decision_prompt_encodes_proposition_grounding_and_epistemic_boundaries(
         {"normalized_question": "Benzoyl peroxide có hạn chế kháng thuốc không?"}
     )
 
-    assert "directly supports the requested factual propositions in full" in system_prompt
+    assert "every record is directly_supported" in system_prompt
+    assert "core_requirements_complete" in system_prompt
+    assert "partial_or_related_only" in system_prompt
+    assert "contradicted_or_opposite" in system_prompt
     assert "Sharing the same topic" in system_prompt
-    assert "is not sufficient by itself" in system_prompt
+    assert "is not sufficient" in system_prompt
     assert "Absence of supporting evidence is not evidence that a proposition is false" in system_prompt
     assert "explicitly states that evidence is insufficient" in system_prompt
     assert "runtime merely failed to find support" in system_prompt
@@ -670,9 +719,10 @@ async def test_repeated_referral_turns_do_not_require_safety_abstention_with_val
 ) -> None:
     await _model(
         monkeypatch,
-        '{"action":"generate","retrieval_query":null,"missing_evidence":null,'
-        '"reason_code":"evidence_sufficient",'
-        '"direct_supporting_evidence_ids":["referral-evidence"]}',
+        _generate_payload(
+            "referral-evidence",
+            "when acne requires dermatologist evaluation",
+        ),
     )
     question = "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
     histories = [
