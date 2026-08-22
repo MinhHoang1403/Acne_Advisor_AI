@@ -65,7 +65,7 @@ Kết quả phản ánh hiệu năng của hệ thống trên bộ dữ liệu v
 4. Cho Acne Advisor AI xử lý 100 tình huống.
 5. Tính năm chỉ số và xuất kết quả.
 
-Ở lần kiểm tra đầu tiên, giữ `RESEARCHER_REVIEW_APPROVED = False` và chạy toàn bộ notebook để xem cấu trúc dữ liệu. Chỉ sau khi thực sự hoàn tất việc đối chiếu, người nghiên cứu mới đổi biến này thành `True` rồi chạy lại toàn bộ notebook.
+Notebook được commit với `RUN_AUTHORIZED = False`. `RUN_AUTHORIZED=True` chỉ cho phép thực hiện lần đánh giá trên máy nghiên cứu; giá trị này không có nghĩa toàn bộ benchmark hoặc calibration đã được người nghiên cứu duyệt thủ công. Sau khi hoàn tất, có thể lưu notebook đã chạy làm bằng chứng cục bộ cho báo cáo, nhưng không ghi đè thư mục baseline và không commit trạng thái ủy quyền/output nếu chưa có kế hoạch riêng.
 """
         ),
         markdown("## 1. Cấu hình, môi trường và dữ liệu"),
@@ -78,7 +78,7 @@ import sys
 from IPython.display import Markdown, display
 from dotenv import load_dotenv
 
-RESEARCHER_REVIEW_APPROVED = False
+RUN_AUTHORIZED = False
 ALLOW_MODEL_FALLBACK = True
 
 ROOT = Path.cwd().resolve()
@@ -90,15 +90,22 @@ if str(ROOT) not in sys.path:
 load_dotenv(ROOT / ".env")
 
 from evaluation.formal_evaluation_support import (  # noqa: E402
+    BASELINE_RESULTS_DIR,
     CALIBRATION_BLOCKED,
     CALIBRATION_READY,
     CALIBRATION_RESULTS_PATH,
     CALIBRATION_REVIEW_REQUIRED,
     CASE_METRICS_PATH,
     EVALUATOR_MODEL,
+    EXPECTED_BASE_SHA,
+    EXPECTED_KB_BUILD_ID,
+    EXPECTED_PIPELINE_FINGERPRINT,
     METRICS_SUMMARY_PATH,
+    POST_IMPROVEMENT_PATHS,
     RAW_RESULTS_PATH,
     RAGCHECKER_VERSION,
+    SYSTEM_UNDER_TEST_SHA,
+    build_baseline_comparison,
     build_openai_batch_adapter,
     evaluate_calibration_runs,
     export_metrics,
@@ -109,8 +116,8 @@ from evaluation.formal_evaluation_support import (  # noqa: E402
     run_formal_cases,
     save_calibration_results,
     score_ragchecker,
-    validate_baseline,
     validate_benchmark,
+    validate_system_under_test,
     vietnamese_analysis,
 )
 
@@ -137,22 +144,34 @@ if missing:
     )
 
 benchmark, manifest, calibration = load_evaluation_artifacts()
+system_report = validate_system_under_test(manifest)
 print("✓ Môi trường đánh giá đã sẵn sàng")
 print(f"✓ RAGChecker {RAGCHECKER_VERSION}")
 print("✓ spaCy model en_core_web_sm đã sẵn sàng")
 print("✓ OpenAI API key đã được cấu hình" if os.getenv("OPENAI_API_KEY", "").strip() else "• OpenAI API key chưa được cấu hình")
-print(f"Phiên bản hệ thống: {manifest['evaluation_base_sha']}")
-print(f"Kho kiến thức tham chiếu: {manifest['active_kb_build_id']}")
-print(f"Benchmark: {manifest['benchmark_counts']['total']} tình huống")
+print(f"Mốc tham chiếu của bộ đánh giá: {EXPECTED_BASE_SHA}")
+print(f"Hệ thống được đánh giá: {SYSTEM_UNDER_TEST_SHA}")
+print(f"Git HEAD khi chạy: {system_report['repository_head']}")
+print(f"Pipeline fingerprint kỳ vọng: {EXPECTED_PIPELINE_FINGERPRINT}")
+print(f"Kho kiến thức tham chiếu: {EXPECTED_KB_BUILD_ID}")
+print(f"Benchmark SHA: {manifest['benchmark_sha256']}")
 print(f"Evaluator: {EVALUATOR_MODEL}")
+print(f"Thư mục kết quả: {POST_IMPROVEMENT_PATHS.directory.relative_to(ROOT)}")
+print(f"Cho phép model fallback: {ALLOW_MODEL_FALLBACK}")
+print(f"Reranker local được bật theo cấu hình: {os.getenv('RERANKER_ENABLED', 'false')}")
 """
         ),
         markdown("## 2. Kiểm tra bộ dữ liệu đánh giá"),
         code(
-            """baseline_report = validate_baseline(manifest)
-benchmark_report = validate_benchmark(benchmark, manifest, calibration)
+            """benchmark_report = validate_benchmark(benchmark, manifest, calibration)
 
-print("✓ Baseline và kho kiến thức tham chiếu phù hợp")
+print("✓ Benchmark SHA canonical phù hợp")
+print("✓ Kho kiến thức đang kích hoạt phù hợp")
+print("✓ Mốc hệ thống được đánh giá là ancestor của Git HEAD hiện tại")
+print("✓ Không có thay đổi production-sensitive sau mốc hệ thống được đánh giá")
+print("✓ Các commit chuẩn bị chỉ thuộc lớp evaluation/test")
+print(f"✓ Baseline chỉ đọc: {BASELINE_RESULTS_DIR.relative_to(ROOT)}")
+print(f"✓ Output hiện tại: {POST_IMPROVEMENT_PATHS.directory.relative_to(ROOT)}")
 print("✓ Cấu trúc benchmark hợp lệ")
 print(f"• Tổng số: {benchmark_report['total']}")
 print(f"• Có đáp án tham chiếu: {benchmark_report['answerable']}")
@@ -174,8 +193,8 @@ display(Markdown("### Phân bố tình huống\\n\\n" + "\\n".join(category_line
             """calibration_first = calibration_second = calibration_decision = None
 evaluator_adapter = None
 
-if not RESEARCHER_REVIEW_APPROVED:
-    print("Chưa chạy kiểm tra mô hình chấm điểm vì bộ dữ liệu chưa được người nghiên cứu xác nhận.")
+if not RUN_AUTHORIZED:
+    print("Chưa chạy calibration vì RUN_AUTHORIZED=False.")
 else:
     evaluator_adapter = build_openai_batch_adapter(EVALUATOR_MODEL)
     print("Đang kiểm tra mô hình chấm điểm, lần 1/2...")
@@ -188,6 +207,7 @@ else:
     print(f"• Claim extraction phù hợp: {calibration_decision['claim_extraction_acceptable']}/8")
     print(f"• Claim checking thống nhất: {calibration_decision['claim_checking_agreement']}/12")
     print(f"• Kết quả lặp lại nhất quán: {calibration_decision['repeat_consistency']}/20")
+    print(f"• Decision: {calibration_decision['decision']}")
     if calibration_decision["disagreements"]:
         print("• Các điểm cần người nghiên cứu xem lại:")
         for disagreement in calibration_decision["disagreements"]:
@@ -208,15 +228,15 @@ else:
 case_metric_rows = metric_summary_rows = None
 nrr_score = nrr_correct = None
 
-if not RESEARCHER_REVIEW_APPROVED:
-    print("Chưa chạy 100 tình huống vì bộ dữ liệu chưa được người nghiên cứu xác nhận.")
+if not RUN_AUTHORIZED:
+    print("Chưa chạy 100 tình huống vì RUN_AUTHORIZED=False.")
 elif calibration_decision is None or calibration_decision["decision"] != CALIBRATION_READY:
     print("Chưa chạy 100 tình huống vì mô hình chấm điểm chưa sẵn sàng.")
 else:
     raw_results = await run_formal_cases(
         benchmark,
         manifest["benchmark_sha256"],
-        researcher_review_approved=RESEARCHER_REVIEW_APPROVED,
+        run_authorized=RUN_AUTHORIZED,
         calibration_decision=calibration_decision,
         allow_model_fallback=ALLOW_MODEL_FALLBACK,
     )
@@ -245,16 +265,44 @@ else:
         "Claim F1": "Mức độ câu trả lời bao quát và khớp với đáp án tham chiếu.",
         "Negative Rejection Rate": "Tỷ lệ hệ thống từ chối phù hợp khi kho kiến thức chưa đủ bằng chứng.",
     }
-    result_lines = ["| Metric | N cases | Score (%) | Diễn giải |", "|---|---:|---:|---|"]
+    result_lines = [
+        "| Metric | N cases | Post-improvement score (%) | Diễn giải |",
+        "|---|---:|---:|---|",
+    ]
     for row in metric_summary_rows:
         result_lines.append(
             f"| {row['Metric']} | {row['N cases']} | {row['Score']:.4f} | {explanations[row['Metric']]} |"
         )
-    display(Markdown("### Năm chỉ số đánh giá\\n\\n" + "\\n".join(result_lines)))
+    display(Markdown("### Năm chỉ số đánh giá post-improvement\\n\\n" + "\\n".join(result_lines)))
 
-    print("Các file kết quả:")
-    for path in (RAW_RESULTS_PATH, CASE_METRICS_PATH, METRICS_SUMMARY_PATH, CALIBRATION_RESULTS_PATH):
+    comparison_rows = build_baseline_comparison(metric_summary_rows)
+    if comparison_rows is None:
+        print(
+            "Không tìm thấy metrics_summary.csv của Formal Run baseline trên máy hiện tại; "
+            "bỏ qua bảng so sánh nhưng vẫn hiển thị kết quả post-improvement."
+        )
+    else:
+        comparison_lines = [
+            "| Metric | N | Formal Run baseline (%) | Post-improvement (%) | Chênh lệch điểm % |",
+            "|---|---:|---:|---:|---:|",
+        ]
+        for row in comparison_rows:
+            comparison_lines.append(
+                f"| {row['Metric']} | {row['N']} | {row['Formal Run baseline (%)']:.4f} | "
+                f"{row['Post-improvement (%)']:.4f} | {row['Chênh lệch điểm %']:+.4f} |"
+            )
+        display(Markdown("### So sánh với Formal Run baseline\\n\\n" + "\\n".join(comparison_lines)))
+
+    print("Các file post-improvement:")
+    for path in (
+        RAW_RESULTS_PATH,
+        CASE_METRICS_PATH,
+        METRICS_SUMMARY_PATH,
+        CALIBRATION_RESULTS_PATH,
+        POST_IMPROVEMENT_PATHS.ragchecker_checkpoint,
+    ):
         print("•", path)
+    print("Thư mục Formal Run baseline (chỉ đọc):", BASELINE_RESULTS_DIR)
     print("\\nPhân tích:")
     print(vietnamese_analysis(metric_summary_rows))
     print("\\nKết luận:")
