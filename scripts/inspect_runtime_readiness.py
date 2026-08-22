@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Đọc manifest/services để mô tả knowledge build và runtime capabilities.
 
-Các check Qdrant/Neo4j chỉ đọc count/schema. Capability flags phản ánh kiến trúc
-thực tế: normal retrieval là Dense + BM25 + RRF; entity/graph không tham gia
-runtime answer grounding.
+Các check Qdrant/Neo4j chỉ đọc count/schema. Capability flags phản ánh cấu hình
+thực tế: normal retrieval là Dense + BM25 + RRF và local reranker tùy chọn;
+entity/graph không tham gia runtime answer grounding.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ def inspect_readiness() -> dict[str, Any]:
             "explicit_abstention": True,
             "entity_runtime_retrieval": False,
             "graph_runtime_retrieval": False,
-            "reranker": False,
+            "reranker": bool((manifest.get("reranker") or {}).get("enabled")),
             "candidate_policy": False,
             "evidence_selector": False,
             "claim_shadow_verifier": False,
@@ -160,7 +160,6 @@ def _neo4j_check() -> dict[str, Any]:
 def _architecture_check() -> dict[str, Any]:
     nodes = set(clinical_graph.get_graph().nodes) - {"__start__", "__end__"}
     removed_paths = (
-        "src/retrieval/reranker.py",
         "src/retrieval/candidate_policy.py",
         "src/retrieval/evidence_selector.py",
         "src/retrieval/v5_contracts.py",

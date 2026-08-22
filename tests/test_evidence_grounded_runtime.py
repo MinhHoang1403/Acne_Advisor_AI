@@ -156,9 +156,11 @@ def test_packed_item_and_rendered_evidence_obey_actual_character_limit() -> None
         max_chars=512,
     )
     assert len(packed.context_text) <= 512
-    assert packed.items[0].text in packed.context_text
-    assert len(packed.items[0].text) < 5000
-    assert "content" not in packed.items[0].payload
+    assert packed.items == []
+    assert "x" * 100 not in packed.context_text
+    assert packed.debug["dropped"] == [
+        {"candidate_id": "chunk-1", "reason": "character_limit"}
+    ]
 
 
 @pytest.mark.asyncio

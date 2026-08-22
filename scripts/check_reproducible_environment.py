@@ -37,6 +37,7 @@ IMPORTANT_LOCK_PACKAGES = {
     "qdrant-client",
     "neo4j",
     "redis",
+    "sentence-transformers",
     "sqlalchemy",
     "pytest",
 }
@@ -48,6 +49,7 @@ RUNTIME_IMPORTS = [
     "qdrant_client",
     "neo4j",
     "redis",
+    "sentence_transformers",
     "sqlalchemy",
     "src.agent.llm.provider",
     "src.database.vector_store",

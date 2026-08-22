@@ -135,7 +135,7 @@ def test_fused_candidate_trace_reports_packer_budget_without_reselecting() -> No
     assert trace[0]["packed"] is True
     assert trace[0]["drop_reason"] is None
     assert trace[1]["packed"] is False
-    assert trace[1]["drop_reason"] == "item_limit"
+    assert trace[1]["drop_reason"] is None
     assert trace[1]["cumulative_chars_before"] > 0
     assert trace[1]["remaining_chars_before"] < 1000
 

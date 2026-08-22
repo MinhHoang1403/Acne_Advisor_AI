@@ -46,18 +46,26 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
     def value(name: str, default: Any = "") -> Any:
         return settings[name] if name in settings else os.getenv(name, default)
 
+    reranker_enabled = _env_bool(value("RERANKER_ENABLED", "false"), False)
+    reranker_model = str(value("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3") or "").strip()
     manifest = {
         "phase": "production",
         "architecture_version": ARCHITECTURE_VERSION,
         "architecture_frozen": ARCHITECTURE_FROZEN,
         "orchestrator": "langgraph",
-        "retrieval_architecture": "dense_bm25_rrf",
+        "retrieval_architecture": (
+            "dense_bm25_rrf_local_reranker" if reranker_enabled else "dense_bm25_rrf"
+        ),
         "dense_vector_name": "dense",
         "bm25_vector_name": "bm25",
         "rrf_k": 60,
         "rrf_dense_weight": 1.0,
         "rrf_bm25_weight": 1.0,
-        "context_packer_version": "bounded_provenance_packer_v2",
+        "reranker": {
+            "enabled": reranker_enabled,
+            "model": reranker_model if reranker_enabled else None,
+        },
+        "context_packer_version": "bounded_whole_chunk_admission",
         "retrieval_candidate_limit": _env_int(value("RETRIEVAL_CANDIDATE_LIMIT", "16"), 16),
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
@@ -154,6 +162,7 @@ def pipeline_manifest_summary(manifest: dict[str, Any] | None = None) -> dict[st
         "orchestrator",
         "retrieval_architecture",
         "rrf_k",
+        "reranker",
         "context_packer_version",
         "max_retrieval_attempts",
         "evidence_contract_version",
@@ -208,6 +217,15 @@ def _env_int(value: Any, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _env_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    text = str(value).strip().casefold()
+    if not text:
+        return default
+    return text in {"1", "true", "yes", "on"}
 
 
 def _csv_list(value: Any) -> list[str]:

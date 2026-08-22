@@ -1,12 +1,12 @@
-"""Đóng gói evidence đã qua RRF trong resource budget hữu hạn.
+"""Đóng gói whole-chunk evidence theo supplied relevance order.
 
-Input đã được ``src/retrieval/service.py`` sắp theo fused rank. Packer giữ thứ
-tự đó, loại candidate thiếu identity/text hoặc trùng identity, giới hạn số item
-và tổng ký tự, đồng thời giữ provenance cần cho citation và source allowlist.
+Input đã được ``src/retrieval/service.py`` sắp theo rerank hoặc RRF fallback.
+Packer giữ thứ tự đó, loại candidate thiếu identity/text hoặc trùng identity,
+giới hạn số item và tổng ký tự, đồng thời giữ provenance cho citation.
 
 Module này không rerank, không chọn treatment và không xác minh medical truth.
 Muốn đổi item/character budget hãy bắt đầu từ cấu hình trong retrieval service;
-muốn đổi quy tắc đóng gói hoặc truncation hãy đọc ``pack_context()``.
+muốn đổi quy tắc whole-chunk admission hãy đọc ``pack_context()``.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def pack_context(
     max_items: int = 8,
     max_chars: int = 6000,
 ) -> PackedContext:
-    """Đóng gói candidate theo fused rank mà không đổi thứ tự relevance.
+    """Đóng gói nguyên candidate mà không đổi supplied relevance order.
 
     ``max_items`` và ``max_chars`` là giới hạn tài nguyên, không phải relevance
     heuristic. Mỗi item được chọn vẫn giữ point, chunk, document và source
@@ -37,8 +37,13 @@ def pack_context(
     seen_ids: set[str] = set()
     rendered_chars = 0
 
-    # Duyệt đúng thứ tự RRF. Candidate đầu tiên có thể được cắt để vẫn cung cấp
-    # ít nhất một evidence block; candidate sau không vừa budget sẽ bị bỏ.
+    ordering = (
+        "rerank_rank"
+        if any(item.rerank_rank is not None for item in candidates)
+        else "rrf_rank"
+    )
+    # Không cắt medical evidence vì phần bị cắt có thể chứa qualifier/negation.
+    # Candidate không vừa bị bỏ nguyên khối và scan tiếp để item nhỏ hơn vẫn vào.
     for candidate in candidates:
         candidate_id = candidate.candidate_id.strip()
         text = candidate.text.strip()
@@ -49,8 +54,7 @@ def pack_context(
             dropped.append({"candidate_id": candidate_id, "reason": "duplicate_id"})
             continue
         if len(selected) >= item_limit:
-            dropped.append({"candidate_id": candidate_id, "reason": "item_limit"})
-            continue
+            break
 
         index = len(selected) + 1
         block = _render_block(candidate, index)
@@ -60,17 +64,8 @@ def pack_context(
             dropped.append({"candidate_id": candidate_id, "reason": "character_limit"})
             continue
         if len(block) > remaining:
-            if selected:
-                dropped.append({"candidate_id": candidate_id, "reason": "character_limit"})
-                continue
-            header = _render_header(candidate.payload, candidate.candidate_id, index)
-            text_budget = max(0, remaining - len(header) - 1)
-            text = text[:text_budget].rstrip()
-            if not text:
-                dropped.append({"candidate_id": candidate_id, "reason": "character_limit"})
-                continue
-            block = f"{header}\n{text}"
-            warnings.append("The first evidence item was truncated to the context character limit.")
+            dropped.append({"candidate_id": candidate_id, "reason": "character_limit"})
+            continue
 
         selected.append(
             ContextItem(
@@ -80,9 +75,11 @@ def pack_context(
                 payload=_provenance_payload(candidate.payload),
                 score=candidate.score,
                 fused_score=candidate.fused_score,
+                rerank_score=candidate.rerank_score,
+                rerank_rank=candidate.rerank_rank,
                 rank=candidate.rank,
                 matched_metadata={},
-                reason="rrf_rank",
+                reason=ordering,
             )
         )
         seen_ids.add(candidate_id)
@@ -95,7 +92,7 @@ def pack_context(
         _render_block_from_item(item, index) for index, item in enumerate(selected, 1)
     )
     if len(context_text) > char_limit:
-        context_text = context_text[:char_limit].rstrip()
+        raise AssertionError("Whole-chunk packing exceeded its character limit.")
 
     return PackedContext(
         original_query=normalized_query.original_query,
@@ -107,7 +104,7 @@ def pack_context(
             "limits": {"max_items": item_limit, "max_chars": char_limit},
             "selected_ids": [item.item_id for item in selected],
             "dropped": dropped,
-            "ordering": "rrf_rank",
+            "ordering": ordering,
         },
     )
 
@@ -125,6 +122,8 @@ def packed_context_to_response_contexts(packed_context: PackedContext) -> list[d
                 "content": item.text,
                 "score": item.fused_score if item.fused_score is not None else item.score,
                 "rrf_score": item.fused_score,
+                "rerank_score": item.rerank_score,
+                "rerank_rank": item.rerank_rank,
                 "rank": item.rank,
                 "retrieval_source": "chunk",
                 "context_role": "medical_evidence",
@@ -143,8 +142,10 @@ def _render_block(candidate: RetrievedCandidate, index: int) -> str:
         payload=_provenance_payload(candidate.payload),
         score=candidate.score,
         fused_score=candidate.fused_score,
+        rerank_score=candidate.rerank_score,
+        rerank_rank=candidate.rerank_rank,
         rank=candidate.rank,
-        reason="rrf_rank",
+        reason="rerank_rank" if candidate.rerank_rank is not None else "rrf_rank",
     )
     return _render_block_from_item(item, index)
 

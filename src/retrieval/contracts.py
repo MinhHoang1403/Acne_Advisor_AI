@@ -1,9 +1,8 @@
 """Typed contracts nối query, retrieval candidates và packed context.
 
-``score`` giữ raw channel score, ``fused_score`` giữ RRF score và ``rank`` là vị
-trí sau fusion. Các field này có semantics khác nhau và không được dùng thay thế
-lẫn nhau. Pydantic model descriptions được giữ ngắn vì schema có thể xuất hiện ở
-runtime boundaries.
+``score`` giữ raw channel score, ``fused_score``/``rank`` giữ RRF output và
+``rerank_score``/``rerank_rank`` giữ local cross-encoder ordering. Các field này
+có semantics khác nhau và không được dùng thay thế lẫn nhau.
 """
 
 from __future__ import annotations
@@ -29,6 +28,8 @@ class RetrievedCandidate(BaseModel):
     text: str
     score: float | None = None
     fused_score: float | None = None
+    rerank_score: float | None = None
+    rerank_rank: int | None = None
     payload: dict[str, Any] = Field(default_factory=dict)
     matched_metadata: dict[str, Any] = Field(default_factory=dict)
     rank: int | None = None
@@ -44,6 +45,8 @@ class ContextItem(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     score: float | None = None
     fused_score: float | None = None
+    rerank_score: float | None = None
+    rerank_rank: int | None = None
     rank: int | None = None
     matched_metadata: dict[str, Any] = Field(default_factory=dict)
     reason: str
