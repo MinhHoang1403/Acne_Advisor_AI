@@ -94,6 +94,29 @@ class StaticRetriever(EvidenceRetriever):
         return self.dense[:limit]
 
 
+class FailedAcquisitionStore:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def search_sparse(self, _query: str, top_k: int) -> list[dict[str, Any]]:
+        self.calls += 1
+        raise RuntimeError("sparse unavailable")
+
+    async def close(self) -> None:
+        return None
+
+
+class FailedAcquisitionRetriever(EvidenceRetriever):
+    def __init__(self, scorer: MappingScorer) -> None:
+        self.store = FailedAcquisitionStore()
+        self.dense_calls = 0
+        super().__init__(self.store, reranker=scorer)
+
+    async def _dense_search(self, _query: str, limit: int) -> list[dict[str, Any]]:
+        self.dense_calls += 1
+        raise RuntimeError("dense unavailable")
+
+
 @pytest.mark.asyncio
 async def test_first_attempt_keeps_stage1_rerank_and_pack_order() -> None:
     scorer = MappingScorer({"broad": 0.1, "direct": 0.9})
@@ -152,6 +175,78 @@ async def test_retry_unions_deduplicates_and_reranks_all_candidates() -> None:
     )
     assert duplicate["debug"]["seen_in_attempts"] == [1, 2]
     assert duplicate["payload"]["source_id"] == "source-b"
+
+
+@pytest.mark.asyncio
+async def test_failed_retry_acquisition_reranks_and_repacks_retained_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = await StaticRetriever(
+        [_evidence("a"), _evidence("b")],
+        [],
+        MappingScorer({"a": 0.9, "b": 0.8}),
+    ).retrieve("overall need", top_k=2, retrieval_attempt=1)
+    retry_scorer = MappingScorer({"a": 0.8, "b": 0.9})
+    retry = FailedAcquisitionRetriever(retry_scorer)
+
+    second = await retry.retrieve(
+        "targeted gap",
+        top_k=2,
+        retained_retrieval_candidates=first.metadata["retained_retrieval_candidates"],
+        rerank_query="overall need",
+        retrieval_attempt=2,
+    )
+    assessment = await workflow.assess_evidence_node(
+        {"vector_contexts": second.vector_contexts, "retrieval_attempt": 2}
+    )
+
+    async def generate_from_retained(state):
+        assert state["packed_context"]["context_text"]
+        assert state["evidence_assessment"]["usable"] is True
+        return {
+            "next_action": "generate",
+            "agent_decision": {
+                "action": "generate",
+                "reason_code": "evidence_sufficient",
+                "retrieval_query": None,
+                "missing_evidence": None,
+            },
+            "missing_evidence": None,
+        }
+
+    monkeypatch.setattr(workflow, "select_agent_action", generate_from_retained)
+    decision = await workflow.decide_node(
+        {
+            "retrieval_attempt": 2,
+            "packed_context": second.metadata["packed_context"],
+            "vector_contexts": second.vector_contexts,
+            "evidence_assessment": assessment["evidence_assessment"],
+            "agent_decision_history": [{"action": "retrieve"}, {"action": "retry"}],
+        }
+    )
+
+    assert second.metadata["retrieval_status"] == "degraded_retained"
+    assert [item["id"] for item in second.vector_contexts] == ["b", "a"]
+    assert retry_scorer.calls == [{"query": "overall need", "candidate_ids": ["a", "b"]}]
+    assert retry.dense_calls == 1
+    assert retry.store.calls == 1
+    assert decision["next_action"] == "generate"
+
+
+@pytest.mark.asyncio
+async def test_failed_retry_acquisition_without_retained_evidence_fails_closed() -> None:
+    retry = FailedAcquisitionRetriever(MappingScorer({}))
+
+    with pytest.raises(RuntimeError, match="channel unavailable"):
+        await retry.retrieve(
+            "targeted gap",
+            retained_retrieval_candidates=[],
+            rerank_query="overall need",
+            retrieval_attempt=2,
+        )
+
+    assert retry.dense_calls == 1
+    assert retry.store.calls == 1
 
 
 @pytest.mark.asyncio

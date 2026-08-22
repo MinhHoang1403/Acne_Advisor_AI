@@ -283,6 +283,37 @@ async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: py
 
 
 @pytest.mark.asyncio
+async def test_failed_retry_without_retained_candidates_keeps_fail_closed_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailedTool:
+        @staticmethod
+        async def ainvoke(_payload):
+            raise RuntimeError("retrieval unavailable")
+
+    monkeypatch.setattr(workflow, "retrieve_evidence", FailedTool())
+    result = await workflow.retrieve_node(
+        {
+            "normalized_question": "Overall question",
+            "agent_decision": {
+                "action": "retry",
+                "reason_code": "evidence_gap",
+                "retrieval_query": "targeted missing evidence",
+            },
+            "retrieval_attempt": 1,
+            "retry_history": [{"query": "overall self-contained query"}],
+            "retained_retrieval_candidates": [],
+        }
+    )
+
+    assert result["retrieval_attempt"] == 2
+    assert result["retrieval_status"] == "failed"
+    assert result["vector_contexts"] == []
+    assert result["packed_context"] is None
+    assert result["retained_retrieval_candidates"] == []
+
+
+@pytest.mark.asyncio
 async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.MonkeyPatch) -> None:
     retrieve_calls = 0
 

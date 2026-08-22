@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -46,6 +47,10 @@ RRF_K = 60
 RRF_DENSE_WEIGHT = 1.0
 RRF_BM25_WEIGHT = 1.0
 # Đây là engineering parameters cho rank fusion, không phải confidence threshold.
+
+_process_reranker: CandidateScorer | None = None
+_process_reranker_settings: RerankerSettings | None = None
+_process_reranker_lock = threading.Lock()
 
 
 @dataclass
@@ -152,9 +157,17 @@ class EvidenceRetriever:
         warnings: list[str] = []
         dense_results = _channel_or_warning("dense", dense_result, warnings)
         bm25_results = _channel_or_warning("bm25", bm25_result, warnings)
-        if not dense_results and not bm25_results and (isinstance(dense_result, Exception) or isinstance(bm25_result, Exception)):
+        acquisition_failed = not dense_results and not bm25_results and (
+            isinstance(dense_result, BaseException) or isinstance(bm25_result, BaseException)
+        )
+        retained_recovery = acquisition_failed and bool(retained_candidates)
+        if acquisition_failed and not retained_candidates:
             errors = "; ".join(warnings) or "No retrieval channel returned evidence."
             raise RuntimeError(errors)
+        if retained_recovery:
+            warnings.append(
+                "New acquisition was unavailable; retained candidates were reranked and repacked."
+            )
 
         fused = reciprocal_rank_fusion(
             dense_results,
@@ -172,7 +185,7 @@ class EvidenceRetriever:
         effective_rerank_query = " ".join((rerank_query or clean_query).split()) or clean_query
         scorer = self._reranker
         if self._reranker_settings.enabled and scorer is None:
-            scorer = CandidateReranker(self._reranker_settings)
+            scorer = _get_process_reranker(self._reranker_settings)
             self._reranker = scorer
         rerank_outcome = await rerank_candidates(
             effective_rerank_query,
@@ -212,7 +225,9 @@ class EvidenceRetriever:
         bm25_failed = isinstance(bm25_result, BaseException)
         # Status phân biệt evidence đầy đủ, degraded theo channel, không có
         # candidate hợp lệ, và lỗi có thể retry khi không channel nào sống sót.
-        if contexts and dense_failed:
+        if contexts and retained_recovery:
+            retrieval_status = "degraded_retained"
+        elif contexts and dense_failed:
             retrieval_status = "degraded_dense"
         elif contexts and bm25_failed:
             retrieval_status = "degraded_bm25"
@@ -346,6 +361,17 @@ async def retrieve_evidence(
         }
     finally:
         await retriever.close()
+
+
+def _get_process_reranker(settings: RerankerSettings) -> CandidateScorer:
+    """Return one lazy local reranker for the active process configuration."""
+
+    global _process_reranker, _process_reranker_settings
+    with _process_reranker_lock:
+        if _process_reranker is None or _process_reranker_settings != settings:
+            _process_reranker = CandidateReranker(settings)
+            _process_reranker_settings = settings
+        return _process_reranker
 
 
 def _to_candidate(item: dict[str, Any], rank: int) -> RetrievedCandidate:
