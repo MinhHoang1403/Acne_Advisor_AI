@@ -1,0 +1,395 @@
+{
+  "baseline_comparison_policy": {
+    "description": "The prior 10 percentage-point comparison rule is descriptive project audit policy only.",
+    "scientific_cutoff": false,
+    "used_for_root_cause": false
+  },
+  "case_counts": {
+    "answerable": 70,
+    "evidence_gap": 30,
+    "rows": 100,
+    "unique_ids": 100
+  },
+  "confirmed_fix_candidates": [
+    {
+      "affected_cases": [
+        "GAP-ABS-001",
+        "GAP-ABS-002",
+        "GAP-ABS-003",
+        "GAP-ABS-004",
+        "GAP-ABS-005",
+        "GAP-ABS-006",
+        "GAP-ABS-007",
+        "GAP-ABS-008",
+        "GAP-ABS-009",
+        "GAP-ABS-010",
+        "GAP-EXA-005",
+        "GAP-REL-002",
+        "GAP-REL-005",
+        "GAP-REL-010"
+      ],
+      "evidence": "All 14 failed evidence-gap answers reject the unsupported core while structured state generates; saved assessment marks topic evidence usable.",
+      "generalization_reason": "The contract concerns proposition scope rather than benchmark wording and can be tested with synthetic guarantee, exact-value and exact-comparison requests.",
+      "name": "Exact-proposition evidence action boundary",
+      "production_change_justified": true,
+      "severity": "HIGH",
+      "validated_root_cause": "Topic-relevant evidence is treated as sufficient for an unsupported exact proposition, producing generate/evidence_sufficient after the answer text rejects the proposition."
+    },
+    {
+      "affected_cases": [
+        "ANS-MUL-010"
+      ],
+      "evidence": "The saved record has no retrieval, empty decision history, null action/reason and a pregnancy-only answer to a pregnancy-and-mental-risk request.",
+      "generalization_reason": "All deterministic safety responses should preserve a complete structured contract independent of a specific medicine or benchmark case.",
+      "name": "Safety response structured-state completeness",
+      "production_change_justified": true,
+      "severity": "HIGH",
+      "validated_root_cause": "An appropriate deterministic safety route returns an answer without action/reason and omits part of the requested risk scope."
+    }
+  ],
+  "confirmed_system_defects": {
+    "SYSTEM_BUG_ACTION_FALSE_GENERATE_GAP": 14,
+    "SYSTEM_BUG_GENERATION_OMISSION": 1,
+    "SYSTEM_BUG_GENERATION_OVER_ANSWERING": 2,
+    "SYSTEM_BUG_MULTI_TURN_CONTEXT": 1,
+    "SYSTEM_BUG_PACKER_SELECTION": 9,
+    "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE": 9,
+    "SYSTEM_BUG_SAFETY_SHORT_CIRCUIT": 1,
+    "SYSTEM_BUG_UNSUPPORTED_GENERATION": 1
+  },
+  "corrected_original_findings": [
+    {
+      "case_id": "ANS-DEF-001",
+      "original": "SYSTEM_BUG_GENERATION_OVER_ANSWERING",
+      "reason": "Extra claims are relevant supported explanation or narrow-gold effects, not proven material over-answering.",
+      "validated": "EXPECTED_METRIC_BEHAVIOR"
+    },
+    {
+      "case_id": "ANS-DEF-002",
+      "original": "SYSTEM_BUG_GENERATION_OMISSION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-TRT-004",
+      "original": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-TRT-006",
+      "original": "SYSTEM_BUG_GENERATION_OMISSION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-TRT-012",
+      "original": "SYSTEM_BUG_GENERATION_OVER_ANSWERING",
+      "reason": "Extra claims are relevant supported explanation or narrow-gold effects, not proven material over-answering.",
+      "validated": "EXPECTED_METRIC_BEHAVIOR"
+    },
+    {
+      "case_id": "ANS-MEC-002",
+      "original": "SYSTEM_BUG_GENERATION_OVER_ANSWERING",
+      "reason": "Extra claims are relevant supported explanation or narrow-gold effects, not proven material over-answering.",
+      "validated": "EXPECTED_METRIC_BEHAVIOR"
+    },
+    {
+      "case_id": "ANS-MEC-005",
+      "original": "SYSTEM_BUG_GENERATION_OVER_ANSWERING",
+      "reason": "Extra claims are relevant supported explanation or narrow-gold effects, not proven material over-answering.",
+      "validated": "EXPECTED_METRIC_BEHAVIOR"
+    },
+    {
+      "case_id": "ANS-MEC-007",
+      "original": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-ADV-002",
+      "original": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-ADV-005",
+      "original": "SYSTEM_BUG_PACKER_SELECTION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-ADV-007",
+      "original": "SYSTEM_BUG_GENERATION_OMISSION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-CMP-001",
+      "original": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-CMP-006",
+      "original": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-CMP-008",
+      "original": "SYSTEM_BUG_PACKER_SELECTION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-REF-006",
+      "original": "SYSTEM_BUG_GENERATION_OVER_ANSWERING",
+      "reason": "Extra claims are relevant supported explanation or narrow-gold effects, not proven material over-answering.",
+      "validated": "EXPECTED_METRIC_BEHAVIOR"
+    },
+    {
+      "case_id": "ANS-MUL-001",
+      "original": "SYSTEM_BUG_GENERATION_OMISSION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-MUL-003",
+      "original": "SYSTEM_BUG_PACKER_SELECTION",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-MUL-006",
+      "original": "SYSTEM_BUG_MULTI_TURN_CONTEXT",
+      "reason": "Semantic review found complete support/answer coverage; the original heuristic classification is corrected.",
+      "validated": "PASS"
+    },
+    {
+      "case_id": "ANS-MUL-008",
+      "original": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE",
+      "reason": "Semantic support reaches the pack, but the response omits a required claim.",
+      "validated": "SYSTEM_BUG_GENERATION_OMISSION"
+    },
+    {
+      "case_id": "ANS-MUL-009",
+      "original": "SYSTEM_BUG_MULTI_TURN_CONTEXT",
+      "reason": "Standalone query is correct; semantic evidence is missing upstream, so the prior multi-turn label is corrected.",
+      "validated": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE"
+    },
+    {
+      "case_id": "ANS-MUL-012",
+      "original": "SYSTEM_BUG_MULTI_TURN_CONTEXT",
+      "reason": "Standalone query is correct; semantic evidence is missing upstream, so the prior multi-turn label is corrected.",
+      "validated": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE"
+    },
+    {
+      "case_id": "ANS-MUL-015",
+      "original": "SYSTEM_BUG_MULTI_TURN_CONTEXT",
+      "reason": "Standalone query is correct; semantic evidence is missing upstream, so the prior multi-turn label is corrected.",
+      "validated": "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE"
+    }
+  ],
+  "deferred_or_not_proven_candidates": [
+    "Pack size 8 is intrinsically wrong: NOT_PROVEN.",
+    "Retry causes worse answers: CAUSAL_EFFECT_NOT_PROVEN.",
+    "The local reranker should be replaced: NOT_PROVEN.",
+    "A single retrieval or packing change explains all semantic misses: NOT_PROVEN."
+  ],
+  "evaluator_validation": {
+    "confirmed_evaluator_anomalies": [],
+    "note": "Low or surprising saved labels were not treated as evaluator defects without a direct semantic contradiction.",
+    "status": "NO_EVALUATOR_ANOMALY_PROVEN"
+  },
+  "generation_validation": {
+    "confirmed_omissions": [
+      "ANS-MUL-008"
+    ],
+    "confirmed_over_answering": [
+      "ANS-DEF-007",
+      "ANS-TRT-005"
+    ],
+    "confirmed_unsupported": [
+      "ANS-ADV-003"
+    ],
+    "expected_scope_or_granularity": [
+      "ANS-DEF-001",
+      "ANS-TRT-012",
+      "ANS-MEC-002",
+      "ANS-MEC-004",
+      "ANS-MEC-005",
+      "ANS-REF-002",
+      "ANS-REF-006"
+    ]
+  },
+  "multi_turn_validation": {
+    "case_count": 15,
+    "confirmed_multi_turn_context_defects": 1,
+    "generation_defects": 1,
+    "no_material_defect": 6,
+    "not_proven_defects": 0,
+    "packing_defects": 3,
+    "retrieval_defects": 3,
+    "safety_structured_action_defects": 1
+  },
+  "not_proven_original_findings": [],
+  "nrr_validated_breakdown": {
+    "behavior_types": {
+      "A": 0,
+      "B": 2,
+      "C": 12,
+      "D": 0,
+      "E": 0
+    },
+    "failures": 14,
+    "natural_language_rejects_core": 14,
+    "structured_false_generates": 14,
+    "successes": 16
+  },
+  "original_classification_counts": {
+    "EXPECTED_METRIC_BEHAVIOR": 2,
+    "PASS": 42,
+    "SYSTEM_BUG_ACTION_FALSE_GENERATE_GAP": 14,
+    "SYSTEM_BUG_GENERATION_OMISSION": 4,
+    "SYSTEM_BUG_GENERATION_OVER_ANSWERING": 7,
+    "SYSTEM_BUG_MULTI_TURN_CONTEXT": 5,
+    "SYSTEM_BUG_PACKER_SELECTION": 12,
+    "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE": 12,
+    "SYSTEM_BUG_SAFETY_SHORT_CIRCUIT": 1,
+    "SYSTEM_BUG_UNSUPPORTED_GENERATION": 1
+  },
+  "packing_semantic_validation": {
+    "case_ids": [
+      "ANS-TRT-001",
+      "ANS-TRT-008",
+      "ANS-TRT-009",
+      "ANS-MEC-008",
+      "ANS-CMP-004",
+      "ANS-REF-004",
+      "ANS-MUL-004",
+      "ANS-MUL-005",
+      "ANS-MUL-011"
+    ],
+    "confirmed_semantic_count": 9,
+    "exact_provenance_only_corrected_count": 3,
+    "not_proven_count": 0,
+    "original_count": 12,
+    "validated_total": 9
+  },
+  "recommended_production_scope": {
+    "decision": "AUDIT_VALIDATION_SUPPORTS_TARGETED_PRODUCTION_CHANGES",
+    "defer": [
+      "Retrieval/reranker/packer retuning without a more localized cause",
+      "Retry policy changes without counterfactual evidence",
+      "Broad generation prompt changes"
+    ],
+    "include": [
+      "Exact-proposition evidence sufficiency and structured action alignment",
+      "Structured action/reason completeness for deterministic safety responses"
+    ]
+  },
+  "reranker_validation": {
+    "conclusion": "RERANKER_RUNTIME_FAILURE_NOT_SUPPORTED",
+    "fallback_or_failure": 0,
+    "saved_final_traces": 96,
+    "succeeded": 96
+  },
+  "retrieval_semantic_validation": {
+    "case_ids": [
+      "ANS-DEF-004",
+      "ANS-DEF-010",
+      "ANS-TRT-011",
+      "ANS-CMP-009",
+      "ANS-CMP-010",
+      "ANS-REF-003",
+      "ANS-MUL-009",
+      "ANS-MUL-012",
+      "ANS-MUL-015"
+    ],
+    "corrected_to_generation_count": 1,
+    "exact_provenance_only_corrected_count": 5,
+    "newly_identified_from_multi_turn_review": 3,
+    "not_proven_count": 0,
+    "original_confirmed_semantic_count": 6,
+    "original_count": 12,
+    "validated_total": 9
+  },
+  "retry_validation": {
+    "causal_effect": "CAUSAL_EFFECT_NOT_PROVEN",
+    "observed_final_correct": 2,
+    "observed_final_incorrect": 4,
+    "observed_retries": 6,
+    "reason": "The saved run has no clean no-retry counterfactual for those cases."
+  },
+  "safety_validation": {
+    "normal_retrieval_executed": false,
+    "requested_scope_complete": false,
+    "routing_appropriate": true,
+    "structured_state_missing": [
+      "ANS-MUL-010"
+    ]
+  },
+  "source_integrity": {
+    "artifact_count": 19,
+    "post_hashes": {
+      "evaluation/audits/post_improvement_47b10954/case_forensic_audit.csv": "f6752d9bd5c6d5b78fb9e119358bdf6bc152d3589a1da7e43e19df9ac80c76be",
+      "evaluation/audits/post_improvement_47b10954/forensic_analysis.py": "6d7ad5ea5b43f137f8d17dc3e9db71cc1ecfad9aaa14dc39b78e383cd5c6c3e6",
+      "evaluation/audits/post_improvement_47b10954/forensic_audit.md": "81937359caa637d70389749143cfd746f8805fcfec61cd328bd012dd70f242ab",
+      "evaluation/audits/post_improvement_47b10954/forensic_summary.json": "74780f35269fde01b23dc98382194792d2e1a9739b5bc04d0eb271894e921b08",
+      "evaluation/benchmark_100.json": "ad42fbc333adcd70c265b8873d0e241e5401224d1cf9f3e7faa08adf1001773f",
+      "evaluation/benchmark_manifest.json": "d67fb1419d3237643816be7ca342efef6ba6a33833f6ea0a8db4e0f558a69a98",
+      "evaluation/evaluator_calibration.json": "1eb50921c25512404451ed97bad1cf31a151d19a84d946895fa7bd5dc67773dd",
+      "evaluation/formal_evaluation.ipynb": "14deaa1cf16babf18af7272cb0166d50603eec31b01913e2979c0c6b11d1abd2",
+      "evaluation/results/formal_run_baseline/case_metrics.csv": "6a6b07db0cb227c43917aef5df15f0d09ada7e58599d91ff4ac61538fd6050c4",
+      "evaluation/results/formal_run_baseline/evaluator_calibration_results.json": "4000ad61b71d6be0cb981ff83faf1292f037dc1b05e75b09edaa0e615298cc85",
+      "evaluation/results/formal_run_baseline/metrics_summary.csv": "5f33ae584c79d16dfcba061bc02ee9ae1c1beadc7c3017ef6e5dbda2f35c21a1",
+      "evaluation/results/formal_run_baseline/ragchecker_checkpoint.json": "4b51bc1563ea3c9e4ecdeec7171e89a8a067de4769fee8b48518757c481da187",
+      "evaluation/results/formal_run_baseline/raw_results.json": "08ff7c624ec633abcce1e877dc55c26cc502bd828134472cb1e9436ece88d16a",
+      "evaluation/results/post_improvement_47b10954/calibration_adjudication.json": "8b659baa918a2378b76afba101b5bc088fa097d7e4b00d6617cb3ced50234552",
+      "evaluation/results/post_improvement_47b10954/case_metrics.csv": "d603903ce692905a3ec4e03f4c03a10c19c64a602f8d802620baca9a74f33359",
+      "evaluation/results/post_improvement_47b10954/evaluator_calibration_results.json": "b5a50e23b03fadf6161a21dee7c3462c85828b5988a1b945a9a6f1cd7d8f92e8",
+      "evaluation/results/post_improvement_47b10954/metrics_summary.csv": "a81752fadf2111f952af31fa2d8fbec546c1847f163e67c3cad529867d56406e",
+      "evaluation/results/post_improvement_47b10954/ragchecker_checkpoint.json": "74c787a37853e16c3875c3243a367489587a085aa51ef81a0e2531a7d9613ea7",
+      "evaluation/results/post_improvement_47b10954/raw_results.json": "20bf0af0e7b697c5b3a3bcc78c5c5fe4db6d9b9985022c8655cb94bb0e794427"
+    },
+    "pre_hashes": {
+      "evaluation/audits/post_improvement_47b10954/case_forensic_audit.csv": "f6752d9bd5c6d5b78fb9e119358bdf6bc152d3589a1da7e43e19df9ac80c76be",
+      "evaluation/audits/post_improvement_47b10954/forensic_analysis.py": "6d7ad5ea5b43f137f8d17dc3e9db71cc1ecfad9aaa14dc39b78e383cd5c6c3e6",
+      "evaluation/audits/post_improvement_47b10954/forensic_audit.md": "81937359caa637d70389749143cfd746f8805fcfec61cd328bd012dd70f242ab",
+      "evaluation/audits/post_improvement_47b10954/forensic_summary.json": "74780f35269fde01b23dc98382194792d2e1a9739b5bc04d0eb271894e921b08",
+      "evaluation/benchmark_100.json": "ad42fbc333adcd70c265b8873d0e241e5401224d1cf9f3e7faa08adf1001773f",
+      "evaluation/benchmark_manifest.json": "d67fb1419d3237643816be7ca342efef6ba6a33833f6ea0a8db4e0f558a69a98",
+      "evaluation/evaluator_calibration.json": "1eb50921c25512404451ed97bad1cf31a151d19a84d946895fa7bd5dc67773dd",
+      "evaluation/formal_evaluation.ipynb": "14deaa1cf16babf18af7272cb0166d50603eec31b01913e2979c0c6b11d1abd2",
+      "evaluation/results/formal_run_baseline/case_metrics.csv": "6a6b07db0cb227c43917aef5df15f0d09ada7e58599d91ff4ac61538fd6050c4",
+      "evaluation/results/formal_run_baseline/evaluator_calibration_results.json": "4000ad61b71d6be0cb981ff83faf1292f037dc1b05e75b09edaa0e615298cc85",
+      "evaluation/results/formal_run_baseline/metrics_summary.csv": "5f33ae584c79d16dfcba061bc02ee9ae1c1beadc7c3017ef6e5dbda2f35c21a1",
+      "evaluation/results/formal_run_baseline/ragchecker_checkpoint.json": "4b51bc1563ea3c9e4ecdeec7171e89a8a067de4769fee8b48518757c481da187",
+      "evaluation/results/formal_run_baseline/raw_results.json": "08ff7c624ec633abcce1e877dc55c26cc502bd828134472cb1e9436ece88d16a",
+      "evaluation/results/post_improvement_47b10954/calibration_adjudication.json": "8b659baa918a2378b76afba101b5bc088fa097d7e4b00d6617cb3ced50234552",
+      "evaluation/results/post_improvement_47b10954/case_metrics.csv": "d603903ce692905a3ec4e03f4c03a10c19c64a602f8d802620baca9a74f33359",
+      "evaluation/results/post_improvement_47b10954/evaluator_calibration_results.json": "b5a50e23b03fadf6161a21dee7c3462c85828b5988a1b945a9a6f1cd7d8f92e8",
+      "evaluation/results/post_improvement_47b10954/metrics_summary.csv": "a81752fadf2111f952af31fa2d8fbec546c1847f163e67c3cad529867d56406e",
+      "evaluation/results/post_improvement_47b10954/ragchecker_checkpoint.json": "74c787a37853e16c3875c3243a367489587a085aa51ef81a0e2531a7d9613ea7",
+      "evaluation/results/post_improvement_47b10954/raw_results.json": "20bf0af0e7b697c5b3a3bcc78c5c5fe4db6d9b9985022c8655cb94bb0e794427"
+    },
+    "unchanged": true
+  },
+  "validated_classification_counts": {
+    "EXPECTED_METRIC_BEHAVIOR": 7,
+    "PASS": 55,
+    "SYSTEM_BUG_ACTION_FALSE_GENERATE_GAP": 14,
+    "SYSTEM_BUG_GENERATION_OMISSION": 1,
+    "SYSTEM_BUG_GENERATION_OVER_ANSWERING": 2,
+    "SYSTEM_BUG_MULTI_TURN_CONTEXT": 1,
+    "SYSTEM_BUG_PACKER_SELECTION": 9,
+    "SYSTEM_BUG_RETRIEVAL_UNDERCOVERAGE": 9,
+    "SYSTEM_BUG_SAFETY_SHORT_CIRCUIT": 1,
+    "SYSTEM_BUG_UNSUPPORTED_GENERATION": 1
+  },
+  "validation_status_counts": {
+    "CONFIRMED": 78,
+    "CORRECTED": 22
+  }
+}
