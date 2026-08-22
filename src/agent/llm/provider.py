@@ -130,6 +130,7 @@ async def _call_gemini(
     model_name: str,
     temperature: float,
     request_timeout: float | None = None,
+    response_schema: object | None = None,
 ) -> str:
     """Gọi Gemini qua Google GenAI adapter bất đồng bộ."""
     return await generate_text_async(
@@ -138,6 +139,7 @@ async def _call_gemini(
         model_name=model_name,
         temperature=temperature,
         request_timeout=request_timeout,
+        response_schema=response_schema,
     )
 
 async def _call_gemini_sync(
@@ -146,6 +148,7 @@ async def _call_gemini_sync(
     model_name: str,
     temperature: float,
     request_timeout: float | None = None,
+    response_schema: object | None = None,
 ) -> str:
     """Đưa lời gọi Google GenAI đồng bộ sang worker thread có timeout."""
     def _generate_sync() -> str:
@@ -155,6 +158,7 @@ async def _call_gemini_sync(
             model_name=model_name,
             temperature=temperature,
             request_timeout=request_timeout,
+            response_schema=response_schema,
         )
 
     if request_timeout and request_timeout > 0:
@@ -172,15 +176,30 @@ async def _call_provider_once(
     temperature: float,
     use_sync: bool,
     request_timeout: float,
+    response_schema: object | None,
 ) -> str:
     if provider == "gemini":
         logger.info("Calling Gemini (%s)...", model)
         if use_sync:
             return repair_mojibake(
-                await _call_gemini_sync(prompt, system_prompt, model, temperature, request_timeout)
+                await _call_gemini_sync(
+                    prompt,
+                    system_prompt,
+                    model,
+                    temperature,
+                    request_timeout,
+                    response_schema,
+                )
             )
         return repair_mojibake(
-            await _call_gemini(prompt, system_prompt, model, temperature, request_timeout)
+            await _call_gemini(
+                prompt,
+                system_prompt,
+                model,
+                temperature,
+                request_timeout,
+                response_schema,
+            )
         )
 
     if provider == "ollama":
@@ -208,6 +227,7 @@ async def _call_provider_resilient(
     use_sync: bool,
     budget: DeadlineBudget,
     settings: RuntimeResilienceSettings,
+    response_schema: object | None,
 ) -> tuple[str, dict]:
     timeout_seconds = (
         settings.gemini_timeout_seconds
@@ -224,6 +244,7 @@ async def _call_provider_resilient(
             temperature=temperature,
             use_sync=use_sync,
             request_timeout=effective_timeout,
+            response_schema=response_schema,
         )
 
     return await call_provider_with_resilience(
@@ -244,6 +265,7 @@ async def generate_llm_response(
     use_sync: bool = False,
     budget: DeadlineBudget | None = None,
     resilience_settings: RuntimeResilienceSettings | None = None,
+    response_schema: object | None = None,
 ) -> dict:
     """Sinh text qua primary provider và chuỗi fallback hữu hạn nếu được phép.
 
@@ -290,6 +312,7 @@ async def generate_llm_response(
             use_sync=use_sync,
             budget=budget,
             settings=settings,
+            response_schema=response_schema,
         )
         result["text"] = text
         result["resilience"] = resilience_meta
@@ -365,6 +388,7 @@ async def generate_llm_response(
                 use_sync=use_sync,
                 budget=budget,
                 settings=settings,
+                response_schema=response_schema,
             )
             chain_entry["status"] = "success"
             result["text"] = text

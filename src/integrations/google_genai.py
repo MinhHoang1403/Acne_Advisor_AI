@@ -53,6 +53,7 @@ def _generation_config(
     model_name: str,
     temperature: float,
     system_prompt: str | None = None,
+    response_schema: Any | None = None,
 ) -> types.GenerateContentConfig:
     kwargs: dict[str, Any] = {
         "http_options": types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=1)),
@@ -63,6 +64,9 @@ def _generation_config(
         kwargs["temperature"] = temperature
     if system_prompt:
         kwargs["system_instruction"] = system_prompt
+    if response_schema is not None:
+        kwargs["response_mime_type"] = "application/json"
+        kwargs["response_schema"] = response_schema
     return types.GenerateContentConfig(**kwargs)
 
 
@@ -73,6 +77,7 @@ async def generate_text_async(
     model_name: str,
     temperature: float,
     request_timeout: float | None = None,
+    response_schema: Any | None = None,
     client: Any | None = None,
 ) -> str | None:
     """Sinh text qua async Google GenAI client và chuẩn hóa lỗi provider."""
@@ -86,6 +91,7 @@ async def generate_text_async(
                 model_name=model_name,
                 temperature=temperature,
                 system_prompt=system_prompt,
+                response_schema=response_schema,
             ),
         )
 
@@ -109,6 +115,7 @@ def generate_text_sync(
     model_name: str,
     temperature: float,
     request_timeout: float | None = None,
+    response_schema: Any | None = None,
     client: Any | None = None,
 ) -> str | None:
     """Sinh text qua synchronous Google GenAI client và chuẩn hóa lỗi provider."""
@@ -122,6 +129,7 @@ def generate_text_sync(
                 model_name=model_name,
                 temperature=temperature,
                 system_prompt=system_prompt,
+                response_schema=response_schema,
             ),
         )
         return extract_response_text(response)

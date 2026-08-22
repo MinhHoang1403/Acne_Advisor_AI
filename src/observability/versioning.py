@@ -71,7 +71,7 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
         "max_retrieval_attempts": 2,
         "retry_evidence_policy": "retain_deduplicate_rerank_repack",
-        "agent_decision_version": "proposition_scoped_support_action_decision",
+        "agent_decision_version": "direct_proposition_support_action_decision",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
             value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),

@@ -15,7 +15,8 @@ from src.agent.nodes import workflow
 
 
 async def _model(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
-    async def fake_generate(**_: object) -> dict:
+    async def fake_generate(**kwargs: object) -> dict:
+        assert kwargs["response_schema"] is AgentDecision
         return {
             "text": payload,
             "provider": "test",
@@ -28,24 +29,12 @@ async def _model(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
 
 def _direct_support_fields(
     evidence_id: str = "evidence-1",
-    requirement: str = "requested acne-information proposition",
 ) -> dict[str, object]:
-    return {
-        "direct_supporting_evidence_ids": [evidence_id],
-        "core_requirements_complete": True,
-        "core_requirement_support": [
-            {
-                "requirement": requirement,
-                "support_status": "directly_supported",
-                "evidence_ids": [evidence_id],
-            }
-        ],
-    }
+    return {"direct_supporting_evidence_ids": [evidence_id]}
 
 
 def _generate_payload(
     evidence_id: str = "evidence-1",
-    requirement: str = "requested acne-information proposition",
 ) -> str:
     return json.dumps(
         {
@@ -53,7 +42,7 @@ def _generate_payload(
             "retrieval_query": None,
             "missing_evidence": None,
             "reason_code": "evidence_sufficient",
-            **_direct_support_fields(evidence_id, requirement),
+            **_direct_support_fields(evidence_id),
         },
         ensure_ascii=False,
     )
@@ -79,8 +68,6 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
         "missing_evidence": None,
         "reason_code": "needs_evidence",
         "direct_supporting_evidence_ids": None,
-        "core_requirements_complete": None,
-        "core_requirement_support": None,
     }
     assert result["agent_decision"]["topic_reset_applied"] is False
     assert result["agent_decision"]["validation_changed"] is False
@@ -91,7 +78,7 @@ async def test_agent_chooses_retrieval_before_evidence(monkeypatch: pytest.Monke
 async def test_agent_chooses_generation_after_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     await _model(
         monkeypatch,
-        _generate_payload("source-evidence", "definition of blackheads"),
+        _generate_payload("source-evidence"),
     )
     result = await select_agent_action(
         {
@@ -163,7 +150,8 @@ async def test_decision_evidence_trace_matches_bounded_prompt_view_without_text(
     trace = result["agent_decision"]["evidence_trace"]
 
     assert qualifier in payload["evidence_for_relevance_check"]
-    assert payload["evidence_for_relevance_check"] == state["packed_context"]["context_text"]
+    assert "evidence_id=chunk-1" in payload["evidence_for_relevance_check"]
+    assert contexts[0]["text"] in payload["evidence_for_relevance_check"]
     assert trace["packed_evidence_count"] == 7
     assert trace["packed_evidence_ids"] == [f"chunk-{index}" for index in range(1, 8)]
     assert trace["decision_visible_evidence_ids"] == [
@@ -222,10 +210,7 @@ async def test_referral_evidence_remains_visible_for_standalone_and_multiturn_de
                 "retrieval_query": None,
                 "missing_evidence": None,
                 "reason_code": "evidence_sufficient",
-                **_direct_support_fields(
-                    f"chunk-{referral_position}",
-                    "when acne requires dermatologist evaluation",
-                ),
+                **_direct_support_fields(f"chunk-{referral_position}"),
             }
         else:
             decision = {
@@ -403,12 +388,14 @@ def test_retry_requires_prior_usable_evidence() -> None:
     assert after_first_retrieval.action == "abstain"
 
 
-def test_decision_schema_requires_explicit_missing_evidence_key() -> None:
-    with pytest.raises(ValueError, match="bounded schema"):
-        parse_agent_decision(
-            '{"action":"generate","retrieval_query":null,'
-            '"reason_code":"evidence_sufficient"}'
-        )
+def test_decision_schema_allows_omitted_conditionally_required_fields() -> None:
+    decision = parse_agent_decision(
+        '{"action":"generate","reason_code":"evidence_sufficient"}'
+    )
+
+    assert decision.retrieval_query is None
+    assert decision.missing_evidence is None
+    assert decision.direct_supporting_evidence_ids is None
 
 
 def test_purposeful_retry_requires_specific_gap_and_revised_query() -> None:
@@ -452,8 +439,6 @@ def test_generate_fails_closed_when_missing_evidence_remains() -> None:
         "missing_evidence": None,
         "reason_code": "evidence_gap",
         "direct_supporting_evidence_ids": None,
-        "core_requirements_complete": None,
-        "core_requirement_support": None,
     }
 
 
@@ -491,6 +476,43 @@ async def test_invalid_schema_fails_closed(monkeypatch: pytest.MonkeyPatch) -> N
     assert result["next_action"] == "abstain"
     assert result["agent_decision"]["reason_code"] == "evidence_gap"
     assert result["fallback_reason_code"] == "insufficient_evidence"
+
+
+def test_parser_accepts_omitted_conditional_fields_and_ignores_harmless_extras() -> None:
+    decision = parse_agent_decision(
+        '{"action":"abstain","reason_code":"evidence_gap","display_note":"ignored"}'
+    )
+
+    assert decision.model_dump(mode="json") == {
+        "action": "abstain",
+        "retrieval_query": None,
+        "missing_evidence": None,
+        "reason_code": "evidence_gap",
+        "direct_supporting_evidence_ids": None,
+    }
+
+
+def test_decision_prompt_exposes_exact_validator_evidence_identity() -> None:
+    _, prompt = decision_module.build_agent_decision_prompt(
+        {
+            "normalized_question": "Adapalene thuộc nhóm thuốc nào?",
+            "retrieval_attempt": 1,
+            "evidence_assessment": {"usable": True},
+            "vector_contexts": [
+                {
+                    "id": "candidate-123",
+                    "chunk_id": "chunk-abc",
+                    "source_id": "guideline",
+                    "text": "Adapalene là retinoid bôi.",
+                }
+            ],
+        }
+    )
+
+    evidence = json.loads(prompt)["evidence_for_relevance_check"]
+    assert "Evidence 1" in evidence
+    assert "evidence_id=candidate-123" in evidence
+    assert "chunk=chunk-abc" in evidence
 
 
 @pytest.mark.asyncio
@@ -548,8 +570,6 @@ def test_invalid_action_reason_pairs_fail_closed(
         "missing_evidence": None,
         "reason_code": "evidence_gap",
         "direct_supporting_evidence_ids": None,
-        "core_requirements_complete": None,
-        "core_requirement_support": None,
     }
 
 
@@ -587,12 +607,6 @@ def test_action_reason_contract_accepts_only_legal_semantic_pairs(
         direct_supporting_evidence_ids=(
             ["evidence-1"] if action == "generate" else None
         ),
-        core_requirements_complete=True if action == "generate" else None,
-        core_requirement_support=(
-            _direct_support_fields()["core_requirement_support"]
-            if action == "generate"
-            else None
-        ),
     )
 
     result = validate_agent_decision(decision, state)
@@ -618,10 +632,10 @@ def test_decision_prompt_encodes_proposition_grounding_and_epistemic_boundaries(
         {"normalized_question": "Benzoyl peroxide có hạn chế kháng thuốc không?"}
     )
 
-    assert "every record is directly_supported" in system_prompt
-    assert "core_requirements_complete" in system_prompt
-    assert "partial_or_related_only" in system_prompt
-    assert "contradicted_or_opposite" in system_prompt
+    assert "directly supports every material part" in system_prompt
+    assert "entity, relationship, polarity, quantity" in system_prompt
+    assert "Related, weaker, opposite, qualitative-only" in system_prompt
+    assert "all material parts" in system_prompt
     assert "Sharing the same topic" in system_prompt
     assert "is not sufficient" in system_prompt
     assert "Absence of supporting evidence is not evidence that a proposition is false" in system_prompt
@@ -719,10 +733,7 @@ async def test_repeated_referral_turns_do_not_require_safety_abstention_with_val
 ) -> None:
     await _model(
         monkeypatch,
-        _generate_payload(
-            "referral-evidence",
-            "when acne requires dermatologist evaluation",
-        ),
+        _generate_payload("referral-evidence"),
     )
     question = "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
     histories = [
