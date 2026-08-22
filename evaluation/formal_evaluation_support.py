@@ -54,6 +54,7 @@ class EvaluationRunPaths:
     run_id: str
     directory: Path
     calibration_results: Path
+    calibration_adjudication: Path
     raw_results: Path
     case_metrics: Path
     metrics_summary: Path
@@ -66,6 +67,7 @@ def build_evaluation_run_paths(run_id: str) -> EvaluationRunPaths:
         run_id=run_id,
         directory=directory,
         calibration_results=directory / "evaluator_calibration_results.json",
+        calibration_adjudication=directory / "calibration_adjudication.json",
         raw_results=directory / "raw_results.json",
         case_metrics=directory / "case_metrics.csv",
         metrics_summary=directory / "metrics_summary.csv",
@@ -77,6 +79,7 @@ BASELINE_RESULTS_DIR = RESULTS_DIR / "formal_run_baseline"
 BASELINE_METRICS_SUMMARY_PATH = BASELINE_RESULTS_DIR / "metrics_summary.csv"
 POST_IMPROVEMENT_PATHS = build_evaluation_run_paths(POST_IMPROVEMENT_RUN_ID)
 CALIBRATION_RESULTS_PATH = POST_IMPROVEMENT_PATHS.calibration_results
+CALIBRATION_ADJUDICATION_PATH = POST_IMPROVEMENT_PATHS.calibration_adjudication
 RAW_RESULTS_PATH = POST_IMPROVEMENT_PATHS.raw_results
 CASE_METRICS_PATH = POST_IMPROVEMENT_PATHS.case_metrics
 METRICS_SUMMARY_PATH = POST_IMPROVEMENT_PATHS.metrics_summary
@@ -749,6 +752,232 @@ def save_calibration_results(
     return payload
 
 
+def load_saved_calibration_results(
+    calibration: dict[str, Any],
+    path: Path | None = None,
+) -> dict[str, Any] | None:
+    """Validate and return saved calibration evidence without invoking an evaluator."""
+
+    saved_path = path or CALIBRATION_RESULTS_PATH
+    if not saved_path.is_file():
+        return None
+    try:
+        payload = load_json(saved_path)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise EvaluationBlocked(
+            f"SAVED_CALIBRATION_INTEGRITY_ERROR: {saved_path}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise EvaluationBlocked(f"SAVED_CALIBRATION_INTEGRITY_ERROR: {saved_path}")
+    identity_checks = {
+        "evaluator_model": payload.get("evaluator_model") == EVALUATOR_MODEL,
+        "evaluator_request_configuration": payload.get("evaluator_request_configuration")
+        == _evaluator_request_configuration(),
+        "calibration_dataset_sha256": payload.get("calibration_dataset_sha256")
+        == canonical_json_file_sha256(CALIBRATION_PATH),
+        "calibration_schema_version": payload.get("calibration_schema_version")
+        == calibration.get("schema_version"),
+        "run_1": isinstance(payload.get("run_1"), dict),
+        "run_2": isinstance(payload.get("run_2"), dict),
+    }
+    if not all(identity_checks.values()):
+        raise EvaluationBlocked(f"SAVED_CALIBRATION_IDENTITY_MISMATCH: {identity_checks}")
+
+    try:
+        automatic = evaluate_calibration_runs(payload["run_1"], payload["run_2"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise EvaluationBlocked(
+            f"SAVED_CALIBRATION_INTEGRITY_ERROR: {saved_path}"
+        ) from exc
+    reproducibility_checks = {
+        "decision": payload.get("final_calibration_decision") == automatic["decision"],
+        "claim_extraction_acceptable": payload.get("claim_extraction_acceptable")
+        == automatic["claim_extraction_acceptable"],
+        "claim_checking_agreement": payload.get("claim_checking_agreement")
+        == automatic["claim_checking_agreement"],
+        "repeat_consistency": payload.get("repeat_consistency")
+        == automatic["repeat_consistency"],
+        "disagreements": payload.get("disagreements") == automatic["disagreements"],
+        "critical_failures": payload.get("critical_failures")
+        == automatic["critical_semantic_failures"],
+    }
+    if not all(reproducibility_checks.values()):
+        raise EvaluationBlocked(
+            f"SAVED_CALIBRATION_DECISION_MISMATCH: {reproducibility_checks}"
+        )
+    return {"payload": payload, "automatic_decision": automatic, "path": saved_path}
+
+
+def resolve_calibration_review(
+    automatic_decision: dict[str, Any],
+    researcher_decisions: dict[str, str],
+) -> dict[str, Any]:
+    """Resolve only REVIEW_REQUIRED items through explicit per-item adjudication."""
+
+    if not isinstance(researcher_decisions, dict):
+        raise EvaluationBlocked("CALIBRATION_REVIEW_DECISIONS_INVALID")
+    invalid_values = {
+        item_id: value
+        for item_id, value in researcher_decisions.items()
+        if not isinstance(item_id, str)
+        or not item_id
+        or value not in {"approve", "reject"}
+    }
+    if invalid_values:
+        raise EvaluationBlocked(f"CALIBRATION_REVIEW_DECISIONS_INVALID: {invalid_values}")
+
+    automatic = automatic_decision.get("decision")
+    base = {
+        "automatic_decision": automatic,
+        "researcher_decisions": dict(researcher_decisions),
+        "automatic_counts": {
+            "claim_extraction_acceptable": automatic_decision.get(
+                "claim_extraction_acceptable"
+            ),
+            "claim_checking_agreement": automatic_decision.get("claim_checking_agreement"),
+            "repeat_consistency": automatic_decision.get("repeat_consistency"),
+        },
+    }
+    if automatic == CALIBRATION_READY:
+        if researcher_decisions:
+            raise EvaluationBlocked("CALIBRATION_REVIEW_DECISIONS_NOT_REQUIRED")
+        return {
+            **base,
+            "effective_decision": CALIBRATION_READY,
+            "formal_run_allowed": True,
+            "researcher_adjudication": "NOT_REQUIRED",
+            "review_item_ids": [],
+            "unresolved_item_ids": [],
+        }
+    if automatic == CALIBRATION_BLOCKED:
+        return {
+            **base,
+            "effective_decision": CALIBRATION_BLOCKED,
+            "formal_run_allowed": False,
+            "researcher_adjudication": "NOT_PERMITTED",
+            "review_item_ids": [],
+            "unresolved_item_ids": [],
+        }
+    if automatic != CALIBRATION_REVIEW_REQUIRED:
+        raise EvaluationBlocked(f"CALIBRATION_AUTOMATIC_DECISION_UNKNOWN: {automatic!r}")
+
+    disagreements = automatic_decision.get("disagreements") or []
+    review_item_ids = [str(item.get("item_id") or "") for item in disagreements]
+    if not review_item_ids or any(not item_id for item_id in review_item_ids):
+        raise EvaluationBlocked("CALIBRATION_REVIEW_ITEMS_INVALID")
+    if len(review_item_ids) != len(set(review_item_ids)):
+        raise EvaluationBlocked("CALIBRATION_REVIEW_ITEMS_DUPLICATED")
+    unknown = sorted(set(researcher_decisions) - set(review_item_ids))
+    if unknown:
+        raise EvaluationBlocked(f"CALIBRATION_REVIEW_ITEMS_UNKNOWN: {unknown}")
+
+    unresolved = [item_id for item_id in review_item_ids if item_id not in researcher_decisions]
+    rejected = [
+        item_id for item_id in review_item_ids if researcher_decisions.get(item_id) == "reject"
+    ]
+    if rejected:
+        effective = CALIBRATION_BLOCKED
+        adjudication = "REJECTED"
+    elif unresolved:
+        effective = CALIBRATION_REVIEW_REQUIRED
+        adjudication = "INCOMPLETE"
+    else:
+        effective = CALIBRATION_READY
+        adjudication = "APPROVED"
+    return {
+        **base,
+        "effective_decision": effective,
+        "formal_run_allowed": effective == CALIBRATION_READY,
+        "researcher_adjudication": adjudication,
+        "review_item_ids": review_item_ids,
+        "unresolved_item_ids": unresolved,
+        "rejected_item_ids": rejected,
+    }
+
+
+def _calibration_reference_information(
+    calibration: dict[str, Any], item_id: str, item_type: str
+) -> dict[str, Any] | None:
+    collection = "claim_extraction" if item_type == "extraction" else "claim_checking"
+    item = next(
+        (
+            candidate
+            for candidate in calibration.get(collection, [])
+            if candidate.get("item_id") == item_id
+        ),
+        None,
+    )
+    if item is None:
+        return None
+    keys = (
+        "input_text",
+        "reference_claims",
+        "evidence",
+        "claim",
+        "claim_triplets",
+        "expected_label",
+        "critical_dimensions",
+    )
+    return {key: item[key] for key in keys if key in item}
+
+
+def calibration_review_items(
+    calibration: dict[str, Any], automatic_decision: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Return researcher-facing evidence for each automatic disagreement."""
+
+    items = []
+    for disagreement in automatic_decision.get("disagreements") or []:
+        item_id = str(disagreement.get("item_id") or "")
+        item_type = str(disagreement.get("type") or "")
+        reasons = sorted(
+            {
+                str(reason)
+                for run_key in ("first", "second")
+                for reason in (disagreement.get(run_key) or {}).get("reasons", [])
+            }
+        )
+        items.append(
+            {
+                "item_id": item_id,
+                "type": item_type,
+                "automatic_reasons": reasons,
+                "run_1_result": disagreement.get("first"),
+                "run_2_result": disagreement.get("second"),
+                "reference_information": _calibration_reference_information(
+                    calibration, item_id, item_type
+                ),
+            }
+        )
+    return items
+
+
+def save_calibration_adjudication(
+    calibration: dict[str, Any],
+    automatic_decision: dict[str, Any],
+    resolution: dict[str, Any],
+    path: Path | None = None,
+) -> dict[str, Any]:
+    """Persist human adjudication separately from immutable evaluator output."""
+
+    if not resolution.get("researcher_decisions"):
+        raise EvaluationBlocked("CALIBRATION_ADJUDICATION_DECISIONS_REQUIRED")
+    payload = {
+        "run_id": POST_IMPROVEMENT_RUN_ID,
+        "calibration_dataset_sha256": canonical_json_file_sha256(CALIBRATION_PATH),
+        "evaluator_model": EVALUATOR_MODEL,
+        "automatic_decision": automatic_decision.get("decision"),
+        "automatic_counts": resolution.get("automatic_counts"),
+        "review_items": calibration_review_items(calibration, automatic_decision),
+        "researcher_decisions": resolution["researcher_decisions"],
+        "researcher_adjudication": resolution["researcher_adjudication"],
+        "effective_decision": resolution["effective_decision"],
+        "review_timestamp": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    atomic_write_json(path or CALIBRATION_ADJUDICATION_PATH, payload)
+    return payload
+
+
 def _installed_version(package: str) -> str:
     try:
         return importlib.metadata.version(package)
@@ -1183,6 +1412,7 @@ __all__ = [
     "BASELINE_RESULTS_DIR",
     "BENCHMARK_PATH",
     "CALIBRATION_BLOCKED",
+    "CALIBRATION_ADJUDICATION_PATH",
     "CALIBRATION_PATH",
     "CALIBRATION_READY",
     "CALIBRATION_RESULTS_PATH",
@@ -1206,12 +1436,14 @@ __all__ = [
     "build_baseline_comparison",
     "build_evaluation_run_paths",
     "build_openai_batch_adapter",
+    "calibration_review_items",
     "canonical_json_bytes",
     "canonical_json_file_sha256",
     "canonical_json_sha256",
     "evaluate_calibration_runs",
     "export_metrics",
     "load_evaluation_artifacts",
+    "load_saved_calibration_results",
     "negative_rejection_rate",
     "require_complete_formal_run",
     "require_researcher_review",
@@ -1219,7 +1451,9 @@ __all__ = [
     "run_calibration_once",
     "run_formal_cases",
     "save_calibration_results",
+    "save_calibration_adjudication",
     "score_ragchecker",
+    "resolve_calibration_review",
     "validate_baseline",
     "validate_benchmark",
     "validate_system_under_test",
