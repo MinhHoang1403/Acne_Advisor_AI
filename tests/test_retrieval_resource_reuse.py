@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -6,6 +7,7 @@ from typing import Any
 import pytest
 
 from src.database.vector_store import QdrantVectorStore
+from src.retrieval import service as retrieval_service
 from src.retrieval.service import EvidenceRetriever
 
 
@@ -35,6 +37,27 @@ def _retriever(dense_channel: Channel, bm25_channel: Channel) -> EvidenceRetriev
             return await dense_channel()
 
     return ChannelRetriever(FakeStore())
+
+
+@pytest.mark.asyncio
+async def test_default_test_environment_disables_process_reranker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def dense() -> list[dict[str, Any]]:
+        return [_evidence("dense-1", "source-1")]
+
+    async def bm25() -> list[dict[str, Any]]:
+        return []
+
+    def unexpected_reranker(_settings: object) -> object:
+        raise AssertionError("normal tests must not construct the process reranker")
+
+    assert os.environ["RERANKER_ENABLED"] == "false"
+    monkeypatch.setattr(retrieval_service, "_get_process_reranker", unexpected_reranker)
+
+    result = await _retriever(dense, bm25).retrieve("mụn viêm")
+
+    assert result.metadata["retrieval_trace"]["reranker"]["enabled"] is False
 
 
 @pytest.mark.asyncio

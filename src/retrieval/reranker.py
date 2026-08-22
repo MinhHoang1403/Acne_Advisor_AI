@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import math
 import os
+import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -83,6 +84,7 @@ class CandidateReranker:
         self.settings = settings or RerankerSettings.from_env()
         self.model_name = self.settings.model_name
         self._model: Any | None = None
+        self._model_init_lock = threading.Lock()
 
     async def score(
         self,
@@ -123,13 +125,15 @@ class CandidateReranker:
 
     def _get_model(self) -> Any:
         if self._model is None:
-            from sentence_transformers import CrossEncoder
+            with self._model_init_lock:
+                if self._model is None:
+                    from sentence_transformers import CrossEncoder
 
-            self._model = CrossEncoder(
-                self.settings.model_name,
-                device=self.settings.device,
-                local_files_only=True,
-            )
+                    self._model = CrossEncoder(
+                        self.settings.model_name,
+                        device=self.settings.device,
+                        local_files_only=True,
+                    )
         return self._model
 
 
