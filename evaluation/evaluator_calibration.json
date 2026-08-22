@@ -1,6 +1,6 @@
 {
   "schema_version": "evaluator_calibration_contract",
-  "evaluator_model": "gpt-5.4-mini-2026-03-17",
+  "evaluator_model": "gpt-5.4-2026-03-05",
   "annotation_authority": "frozen_kb_source_annotation_not_human_review",
   "counts": {
     "total": 20,

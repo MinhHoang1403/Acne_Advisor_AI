@@ -61,6 +61,14 @@ async def guard_node(state: ClinicalState) -> dict[str, Any]:
             "missing_evidence": None,
             "reason_code": "evidence_sufficient",
             "direct_supporting_evidence_ids": list(safety.source_ids),
+            "core_requirements_complete": True,
+            "core_requirement_support": [
+                {
+                    "requirement": safety.action,
+                    "support_status": "directly_supported",
+                    "evidence_ids": list(safety.source_ids),
+                }
+            ],
             "provider": "system",
             "model": None,
             "fallback_used": False,

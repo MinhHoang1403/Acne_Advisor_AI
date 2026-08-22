@@ -48,7 +48,7 @@ from src.ingestion.source_manifest import load_source_manifest
 OUTPUT_DIR = ROOT / "evaluation"
 BASE_SHA = "6a1809c4ddedbccab986ec76eb730321686ff3ff"
 KB_BUILD_ID = "94d613bc9b33628de3ef"
-EVALUATOR_MODEL = "gpt-5.4-mini-2026-03-17"
+EVALUATOR_MODEL = "gpt-5.4-2026-03-05"
 RAGCHECKER_VERSION = "0.1.9"
 RAGCHECKER_COMMIT = "9017b3263b82ea5354948c4db40a65bba94d779e"
 RAGCHECKER_PACKAGE = "ragchecker==0.1.9"
