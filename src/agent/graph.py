@@ -122,6 +122,7 @@ async def run_clinical_agent(
         "agent_decision": None,
         "safety_override": False,
         "vector_contexts": [],
+        "retained_retrieval_candidates": [],
         "sources": [],
         "source_allowlist": [],
         "retrieval_status": "not_started",
