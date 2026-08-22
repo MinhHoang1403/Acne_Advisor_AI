@@ -65,7 +65,7 @@ Kết quả phản ánh hiệu năng của hệ thống trên bộ dữ liệu v
 4. Cho Acne Advisor AI xử lý 100 tình huống.
 5. Tính năm chỉ số và xuất kết quả.
 
-Notebook được commit với `RUN_AUTHORIZED = False`. `RUN_AUTHORIZED=True` chỉ cho phép thực hiện lần đánh giá trên máy nghiên cứu; giá trị này không có nghĩa toàn bộ benchmark hoặc calibration đã được người nghiên cứu duyệt thủ công. Sau khi hoàn tất, có thể lưu notebook đã chạy làm bằng chứng cục bộ cho báo cáo, nhưng không ghi đè thư mục baseline và không commit trạng thái ủy quyền/output nếu chưa có kế hoạch riêng.
+Notebook được commit với `RUN_AUTHORIZED = False` và `CALIBRATION_REVIEW_DECISIONS = {}`. `RUN_AUTHORIZED=True` chỉ cho phép thực hiện lần đánh giá trên máy nghiên cứu; giá trị này không có nghĩa toàn bộ benchmark hoặc calibration đã được người nghiên cứu duyệt thủ công. Nếu calibration yêu cầu review, hãy đọc bằng chứng hiển thị và điền quyết định `"approve"` hoặc `"reject"` cho từng item. Sau khi hoàn tất, có thể lưu notebook đã chạy làm bằng chứng cục bộ cho báo cáo, nhưng không ghi đè thư mục baseline và không commit trạng thái ủy quyền/output nếu chưa có kế hoạch riêng.
 """
         ),
         markdown("## 1. Cấu hình, môi trường và dữ liệu"),
@@ -79,6 +79,7 @@ from IPython.display import Markdown, display
 from dotenv import load_dotenv
 
 RUN_AUTHORIZED = False
+CALIBRATION_REVIEW_DECISIONS = {}
 ALLOW_MODEL_FALLBACK = True
 
 ROOT = Path.cwd().resolve()
@@ -91,6 +92,7 @@ load_dotenv(ROOT / ".env")
 
 from evaluation.formal_evaluation_support import (  # noqa: E402
     BASELINE_RESULTS_DIR,
+    CALIBRATION_ADJUDICATION_PATH,
     CALIBRATION_BLOCKED,
     CALIBRATION_READY,
     CALIBRATION_RESULTS_PATH,
@@ -107,13 +109,17 @@ from evaluation.formal_evaluation_support import (  # noqa: E402
     SYSTEM_UNDER_TEST_SHA,
     build_baseline_comparison,
     build_openai_batch_adapter,
+    calibration_review_items,
     evaluate_calibration_runs,
     export_metrics,
     load_evaluation_artifacts,
+    load_saved_calibration_results,
     negative_rejection_rate,
     require_complete_formal_run,
     run_calibration_once,
     run_formal_cases,
+    resolve_calibration_review,
+    save_calibration_adjudication,
     save_calibration_results,
     score_ragchecker,
     validate_benchmark,
@@ -190,36 +196,104 @@ display(Markdown("### Phân bố tình huống\\n\\n" + "\\n".join(category_line
         ),
         markdown("## 3. Kiểm tra mô hình chấm điểm"),
         code(
-            """calibration_first = calibration_second = calibration_decision = None
+            """calibration_first = calibration_second = None
+automatic_calibration_decision = effective_calibration_decision = None
+calibration_resolution = None
 evaluator_adapter = None
 
-if not RUN_AUTHORIZED:
-    print("Chưa chạy calibration vì RUN_AUTHORIZED=False.")
+saved_calibration = load_saved_calibration_results(calibration)
+if saved_calibration is not None:
+    print("✓ Đã tìm thấy kết quả calibration đã lưu của run hiện tại.")
+    print("Không gọi lại evaluator; sử dụng kết quả đã lưu để tránh chọn lại kết quả ngẫu nhiên.")
+    calibration_first = saved_calibration["payload"]["run_1"]
+    calibration_second = saved_calibration["payload"]["run_2"]
+    automatic_calibration_decision = saved_calibration["automatic_decision"]
+elif not RUN_AUTHORIZED:
+    print("Chưa có calibration đã lưu và RUN_AUTHORIZED=False; không gọi evaluator.")
 else:
     evaluator_adapter = build_openai_batch_adapter(EVALUATOR_MODEL)
     print("Đang kiểm tra mô hình chấm điểm, lần 1/2...")
     calibration_first = run_calibration_once(calibration, evaluator_adapter)
     print("Đang kiểm tra mô hình chấm điểm, lần 2/2...")
     calibration_second = run_calibration_once(calibration, evaluator_adapter)
-    calibration_decision = evaluate_calibration_runs(calibration_first, calibration_second)
-    save_calibration_results(calibration, calibration_first, calibration_second, calibration_decision)
+    automatic_calibration_decision = evaluate_calibration_runs(
+        calibration_first, calibration_second
+    )
+    save_calibration_results(
+        calibration,
+        calibration_first,
+        calibration_second,
+        automatic_calibration_decision,
+    )
 
-    print(f"• Claim extraction phù hợp: {calibration_decision['claim_extraction_acceptable']}/8")
-    print(f"• Claim checking thống nhất: {calibration_decision['claim_checking_agreement']}/12")
-    print(f"• Kết quả lặp lại nhất quán: {calibration_decision['repeat_consistency']}/20")
-    print(f"• Decision: {calibration_decision['decision']}")
-    if calibration_decision["disagreements"]:
-        print("• Các điểm cần người nghiên cứu xem lại:")
-        for disagreement in calibration_decision["disagreements"]:
-            print("  -", disagreement)
+if automatic_calibration_decision is not None:
+    print(
+        f"• Claim extraction phù hợp: "
+        f"{automatic_calibration_decision['claim_extraction_acceptable']}/8"
+    )
+    print(
+        f"• Claim checking thống nhất: "
+        f"{automatic_calibration_decision['claim_checking_agreement']}/12"
+    )
+    print(
+        f"• Kết quả lặp lại nhất quán: "
+        f"{automatic_calibration_decision['repeat_consistency']}/20"
+    )
+    print(f"• Automatic calibration decision: {automatic_calibration_decision['decision']}")
 
-    decision = calibration_decision["decision"]
-    if decision == CALIBRATION_READY:
-        print("✓ Mô hình chấm điểm sẵn sàng cho lần chạy đánh giá chính thức")
-    elif decision == CALIBRATION_REVIEW_REQUIRED:
-        print("Chưa thể tiếp tục: kết quả calibration cần được người nghiên cứu xem lại.")
-    elif decision == CALIBRATION_BLOCKED:
-        print("Chưa thể tiếp tục: calibration phát hiện lỗi ngữ nghĩa nghiêm trọng được lặp lại.")
+    review_evidence = calibration_review_items(calibration, automatic_calibration_decision)
+    if review_evidence:
+        print("Calibration cần người nghiên cứu đối chiếu thủ công.")
+        for item in review_evidence:
+            print(f"\\nItem ID: {item['item_id']}")
+            print(f"Type: {item['type']}")
+            print(f"Automatic reason: {item['automatic_reasons']}")
+            print(f"Run 1 status/output: {item['run_1_result']}")
+            print(f"Run 2 status/output: {item['run_2_result']}")
+            print(f"Expected/reference information: {item['reference_information']}")
+        print(
+            "Sau khi đối chiếu, điền từng item vào CALIBRATION_REVIEW_DECISIONS "
+            "với giá trị 'approve' hoặc 'reject', rồi Run All lại."
+        )
+
+    calibration_resolution = resolve_calibration_review(
+        automatic_calibration_decision,
+        CALIBRATION_REVIEW_DECISIONS,
+    )
+    effective_calibration_decision = {
+        **automatic_calibration_decision,
+        "automatic_decision": automatic_calibration_decision["decision"],
+        "decision": calibration_resolution["effective_decision"],
+        "blocked": calibration_resolution["effective_decision"] == CALIBRATION_BLOCKED,
+        "requires_researcher_review": (
+            calibration_resolution["effective_decision"] == CALIBRATION_REVIEW_REQUIRED
+        ),
+        "formal_run_allowed": calibration_resolution["formal_run_allowed"],
+        "researcher_adjudication": calibration_resolution["researcher_adjudication"],
+    }
+    if (
+        automatic_calibration_decision["decision"] == CALIBRATION_REVIEW_REQUIRED
+        and CALIBRATION_REVIEW_DECISIONS
+    ):
+        save_calibration_adjudication(
+            calibration,
+            automatic_calibration_decision,
+            calibration_resolution,
+        )
+        print(f"✓ Đã lưu adjudication riêng tại: {CALIBRATION_ADJUDICATION_PATH}")
+
+    print(f"Automatic calibration decision: {calibration_resolution['automatic_decision']}")
+    print(f"Researcher adjudication: {calibration_resolution['researcher_adjudication']}")
+    print(f"Effective calibration decision: {calibration_resolution['effective_decision']}")
+    if calibration_resolution["unresolved_item_ids"]:
+        print(f"Các item chưa có quyết định: {calibration_resolution['unresolved_item_ids']}")
+
+    if (
+        RUN_AUTHORIZED
+        and calibration_resolution["formal_run_allowed"]
+        and evaluator_adapter is None
+    ):
+        evaluator_adapter = build_openai_batch_adapter(EVALUATOR_MODEL)
 """
         ),
         markdown("## 4. Chạy hệ thống, chấm điểm và xuất kết quả"),
@@ -230,19 +304,24 @@ nrr_score = nrr_correct = None
 
 if not RUN_AUTHORIZED:
     print("Chưa chạy 100 tình huống vì RUN_AUTHORIZED=False.")
-elif calibration_decision is None or calibration_decision["decision"] != CALIBRATION_READY:
+elif (
+    effective_calibration_decision is None
+    or effective_calibration_decision["decision"] != CALIBRATION_READY
+):
     print("Chưa chạy 100 tình huống vì mô hình chấm điểm chưa sẵn sàng.")
 else:
     raw_results = await run_formal_cases(
         benchmark,
         manifest["benchmark_sha256"],
         run_authorized=RUN_AUTHORIZED,
-        calibration_decision=calibration_decision,
+        calibration_decision=effective_calibration_decision,
         allow_model_fallback=ALLOW_MODEL_FALLBACK,
     )
     require_complete_formal_run(raw_results, manifest["benchmark_sha256"])
     print("✓ Hoàn tất 100 tình huống")
 
+    if evaluator_adapter is None:
+        raise RuntimeError("Evaluator adapter must be available before RAGChecker scoring.")
     rag_results = score_ragchecker(benchmark, raw_results, evaluator_adapter)
     print("✓ Hoàn tất RAGChecker")
 
@@ -299,6 +378,7 @@ else:
         CASE_METRICS_PATH,
         METRICS_SUMMARY_PATH,
         CALIBRATION_RESULTS_PATH,
+        CALIBRATION_ADJUDICATION_PATH,
         POST_IMPROVEMENT_PATHS.ragchecker_checkpoint,
     ):
         print("•", path)

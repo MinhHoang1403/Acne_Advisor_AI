@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import csv
+import hashlib
 import json
 import subprocess
 import sys
@@ -19,6 +20,7 @@ from evaluation.formal_evaluation_support import (
     BASELINE_RESULTS_DIR,
     BENCHMARK_PATH,
     CALIBRATION_BLOCKED,
+    CALIBRATION_ADJUDICATION_PATH,
     CALIBRATION_PATH,
     CALIBRATION_READY,
     CALIBRATION_RESULTS_PATH,
@@ -48,13 +50,17 @@ from evaluation.formal_evaluation_support import (
     build_baseline_comparison,
     build_evaluation_run_paths,
     evaluate_calibration_runs,
+    calibration_review_items,
     export_metrics,
     load_evaluation_artifacts,
+    load_saved_calibration_results,
     load_json,
     negative_rejection_rate,
     require_complete_formal_run,
     run_calibration_once,
     run_formal_cases,
+    resolve_calibration_review,
+    save_calibration_adjudication,
     save_calibration_results,
     score_ragchecker,
     validate_benchmark,
@@ -252,8 +258,14 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert all(cell["execution_count"] is None and cell["outputs"] == [] for cell in code_cells)
     all_source = "\n".join("".join(cell["source"]) for cell in notebook["cells"])
     assert "RUN_AUTHORIZED = False" in all_source
+    assert "CALIBRATION_REVIEW_DECISIONS = {}" in all_source
+    assert '"CAL-EXT-03": "approve"' not in all_source
     assert "chỉ cho phép thực hiện lần đánh giá" in all_source
     assert "không có nghĩa toàn bộ benchmark hoặc calibration" in all_source
+    assert "Không gọi lại evaluator" in all_source
+    assert "resolve_calibration_review" in all_source
+    assert "save_calibration_adjudication" in all_source
+    assert "if evaluator_adapter is None" in all_source
     assert "CALIBRATION_BLOCKED" in all_source
     assert "CALIBRATION_REVIEW_REQUIRED" in all_source
     assert CALIBRATION_BLOCKED == "BLOCKED_BY_EVALUATOR_CALIBRATION"
@@ -279,7 +291,16 @@ def test_formal_outputs_are_not_precreated_or_tracked() -> None:
     for path in (RAW_RESULTS_PATH, CASE_METRICS_PATH, METRICS_SUMMARY_PATH):
         assert not path.exists()
     tracked = subprocess.run(
-        ["git", "ls-files", "--", str(RAW_RESULTS_PATH), str(CASE_METRICS_PATH), str(METRICS_SUMMARY_PATH), str(CALIBRATION_RESULTS_PATH)],
+        [
+            "git",
+            "ls-files",
+            "--",
+            str(RAW_RESULTS_PATH),
+            str(CASE_METRICS_PATH),
+            str(METRICS_SUMMARY_PATH),
+            str(CALIBRATION_RESULTS_PATH),
+            str(CALIBRATION_ADJUDICATION_PATH),
+        ],
         check=True,
         capture_output=True,
         text=True,
@@ -294,6 +315,7 @@ def test_post_improvement_output_paths_are_isolated_from_baseline() -> None:
         paths.case_metrics,
         paths.metrics_summary,
         paths.calibration_results,
+        paths.calibration_adjudication,
         paths.ragchecker_checkpoint,
     }
 
@@ -711,6 +733,280 @@ def test_calibration_decision_distinguishes_ready_review_and_blocked() -> None:
     assert evaluate_calibration_runs(first, second)["decision"] == CALIBRATION_BLOCKED
 
 
+def _automatic_review(*item_ids: str) -> dict:
+    return {
+        "claim_extraction_acceptable": 7,
+        "claim_checking_agreement": 12,
+        "repeat_consistency": 19,
+        "critical_semantic_failures": [],
+        "disagreements": [
+            {
+                "item_id": item_id,
+                "type": "extraction",
+                "first": {
+                    "status": "review_required",
+                    "reasons": ["missing_reference:R01"],
+                    "claims": ["synthetic evaluator paraphrase"],
+                },
+                "second": {
+                    "status": "accepted",
+                    "reasons": [],
+                    "claims": ["synthetic reference concept"],
+                },
+            }
+            for item_id in item_ids
+        ],
+        "decision": CALIBRATION_REVIEW_REQUIRED,
+    }
+
+
+def test_ready_calibration_needs_no_manual_adjudication() -> None:
+    automatic = {"decision": CALIBRATION_READY}
+
+    resolution = resolve_calibration_review(automatic, {})
+
+    assert resolution["effective_decision"] == CALIBRATION_READY
+    assert resolution["formal_run_allowed"] is True
+    assert resolution["researcher_adjudication"] == "NOT_REQUIRED"
+    with pytest.raises(EvaluationBlocked, match="DECISIONS_NOT_REQUIRED"):
+        resolve_calibration_review(automatic, {"CAL-X": "approve"})
+
+
+def test_blocked_calibration_cannot_be_manually_overridden() -> None:
+    automatic = {
+        "decision": CALIBRATION_BLOCKED,
+        "critical_semantic_failures": [{"item_id": "CAL-X"}],
+    }
+
+    resolution = resolve_calibration_review(automatic, {"CAL-X": "approve"})
+
+    assert resolution["effective_decision"] == CALIBRATION_BLOCKED
+    assert resolution["formal_run_allowed"] is False
+    assert resolution["researcher_adjudication"] == "NOT_PERMITTED"
+
+
+@pytest.mark.parametrize(
+    ("decisions", "effective", "adjudication", "unresolved"),
+    [
+        ({}, CALIBRATION_REVIEW_REQUIRED, "INCOMPLETE", ["CAL-X", "CAL-Y"]),
+        (
+            {"CAL-X": "approve"},
+            CALIBRATION_REVIEW_REQUIRED,
+            "INCOMPLETE",
+            ["CAL-Y"],
+        ),
+        (
+            {"CAL-X": "approve", "CAL-Y": "approve"},
+            CALIBRATION_READY,
+            "APPROVED",
+            [],
+        ),
+        (
+            {"CAL-X": "approve", "CAL-Y": "reject"},
+            CALIBRATION_BLOCKED,
+            "REJECTED",
+            [],
+        ),
+    ],
+)
+def test_review_resolution_requires_every_per_item_decision(
+    decisions: dict[str, str],
+    effective: str,
+    adjudication: str,
+    unresolved: list[str],
+) -> None:
+    automatic = _automatic_review("CAL-X", "CAL-Y")
+    automatic_before = json.loads(json.dumps(automatic))
+
+    resolution = resolve_calibration_review(automatic, decisions)
+
+    assert resolution["effective_decision"] == effective
+    assert resolution["researcher_adjudication"] == adjudication
+    assert resolution["unresolved_item_ids"] == unresolved
+    assert resolution["formal_run_allowed"] is (effective == CALIBRATION_READY)
+    assert resolution["automatic_counts"] == {
+        "claim_extraction_acceptable": 7,
+        "claim_checking_agreement": 12,
+        "repeat_consistency": 19,
+    }
+    assert automatic == automatic_before
+
+
+def test_review_resolution_rejects_unknown_item() -> None:
+    with pytest.raises(EvaluationBlocked, match="REVIEW_ITEMS_UNKNOWN"):
+        resolve_calibration_review(
+            _automatic_review("CAL-X"),
+            {"CAL-X": "approve", "CAL-Z": "approve"},
+        )
+
+
+@pytest.mark.parametrize("invalid", ["yes", "true", "accepted", True, None])
+def test_review_resolution_rejects_invalid_decision_value(invalid: object) -> None:
+    with pytest.raises(EvaluationBlocked, match="REVIEW_DECISIONS_INVALID"):
+        resolve_calibration_review(
+            _automatic_review("CAL-X"),
+            {"CAL-X": invalid},  # type: ignore[dict-item]
+        )
+
+
+def _saved_calibration_payload(
+    calibration: dict,
+    first: dict,
+    second: dict,
+) -> dict:
+    automatic = evaluate_calibration_runs(first, second)
+    return {
+        "evaluator_model": EVALUATOR_MODEL,
+        "evaluator_request_configuration": {
+            "extraction": {
+                "model": EVALUATOR_MODEL,
+                "reasoning_effort": EXTRACTION_REASONING_EFFORT,
+            },
+            "checking": {
+                "model": EVALUATOR_MODEL,
+                "reasoning_effort": CHECKING_REASONING_EFFORT,
+            },
+        },
+        "run_timestamp": "2026-08-22T00:00:00+00:00",
+        "calibration_dataset_sha256": canonical_json_file_sha256(CALIBRATION_PATH),
+        "calibration_schema_version": calibration["schema_version"],
+        "run_1": first,
+        "run_2": second,
+        "claim_extraction_acceptable": automatic["claim_extraction_acceptable"],
+        "claim_checking_agreement": automatic["claim_checking_agreement"],
+        "repeat_consistency": automatic["repeat_consistency"],
+        "disagreements": automatic["disagreements"],
+        "critical_failures": automatic["critical_semantic_failures"],
+        "final_calibration_decision": automatic["decision"],
+    }
+
+
+def test_saved_review_calibration_is_reused_without_provider_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    first, second = _clean_calibration_runs()
+    second["checking"][0].update(actual="UNPARSEABLE", agreement=False)
+    payload = _saved_calibration_payload(calibration, first, second)
+    saved_path = tmp_path / "evaluator_calibration_results.json"
+    atomic_write_json(saved_path, payload)
+    provider_calls = 0
+
+    def provider_must_not_run(*_args, **_kwargs):
+        nonlocal provider_calls
+        provider_calls += 1
+        pytest.fail("saved calibration validation must not build or call an evaluator")
+
+    monkeypatch.setattr(
+        evaluation_support,
+        "build_openai_batch_adapter",
+        provider_must_not_run,
+    )
+    loaded = load_saved_calibration_results(calibration, saved_path)
+
+    assert loaded is not None
+    assert loaded["payload"] == payload
+    assert loaded["automatic_decision"]["decision"] == CALIBRATION_REVIEW_REQUIRED
+    assert loaded["path"] == saved_path
+    assert provider_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value"),
+    [
+        ("evaluator_model", "wrong-model"),
+        ("calibration_dataset_sha256", "wrong-sha"),
+        ("evaluator_request_configuration", {"extraction": {}, "checking": {}}),
+        ("run_1", None),
+        ("run_2", None),
+    ],
+)
+def test_saved_calibration_identity_mismatch_fails_closed(
+    tmp_path: Path,
+    field: str,
+    invalid_value: object,
+) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    first, second = _clean_calibration_runs()
+    payload = _saved_calibration_payload(calibration, first, second)
+    payload[field] = invalid_value
+    saved_path = tmp_path / "evaluator_calibration_results.json"
+    atomic_write_json(saved_path, payload)
+
+    with pytest.raises(EvaluationBlocked, match="SAVED_CALIBRATION_IDENTITY_MISMATCH"):
+        load_saved_calibration_results(calibration, saved_path)
+
+
+def test_saved_calibration_corruption_fails_closed(tmp_path: Path) -> None:
+    saved_path = tmp_path / "evaluator_calibration_results.json"
+    saved_path.write_text("not-json", encoding="utf-8")
+
+    with pytest.raises(EvaluationBlocked, match="SAVED_CALIBRATION_INTEGRITY_ERROR"):
+        load_saved_calibration_results(load_json(CALIBRATION_PATH), saved_path)
+
+
+def test_saved_calibration_decision_mismatch_fails_closed(tmp_path: Path) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    first, second = _clean_calibration_runs()
+    payload = _saved_calibration_payload(calibration, first, second)
+    payload["final_calibration_decision"] = CALIBRATION_REVIEW_REQUIRED
+    saved_path = tmp_path / "evaluator_calibration_results.json"
+    atomic_write_json(saved_path, payload)
+
+    with pytest.raises(EvaluationBlocked, match="SAVED_CALIBRATION_DECISION_MISMATCH"):
+        load_saved_calibration_results(calibration, saved_path)
+
+
+def test_saved_calibration_run_structure_corruption_fails_closed(tmp_path: Path) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    first, second = _clean_calibration_runs()
+    payload = _saved_calibration_payload(calibration, first, second)
+    payload["run_1"] = {}
+    saved_path = tmp_path / "evaluator_calibration_results.json"
+    atomic_write_json(saved_path, payload)
+
+    with pytest.raises(EvaluationBlocked, match="SAVED_CALIBRATION_INTEGRITY_ERROR"):
+        load_saved_calibration_results(calibration, saved_path)
+
+
+def test_adjudication_is_separate_and_raw_calibration_remains_immutable(
+    tmp_path: Path,
+) -> None:
+    calibration = load_json(CALIBRATION_PATH)
+    first, second = _clean_calibration_runs()
+    second["checking"][0].update(actual="UNPARSEABLE", agreement=False)
+    raw_payload = _saved_calibration_payload(calibration, first, second)
+    raw_path = tmp_path / "evaluator_calibration_results.json"
+    adjudication_path = tmp_path / "calibration_adjudication.json"
+    atomic_write_json(raw_path, raw_payload)
+    raw_before = raw_path.read_bytes()
+    raw_sha_before = hashlib.sha256(raw_before).hexdigest()
+    automatic = evaluate_calibration_runs(first, second)
+    item_id = automatic["disagreements"][0]["item_id"]
+    resolution = resolve_calibration_review(automatic, {item_id: "approve"})
+
+    adjudication = save_calibration_adjudication(
+        calibration,
+        automatic,
+        resolution,
+        adjudication_path,
+    )
+
+    assert raw_path.read_bytes() == raw_before
+    assert hashlib.sha256(raw_path.read_bytes()).hexdigest() == raw_sha_before
+    assert load_json(adjudication_path) == adjudication
+    assert adjudication["automatic_decision"] == CALIBRATION_REVIEW_REQUIRED
+    assert adjudication["automatic_counts"] == {
+        "claim_extraction_acceptable": 8,
+        "claim_checking_agreement": 11,
+        "repeat_consistency": 19,
+    }
+    assert adjudication["researcher_decisions"] == {item_id: "approve"}
+    assert adjudication["researcher_adjudication"] == "APPROVED"
+    assert adjudication["effective_decision"] == CALIBRATION_READY
+    assert calibration_review_items(calibration, automatic) == adjudication["review_items"]
+
+
 def test_metrics_export_normalizes_all_headlines_to_percent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1042,6 +1338,9 @@ def _patch_formal_run_paths(
         run_id=POST_IMPROVEMENT_RUN_ID,
         directory=root / POST_IMPROVEMENT_RUN_ID,
         calibration_results=root / POST_IMPROVEMENT_RUN_ID / "evaluator_calibration_results.json",
+        calibration_adjudication=(
+            root / POST_IMPROVEMENT_RUN_ID / "calibration_adjudication.json"
+        ),
         raw_results=root / POST_IMPROVEMENT_RUN_ID / "raw_results.json",
         case_metrics=root / POST_IMPROVEMENT_RUN_ID / "case_metrics.csv",
         metrics_summary=root / POST_IMPROVEMENT_RUN_ID / "metrics_summary.csv",
@@ -1049,6 +1348,11 @@ def _patch_formal_run_paths(
     )
     monkeypatch.setattr(evaluation_support, "RAW_RESULTS_PATH", paths.raw_results)
     monkeypatch.setattr(evaluation_support, "CALIBRATION_RESULTS_PATH", paths.calibration_results)
+    monkeypatch.setattr(
+        evaluation_support,
+        "CALIBRATION_ADJUDICATION_PATH",
+        paths.calibration_adjudication,
+    )
     monkeypatch.setattr(evaluation_support, "CASE_METRICS_PATH", paths.case_metrics)
     monkeypatch.setattr(evaluation_support, "METRICS_SUMMARY_PATH", paths.metrics_summary)
     monkeypatch.setattr(evaluation_support, "RAGCHECKER_CHECKPOINT_PATH", paths.ragchecker_checkpoint)
