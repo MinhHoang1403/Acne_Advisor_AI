@@ -25,7 +25,7 @@
     "unsupported_comparison_relationship_specificity": 10,
     "unsupported_exact_quantity_time": 10
   },
-  "evaluator_model": "gpt-5.4-mini-2026-03-17",
+  "evaluator_model": "gpt-5.4-2026-03-05",
   "ragchecker": {
     "version": "0.1.9",
     "commit": "9017b3263b82ea5354948c4db40a65bba94d779e",

@@ -34,11 +34,11 @@ MANIFEST_PATH = EVALUATION_DIR / "benchmark_manifest.json"
 CALIBRATION_PATH = EVALUATION_DIR / "evaluator_calibration.json"
 
 EXPECTED_BASE_SHA = "6a1809c4ddedbccab986ec76eb730321686ff3ff"
-SYSTEM_UNDER_TEST_SHA = "47b10954d217de91cf8919650b31dc7569ec1f0e"
+SYSTEM_UNDER_TEST_SHA = "978093b99f3e3c3d1591d408183bf105db7d14f4"
 EXPECTED_KB_BUILD_ID = "94d613bc9b33628de3ef"
-EXPECTED_PIPELINE_FINGERPRINT = "5991f3c8effb67091fd6274c"
-POST_IMPROVEMENT_RUN_ID = "post_improvement_47b10954"
-EVALUATOR_MODEL = "gpt-5.4-mini-2026-03-17"
+EXPECTED_PIPELINE_FINGERPRINT = "4471ea95f7859ed35a0cc270"
+POST_IMPROVEMENT_RUN_ID = "formal_run_978093b9"
+EVALUATOR_MODEL = "gpt-5.4-2026-03-05"
 RAGCHECKER_VERSION = "0.1.9"
 EXTRACTION_REASONING_EFFORT = "medium"
 CHECKING_REASONING_EFFORT = "low"
@@ -118,6 +118,28 @@ _RAGCHECKER_CHECKING_PROMPT_PREFIXES = (
 
 class EvaluationBlocked(RuntimeError):
     """Raised when a methodology gate forbids the next evaluation stage."""
+
+
+def validate_final_evaluator_model(model: str) -> str:
+    """Require the exact official evaluator snapshot before any paid call."""
+
+    if model != EVALUATOR_MODEL:
+        raise EvaluationBlocked(
+            "FINAL_EVALUATOR_MODEL_MISMATCH: expected "
+            f"{EVALUATOR_MODEL}, received {model or '<empty>'}"
+        )
+    return model
+
+
+def effective_runtime_pipeline_fingerprint() -> str:
+    """Load runtime configuration in production order, then compute its identity."""
+
+    from dotenv import load_dotenv
+
+    load_dotenv(ROOT / ".env", override=False)
+    from src.observability.versioning import current_pipeline_fingerprint
+
+    return current_pipeline_fingerprint()
 
 
 def load_json(path: Path) -> Any:
@@ -226,6 +248,7 @@ def validate_system_under_test(manifest: dict[str, Any]) -> dict[str, Any]:
         *PRODUCTION_SENSITIVE_PATHS,
     ).splitlines()
     knowledge_manifest = load_json(ROOT / "data" / "knowledge_build_manifest.json")
+    active_pipeline_fingerprint = effective_runtime_pipeline_fingerprint()
     checks = {
         "benchmark_reference_base_sha": manifest.get("evaluation_base_sha") == EXPECTED_BASE_SHA,
         "benchmark_sha256": manifest.get("benchmark_sha256")
@@ -236,6 +259,8 @@ def validate_system_under_test(manifest: dict[str, Any]) -> dict[str, Any]:
         "phase1_frozen": knowledge_manifest.get("phase1_frozen") is True,
         "manifest_status": knowledge_manifest.get("status") == "activated",
         "benchmark_manifest_kb": manifest.get("active_kb_build_id") == EXPECTED_KB_BUILD_ID,
+        "active_pipeline_fingerprint": active_pipeline_fingerprint
+        == EXPECTED_PIPELINE_FINGERPRINT,
     }
     if not all(value is True or value == [] for value in checks.values()):
         raise EvaluationBlocked(f"System under test không khớp: {checks}")
@@ -243,6 +268,7 @@ def validate_system_under_test(manifest: dict[str, Any]) -> dict[str, Any]:
         "repository_head": head,
         "system_under_test_sha": SYSTEM_UNDER_TEST_SHA,
         "expected_pipeline_fingerprint": EXPECTED_PIPELINE_FINGERPRINT,
+        "reproduced_pipeline_fingerprint": active_pipeline_fingerprint,
         **checks,
     }
 
@@ -432,6 +458,7 @@ def _evaluator_request_configuration() -> dict[str, Any]:
 def build_openai_batch_adapter(model: str = EVALUATOR_MODEL) -> Callable[[list[str]], list[str]]:
     """Return a fail-closed RAGChecker callback with stage-specific reasoning effort."""
 
+    model = validate_final_evaluator_model(model)
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise EvaluationBlocked("OPENAI_API_KEY chưa được cấu hình tại notebook runtime.")
@@ -461,6 +488,7 @@ def build_openai_batch_adapter(model: str = EVALUATOR_MODEL) -> Callable[[list[s
 def _make_ragchecker(adapter: Callable[[list[str]], list[str]]):
     from ragchecker import RAGChecker
 
+    validate_final_evaluator_model(EVALUATOR_MODEL)
     return RAGChecker(
         extractor_name=EVALUATOR_MODEL,
         checker_name=EVALUATOR_MODEL,
@@ -1233,6 +1261,7 @@ def score_ragchecker(
 ):
     """Use official RAGChecker metrics without changing their semantics."""
 
+    validate_final_evaluator_model(EVALUATOR_MODEL)
     _validate_pipeline_fingerprints(raw.get("records") or [])
 
     from ragchecker import RAGChecker, RAGResult, RAGResults
@@ -1420,6 +1449,7 @@ __all__ = [
     "CASE_METRICS_PATH",
     "CHECKING_REASONING_EFFORT",
     "EVALUATOR_MODEL",
+    "effective_runtime_pipeline_fingerprint",
     "EXPECTED_BASE_SHA",
     "EXPECTED_KB_BUILD_ID",
     "EXPECTED_PIPELINE_FINGERPRINT",
@@ -1456,6 +1486,7 @@ __all__ = [
     "resolve_calibration_review",
     "validate_baseline",
     "validate_benchmark",
+    "validate_final_evaluator_model",
     "validate_system_under_test",
     "vietnamese_analysis",
     "write_pretty_json",

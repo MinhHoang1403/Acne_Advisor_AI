@@ -49,6 +49,7 @@ from evaluation.formal_evaluation_support import (
     build_openai_batch_adapter,
     build_baseline_comparison,
     build_evaluation_run_paths,
+    effective_runtime_pipeline_fingerprint,
     evaluate_calibration_runs,
     calibration_review_items,
     export_metrics,
@@ -64,6 +65,7 @@ from evaluation.formal_evaluation_support import (
     save_calibration_results,
     score_ragchecker,
     validate_benchmark,
+    validate_final_evaluator_model,
     validate_system_under_test,
     write_pretty_json,
 )
@@ -102,6 +104,7 @@ def test_formal_benchmark_contract_and_hash() -> None:
     assert manifest["benchmark_sha256"] == "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b"
     assert manifest["evaluation_base_sha"] == "6a1809c4ddedbccab986ec76eb730321686ff3ff"
     assert manifest["active_kb_build_id"] == "94d613bc9b33628de3ef"
+    assert manifest["evaluator_model"] == "gpt-5.4-2026-03-05"
     assert manifest["researcher_review_status"] == "pending"
     assert manifest["ragchecker"]["per_case_metric_scale"] == "ratio_0_1"
     assert manifest["ragchecker"]["aggregate_metric_scale"] == "percent_0_100"
@@ -111,6 +114,21 @@ def test_formal_benchmark_contract_and_hash() -> None:
     assert benchmark["anti_contamination"]["manual_pattern_matches_at_or_above_0_86"] == 0
     assert benchmark["anti_contamination"]["registry_source_paths"] == ["tests", "docs", "scripts"]
     assert benchmark["anti_contamination"]["repeated_gold_claim_sets"] >= 0
+
+
+def test_final_evaluation_identity_targets_production_commit_and_fresh_run() -> None:
+    assert SYSTEM_UNDER_TEST_SHA == "978093b99f3e3c3d1591d408183bf105db7d14f4"
+    assert EXPECTED_PIPELINE_FINGERPRINT == "4471ea95f7859ed35a0cc270"
+    assert EXPECTED_KB_BUILD_ID == "94d613bc9b33628de3ef"
+    assert POST_IMPROVEMENT_RUN_ID == "formal_run_978093b9"
+    assert canonical_json_file_sha256(BENCHMARK_PATH) == (
+        "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b"
+    )
+    assert POST_IMPROVEMENT_PATHS.directory.name == POST_IMPROVEMENT_RUN_ID
+    assert POST_IMPROVEMENT_PATHS.directory not in {
+        BASELINE_RESULTS_DIR,
+        BASELINE_RESULTS_DIR.parent / "post_improvement_47b10954",
+    }
 
 
 def test_answerable_gold_provenance_is_self_contained() -> None:
@@ -359,6 +377,11 @@ def test_system_under_test_validation_blocks_only_production_sensitive_diff(
         "run",
         lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
     )
+    monkeypatch.setattr(
+        evaluation_support,
+        "effective_runtime_pipeline_fingerprint",
+        lambda: EXPECTED_PIPELINE_FINGERPRINT,
+    )
 
     if should_pass:
         report = validate_system_under_test(manifest)
@@ -381,6 +404,51 @@ def test_system_under_test_validation_fails_when_checkpoint_is_not_ancestor(
         evaluation_support.subprocess,
         "run",
         lambda *_args, **_kwargs: SimpleNamespace(returncode=1),
+    )
+
+    with pytest.raises(EvaluationBlocked, match="System under test"):
+        validate_system_under_test(load_json(MANIFEST_PATH))
+
+
+def test_effective_runtime_fingerprint_loads_environment_before_computing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    def fake_load_dotenv(*_args, **_kwargs) -> None:
+        events.append("load")
+
+    def fake_fingerprint() -> str:
+        events.append("fingerprint")
+        return "effective-fingerprint"
+
+    import dotenv
+    import src.observability.versioning as versioning
+
+    monkeypatch.setattr(dotenv, "load_dotenv", fake_load_dotenv)
+    monkeypatch.setattr(versioning, "current_pipeline_fingerprint", fake_fingerprint)
+
+    assert effective_runtime_pipeline_fingerprint() == "effective-fingerprint"
+    assert events == ["load", "fingerprint"]
+
+
+def test_system_under_test_validation_rejects_runtime_fingerprint_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        evaluation_support,
+        "_git",
+        lambda *args: "head" if args[:2] == ("rev-parse", "HEAD") else "",
+    )
+    monkeypatch.setattr(
+        evaluation_support.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
+    )
+    monkeypatch.setattr(
+        evaluation_support,
+        "effective_runtime_pipeline_fingerprint",
+        lambda: "wrong-fingerprint",
     )
 
     with pytest.raises(EvaluationBlocked, match="System under test"):
@@ -1162,6 +1230,37 @@ def test_evaluator_adapter_fails_closed_without_key(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(EvaluationBlocked, match="OPENAI_API_KEY"):
         build_openai_batch_adapter()
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-mini",
+        "gpt-5.4",
+        "unexpected-model",
+        "",
+    ],
+)
+def test_final_evaluator_rejects_mini_alias_and_unexpected_models_before_client_creation(
+    monkeypatch: pytest.MonkeyPatch,
+    model: str,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "offline-test-key")
+
+    class ForbiddenOpenAI:
+        def __init__(self, **_kwargs) -> None:
+            pytest.fail("invalid evaluator model reached OpenAI client construction")
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=ForbiddenOpenAI))
+
+    with pytest.raises(EvaluationBlocked, match="FINAL_EVALUATOR_MODEL_MISMATCH"):
+        build_openai_batch_adapter(model)
+
+
+def test_final_evaluator_accepts_only_exact_snapshot() -> None:
+    assert EVALUATOR_MODEL == "gpt-5.4-2026-03-05"
+    assert validate_final_evaluator_model(EVALUATOR_MODEL) == EVALUATOR_MODEL
 
 
 def _ragchecker_role_prompts() -> tuple[list[str], str]:
