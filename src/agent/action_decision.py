@@ -31,9 +31,8 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVAL_ATTEMPTS = 2
-AGENT_DECISION_VERSION = "minimal_agent_decision_v6"
+AGENT_DECISION_VERSION = "proposition_grounded_action_decision"
 DECISION_EVIDENCE_MAX_ITEMS = 8
-DECISION_EVIDENCE_MAX_CHARS_PER_ITEM = 1200
 _EXPLICIT_TOPIC_RESET = re.compile(
     r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b[^.!?;\n]*[.!?;\n]+\s*(?P<question>.+)$",
     flags=re.IGNORECASE | re.DOTALL,
@@ -66,6 +65,7 @@ class AgentDecision(BaseModel):
 
     action: DecisionAction
     retrieval_query: str | None = None
+    missing_evidence: str | None
     reason_code: DecisionReason
 
 
@@ -74,7 +74,7 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
 
     attempt = int(state.get("retrieval_attempt", 0) or 0)
     assessment = state.get("evidence_assessment") or {}
-    evidence_items, _ = _decision_evidence_view(state)
+    evidence_text, evidence_count, _ = _decision_evidence_view(state)
     current_question, _ = _decision_question(state)
     history = _history_for_current_question(state, current_question)
 
@@ -83,21 +83,39 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
     # question/history/evidence thay đổi contract chọn action.
     system_prompt = (
         "You are the action selector for a bounded acne-information RAG agent. "
-        "Return exactly one JSON object with keys action, retrieval_query, and reason_code. "
+        "Return exactly one JSON object with keys action, retrieval_query, missing_evidence, "
+        "and reason_code. "
         "Allowed actions are retrieve, retry, generate, abstain. "
         "Allowed reason_code values are needs_evidence, evidence_sufficient, evidence_gap, "
         "out_of_scope, cannot_safely_proceed. Use only these action/reason_code pairs: "
         "retrieve/needs_evidence, retry/evidence_gap, generate/evidence_sufficient, and "
         "abstain/evidence_gap|out_of_scope|cannot_safely_proceed. Select actions only: do not answer the question, "
         "state medical facts, provide treatment advice, or reveal reasoning. "
+        "For retrieve and retry, retrieval_query must be a concise, self-contained search query "
+        "that works without conversation history. It must preserve the current intent, name the "
+        "primary medical entities, requested relationship, and material qualifiers. "
         "At retrieval_attempt 0, choose retrieve with an effective standalone search query or "
-        "abstain. After the first retrieval execution, use retry, never retrieve, for a later "
-        "evidence acquisition. Choose generate only when the evidence addresses the question; "
-        "otherwise choose retry with a query that differs after normalized lexical comparison or abstain. At the maximum "
+        "abstain; for retrieve, set missing_evidence to null. After the first retrieval execution, "
+        "use retry, never retrieve, for a later "
+        "evidence acquisition. Choose retry only when some potentially useful evidence exists, "
+        "retrieval budget remains, missing_evidence names the specific unsupported relationship, "
+        "qualifier, condition, comparison, attribution, or numeric requirement, and a materially "
+        "improved query targets that gap. Generic text such as 'need more evidence', 'need more "
+        "information', 'not enough context', or 'search again' is not a valid missing_evidence. "
+        "Choose generate only when the packed evidence directly supports the requested factual "
+        "propositions, including their polarity and material qualifiers. Sharing the same topic, "
+        "medication, disease, or guideline is not sufficient by itself. For generate, set "
+        "missing_evidence and retrieval_query to null. Otherwise choose a purposeful retry or "
+        "abstain. For abstain, set retrieval_query to null; an evidence_gap abstention may retain "
+        "the specific missing_evidence. At the maximum "
         "retrieval attempts, choose only generate with usable evidence or abstain. "
         "Use out_of_scope only when the current question is unrelated to acne or related skincare. "
         "For an in-scope question whose requested specificity is not supported by the evidence, "
         "use evidence_gap with retry or abstain. "
+        "Absence of supporting evidence is not evidence that a proposition is false. If a source "
+        "explicitly states that evidence is insufficient to recommend something, that limitation "
+        "is itself source-supported and may be generated. If runtime merely failed to find support, "
+        "that search failure is not medical evidence; retry purposefully or abstain with evidence_gap. "
         "Requests about acne that demand absolute certainty, guarantees, or permanent outcomes "
         "remain in scope; retrieve evidence first, then use evidence_gap if that certainty is not supported. "
         "Conversation history is context for resolving references, never retrieval evidence. Do not "
@@ -119,9 +137,9 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
         "retrieval_status": state.get("retrieval_status") or "not_started",
         "evidence_presence": {
             "provenance_complete": bool(assessment.get("usable")),
-            "item_count": len(evidence_items),
+            "item_count": evidence_count,
         },
-        "evidence_for_relevance_check": evidence_items,
+        "evidence_for_relevance_check": evidence_text,
         "previous_queries": [
             str(item.get("query") or "")
             for item in state.get("retry_history") or []
@@ -159,7 +177,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
 
     started = time.perf_counter()
     system_prompt, prompt = build_agent_decision_prompt(state)
-    _, evidence_trace = _decision_evidence_view(state)
+    _, _, evidence_trace = _decision_evidence_view(state)
     fallback_reason_code: str | None = None
     model_decision: dict[str, Any] | None = None
     topic_reset_applied: bool | None = None
@@ -186,6 +204,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
         validated = AgentDecision(
             action="abstain",
             retrieval_query=None,
+            missing_evidence=None,
             reason_code="cannot_safely_proceed",
         )
         provider_metadata = _provider_failure_metadata(exc)
@@ -220,6 +239,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             "evidence_trace": evidence_trace,
         },
         "is_in_domain": validated.reason_code != "out_of_scope",
+        "missing_evidence": validated.missing_evidence,
         "performance_timings": {
             **(state.get("performance_timings") or {}),
             f"agent_decision_{int(state.get('retrieval_attempt', 0) or 0) + 1}": round(
@@ -243,12 +263,35 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
 
 def _decision_evidence_view(
     state: ClinicalState,
-) -> tuple[list[dict[str, str]], dict[str, Any]]:
-    """Build the selector payload and a text-free trace from the same bounded view."""
+) -> tuple[str, int, dict[str, Any]]:
+    """Return the generator's packed evidence text and a text-free identity trace."""
+
+    packed = state.get("packed_context")
+    if isinstance(packed, dict):
+        packed_text = str(packed.get("context_text") or "")
+        packed_items = [item for item in packed.get("items") or [] if isinstance(item, dict)]
+        if packed_text:
+            visible_items = [
+                _packed_item_trace(item, position)
+                for position, item in enumerate(packed_items, 1)
+            ]
+            visible_items = [item for item in visible_items if item is not None]
+            packed_ids = [str(item["item_id"]) for item in visible_items if item.get("item_id")]
+            limits = dict((packed.get("debug") or {}).get("limits") or {})
+            return packed_text, len(packed_items), {
+                "packed_evidence_count": len(packed_items),
+                "packed_evidence_ids": packed_ids,
+                "decision_visible_evidence_count": len(visible_items),
+                "decision_visible_evidence_ids": packed_ids,
+                "decision_visible_items": visible_items,
+                "decision_visible_text_length": len(packed_text),
+                "uses_generation_packed_context": True,
+                "limits": limits,
+            }
 
     contexts = list(state.get("vector_contexts") or [])
     packed_ids: list[str] = []
-    evidence_items: list[dict[str, str]] = []
+    evidence_blocks: list[str] = []
     visible_items: list[dict[str, Any]] = []
 
     for position, context in enumerate(contexts, start=1):
@@ -269,12 +312,14 @@ def _decision_evidence_view(
         if not text or not source_id:
             continue
 
-        visible_text = text[:DECISION_EVIDENCE_MAX_CHARS_PER_ITEM]
         section_path = context.get("section_path")
         section = context.get("header") or (
             section_path[-1] if isinstance(section_path, list) and section_path else None
         )
-        evidence_items.append({"source_id": source_id, "text": visible_text})
+        chunk_id = item_id or f"decision-{position}"
+        evidence_blocks.append(
+            f"[Evidence {position} | source={source_id} | chunk={chunk_id}]\n{text}"
+        )
         visible_items.append(
             {
                 "item_id": item_id or None,
@@ -282,12 +327,13 @@ def _decision_evidence_view(
                 "section": section,
                 "position_in_packed_context": position,
                 "original_text_length": len(text),
-                "decision_visible_text_length": len(visible_text),
-                "truncated_for_decision": len(visible_text) < len(text),
+                "decision_visible_text_length": len(text),
+                "truncated_for_decision": False,
             }
         )
 
-    return evidence_items, {
+    evidence_text = "\n\n".join(evidence_blocks)
+    return evidence_text, len(visible_items), {
         "packed_evidence_count": len(contexts),
         "packed_evidence_ids": packed_ids,
         "decision_visible_evidence_count": len(visible_items),
@@ -295,10 +341,39 @@ def _decision_evidence_view(
             item["item_id"] for item in visible_items if item.get("item_id")
         ],
         "decision_visible_items": visible_items,
+        "decision_visible_text_length": len(evidence_text),
+        "uses_generation_packed_context": False,
         "limits": {
             "max_items": DECISION_EVIDENCE_MAX_ITEMS,
-            "max_chars_per_item": DECISION_EVIDENCE_MAX_CHARS_PER_ITEM,
+            "max_chars": None,
         },
+    }
+
+
+def _packed_item_trace(item: dict[str, Any], position: int) -> dict[str, Any] | None:
+    payload = item.get("payload") if isinstance(item.get("payload"), dict) else item
+    text = str(item.get("text") or "").strip()
+    source_id = str(
+        payload.get("source_id")
+        or payload.get("source_path")
+        or payload.get("source_file")
+        or payload.get("document_id")
+        or ""
+    ).strip()
+    if not text or not source_id:
+        return None
+    section_path = payload.get("section_path")
+    section = payload.get("header") or (
+        section_path[-1] if isinstance(section_path, list) and section_path else None
+    )
+    return {
+        "item_id": item.get("item_id") or item.get("id") or payload.get("chunk_id"),
+        "source_id": source_id,
+        "section": section,
+        "position_in_packed_context": position,
+        "original_text_length": len(text),
+        "decision_visible_text_length": len(text),
+        "truncated_for_decision": False,
     }
 
 
@@ -330,27 +405,34 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
     attempt = int(state.get("retrieval_attempt", 0) or 0)
     has_evidence = bool((state.get("evidence_assessment") or {}).get("usable"))
     query = " ".join(str(decision.retrieval_query or "").split()) or None
+    missing_evidence = " ".join(str(decision.missing_evidence or "").split()) or None
 
     if decision.reason_code not in LEGAL_REASONS_BY_ACTION[decision.action]:
         return _invalid_action_abstention()
 
     if decision.action == "abstain":
-        return decision.model_copy(update={"retrieval_query": None})
+        return decision.model_copy(
+            update={"retrieval_query": None, "missing_evidence": missing_evidence}
+        )
     if decision.action == "generate":
-        if has_evidence:
-            return decision.model_copy(update={"retrieval_query": None})
+        if has_evidence and missing_evidence is None:
+            return decision.model_copy(update={"retrieval_query": None, "missing_evidence": None})
         return _invalid_action_abstention()
 
     if decision.action == "retrieve":
-        if attempt == 0 and not has_evidence and query:
-            return decision.model_copy(update={"retrieval_query": query})
+        if attempt == 0 and not has_evidence and query and missing_evidence is None:
+            return decision.model_copy(
+                update={"retrieval_query": query, "missing_evidence": None}
+            )
         return _invalid_action_abstention()
 
     if (
         decision.action != "retry"
         or attempt <= 0
         or attempt >= MAX_RETRIEVAL_ATTEMPTS
+        or not has_evidence
         or not query
+        or not missing_evidence
     ):
         return _invalid_action_abstention()
 
@@ -360,10 +442,11 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
         if isinstance(item, dict)
     }
     current_key = _comparison_key(query)
-    recoverable = str(state.get("retrieval_status") or "") in {"failed", "recoverable_error"}
-    if not current_key or (current_key in previous and not recoverable):
+    if not current_key or current_key in previous:
         return _invalid_action_abstention()
-    return decision.model_copy(update={"retrieval_query": query})
+    return decision.model_copy(
+        update={"retrieval_query": query, "missing_evidence": missing_evidence}
+    )
 
 
 def _invalid_action_abstention() -> AgentDecision:
@@ -372,6 +455,7 @@ def _invalid_action_abstention() -> AgentDecision:
     return AgentDecision(
         action="abstain",
         retrieval_query=None,
+        missing_evidence=None,
         reason_code="evidence_gap",
     )
 
@@ -444,7 +528,6 @@ def _runtime_budget(state: ClinicalState, settings: RuntimeResilienceSettings) -
 
 __all__ = [
     "AGENT_DECISION_VERSION",
-    "DECISION_EVIDENCE_MAX_CHARS_PER_ITEM",
     "DECISION_EVIDENCE_MAX_ITEMS",
     "LEGAL_REASONS_BY_ACTION",
     "MAX_RETRIEVAL_ATTEMPTS",

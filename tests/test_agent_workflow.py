@@ -157,6 +157,7 @@ async def test_decide_node_records_post_retrieval_decision_visible_evidence(
                 "action": "generate",
                 "reason_code": "evidence_sufficient",
                 "retrieval_query": None,
+                "missing_evidence": None,
                 "provider": "test",
                 "model": "decision-model",
                 "fallback_used": False,
@@ -213,6 +214,7 @@ async def test_decide_node_records_post_retrieval_decision_visible_evidence(
             "action": "generate",
             "reason_code": "evidence_sufficient",
             "retrieval_query": None,
+            "missing_evidence": None,
             "provider": "test",
             "model": "decision-model",
             "requested_provider": None,
@@ -290,18 +292,21 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
             payload = {
                 "action": "retrieve",
                 "retrieval_query": "initial acne query",
+                "missing_evidence": None,
                 "reason_code": "needs_evidence",
             }
         elif attempt == 1:
             payload = {
                 "action": "retry",
                 "retrieval_query": "changed acne evidence query",
+                "missing_evidence": "a specific missing acne treatment relationship",
                 "reason_code": "evidence_gap",
             }
         else:
             payload = {
                 "action": "retrieve",
                 "retrieval_query": "attempt to bypass retry budget",
+                "missing_evidence": None,
                 "reason_code": "needs_evidence",
             }
         return {
@@ -325,9 +330,32 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
         nonlocal retrieve_calls
         retrieve_calls += 1
         return {
-            "vector_contexts": [],
-            "sources": [],
-            "metadata": {"retrieval_status": "no_evidence", "retrieval_trace": {}},
+            "vector_contexts": [
+                {
+                    "id": f"chunk-{retrieve_calls}",
+                    "text": "Potentially useful acne evidence.",
+                    "source_id": "guideline",
+                }
+            ],
+            "sources": ["guideline"],
+            "metadata": {
+                "retrieval_status": "ok",
+                "retrieval_trace": {},
+                "packed_context": {
+                    "context_text": (
+                        f"[Evidence 1 | source=guideline | chunk=chunk-{retrieve_calls}]\n"
+                        "Potentially useful acne evidence."
+                    ),
+                    "items": [
+                        {
+                            "item_id": f"chunk-{retrieve_calls}",
+                            "text": "Potentially useful acne evidence.",
+                            "payload": {"source_id": "guideline"},
+                        }
+                    ],
+                    "debug": {"limits": {"max_items": 8, "max_chars": 6000}},
+                },
+            },
         }
 
     async def fake_fallback(_state: ClinicalState) -> dict:

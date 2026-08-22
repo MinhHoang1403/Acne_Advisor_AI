@@ -23,6 +23,7 @@ class ClinicalState(TypedDict, total=False):
     conversation_history: list[dict[str, str]]
     standalone_question: str | None
     retrieval_query: str | None
+    missing_evidence: str | None
     normalized_question: str
     conversation_context: dict[str, Any] | None
 

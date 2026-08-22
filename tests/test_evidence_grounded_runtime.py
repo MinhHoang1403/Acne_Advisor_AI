@@ -77,6 +77,7 @@ async def test_no_evidence_abstains_without_blind_second_attempt(
         return {
             "text": (
                 '{"action":"retry","retrieval_query":"Câu hỏi giống nhau",'
+                '"missing_evidence":"specific acne evidence",'
                 '"reason_code":"evidence_gap"}'
             ),
             "provider": "test",
