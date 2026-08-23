@@ -17,7 +17,8 @@ The repository contains two cooperating parts:
    knowledge assets.
 2. **The Agentic RAG runtime** accepts questions through FastAPI, uses LangGraph
    to select bounded actions, retrieves evidence with Dense and BM25 search,
-   generates or abstains, and returns an answer to the React interface.
+   reranks fused candidates with a local BGE cross-encoder, generates or
+   abstains, and returns an answer to the React interface.
 
 Responsibilities are intentionally separate:
 
@@ -43,7 +44,10 @@ AGENTIC RAG RUNTIME
 
 React -> FastAPI -> START -> prepare -> guard -> decide
                                              +-- retrieve/retry
-                                             |      -> retrieve -> assess -> decide
+                                             |      -> Dense + BM25 -> RRF
+                                             |      -> local BGE reranking
+                                             |      -> whole-chunk packing
+                                             |      -> assess -> decide
                                              +-- generate -> generate -> finalize -> END
                                              +-- abstain  -> abstain  -> finalize -> END
                                              `-- cache/safety -> finalize -> END
@@ -125,9 +129,10 @@ conversation context when applicable, the exact packed evidence, and a source
 allowlist. Retrieval, context packing, prompt assembly, and provider dispatch
 are internal Python calls rather than separate HTTP services.
 
-The answer path does not contain a reranker, Candidate Policy, metadata score
-boost, evidence selector, EntityCard retrieval, graph retrieval, medical
-proposition engine, semantic cache, or deterministic normal-answer engine.
+The answer path includes one local cross-encoder reranker after RRF. It does not
+contain a Candidate Policy, metadata score boost, separate evidence selector,
+EntityCard retrieval, graph retrieval, medical proposition engine, semantic
+cache, or deterministic normal-answer engine.
 
 ## Retrieval
 
@@ -143,7 +148,10 @@ query
                     Reciprocal Rank Fusion (RRF)
                                   |
                                   v
-                    bounded provenance context
+                    local BGE cross-encoder
+                                  |
+                                  v
+                    whole-chunk context packing
 ```
 
 | Default | Value |
@@ -160,6 +168,12 @@ but BM25 returns evidence, the result is preserved as `degraded_dense`. If BM25
 fails but Dense succeeds, it is preserved as `degraded_bm25`. If neither
 channel yields usable evidence, the Agent can request one legal retry and then
 abstains when the retrieval budget is exhausted.
+
+The reranker uses `BAAI/bge-reranker-v2-m3` from an already available local
+model artifact. Its raw score is used only to order candidates; it is not a
+probability or medical-confidence score. A bounded operational failure preserves
+the deterministic pre-reranker order. Packing then keeps complete chunk text and
+provenance while enforcing the 8-item and 6000-character limits.
 
 The formulas, provider contracts, and parameter classifications are documented
 in [Methods and Formulas](docs/METHODS_AND_FORMULAS.md).
@@ -216,12 +230,18 @@ channels, the overall Agent request, and frontend requests use finite timeouts.
 Retries are bounded, and provider fallback requires both server configuration
 and request-level opt-in.
 
+The evaluated generation chain is `gemini-3.5-flash-lite`, then
+`gemini-3.1-flash-lite`, then local `qwen3:8b` when fallback is enabled and the
+request opts in. This fallback order does not change retrieval or evidence
+requirements.
+
 ## Data Stores and Providers
 
 | Component | Responsibility | Runtime role |
 |---|---|---|
 | Qdrant knowledge index | Dense and BM25 medical evidence | required for normal RAG |
 | Google embedding API | 3072-dimensional Dense query embeddings | required by current preflight; BM25 can preserve evidence during an individual Dense-channel failure |
+| Local BGE reranker | Cross-encoder ordering after RRF | enabled in the evaluated runtime; failure preserves deterministic candidate order |
 | Gemini or Ollama | action selection and answer generation | one configured generation path is required |
 | PostgreSQL | chat/session persistence and history endpoints | optional for a single chat response; history features depend on it |
 | Redis | exact answer cache | optional; cache failure becomes a miss |
@@ -291,7 +311,7 @@ hardening.
 | `scripts/knowledge_build.py` | knowledge build, validation, and status interface |
 | `src/ingestion/` | parsing, chunking, provenance, validation, and indexing |
 | `src/knowledge/` | taxonomy, EntityCards, and deterministic graph assets |
-| `src/retrieval/` | Dense + native BM25 + RRF evidence retrieval |
+| `src/retrieval/` | Dense + native BM25 + RRF, local reranking, and whole-chunk packing |
 | `src/agent/` | LangGraph state, decisions, generation, safety, and presentation |
 | `src/quality/` | structural/provenance verification and safe fallback contracts |
 | `src/cache/` | exact Redis answer cache |
@@ -302,6 +322,8 @@ hardening.
 | `src/frontend/` | React/Vite interface |
 | `docs/` | architecture, methods, safety, data, and operations documentation |
 | `tests/` | implementation and regression contracts |
+| `evaluation/` | benchmark, evaluator package, executed notebook, and official result |
+| `research_archive/` | preserved development evaluations and forensic history |
 
 ## Local Setup
 
@@ -311,6 +333,7 @@ hardening.
 - Node.js 24 and npm
 - Docker Desktop with Compose
 - a Gemini API key for live Gemini generation and Dense query embeddings
+- a local `BAAI/bge-reranker-v2-m3` artifact when reranking is enabled
 - Ollama with `qwen3:8b` when Ollama generation or fallback is enabled
 
 ### Installation
@@ -405,6 +428,27 @@ correctness, claim-level faithfulness, clinical effectiveness, or deployment
 readiness. Those qualities require separate system evaluation and clinical
 review.
 
+## Official Formal Evaluation
+
+The completed official run is
+[`formal_run_2d5f0124`](evaluation/results/formal_run_2d5f0124/). It evaluated
+commit `2d5f0124dc532a4970a4b08dcd6cf846389a03ff` with pipeline fingerprint
+`f93ad3e8dfb2c39f403b0794`, knowledge build `94d613bc9b33628de3ef`,
+RAGChecker `0.1.9`, and evaluator snapshot `gpt-5.4-2026-03-05`.
+
+| Metric | Score |
+|---|---:|
+| Claim Recall | 72.3% |
+| Context Precision | 38.9% |
+| Faithfulness | 87.7% |
+| Claim F1 | 33.8% |
+| Negative Rejection Rate | 80.0% (24/30) |
+
+All 100 cases completed with zero infrastructure failures. The raw outputs,
+case-level metrics, checkpoint, calibration evidence, hashes, and interpretation
+boundary are listed in [Official Evaluation Results](evaluation/results/README.md).
+These benchmark results are research evidence, not clinical validation.
+
 ## Limitations
 
 - The indexed corpus contains four curated acne source snapshots and is not
@@ -414,6 +458,10 @@ review.
   2026. Its exact current-version provenance has not been independently
   reconciled.
 - Source allowlisting does not prove sentence-level or claim-level entailment.
+- The official evaluation retains residual retrieval misses, context-packing
+  noise, and localized multi-turn limitations.
+- Structured abstention can still be sensitive to absolute-certainty wording,
+  and evaluator claim extraction has observed variability.
 - End-to-end medical quality and clinical safety effectiveness have not been
   clinically validated.
 - Dense query embedding uses the external Gemini Embedding 2 provider under the

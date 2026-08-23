@@ -71,13 +71,12 @@ Notebook được commit với `RUN_AUTHORIZED = False` và `CALIBRATION_REVIEW_
         markdown("## 1. Cấu hình, môi trường và dữ liệu"),
         code(
             """from pathlib import Path
+from collections import Counter
 from contextlib import redirect_stdout
 import importlib.metadata
 import io
-import os
 import sys
 
-from IPython.display import Markdown, display
 from dotenv import load_dotenv
 
 RUN_AUTHORIZED = False
@@ -93,23 +92,16 @@ if str(ROOT) not in sys.path:
 load_dotenv(ROOT / ".env")
 
 from evaluation.formal_evaluation_support import (  # noqa: E402
-    BASELINE_RESULTS_DIR,
-    CALIBRATION_ADJUDICATION_PATH,
     CALIBRATION_BLOCKED,
     CALIBRATION_READY,
-    CALIBRATION_RESULTS_PATH,
     CALIBRATION_REVIEW_REQUIRED,
-    CASE_METRICS_PATH,
     EVALUATOR_MODEL,
-    EXPECTED_BASE_SHA,
+    EvaluationBlocked,
     EXPECTED_KB_BUILD_ID,
-    EXPECTED_PIPELINE_FINGERPRINT,
-    METRICS_SUMMARY_PATH,
     POST_IMPROVEMENT_PATHS,
-    RAW_RESULTS_PATH,
+    POST_IMPROVEMENT_RUN_ID,
     RAGCHECKER_VERSION,
     SYSTEM_UNDER_TEST_SHA,
-    build_baseline_comparison,
     build_openai_batch_adapter,
     calibration_review_items,
     evaluate_calibration_runs,
@@ -125,8 +117,8 @@ from evaluation.formal_evaluation_support import (  # noqa: E402
     save_calibration_results,
     score_ragchecker,
     validate_benchmark,
+    validate_final_evaluator_model,
     validate_system_under_test,
-    vietnamese_analysis,
 )
 
 required_packages = {"ragchecker": RAGCHECKER_VERSION, "openai": None, "spacy": None}
@@ -153,12 +145,40 @@ if missing:
 
 benchmark, manifest, calibration = load_evaluation_artifacts()
 system_report = validate_system_under_test(manifest)
+preflight_benchmark_report = validate_benchmark(benchmark, manifest, calibration)
+validated_evaluator = validate_final_evaluator_model(EVALUATOR_MODEL)
+if POST_IMPROVEMENT_RUN_ID != "formal_run_2d5f0124":
+    raise EvaluationBlocked(
+        f"OFFICIAL_RESULT_ID_MISMATCH: {POST_IMPROVEMENT_RUN_ID}"
+    )
+if POST_IMPROVEMENT_PATHS.run_id != POST_IMPROVEMENT_RUN_ID:
+    raise EvaluationBlocked("OFFICIAL_RESULT_PATH_ID_MISMATCH")
+
+blocked_evaluator_aliases = (
+    "gpt-5.4-mini-2026-03-17",
+    "gpt-5.4-mini",
+    "gpt-5.4",
+)
+for blocked_model in blocked_evaluator_aliases:
+    try:
+        validate_final_evaluator_model(blocked_model)
+    except EvaluationBlocked:
+        continue
+    raise EvaluationBlocked(f"EVALUATOR_ALIAS_NOT_BLOCKED: {blocked_model}")
+
+print("OFFICIAL GPT-5.4 CAMPAIGN PREFLIGHT")
 print("✓ Môi trường đánh giá đã sẵn sàng")
 print("✓ Tính toàn vẹn cấu hình đánh giá đã được xác nhận")
-print(f"Evaluator: {EVALUATOR_MODEL}")
+print(f"System: {SYSTEM_UNDER_TEST_SHA}")
+print(f"Pipeline: {system_report['reproduced_pipeline_fingerprint']}")
+print(f"KB: {EXPECTED_KB_BUILD_ID}")
+print(f"Benchmark: {preflight_benchmark_report['total']} cases")
+print("Integrity: PASS")
+print(f"Evaluator: {validated_evaluator}")
+print("Anti-mini guard: PASS")
 print(f"RAGChecker: {RAGCHECKER_VERSION}")
-print(f"Production generator: {os.getenv('LLM_PROVIDER', 'gemini')} / {os.getenv('GOOGLE_MODEL', 'gemini-3.5-flash-lite')}")
-print(f"Reranker: {os.getenv('SEMANTIC_RERANK_MODEL_PATH', 'local model')}")
+print(f"Official result: {POST_IMPROVEMENT_RUN_ID}")
+print("Ready for researcher authorization.")
 """
         ),
         markdown("## 2. Kiểm tra bộ dữ liệu đánh giá"),
@@ -232,9 +252,18 @@ if automatic_calibration_decision is not None:
             "với giá trị 'approve' hoặc 'reject', rồi Run All lại."
         )
 
+    current_review_item_ids = {
+        str(item.get("item_id") or "")
+        for item in automatic_calibration_decision.get("disagreements") or []
+    }
+    applicable_review_decisions = {
+        item_id: decision
+        for item_id, decision in CALIBRATION_REVIEW_DECISIONS.items()
+        if item_id in current_review_item_ids
+    }
     calibration_resolution = resolve_calibration_review(
         automatic_calibration_decision,
-        CALIBRATION_REVIEW_DECISIONS,
+        applicable_review_decisions,
     )
     effective_calibration_decision = {
         **automatic_calibration_decision,
@@ -249,7 +278,7 @@ if automatic_calibration_decision is not None:
     }
     if (
         automatic_calibration_decision["decision"] == CALIBRATION_REVIEW_REQUIRED
-        and CALIBRATION_REVIEW_DECISIONS
+        and applicable_review_decisions
     ):
         save_calibration_adjudication(
             calibration,
@@ -277,6 +306,8 @@ if automatic_calibration_decision is not None:
             """raw_results = rag_results = None
 case_metric_rows = metric_summary_rows = None
 nrr_score = nrr_correct = None
+completed_cases = infrastructure_failure_count = fallback_cases = None
+provider_summary = None
 
 if not RUN_AUTHORIZED:
     print("Chưa chạy 100 tình huống vì RUN_AUTHORIZED=False.")
@@ -311,15 +342,29 @@ else:
     fallback_cases = sum(
         bool(record.get("llm_fallback_used")) for record in raw_results["records"]
     )
-    print(f"Evaluation: {len(raw_results['records'])}/100")
-    print("✓ Hoàn tất 100 tình huống")
-    print(f"Provider fallback được dùng: {fallback_cases} tình huống")
-    print(f"Lỗi hạ tầng: {len(infrastructure_failures)}")
+    provider_counts = Counter(
+        f"{record.get('actual_provider') or 'unknown'} / "
+        f"{record.get('actual_model') or 'unknown'}"
+        for record in raw_results["records"]
+    )
+    provider_summary = ", ".join(
+        f"{provider_model}: {count}"
+        for provider_model, count in sorted(provider_counts.items())
+    )
+    completed_cases = len(raw_results["records"])
+    infrastructure_failure_count = len(infrastructure_failures)
+    successful_cases = completed_cases - infrastructure_failure_count
+    print("Formal evaluation")
+    print(f"{completed_cases} / 100 completed")
+    print(f"✓ Successful cases: {successful_cases}")
+    print(f"✓ Infrastructure failures: {infrastructure_failure_count}")
+    print(f"Production provider: {provider_summary}")
+    print(f"Recovered fallback usage: {fallback_cases} cases")
 
     if evaluator_adapter is None:
         raise RuntimeError("Evaluator adapter must be available before RAGChecker scoring.")
     rag_results = score_ragchecker(benchmark, raw_results, evaluator_adapter)
-    print("✓ RAGChecker hoàn tất")
+    print("RAGChecker: ✓ completed")
 
     nrr_score, nrr_correct = negative_rejection_rate(raw_results)
     print(f"Negative Rejection Rate: {nrr_correct}/30 = {nrr_score:.4f}%")
@@ -333,43 +378,39 @@ else:
             """if metric_summary_rows is None:
     print("Chưa có kết quả định lượng. Hãy hoàn tất bước xác nhận trước khi chạy đánh giá.")
 else:
-    explanations = {
-        "Claim Recall": "Mức độ hệ thống tìm đủ các bằng chứng cần thiết.",
-        "Context Precision": "Mức độ các đoạn được truy hồi thực sự liên quan.",
-        "Faithfulness": "Mức độ câu trả lời bám sát bằng chứng.",
-        "Claim F1": "Mức độ câu trả lời bao quát và khớp với đáp án tham chiếu.",
-        "Negative Rejection Rate": "Tỷ lệ hệ thống từ chối phù hợp khi kho kiến thức chưa đủ bằng chứng.",
-    }
-    result_lines = [
-        "| Metric | N cases | Post-improvement score (%) | Diễn giải |",
-        "|---|---:|---:|---|",
-    ]
-    for row in metric_summary_rows:
-        result_lines.append(
-            f"| {row['Metric']} | {row['N cases']} | {row['Score']:.4f} | {explanations[row['Metric']]} |"
-        )
-    display(Markdown("### Năm chỉ số đánh giá post-improvement\\n\\n" + "\\n".join(result_lines)))
+    headline_metrics = (
+        "Claim Recall",
+        "Context Precision",
+        "Faithfulness",
+        "Claim F1",
+        "Negative Rejection Rate",
+    )
+    scores = {str(row["Metric"]): float(row["Score"]) for row in metric_summary_rows}
+    if set(scores) != set(headline_metrics):
+        raise RuntimeError(f"OFFICIAL_METRIC_SET_MISMATCH: {sorted(scores)}")
 
-    comparison_rows = build_baseline_comparison(metric_summary_rows)
-    if comparison_rows is None:
-        print(
-            "Không tìm thấy metrics_summary.csv của Formal Run baseline trên máy hiện tại; "
-            "bỏ qua bảng so sánh nhưng vẫn hiển thị kết quả post-improvement."
-        )
-    else:
-        comparison_lines = [
-            "| Metric | N | Formal Run baseline (%) | Post-improvement (%) | Chênh lệch điểm % |",
-            "|---|---:|---:|---:|---:|",
-        ]
-        for row in comparison_rows:
-            comparison_lines.append(
-                f"| {row['Metric']} | {row['N']} | {row['Formal Run baseline (%)']:.4f} | "
-                f"{row['Post-improvement (%)']:.4f} | {row['Chênh lệch điểm %']:+.4f} |"
-            )
-        display(Markdown("### So sánh với Formal Run baseline\\n\\n" + "\\n".join(comparison_lines)))
+    print("OFFICIAL GPT-5.4 EVALUATION")
+    for metric in headline_metrics:
+        print(f"{metric}: {scores[metric]:.2f}%")
+    print(f"NRR numerator: {nrr_correct} / 30")
+    print(f"Completed: {completed_cases} / 100")
+    print(f"Infrastructure failures: {infrastructure_failure_count}")
+    print(f"Production fallback: {fallback_cases} cases; {provider_summary}")
 
-    print("\\nPhân tích:")
-    print(vietnamese_analysis(metric_summary_rows))
+    highest_metric = max(headline_metrics, key=scores.__getitem__)
+    lowest_metric = min(headline_metrics, key=scores.__getitem__)
+    recall_precision_gap = scores["Claim Recall"] - scores["Context Precision"]
+    print("\\nPhân tích xác định:")
+    print(f"Chỉ số cao nhất: {highest_metric} ({scores[highest_metric]:.2f}%).")
+    print(f"Chỉ số thấp nhất: {lowest_metric} ({scores[lowest_metric]:.2f}%).")
+    print(
+        "Chênh lệch Claim Recall - Context Precision: "
+        f"{recall_precision_gap:+.2f} điểm phần trăm."
+    )
+    print(
+        "Kết quả chỉ phản ánh benchmark và kho kiến thức tham chiếu; "
+        "không phải xác nhận lâm sàng."
+    )
 """
         ),
     ]

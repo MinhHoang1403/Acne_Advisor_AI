@@ -1,0 +1,203 @@
+{
+    "schema_version":  "1.0",
+    "purpose":  "development/internal evaluation provenance",
+    "official_final_result":  false,
+    "source_workspace":  "evaluation/",
+    "archived_at":  "2026-08-22T21:42:42.4651058Z",
+    "last_updated_at":  "2026-08-23T15:04:33.4652947Z",
+    "file_count":  24,
+    "files":  [
+                  {
+                      "original_path":  "evaluation/results/formal_run_baseline/case_metrics.csv",
+                      "archive_path":  "research_archive/development_evaluation/formal_run_baseline/case_metrics.csv",
+                      "size_bytes":  14188,
+                      "sha256_before":  "6a6b07db0cb227c43917aef5df15f0d09ada7e58599d91ff4ac61538fd6050c4",
+                      "sha256_after":  "6a6b07db0cb227c43917aef5df15f0d09ada7e58599d91ff4ac61538fd6050c4",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_baseline/evaluator_calibration_results.json",
+                      "archive_path":  "research_archive/development_evaluation/formal_run_baseline/evaluator_calibration_results.json",
+                      "size_bytes":  14059,
+                      "sha256_before":  "4000ad61b71d6be0cb981ff83faf1292f037dc1b05e75b09edaa0e615298cc85",
+                      "sha256_after":  "4000ad61b71d6be0cb981ff83faf1292f037dc1b05e75b09edaa0e615298cc85",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_baseline/metrics_summary.csv",
+                      "archive_path":  "research_archive/development_evaluation/formal_run_baseline/metrics_summary.csv",
+                      "size_bytes":  692,
+                      "sha256_before":  "5f33ae584c79d16dfcba061bc02ee9ae1c1beadc7c3017ef6e5dbda2f35c21a1",
+                      "sha256_after":  "5f33ae584c79d16dfcba061bc02ee9ae1c1beadc7c3017ef6e5dbda2f35c21a1",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_baseline/ragchecker_checkpoint.json",
+                      "archive_path":  "research_archive/development_evaluation/formal_run_baseline/ragchecker_checkpoint.json",
+                      "size_bytes":  815577,
+                      "sha256_before":  "4b51bc1563ea3c9e4ecdeec7171e89a8a067de4769fee8b48518757c481da187",
+                      "sha256_after":  "4b51bc1563ea3c9e4ecdeec7171e89a8a067de4769fee8b48518757c481da187",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_baseline/raw_results.json",
+                      "archive_path":  "research_archive/development_evaluation/formal_run_baseline/raw_results.json",
+                      "size_bytes":  3173158,
+                      "sha256_before":  "08ff7c624ec633abcce1e877dc55c26cc502bd828134472cb1e9436ece88d16a",
+                      "sha256_after":  "08ff7c624ec633abcce1e877dc55c26cc502bd828134472cb1e9436ece88d16a",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/calibration_adjudication.json",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/calibration_adjudication.json",
+                      "size_bytes":  3192,
+                      "sha256_before":  "8b659baa918a2378b76afba101b5bc088fa097d7e4b00d6617cb3ced50234552",
+                      "sha256_after":  "8b659baa918a2378b76afba101b5bc088fa097d7e4b00d6617cb3ced50234552",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/case_metrics.csv",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/case_metrics.csv",
+                      "size_bytes":  14304,
+                      "sha256_before":  "d603903ce692905a3ec4e03f4c03a10c19c64a602f8d802620baca9a74f33359",
+                      "sha256_after":  "d603903ce692905a3ec4e03f4c03a10c19c64a602f8d802620baca9a74f33359",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/evaluator_calibration_results.json",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/evaluator_calibration_results.json",
+                      "size_bytes":  15141,
+                      "sha256_before":  "b5a50e23b03fadf6161a21dee7c3462c85828b5988a1b945a9a6f1cd7d8f92e8",
+                      "sha256_after":  "b5a50e23b03fadf6161a21dee7c3462c85828b5988a1b945a9a6f1cd7d8f92e8",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/metrics_summary.csv",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/metrics_summary.csv",
+                      "size_bytes":  706,
+                      "sha256_before":  "a81752fadf2111f952af31fa2d8fbec546c1847f163e67c3cad529867d56406e",
+                      "sha256_after":  "a81752fadf2111f952af31fa2d8fbec546c1847f163e67c3cad529867d56406e",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/ragchecker_checkpoint.json",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/ragchecker_checkpoint.json",
+                      "size_bytes":  805618,
+                      "sha256_before":  "74c787a37853e16c3875c3243a367489587a085aa51ef81a0e2531a7d9613ea7",
+                      "sha256_after":  "74c787a37853e16c3875c3243a367489587a085aa51ef81a0e2531a7d9613ea7",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/raw_results.json",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/raw_results.json",
+                      "size_bytes":  4258730,
+                      "sha256_before":  "20bf0af0e7b697c5b3a3bcc78c5c5fe4db6d9b9985022c8655cb94bb0e794427",
+                      "sha256_after":  "20bf0af0e7b697c5b3a3bcc78c5c5fe4db6d9b9985022c8655cb94bb0e794427",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/post_improvement_47b10954/researcher_notebook_calibration_review_required.ipynb",
+                      "archive_path":  "research_archive/development_evaluation/post_improvement_47b10954/researcher_notebook_calibration_review_required.ipynb",
+                      "size_bytes":  25915,
+                      "sha256_before":  "01df0ed63e09530f4c640a78501d8112b3d0141190935894ecf44128f33fd230",
+                      "sha256_after":  "01df0ed63e09530f4c640a78501d8112b3d0141190935894ecf44128f33fd230",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/audit_validation_report.md",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/audit_validation_report.md",
+                      "size_bytes":  38898,
+                      "sha256_before":  "ab2dd285cac426987db8e91b57235b0e8d97b2eedfb5e7e8d7e7fecad7d6616d",
+                      "sha256_after":  "ab2dd285cac426987db8e91b57235b0e8d97b2eedfb5e7e8d7e7fecad7d6616d",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/audit_validation_summary.json",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/audit_validation_summary.json",
+                      "size_bytes":  18540,
+                      "sha256_before":  "7167bcc5a650dd74ef7606438b2db195a10b89848165d731faa3cb37916512fc",
+                      "sha256_after":  "7167bcc5a650dd74ef7606438b2db195a10b89848165d731faa3cb37916512fc",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/case_forensic_audit.csv",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/case_forensic_audit.csv",
+                      "size_bytes":  84269,
+                      "sha256_before":  "f6752d9bd5c6d5b78fb9e119358bdf6bc152d3589a1da7e43e19df9ac80c76be",
+                      "sha256_after":  "f6752d9bd5c6d5b78fb9e119358bdf6bc152d3589a1da7e43e19df9ac80c76be",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/forensic_analysis.py",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/forensic_analysis.py",
+                      "size_bytes":  60697,
+                      "sha256_before":  "6d7ad5ea5b43f137f8d17dc3e9db71cc1ecfad9aaa14dc39b78e383cd5c6c3e6",
+                      "sha256_after":  "6d7ad5ea5b43f137f8d17dc3e9db71cc1ecfad9aaa14dc39b78e383cd5c6c3e6",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/forensic_audit.md",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/forensic_audit.md",
+                      "size_bytes":  25263,
+                      "sha256_before":  "81937359caa637d70389749143cfd746f8805fcfec61cd328bd012dd70f242ab",
+                      "sha256_after":  "81937359caa637d70389749143cfd746f8805fcfec61cd328bd012dd70f242ab",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/forensic_summary.json",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/forensic_summary.json",
+                      "size_bytes":  19539,
+                      "sha256_before":  "74780f35269fde01b23dc98382194792d2e1a9739b5bc04d0eb271894e921b08",
+                      "sha256_after":  "74780f35269fde01b23dc98382194792d2e1a9739b5bc04d0eb271894e921b08",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/validate_forensic_audit.py",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/validate_forensic_audit.py",
+                      "size_bytes":  34302,
+                      "sha256_before":  "6beea17dd5798d66518014dd6931df99819802104041a350a698d850b030f19e",
+                      "sha256_after":  "6beea17dd5798d66518014dd6931df99819802104041a350a698d850b030f19e",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/audits/post_improvement_47b10954/validated_case_forensic_audit.csv",
+                      "archive_path":  "research_archive/development_evaluation/audits/post_improvement_47b10954/validated_case_forensic_audit.csv",
+                      "size_bytes":  74130,
+                      "sha256_before":  "b1a37d3ba61727b63add28b434a183036897b7c924154b2e26f7df0d6a614021",
+                      "sha256_after":  "b1a37d3ba61727b63add28b434a183036897b7c924154b2e26f7df0d6a614021",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_evaluation_manual_output_before_evaluator_config.ipynb",
+                      "archive_path":  "research_archive/development_evaluation/historical_notebooks/formal_evaluation_manual_output_before_evaluator_config.ipynb",
+                      "size_bytes":  22672,
+                      "sha256_before":  "9cd9e463a9f729d7a6f8addc0921d3b32d34ffc4d99677790550588a152356d1",
+                      "sha256_after":  "9cd9e463a9f729d7a6f8addc0921d3b32d34ffc4d99677790550588a152356d1",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_978093b9/calibration_adjudication.json",
+                      "archive_path":  "research_archive/development_evaluation/aborted_formal_run_978093b9/calibration_adjudication.json",
+                      "size_bytes":  2382,
+                      "sha256_before":  "3c8e73fa531b2908a5cf248cf36de47ea2302af7c684015bd4fff5671eddec22",
+                      "sha256_after":  "3c8e73fa531b2908a5cf248cf36de47ea2302af7c684015bd4fff5671eddec22",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_978093b9/evaluator_calibration_results.json",
+                      "archive_path":  "research_archive/development_evaluation/aborted_formal_run_978093b9/evaluator_calibration_results.json",
+                      "size_bytes":  15323,
+                      "sha256_before":  "8b9a37fe770ae89d618fd4b881458633b9d8ef491bcf46fe5d42d440956ce3cf",
+                      "sha256_after":  "8b9a37fe770ae89d618fd4b881458633b9d8ef491bcf46fe5d42d440956ce3cf",
+                      "unchanged":  true
+                  },
+                  {
+                      "original_path":  "evaluation/results/formal_run_978093b9/raw_results.json",
+                      "archive_path":  "research_archive/development_evaluation/aborted_formal_run_978093b9/raw_results.json",
+                      "size_bytes":  2253169,
+                      "sha256_before":  "eef031bdf5cf600799365aee506a87e9cff76f0ed86703184a67eccf00292ed4",
+                      "sha256_after":  "eef031bdf5cf600799365aee506a87e9cff76f0ed86703184a67eccf00292ed4",
+                      "unchanged":  true
+                  }
+              ]
+}

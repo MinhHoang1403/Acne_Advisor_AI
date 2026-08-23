@@ -5,7 +5,6 @@ import asyncio
 import csv
 import hashlib
 import json
-import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -36,6 +35,7 @@ from evaluation.formal_evaluation_support import (
     METRICS_SUMMARY_PATH,
     POST_IMPROVEMENT_PATHS,
     POST_IMPROVEMENT_RUN_ID,
+    RAGCHECKER_CHECKPOINT_PATH,
     RAW_RESULTS_PATH,
     SYSTEM_UNDER_TEST_SHA,
     atomic_write_json,
@@ -117,10 +117,10 @@ def test_formal_benchmark_contract_and_hash() -> None:
 
 
 def test_final_evaluation_identity_targets_production_commit_and_fresh_run() -> None:
-    assert SYSTEM_UNDER_TEST_SHA == "978093b99f3e3c3d1591d408183bf105db7d14f4"
-    assert EXPECTED_PIPELINE_FINGERPRINT == "4471ea95f7859ed35a0cc270"
+    assert SYSTEM_UNDER_TEST_SHA == "2d5f0124dc532a4970a4b08dcd6cf846389a03ff"
+    assert EXPECTED_PIPELINE_FINGERPRINT == "f93ad3e8dfb2c39f403b0794"
     assert EXPECTED_KB_BUILD_ID == "94d613bc9b33628de3ef"
-    assert POST_IMPROVEMENT_RUN_ID == "formal_run_978093b9"
+    assert POST_IMPROVEMENT_RUN_ID == "formal_run_2d5f0124"
     assert canonical_json_file_sha256(BENCHMARK_PATH) == (
         "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b"
     )
@@ -265,19 +265,50 @@ def test_calibration_matrix_is_predeclared_and_balanced() -> None:
     )
 
 
-def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
+def test_official_executed_notebook_preserves_canonical_source() -> None:
     notebook_path = Path("evaluation/formal_evaluation.ipynb")
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     expected = build_notebook()
 
-    assert notebook == expected
     code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
+    expected_cells = expected["cells"]
+    actual_sources = ["".join(cell["source"]) for cell in notebook["cells"]]
+    expected_sources = ["".join(cell["source"]) for cell in expected_cells]
+    actual_sources[4] = actual_sources[4].replace(
+        "RUN_AUTHORIZED = True\n",
+        "RUN_AUTHORIZED = False\n",
+        1,
+    ).replace(
+        'CALIBRATION_REVIEW_DECISIONS = {\n    "CAL-EXT-01": "approve",\n}\n',
+        "CALIBRATION_REVIEW_DECISIONS = {}\n",
+        1,
+    )
+
+    assert [cell["cell_type"] for cell in notebook["cells"]] == [
+        cell["cell_type"] for cell in expected_cells
+    ]
+    assert actual_sources == expected_sources
     assert len(code_cells) == 5
-    assert all(cell["execution_count"] is None and cell["outputs"] == [] for cell in code_cells)
+    assert [cell["execution_count"] for cell in code_cells] == [1, 2, 3, 4, 5]
+    assert sum(len(cell["outputs"]) for cell in code_cells) == 9
+    assert all(
+        output.get("output_type") != "error"
+        for cell in code_cells
+        for output in cell["outputs"]
+    )
     all_source = "\n".join("".join(cell["source"]) for cell in notebook["cells"])
-    assert "RUN_AUTHORIZED = False" in all_source
-    assert "CALIBRATION_REVIEW_DECISIONS = {}" in all_source
-    assert '"CAL-EXT-03": "approve"' not in all_source
+    canonical_source = "\n".join("".join(cell["source"]) for cell in expected["cells"])
+    output_text = "\n".join(
+        "".join(output.get("text") or [])
+        if isinstance(output.get("text"), list)
+        else str(output.get("text") or "")
+        for cell in code_cells
+        for output in cell["outputs"]
+    )
+    assert "RUN_AUTHORIZED = True" in all_source
+    assert '"CAL-EXT-01": "approve"' in all_source
+    assert "RUN_AUTHORIZED = False" in canonical_source
+    assert "CALIBRATION_REVIEW_DECISIONS = {}" in canonical_source
     assert "chỉ cho phép thực hiện lần đánh giá" in all_source
     assert "không có nghĩa toàn bộ benchmark hoặc calibration" in all_source
     assert "Sử dụng kết quả calibration đã lưu" in all_source
@@ -290,44 +321,76 @@ def test_notebook_is_unexecuted_and_keeps_manual_gate_closed() -> None:
     assert "## Thuật ngữ" in all_source
     assert "### Bảng đối chiếu 30 trường hợp thiếu bằng chứng" not in all_source
     assert "evidence_gap_review_rows" not in all_source
-    assert "gpt-5.4-mini-2026-03-17" not in all_source  # Imported from the fixed helper contract.
+    assert "gpt-5.4-mini-2026-03-17" in all_source
+    assert "gpt-5.4-mini" in all_source
+    assert "validate_final_evaluator_model" in all_source
+    assert "OFFICIAL GPT-5.4 CAMPAIGN PREFLIGHT" in all_source
     assert "Phiên bản hệ thống: {manifest['evaluation_base_sha']}" not in all_source
     assert "Git HEAD khi chạy" not in all_source
     assert "Pipeline fingerprint kỳ vọng" not in all_source
     assert "Raw results:" not in all_source
     assert "category_lines" not in all_source
     assert "execution_log = io.StringIO()" in all_source
-    assert "Provider fallback được dùng" in all_source
+    assert "Recovered fallback usage" in all_source
     assert "Run 1 status/output" not in all_source
     assert "Kết luận:" not in all_source
     assert "Hạn chế:" not in all_source
-    assert "Post-improvement score (%)" in all_source
-    assert "So sánh với Formal Run baseline" in all_source
+    assert "OFFICIAL GPT-5.4 EVALUATION" in all_source
+    assert "Post-improvement score (%)" not in all_source
+    assert "So sánh với Formal Run baseline" not in all_source
+    assert "build_baseline_comparison" not in all_source
+    assert "applicable_review_decisions" in all_source
     assert "post_improvement_47b10954" not in all_source  # Imported from the fixed helper contract.
+    assert "OFFICIAL GPT-5.4 EVALUATION" in output_text
+    assert "Completed: 100 / 100" in output_text
+    assert "Infrastructure failures: 0" in output_text
+    assert "Claim Recall: 72.30%" in output_text
+    assert "Context Precision: 38.90%" in output_text
+    assert "Faithfulness: 87.70%" in output_text
+    assert "Claim F1: 33.80%" in output_text
+    assert "Negative Rejection Rate: 80.00%" in output_text
     for cell in code_cells:
         compile("".join(cell["source"]), "<notebook-cell>", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
 
 
-def test_formal_outputs_are_never_tracked() -> None:
+def test_official_formal_outputs_are_complete_and_byte_locked() -> None:
     assert MANIFEST_PATH.is_file()
     assert BENCHMARK_PATH.is_file()
     assert CALIBRATION_PATH.is_file()
-    tracked = subprocess.run(
-        [
-            "git",
-            "ls-files",
-            "--",
-            str(RAW_RESULTS_PATH),
-            str(CASE_METRICS_PATH),
-            str(METRICS_SUMMARY_PATH),
-            str(CALIBRATION_RESULTS_PATH),
-            str(CALIBRATION_ADJUDICATION_PATH),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    assert tracked == ""
+    artifacts = {
+        RAW_RESULTS_PATH: "0b49d1927f91ac98c342c4051bb52a522722ebf19818bd2e2baaa11ad5efdca1",
+        CASE_METRICS_PATH: "430830e24cd784deb16e873f958377a061caad74186572c579747c0ceb216eaf",
+        METRICS_SUMMARY_PATH: "dffc12e40f52b48c40eb5ef2dca3046ae37d100560b1c06572236c5e0daa77c9",
+        RAGCHECKER_CHECKPOINT_PATH: "80b871759b7a8f9f3bd7eb9bfefd9599146cf4abfb568af98c47df9a4aadb984",
+        CALIBRATION_RESULTS_PATH: "8b9a37fe770ae89d618fd4b881458633b9d8ef491bcf46fe5d42d440956ce3cf",
+        CALIBRATION_ADJUDICATION_PATH: "ded7052769d3bf8b1df58f50526039ae051468986cd7c65666ebac3a8640268d",
+    }
+    for path, expected_sha256 in artifacts.items():
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == expected_sha256
+
+    benchmark_sha = canonical_json_file_sha256(BENCHMARK_PATH)
+    raw_results = load_json(RAW_RESULTS_PATH)
+    require_complete_formal_run(raw_results, benchmark_sha)
+    assert raw_results["system_under_test_sha"] == SYSTEM_UNDER_TEST_SHA
+    assert raw_results["expected_pipeline_fingerprint"] == EXPECTED_PIPELINE_FINGERPRINT
+    assert raw_results["active_kb_build_id"] == EXPECTED_KB_BUILD_ID
+
+    metric_rows = list(csv.DictReader(METRICS_SUMMARY_PATH.open(encoding="utf-8-sig")))
+    assert {row["Metric"]: float(row["Score"]) for row in metric_rows} == {
+        "Claim Recall": 72.3,
+        "Context Precision": 38.9,
+        "Faithfulness": 87.7,
+        "Claim F1": 33.8,
+        "Negative Rejection Rate": 80.0,
+    }
+    calibration = load_json(CALIBRATION_RESULTS_PATH)
+    adjudication = load_json(CALIBRATION_ADJUDICATION_PATH)
+    checkpoint = load_json(RAGCHECKER_CHECKPOINT_PATH)
+    assert calibration["evaluator_model"] == EVALUATOR_MODEL
+    assert adjudication["run_id"] == POST_IMPROVEMENT_RUN_ID
+    assert adjudication["evaluator_model"] == EVALUATOR_MODEL
+    assert set(checkpoint) == {"metrics", "results"}
 
 
 def test_post_improvement_output_paths_are_isolated_from_baseline() -> None:

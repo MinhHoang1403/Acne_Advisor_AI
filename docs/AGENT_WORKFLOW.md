@@ -49,6 +49,7 @@ sequenceDiagram
     participant Cache as Redis
     participant Tool as retrieve_evidence
     participant Qdrant
+    participant Reranker as Local BGE reranker
     participant LLM as Gemini/Ollama
 
     User->>API: POST /chat
@@ -64,7 +65,9 @@ sequenceDiagram
             Agent->>Tool: retrieve source evidence
             Tool->>Qdrant: Dense and native BM25 queries
             Qdrant-->>Tool: ranked source chunks
-            Tool-->>Agent: equal RRF and bounded provenance
+            Tool->>Reranker: RRF candidate union and standalone retrieval query
+            Reranker-->>Tool: reranked candidates or deterministic RRF fallback
+            Tool-->>Agent: whole-chunk bounded provenance
             Agent->>Agent: assess evidence
             Agent->>LLM: select post-retrieval action
             LLM-->>Agent: retry, generate, or abstain

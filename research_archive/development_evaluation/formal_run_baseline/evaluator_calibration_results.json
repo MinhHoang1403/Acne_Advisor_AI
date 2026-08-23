@@ -1,0 +1,516 @@
+{
+  "evaluator_model": "gpt-5.4-mini-2026-03-17",
+  "evaluator_request_configuration": {
+    "extraction": {
+      "model": "gpt-5.4-mini-2026-03-17",
+      "reasoning_effort": "medium"
+    },
+    "checking": {
+      "model": "gpt-5.4-mini-2026-03-17",
+      "reasoning_effort": "low"
+    }
+  },
+  "run_timestamp": "2026-08-21T20:59:17+00:00",
+  "calibration_dataset_sha256": "1748aa3c2b45baf64e38ff59e38d7351678fa5bb97114e130deb1a4e1601de56",
+  "calibration_schema_version": "evaluator_calibration_contract",
+  "run_1": {
+    "extraction": [
+      {
+        "item_id": "CAL-EXT-01",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Mụn trứng cá', 'là bệnh viêm mạn tính của', 'đơn vị nang lông - tuyến bã']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-02",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Benzoyl peroxide', 'is', 'topical antibacterial agent']",
+          "['Benzoyl peroxide', 'has effect', 'mild comedolytic effect']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-03",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Bằng chứng về chế độ ăn tải đường huyết thấp', 'trạng thái', 'mâu thuẫn']",
+          "['Bằng chứng về chế độ ăn tải đường huyết thấp', 'chỉ gợi ý khả năng', 'giảm mụn']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-04",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['maintenance treatment', 'is not always necessary', 'in all cases']",
+          "['maintenance treatment', 'can be considered', 'when frequent recurrences occur']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-05",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['kháng sinh bôi', 'không nên dùng', 'đơn trị liệu']",
+          "['phối hợp benzoyl peroxide', 'có thể hạn chế', 'kháng kháng sinh']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-06",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Isotretinoin', 'làm giảm', 'tuyến bã']",
+          "['Isotretinoin', 'điều chỉnh', 'sừng hóa']",
+          "['Isotretinoin', 'có tác dụng', 'chống viêm']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-07",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Open comedone', 'is', 'mụn đầu đen']",
+          "['closed comedone', 'is', 'mụn đầu trắng']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-08",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Benzoyl peroxide', 'is', 'antimicrobial']",
+          "['Benzoyl peroxide', 'is not', 'topical antibiotic']",
+          "['Clindamycin', 'is', 'topical antibiotic']"
+        ]
+      }
+    ],
+    "checking": [
+      {
+        "item_id": "CAL-CHK-01",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "entity_distinction"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-02",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "qualifier_modality"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-03",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "negation"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-04",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_number"
+        ],
+        "raw": [
+          "Contradiction"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-05",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "negation",
+          "absolute_claim"
+        ],
+        "raw": [
+          "Contradiction"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-06",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "qualifier_modality",
+          "absolute_claim"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-07",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "cross_language_entailment"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-08",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "entity_distinction",
+          "cross_language_entailment"
+        ],
+        "raw": [
+          "Entailment",
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-09",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_time",
+          "cross_language_entailment"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-10",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "unsupported_comparison",
+          "entity_distinction"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-11",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_time",
+          "absolute_claim"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-12",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_number",
+          "unsupported_comparison"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      }
+    ]
+  },
+  "run_2": {
+    "extraction": [
+      {
+        "item_id": "CAL-EXT-01",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Mụn trứng cá', 'là', 'bệnh viêm mạn tính của đơn vị nang lông - tuyến bã']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-02",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Benzoyl peroxide', 'is', 'topical antibacterial active ingredient']",
+          "['Benzoyl peroxide', 'has', 'mild comedolytic effect']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-03",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Bằng chứng về chế độ ăn tải đường huyết thấp', 'còn', 'mâu thuẫn']",
+          "['Bằng chứng về chế độ ăn tải đường huyết thấp', 'chỉ gợi ý khả năng', 'giảm mụn']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-04",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['maintenance treatment', 'is not always necessary', 'true']",
+          "['maintenance treatment', 'can be considered when', 'frequent recurrences occur']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-05",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['kháng sinh bôi', 'không dùng như', 'đơn trị liệu']",
+          "['phối hợp benzoyl peroxide', 'có thể hạn chế', 'kháng kháng sinh']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-06",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Isotretinoin', 'làm giảm', 'tuyến bã']",
+          "['Isotretinoin', 'điều chỉnh', 'sừng hóa']",
+          "['Isotretinoin', 'có tác dụng', 'chống viêm']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-07",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Open comedone', 'is', 'mụn đầu đen']",
+          "['Closed comedone', 'is', 'mụn đầu trắng']"
+        ]
+      },
+      {
+        "item_id": "CAL-EXT-08",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Benzoyl peroxide', 'is', 'antimicrobial']",
+          "['Benzoyl peroxide', 'is not', 'topical antibiotic']",
+          "['Clindamycin', 'is', 'topical antibiotic']"
+        ]
+      }
+    ],
+    "checking": [
+      {
+        "item_id": "CAL-CHK-01",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "entity_distinction"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-02",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "qualifier_modality"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-03",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "negation"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-04",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_number"
+        ],
+        "raw": [
+          "Contradiction"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-05",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "negation",
+          "absolute_claim"
+        ],
+        "raw": [
+          "Contradiction"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-06",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "qualifier_modality",
+          "absolute_claim"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-07",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "cross_language_entailment"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-08",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "entity_distinction",
+          "cross_language_entailment"
+        ],
+        "raw": [
+          "Entailment",
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-09",
+        "expected": "SUPPORTED",
+        "actual": "SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_time",
+          "cross_language_entailment"
+        ],
+        "raw": [
+          "Entailment"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-10",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "unsupported_comparison",
+          "entity_distinction"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-11",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_time",
+          "absolute_claim"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      },
+      {
+        "item_id": "CAL-CHK-12",
+        "expected": "NOT_SUPPORTED",
+        "actual": "NOT_SUPPORTED",
+        "agreement": true,
+        "critical_dimensions": [
+          "exact_number",
+          "unsupported_comparison"
+        ],
+        "raw": [
+          "Neutral"
+        ]
+      }
+    ]
+  },
+  "claim_extraction_acceptable": 8,
+  "claim_checking_agreement": 12,
+  "repeat_consistency": 20,
+  "disagreements": [],
+  "critical_failures": [],
+  "final_calibration_decision": "CALIBRATION_READY_FOR_FORMAL_RUN"
+}

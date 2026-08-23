@@ -68,9 +68,10 @@ dmypy.json
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 
-# Ignore notebooks by default, but keep the formal evaluation notebook
+# Ignore notebooks by default, but keep formal and archived research evidence
 *.ipynb
 !evaluation/formal_evaluation.ipynb
+!research_archive/**/*.ipynb
 
 # Local notebook recovery backups
 local_notebook_backups/
@@ -206,12 +207,10 @@ temp/
 
 # ---------------------------------------------------------------------------
 # Formal evaluation runtime outputs
-# These are created only when the researcher runs the evaluation notebook.
-# Keep the methodology/package in Git, but keep runtime outputs local.
+# Runtime outputs stay local by default. The completed official run is retained
+# as immutable research evidence and is explicitly version-controlled below.
 # ---------------------------------------------------------------------------
 evaluation/results/*
-
-# Keep the figures directory structure only
-!evaluation/results/figures/
-evaluation/results/figures/*
-!evaluation/results/figures/.gitkeep
+!evaluation/results/README.md
+!evaluation/results/formal_run_2d5f0124/
+!evaluation/results/formal_run_2d5f0124/**
