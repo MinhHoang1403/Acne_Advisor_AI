@@ -70,6 +70,26 @@ async def test_generate_text_async_uses_google_genai_method_and_config() -> None
 
 
 @pytest.mark.asyncio
+async def test_generate_text_async_passes_native_response_schema() -> None:
+    capture: dict = {}
+    client = _FakeClient(capture, SimpleNamespace(text='{"action":"abstain"}'))
+
+    text = await google_genai.generate_text_async(
+        prompt="Choose an action",
+        system_prompt="Return JSON",
+        model_name="gemini-test",
+        temperature=0.0,
+        request_timeout=3,
+        response_schema={"type": "object"},
+        client=client,
+    )
+
+    assert text == '{"action":"abstain"}'
+    assert capture["config"].response_mime_type == "application/json"
+    assert capture["config"].response_schema == {"type": "object"}
+
+
+@pytest.mark.asyncio
 async def test_flash_lite_request_omits_deprecated_sampling_parameters() -> None:
     capture: dict = {}
     client = _FakeClient(capture, SimpleNamespace(text="Xin chào"))

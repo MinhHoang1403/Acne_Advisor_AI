@@ -29,9 +29,9 @@ dùng tên tiếng Anh như trong code.
 | Embedding/indexing | `src/ingestion/embedding.py`, `index.py`, `bm25.py` | Gọi embedding provider, cấu hình/tạo Qdrant candidates | Không tự chạy cosine/BM25 search engine |
 | Build orchestration | `src/ingestion/pipeline.py`, `scripts/knowledge_build.py` | Prepare, validate, build và activate có kiểm soát | Không thuộc normal API request path |
 | Retrieval | `src/database/vector_store.py`, `src/retrieval/service.py` | Gọi Dense/BM25 search, quản lý timeout/degraded status | Không sinh answer hoặc xác minh y khoa |
-| Fusion/context | `src/retrieval/rrf.py`, `context_packer.py` | Fuse rank, dedupe identity và áp resource budget | Không rerank theo truth/confidence |
+| Fusion/rerank/context | `src/retrieval/rrf.py`, `reranker.py`, `context_packer.py` | Fuse rank, local cross-encoder rerank, dedupe identity và áp resource budget | Không xem reranker score là truth/confidence |
 | Agent | `src/agent/graph.py`, `action_decision.py`, `state.py` | Topology, semantic action và state contract | Model không tự thực thi transition |
-| Safety | `src/agent/safety_policy.py` | Bảy override deterministic, hẹp, source-mapped | Không phải classifier/chẩn đoán tổng quát |
+| Safety | `src/agent/safety_policy.py` | Chín override deterministic, hẹp, source-mapped | Không phải classifier/chẩn đoán tổng quát |
 | Generation | `src/agent/nodes/reason.py`, `agent/prompts/medical_answer.py` | Xây prompt và gọi LLM từ evidence | Không search/rerank lại context |
 | Presentation | `src/agent/nodes/respond.py`, `answer_formatting.py`, `source_presentation.py` | Format answer và giới hạn source mention | Không chứng minh claim đúng |
 | Verification | `src/quality/answer_verifier.py` | Kiểm cấu trúc và provenance identity | Không kiểm clinical truth/entailment |
@@ -127,9 +127,14 @@ là channel weight và `k=60` làm giảm ảnh hưởng của chênh lệch ran
 Candidate xuất hiện ở cả Dense và BM25 nhận hai contribution. `k` là engineering
 parameter, không phải relevance hay medical-confidence threshold.
 
-`context_packer.py` giữ nguyên thứ tự RRF, dedupe bằng stable item identity và áp
-`max_items`/`max_chars`. Nó không chạy reranker và không quyết định item nào là
-"sự thật". Packed context chính là bounded evidence được gửi tới generation.
+`reranker.py` dùng local `BAAI/bge-reranker-v2-m3` cross-encoder để sắp thứ tự
+candidate sau RRF. Raw score chỉ là ranking signal, không phải probability hay
+medical confidence; operational failure giữ deterministic pre-reranker order.
+
+`context_packer.py` giữ thứ tự candidate sau bước rerank (hoặc fallback order),
+dedupe bằng stable item identity và áp `max_items`/`max_chars`. Packer không quyết
+định item nào là "sự thật". Packed context chính là bounded evidence được gửi tới
+generation.
 
 ## Agent, safety và generation
 

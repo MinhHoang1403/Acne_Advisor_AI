@@ -1,0 +1,96 @@
+{
+  "run_id": "post_improvement_47b10954",
+  "calibration_dataset_sha256": "1748aa3c2b45baf64e38ff59e38d7351678fa5bb97114e130deb1a4e1601de56",
+  "evaluator_model": "gpt-5.4-mini-2026-03-17",
+  "automatic_decision": "CALIBRATION_REVIEW_REQUIRED",
+  "automatic_counts": {
+    "claim_extraction_acceptable": 7,
+    "claim_checking_agreement": 12,
+    "repeat_consistency": 19
+  },
+  "review_items": [
+    {
+      "item_id": "CAL-EXT-03",
+      "type": "extraction",
+      "automatic_reasons": [
+        "missing_reference:R01"
+      ],
+      "run_1_result": {
+        "item_id": "CAL-EXT-03",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Bằng chứng về chế độ ăn tải đường huyết thấp', 'còn mâu thuẫn', 'có']",
+          "['Bằng chứng về chế độ ăn tải đường huyết thấp', 'chỉ gợi ý', 'khả năng giảm mụn']"
+        ]
+      },
+      "run_2_result": {
+        "item_id": "CAL-EXT-03",
+        "status": "review_required",
+        "acceptable": false,
+        "review_required": true,
+        "reasons": [
+          "missing_reference:R01"
+        ],
+        "claims": [
+          "['Evidence about low glycemic load diet', 'is', 'contradictory']",
+          "['Evidence about low glycemic load diet', 'only suggests possibility of', 'reducing acne']"
+        ]
+      },
+      "reference_information": {
+        "input_text": "Bằng chứng về chế độ ăn tải đường huyết thấp còn mâu thuẫn và chỉ gợi ý khả năng giảm mụn.",
+        "reference_claims": [
+          {
+            "reference_id": "R01",
+            "text": "Bằng chứng về chế độ ăn tải đường huyết thấp còn mâu thuẫn.",
+            "required_concept_groups": [
+              [
+                "tải đường huyết thấp",
+                "low glycemic"
+              ],
+              [
+                "mâu thuẫn",
+                "conflicting"
+              ]
+            ],
+            "qualifier_concept_groups": []
+          },
+          {
+            "reference_id": "R02",
+            "text": "Bằng chứng chỉ gợi ý chế độ ăn tải đường huyết thấp có thể giảm mụn.",
+            "required_concept_groups": [
+              [
+                "tải đường huyết thấp",
+                "low glycemic"
+              ],
+              [
+                "giảm mụn",
+                "reduce acne"
+              ]
+            ],
+            "qualifier_concept_groups": [
+              [
+                "gợi ý",
+                "suggest"
+              ],
+              [
+                "có thể",
+                "khả năng",
+                "may",
+                "possible"
+              ]
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "researcher_decisions": {
+    "CAL-EXT-03": "approve"
+  },
+  "researcher_adjudication": "APPROVED",
+  "effective_decision": "CALIBRATION_READY_FOR_FORMAL_RUN",
+  "review_timestamp": "2026-08-22T17:19:06+00:00"
+}

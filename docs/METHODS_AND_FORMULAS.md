@@ -44,15 +44,27 @@ RRF(d) = sum_r w_r / (k + rank_r(d))
 The runtime uses `k=60`, `w_dense=1.0`, and `w_bm25=1.0`. The RRF paper supports
 rank-based reciprocal fusion; it does not establish those project constants as
 optimal. Equal weights are an explicit engineering policy, not a clinical
-constant. No post-fusion relevance adjustment or structural-store score changes
-the fused ranking.
+constant. Metadata and structural-store scores do not modify RRF.
+
+## Local Cross-Encoder Reranking
+
+After RRF, the enabled runtime sends the standalone retrieval query and fused
+candidate text to a locally available `BAAI/bge-reranker-v2-m3` cross-encoder.
+The model score is used only to sort candidates. It is not calibrated as a
+probability, semantic-sufficiency threshold, or medical-confidence score.
+
+Inference has a finite timeout and uses local files only. If the local model is
+unavailable, times out, or fails inference, the service preserves deterministic
+pre-reranker candidate order. No provider call, metadata boost, EntityCard score,
+or Neo4j score participates in this step.
 
 ## Context and Evidence Contracts
 
-`src/retrieval/context_packer.py` preserves fused order, deduplicates only by
-stable item identity, retains provenance, and enforces finite item/character
-budgets. The defaults are 8 packed items and 6000 characters from an initial
-candidate pool of 16. These are resource policies, not relevance thresholds.
+`src/retrieval/context_packer.py` preserves its input order after reranking (or
+the deterministic fallback order), deduplicates only by stable item identity,
+retains provenance, and enforces finite item/character budgets. The defaults are
+8 packed items and 6000 characters from an initial candidate pool of 16. These
+are resource policies, not relevance thresholds.
 Evidence is marked usable only when at least one packed item has both
 text and a source identifier. This is a deterministic presence/provenance check,
 not a semantic sufficiency or entailment claim. The exact bounded
@@ -68,7 +80,8 @@ mechanica from sports equipment or clothing, friction, heat, and sweat, but does
 not directly mention masks or face coverings. Its absence from retrieval is
 therefore not a retrieval-quality failure or a knowledge-gap claim. Diagnostic
 channel and packing traces can localize a candidate's rank, character cost, and
-drop reason; they do not add a reranker, entailment check, or medical verdict.
+drop reason; they do not add another ranking stage, entailment check, or medical
+verdict.
 
 Each Dense and BM25 channel is independently bounded by
 `RETRIEVAL_TIMEOUT_SECONDS`, and the agent remains bounded to two retrieval

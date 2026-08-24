@@ -34,8 +34,6 @@ async def _mock_decision(
     action: str,
     reason_code: str,
     direct_supporting_evidence_ids: list[str] | None,
-    core_requirements_complete: bool | None = None,
-    core_requirement_support: list[dict[str, object]] | None = None,
     missing_evidence: str | None = None,
 ) -> None:
     async def fake_generate(**_: object) -> dict:
@@ -47,8 +45,6 @@ async def _mock_decision(
                     "missing_evidence": missing_evidence,
                     "reason_code": reason_code,
                     "direct_supporting_evidence_ids": direct_supporting_evidence_ids,
-                    "core_requirements_complete": core_requirements_complete,
-                    "core_requirement_support": core_requirement_support,
                 }
             ),
             "provider": "test",
@@ -61,51 +57,45 @@ async def _mock_decision(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("question", "evidence_text", "support_status"),
+    ("question", "evidence_text"),
     [
         (
             "Liệu pháp A có bảo đảm cải thiện cho mọi người không?",
             "Liệu pháp A có thể hỗ trợ một số người.",
-            "partial_or_related_only",
         ),
         (
             "Liệu pháp A cải thiện chính xác bao nhiêu phần trăm?",
             "Liệu pháp A có thể cải thiện tình trạng da.",
-            "unsupported",
         ),
         (
             "Liệu pháp A làm tăng độ nhạy của da phải không?",
             "Liệu pháp A không làm tăng độ nhạy của da.",
-            "contradicted_or_opposite",
         ),
         (
             "Liệu pháp A tác động lên quá trình tạo nhân mụn thế nào?",
             "Tài liệu này mô tả cách rửa mặt dịu nhẹ.",
-            "unsupported",
         ),
     ],
+    ids=[
+        "N2_weaker_evidence_for_stronger_claim",
+        "N3_qualitative_evidence_for_exact_number",
+        "N4_opposite_polarity",
+        "N1_related_topic_without_core_support",
+    ],
 )
-async def test_existing_but_semantically_insufficient_evidence_fails_closed(
+async def test_semantically_insufficient_evidence_selects_evidence_gap(
     monkeypatch: pytest.MonkeyPatch,
     question: str,
     evidence_text: str,
-    support_status: str,
 ) -> None:
     state = _evidence_state(question)
     state["vector_contexts"][0]["text"] = evidence_text
     await _mock_decision(
         monkeypatch,
-        action="generate",
-        reason_code="evidence_sufficient",
-        direct_supporting_evidence_ids=["evidence-1"],
-        core_requirements_complete=True,
-        core_requirement_support=[
-            {
-                "requirement": question,
-                "support_status": support_status,
-                "evidence_ids": ["evidence-1"],
-            }
-        ],
+        action="abstain",
+        reason_code="evidence_gap",
+        direct_supporting_evidence_ids=None,
+        missing_evidence="the exact requested proposition is not directly supported",
     )
 
     result = await select_agent_action(state)
@@ -135,6 +125,12 @@ async def test_existing_but_semantically_insufficient_evidence_fails_closed(
             "Hoạt chất A hỗ trợ điều trị mụn viêm.",
         ),
     ],
+    ids=[
+        "P2_exact_value",
+        "P3_matching_modality",
+        "P1_supported_mechanism",
+        "P1_supported_role",
+    ],
 )
 async def test_directly_supported_proposition_can_generate(
     monkeypatch: pytest.MonkeyPatch,
@@ -148,14 +144,6 @@ async def test_directly_supported_proposition_can_generate(
         action="generate",
         reason_code="evidence_sufficient",
         direct_supporting_evidence_ids=["evidence-1"],
-        core_requirements_complete=True,
-        core_requirement_support=[
-            {
-                "requirement": question,
-                "support_status": "directly_supported",
-                "evidence_ids": ["evidence-1"],
-            }
-        ],
     )
 
     result = await select_agent_action(state)
@@ -176,14 +164,6 @@ async def test_generate_rejects_support_identifier_not_visible_to_decision(
         action="generate",
         reason_code="evidence_sufficient",
         direct_supporting_evidence_ids=["invented-evidence"],
-        core_requirements_complete=True,
-        core_requirement_support=[
-            {
-                "requirement": "Hoạt chất A có vai trò gì?",
-                "support_status": "directly_supported",
-                "evidence_ids": ["invented-evidence"],
-            }
-        ],
     )
 
     result = await select_agent_action(_evidence_state("Hoạt chất A có vai trò gì?"))
@@ -209,26 +189,43 @@ async def test_multi_part_request_requires_and_accepts_complete_direct_support(
         action="generate",
         reason_code="evidence_sufficient",
         direct_supporting_evidence_ids=["evidence-1", "evidence-2"],
-        core_requirements_complete=True,
-        core_requirement_support=[
-            {
-                "requirement": "Nồng độ của hoạt chất A",
-                "support_status": "directly_supported",
-                "evidence_ids": ["evidence-1"],
-            },
-            {
-                "requirement": "Vai trò của hoạt chất A",
-                "support_status": "directly_supported",
-                "evidence_ids": ["evidence-2"],
-            },
-        ],
     )
 
     result = await select_agent_action(state)
 
     assert result["next_action"] == "generate"
-    assert result["agent_decision"]["core_requirements_complete"] is True
-    assert len(result["agent_decision"]["core_requirement_support"]) == 2
+    assert result["agent_decision"]["direct_supporting_evidence_ids"] == [
+        "evidence-1",
+        "evidence-2",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_supported_proposition_accepts_multiple_visible_evidence_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = _evidence_state("Liệu pháp A có thể cải thiện tổn thương viêm không?")
+    state["vector_contexts"].append(
+        {
+            "id": "evidence-2",
+            "source_id": "synthetic-review",
+            "text": "Một tổng quan khác cũng ghi nhận cải thiện tổn thương viêm.",
+        }
+    )
+    await _mock_decision(
+        monkeypatch,
+        action="generate",
+        reason_code="evidence_sufficient",
+        direct_supporting_evidence_ids=["evidence-1", "evidence-2"],
+    )
+
+    result = await select_agent_action(state)
+
+    assert result["next_action"] == "generate"
+    assert result["agent_decision"]["direct_supporting_evidence_ids"] == [
+        "evidence-1",
+        "evidence-2",
+    ]
 
 
 @pytest.mark.asyncio

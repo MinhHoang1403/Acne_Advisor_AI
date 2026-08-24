@@ -1,0 +1,6 @@
+﻿Metric,N cases,Score,Unit,Vietnamese interpretation/description
+Claim Recall,70,60.5,percent_0_100,Mức độ bằng chứng truy hồi bao phủ các claim trong gold answer.
+Context Precision,70,26.3,percent_0_100,Tỷ lệ context truy hồi có liên quan đến claim gold theo RAGChecker.
+Faithfulness,70,74.3,percent_0_100,Mức độ claim trong câu trả lời được context truy hồi hỗ trợ.
+Claim F1,70,37.3,percent_0_100,RAGChecker overall claim-level F1 giữa gold answer và system response.
+Negative Rejection Rate,30,70.0,percent_0_100,Tỷ lệ evidence-gap case trả structured action=abstain và reason=evidence_gap; đây là RGB-inspired adaptation.

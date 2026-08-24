@@ -31,7 +31,7 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 logger = logging.getLogger(__name__)
 
 MAX_RETRIEVAL_ATTEMPTS = 2
-AGENT_DECISION_VERSION = "proposition_scoped_support_action_decision"
+AGENT_DECISION_VERSION = "direct_proposition_support_action_decision"
 DECISION_EVIDENCE_MAX_ITEMS = 8
 _EXPLICIT_TOPIC_RESET = re.compile(
     r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b[^.!?;\n]*[.!?;\n]+\s*(?P<question>.+)$",
@@ -42,12 +42,6 @@ _EXPLICIT_TOPIC_RESET = re.compile(
 # ngưỡng confidence hay đánh giá mức độ đúng y khoa của evidence.
 
 DecisionAction = Literal["retrieve", "retry", "generate", "abstain"]
-SupportStatus = Literal[
-    "directly_supported",
-    "partial_or_related_only",
-    "contradicted_or_opposite",
-    "unsupported",
-]
 DecisionReason = Literal[
     "needs_evidence",
     "evidence_sufficient",
@@ -64,28 +58,16 @@ LEGAL_REASONS_BY_ACTION: dict[DecisionAction, frozenset[DecisionReason]] = {
 }
 
 
-class CoreRequirementSupport(BaseModel):
-    """Semantic support declaration for one independently required proposition."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    requirement: str
-    support_status: SupportStatus
-    evidence_ids: list[str] | None = None
-
-
 class AgentDecision(BaseModel):
     """Contract nhỏ chỉ chứa action, không mang medical fact hay free reasoning."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     action: DecisionAction
     retrieval_query: str | None = None
-    missing_evidence: str | None
+    missing_evidence: str | None = None
     reason_code: DecisionReason
     direct_supporting_evidence_ids: list[str] | None = None
-    core_requirements_complete: bool | None = None
-    core_requirement_support: list[CoreRequirementSupport] | None = None
 
 
 def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
@@ -103,8 +85,7 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
     system_prompt = (
         "You are the action selector for a bounded acne-information RAG agent. "
         "Return exactly one JSON object with keys action, retrieval_query, missing_evidence, "
-        "reason_code, direct_supporting_evidence_ids, core_requirements_complete, and "
-        "core_requirement_support. "
+        "reason_code, and direct_supporting_evidence_ids. "
         "Allowed actions are retrieve, retry, generate, abstain. "
         "Allowed reason_code values are needs_evidence, evidence_sufficient, evidence_gap, "
         "out_of_scope, cannot_safely_proceed. Use only these action/reason_code pairs: "
@@ -122,22 +103,17 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
         "qualifier, condition, comparison, attribution, or numeric requirement, and a materially "
         "improved query targets that gap. Generic text such as 'need more evidence', 'need more "
         "information', 'not enough context', or 'search again' is not a valid missing_evidence. "
-        "After evidence is available, split the current question into every independently required "
-        "core factual proposition or information requirement. Return one core_requirement_support "
-        "record for each, preserving its entity, relationship, polarity, quantity, comparison, and "
-        "material qualifiers. Set support_status to exactly one of directly_supported, "
-        "partial_or_related_only, contradicted_or_opposite, or unsupported. Set "
-        "core_requirements_complete to true only when the records cover every core requirement in "
-        "the current question. Choose generate only when every record is directly_supported by the "
-        "packed evidence. Sharing the same topic, medication, disease, or guideline is not sufficient. "
-        "For each record, evidence_ids may identify the packed evidence assessed for that requirement. "
-        "Every directly_supported record must have a non-empty evidence_ids list containing only IDs "
-        "present in evidence_for_relevance_check. For generate, also set the "
-        "top-level direct_supporting_evidence_ids to the union of those IDs and set missing_evidence "
-        "and retrieval_query to null. Partial, related, contradictory, opposite, qualitative-only, or "
-        "otherwise unsupported evidence cannot justify generate for a stronger, exact, or differently "
-        "qualified core requirement. For retrieve before evidence exists, set support fields and "
-        "direct_supporting_evidence_ids to null. Otherwise choose a purposeful retry or "
+        "Choose generate only when the packed evidence directly supports every material part of the "
+        "current information need, including the requested entity, relationship, polarity, quantity, "
+        "comparison, attribution, and material qualifiers. Sharing the same topic, medication, disease, "
+        "or guideline is not sufficient by itself. Related, weaker, opposite, qualitative-only, or "
+        "differently qualified evidence cannot justify generate for an unsupported exact or core "
+        "proposition. For generate, set missing_evidence and retrieval_query to null and set "
+        "direct_supporting_evidence_ids to the non-empty list of evidence IDs that directly establish "
+        "all material parts. An evidence ID is the exact string after evidence_id= in "
+        "evidence_for_relevance_check; never cite the ordinal display label. Cite only those exact "
+        "evidence IDs. For retrieve, retry, "
+        "and abstain, set direct_supporting_evidence_ids to null. Otherwise choose a purposeful retry or "
         "abstain. For abstain, set retrieval_query to null; an evidence_gap abstention may retain "
         "the specific missing_evidence. At the maximum "
         "retrieval attempts, choose only generate with usable evidence or abstain. "
@@ -225,6 +201,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             allow_fallback=state.get("allow_model_fallback", False),
             budget=_runtime_budget(state, settings),
             resilience_settings=settings,
+            response_schema=AgentDecision,
         )
         provider_metadata = {
             "provider": response.get("provider"),
@@ -300,15 +277,19 @@ def _decision_evidence_view(
 
     packed = state.get("packed_context")
     if isinstance(packed, dict):
-        packed_text = str(packed.get("context_text") or "")
         packed_items = [item for item in packed.get("items") or [] if isinstance(item, dict)]
-        if packed_text:
+        if str(packed.get("context_text") or "") and packed_items:
             visible_items = [
                 _packed_item_trace(item, position)
                 for position, item in enumerate(packed_items, 1)
             ]
             visible_items = [item for item in visible_items if item is not None]
             packed_ids = [str(item["item_id"]) for item in visible_items if item.get("item_id")]
+            evidence_blocks = [
+                _render_packed_decision_block(item, position)
+                for position, item in enumerate(packed_items, 1)
+            ]
+            packed_text = "\n\n".join(block for block in evidence_blocks if block)
             limits = dict((packed.get("debug") or {}).get("limits") or {})
             return packed_text, len(packed_items), {
                 "packed_evidence_count": len(packed_items),
@@ -348,9 +329,10 @@ def _decision_evidence_view(
         section = context.get("header") or (
             section_path[-1] if isinstance(section_path, list) and section_path else None
         )
-        chunk_id = item_id or f"decision-{position}"
+        chunk_id = str(context.get("chunk_id") or item_id or f"decision-{position}")
         evidence_blocks.append(
-            f"[Evidence {position} | source={source_id} | chunk={chunk_id}]\n{text}"
+            f"[Evidence {position} | evidence_id={item_id} | source={source_id} | "
+            f"chunk={chunk_id}]\n{text}"
         )
         visible_items.append(
             {
@@ -409,6 +391,21 @@ def _packed_item_trace(item: dict[str, Any], position: int) -> dict[str, Any] | 
     }
 
 
+def _render_packed_decision_block(item: dict[str, Any], position: int) -> str | None:
+    """Render whole packed evidence with the exact identity expected by validation."""
+
+    trace = _packed_item_trace(item, position)
+    if trace is None or not trace.get("item_id"):
+        return None
+    payload = item.get("payload") if isinstance(item.get("payload"), dict) else item
+    text = str(item.get("text") or "").strip()
+    chunk_id = str(payload.get("chunk_id") or trace["item_id"])
+    return (
+        f"[Evidence {position} | evidence_id={trace['item_id']} | "
+        f"source={trace['source_id']} | chunk={chunk_id}]\n{text}"
+    )
+
+
 def parse_agent_decision(value: Any) -> AgentDecision:
     """Parse JSON nghiêm ngặt, chỉ nới lỏng lớp Markdown fence bao ngoài."""
 
@@ -430,9 +427,9 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
 
     ``retrieve`` chỉ hợp lệ ở lần đầu; các lần lấy evidence tiếp theo phải là
     ``retry`` với query khác. ``generate`` cần evidence đã qua kiểm tra hiện diện,
-    provenance và một support declaration cho từng core requirement. Model hiện
-    có sở hữu đánh giá ngữ nghĩa; Python chỉ kiểm coverage declaration, trạng thái
-    support và identity của evidence, không giả vờ tự suy luận entailment.
+    provenance và ít nhất một ID mà semantic decision đã xác nhận hỗ trợ trực
+    tiếp. Model sở hữu đánh giá ngữ nghĩa; Python chỉ kiểm identity của evidence,
+    không giả vờ tự suy luận entailment.
     """
 
     attempt = int(state.get("retrieval_attempt", 0) or 0)
@@ -446,8 +443,6 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
             if str(item).strip()
         )
     )
-    requirement_support = list(decision.core_requirement_support or [])
-
     if decision.reason_code not in LEGAL_REASONS_BY_ACTION[decision.action]:
         return _invalid_action_abstention()
 
@@ -461,57 +456,17 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
         )
     if decision.action == "generate":
         visible_ids = set(_decision_evidence_view(state)[2]["decision_visible_evidence_ids"])
-        normalized_support: list[CoreRequirementSupport] = []
-        declared_requirements: set[str] = set()
-        support_ids: list[str] = []
-        support_contract_valid = bool(
-            decision.core_requirements_complete is True and requirement_support
-        )
-        for support in requirement_support:
-            requirement = " ".join(str(support.requirement or "").split())
-            requirement_key = _comparison_key(requirement)
-            ids = list(
-                dict.fromkeys(
-                    str(item).strip()
-                    for item in support.evidence_ids or []
-                    if str(item).strip()
-                )
-            )
-            if (
-                not requirement_key
-                or requirement_key in declared_requirements
-                or support.support_status != "directly_supported"
-                or not ids
-                or not set(ids).issubset(visible_ids)
-            ):
-                support_contract_valid = False
-            declared_requirements.add(requirement_key)
-            support_ids.extend(ids)
-            normalized_support.append(
-                support.model_copy(
-                    update={
-                        "requirement": requirement,
-                        "evidence_ids": ids or None,
-                    }
-                )
-            )
-        support_ids = list(dict.fromkeys(support_ids))
         if (
             has_evidence
             and missing_evidence is None
-            and support_contract_valid
-            and support_ids
             and direct_support_ids
             and set(direct_support_ids).issubset(visible_ids)
-            and set(direct_support_ids) == set(support_ids)
         ):
             return decision.model_copy(
                 update={
                     "retrieval_query": None,
                     "missing_evidence": None,
-                    "direct_supporting_evidence_ids": support_ids,
-                    "core_requirements_complete": True,
-                    "core_requirement_support": normalized_support,
+                    "direct_supporting_evidence_ids": direct_support_ids,
                 }
             )
         return _invalid_action_abstention()
@@ -523,8 +478,6 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
                     "retrieval_query": query,
                     "missing_evidence": None,
                     "direct_supporting_evidence_ids": None,
-                    "core_requirements_complete": None,
-                    "core_requirement_support": None,
                 }
             )
         return _invalid_action_abstention()
@@ -552,8 +505,6 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
             "retrieval_query": query,
             "missing_evidence": missing_evidence,
             "direct_supporting_evidence_ids": None,
-            "core_requirements_complete": decision.core_requirements_complete,
-            "core_requirement_support": requirement_support or None,
         }
     )
 
@@ -641,7 +592,6 @@ __all__ = [
     "LEGAL_REASONS_BY_ACTION",
     "MAX_RETRIEVAL_ATTEMPTS",
     "AgentDecision",
-    "CoreRequirementSupport",
     "build_agent_decision_prompt",
     "parse_agent_decision",
     "select_agent_action",

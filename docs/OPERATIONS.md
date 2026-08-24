@@ -51,7 +51,7 @@ recreate, or delete the Qdrant knowledge index.
 The runtime uses exact normalized answer cache `v10`. Cache identity
 includes provider, model, pipeline fingerprint, and the normalized question; no
 semantic-similarity lookup is performed. Runtime retrieval is read-only
-Dense + native BM25 + RRF over
+Dense + native BM25 + RRF, local BGE reranking, and whole-chunk packing over
 `acne_knowledge`; it does not query EntityCards or Neo4j. Knowledge compilation,
 activation, reindexing, and embedding are separate maintenance operations rather
 than application-startup steps.

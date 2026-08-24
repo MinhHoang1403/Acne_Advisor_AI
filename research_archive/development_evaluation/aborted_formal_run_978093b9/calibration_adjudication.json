@@ -1,0 +1,73 @@
+{
+  "run_id": "formal_run_978093b9",
+  "calibration_dataset_sha256": "69b837a5571614b24c7705b362af1cb451b6111fddd60c9e471ffbd49fd04644",
+  "evaluator_model": "gpt-5.4-2026-03-05",
+  "automatic_decision": "CALIBRATION_REVIEW_REQUIRED",
+  "automatic_counts": {
+    "claim_extraction_acceptable": 7,
+    "claim_checking_agreement": 12,
+    "repeat_consistency": 19
+  },
+  "review_items": [
+    {
+      "item_id": "CAL-EXT-01",
+      "type": "extraction",
+      "automatic_reasons": [
+        "missing_reference:R01"
+      ],
+      "run_1_result": {
+        "item_id": "CAL-EXT-01",
+        "status": "review_required",
+        "acceptable": false,
+        "review_required": true,
+        "reasons": [
+          "missing_reference:R01"
+        ],
+        "claims": [
+          "['Mụn trứng cá', 'là', 'bệnh viêm']",
+          "['Mụn trứng cá', 'có tính chất', 'mạn tính']",
+          "['Mụn trứng cá', 'xảy ra ở', 'đơn vị nang lông - tuyến bã']"
+        ]
+      },
+      "run_2_result": {
+        "item_id": "CAL-EXT-01",
+        "status": "accepted",
+        "acceptable": true,
+        "review_required": false,
+        "reasons": [],
+        "claims": [
+          "['Mụn trứng cá', 'là bệnh viêm mạn tính của', 'đơn vị nang lông - tuyến bã']"
+        ]
+      },
+      "reference_information": {
+        "input_text": "Mụn trứng cá là bệnh viêm mạn tính của đơn vị nang lông - tuyến bã.",
+        "reference_claims": [
+          {
+            "reference_id": "R01",
+            "text": "Mụn trứng cá là bệnh viêm mạn tính của đơn vị nang lông - tuyến bã.",
+            "required_concept_groups": [
+              [
+                "mụn trứng cá"
+              ],
+              [
+                "viêm mạn tính",
+                "viêm mạn"
+              ],
+              [
+                "đơn vị nang lông tuyến bã",
+                "nang lông tuyến bã"
+              ]
+            ],
+            "qualifier_concept_groups": []
+          }
+        ]
+      }
+    }
+  ],
+  "researcher_decisions": {
+    "CAL-EXT-01": "approve"
+  },
+  "researcher_adjudication": "APPROVED",
+  "effective_decision": "CALIBRATION_READY_FOR_FORMAL_RUN",
+  "review_timestamp": "2026-08-22T22:08:33+00:00"
+}

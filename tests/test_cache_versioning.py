@@ -147,7 +147,7 @@ def test_changed_semantic_contract_versions_partition_cache_without_v11() -> Non
     assert current["answer_cache_version"] == "v10"
     assert current["answer_formatting_contract_version"] == "answer_formatting_contract_v16"
     assert current["safe_fallback_flow_version"] == "safe_fallback_flow_v4"
-    assert current["agent_decision_version"] == "proposition_scoped_support_action_decision"
+    assert current["agent_decision_version"] == "direct_proposition_support_action_decision"
     assert current["safety_policy_version"] == "source_mapped_composite_safety_policy"
     assert current["answer_validation_version"] == "structural_provenance_locality_validation_v2"
 

@@ -18,7 +18,8 @@ User -> FastAPI -> LangGraph
                      |      +-> Dense search
                      |      +-> native BM25 search
                      |      +-> equal-weight RRF
-                     |      +-> bounded provenance packer
+                     |      +-> local BGE cross-encoder reranking
+                     |      +-> whole-chunk provenance packing
                      +-> assess evidence presence and source identity
                      +-> retrieve again when requested (maximum two executions)
                      +-> generate or abstain
@@ -29,6 +30,7 @@ User -> FastAPI -> LangGraph
 |---|---|
 | Knowledge compilation and activation | `src/ingestion/`, `scripts/knowledge_build.py` |
 | Dense + BM25 + RRF retrieval | `src/retrieval/service.py`, `src/retrieval/rrf.py` |
+| Local candidate reranking | `src/retrieval/reranker.py` |
 | Bounded context packing | `src/retrieval/context_packer.py` |
 | LangGraph orchestration and decisions | `src/agent/graph.py`, `src/agent/nodes/workflow.py` |
 | Generation and presentation | `src/agent/nodes/reason.py`, `src/agent/nodes/respond.py` |
@@ -53,7 +55,7 @@ implementations.
 |---|---|
 | `src/ingestion` | content-addressed knowledge compilation and controlled activation |
 | `src/knowledge` | taxonomy identities, EntityCards, and deterministic graph build |
-| `src/retrieval` | source-evidence retrieval and context packing |
+| `src/retrieval` | source-evidence retrieval, local reranking, and context packing |
 | `src/agent` | state graph, action decisions, generation, safety, and presentation |
 | `src/quality` | structural/provenance verification and safe fallback contracts |
 | `src/integrations` | external generation and embedding provider adapters |
