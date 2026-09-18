@@ -445,6 +445,17 @@ def test_system_under_test_validation_blocks_only_production_sensitive_diff(
         "effective_runtime_pipeline_fingerprint",
         lambda: EXPECTED_PIPELINE_FINGERPRINT,
     )
+    monkeypatch.setattr(
+        evaluation_support,
+        "load_json",
+        lambda path: {
+            "build_id": EXPECTED_KB_BUILD_ID,
+            "phase1_frozen": True,
+            "status": "activated",
+        }
+        if Path(path).name == "knowledge_build_manifest.json"
+        else load_json(path),
+    )
 
     if should_pass:
         report = validate_system_under_test(manifest)

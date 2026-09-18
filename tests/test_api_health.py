@@ -423,15 +423,20 @@ async def test_chat_creates_and_propagates_canonical_request_id(monkeypatch, tmp
     monkeypatch.setenv("OBSERVABILITY_ENABLED", "true")
     monkeypatch.setenv("OBSERVABILITY_TRACE_DIR", str(tmp_path))
 
+    supplied_request_id = "79aa7410-b3bd-4431-9aed-609ff1ef9c20"
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/chat", json={"message": query})
+        response = await client.post(
+            "/chat", json={"message": query, "request_id": supplied_request_id}
+        )
 
     assert response.status_code == 200
     request_id = response.json()["metadata"]["request_id"]
+    assert request_id == supplied_request_id
     assert str(uuid.UUID(request_id)) == request_id
     assert query not in request_id
     assert captured_agent["request_id"] == request_id
     assert captured_db["db_metadata"]["request_id"] == request_id
+    assert captured_db["request_id"] == request_id
 
     files = list(tmp_path.glob("phase2_traces-*.jsonl"))
     assert len(files) == 1

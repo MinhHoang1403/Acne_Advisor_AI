@@ -70,7 +70,7 @@ def test_extract_data_counts_reads_current_readiness_schema() -> None:
             },
             {
                 "name": "qdrant_frozen_knowledge",
-                "details": {"points_count": 512},
+                "details": {"points_count": 536},
             },
             {
                 "name": "neo4j_frozen_graph",
@@ -82,7 +82,7 @@ def test_extract_data_counts_reads_current_readiness_schema() -> None:
     counts = checker.extract_data_counts(summary)
 
     assert counts["passed"] is True
-    assert counts["acne_knowledge"] == 512
+    assert counts["acne_knowledge"] == 536
     assert counts["acne_entities"] == 32
     assert counts["neo4j_nodes"] == 32
     assert counts["neo4j_relationships"] == 27

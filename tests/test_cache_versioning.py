@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from src.agent.nodes import cache as cache_node
+from src.cache.exact_cache import make_cache_key
+from src.ingestion.build import BUILD_MANIFEST_SCHEMA
 from src.observability.versioning import (
     ARCHITECTURE_FROZEN,
     ARCHITECTURE_VERSION,
@@ -14,6 +19,25 @@ from src.observability.versioning import (
 )
 
 
+def _write_active_manifest(path: Path, build_id: str) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema": BUILD_MANIFEST_SCHEMA,
+                "status": "activated",
+                "build_id": build_id,
+                "collections": {
+                    "knowledge_logical": "acne_knowledge",
+                    "knowledge_physical": f"acne_knowledge__{build_id}",
+                    "entity_logical": "acne_entities",
+                    "entity_physical": f"acne_entities__{build_id}",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
     manifest = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v10"})
     reversed_manifest = dict(reversed(list(manifest.items())))
@@ -22,6 +46,34 @@ def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
     assert compute_pipeline_fingerprint(manifest) == compute_pipeline_fingerprint(reversed_manifest)
     assert compute_pipeline_fingerprint(manifest) != compute_pipeline_fingerprint(changed)
     assert len(compute_pipeline_fingerprint(manifest)) == 24
+
+
+def test_activated_build_change_partitions_fingerprint_and_cache_namespace(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    _write_active_manifest(manifest_path, "a" * 20)
+    first = build_pipeline_version_manifest(knowledge_manifest_path=manifest_path)
+    first_fingerprint = compute_pipeline_fingerprint(first)
+
+    _write_active_manifest(manifest_path, "b" * 20)
+    second = build_pipeline_version_manifest(knowledge_manifest_path=manifest_path)
+    second_fingerprint = compute_pipeline_fingerprint(second)
+
+    assert first["kb_version"] == "a" * 20
+    assert second["kb_version"] == "b" * 20
+    assert first_fingerprint != second_fingerprint
+    assert make_cache_key(
+        "same question",
+        provider="gemini",
+        model="test-model",
+        pipeline_fingerprint=first_fingerprint,
+    ) != make_cache_key(
+        "same question",
+        provider="gemini",
+        model="test-model",
+        pipeline_fingerprint=second_fingerprint,
+    )
 
 
 def test_manifest_describes_stage1_retrieval_contract() -> None:
@@ -132,7 +184,10 @@ def test_legacy_answer_formatting_contract_is_promoted_to_v16() -> None:
         {"ANSWER_FORMATTING_CONTRACT_VERSION": "answer_formatting_contract_v8"}
     )
 
-    assert manifest["answer_formatting_contract_version"] == "answer_formatting_contract_v16"
+    assert (
+        manifest["answer_formatting_contract_version"]
+        == "bounded_list_and_terminal_qualifier_formatting"
+    )
 
 
 def test_changed_semantic_contract_versions_partition_cache_without_v11() -> None:
@@ -145,11 +200,17 @@ def test_changed_semantic_contract_versions_partition_cache_without_v11() -> Non
     )
 
     assert current["answer_cache_version"] == "v10"
-    assert current["answer_formatting_contract_version"] == "answer_formatting_contract_v16"
+    assert (
+        current["answer_formatting_contract_version"]
+        == "bounded_list_and_terminal_qualifier_formatting"
+    )
     assert current["safe_fallback_flow_version"] == "safe_fallback_flow_v4"
     assert current["agent_decision_version"] == "direct_proposition_support_action_decision"
-    assert current["safety_policy_version"] == "source_mapped_composite_safety_policy"
-    assert current["answer_validation_version"] == "structural_provenance_locality_validation_v2"
+    assert current["safety_policy_version"] == "source_mapped_current_context_safety_policy"
+    assert (
+        current["answer_validation_version"]
+        == "structural_provenance_requested_entity_scope"
+    )
 
 
 def test_legacy_prompt_version_is_promoted_to_requested_scope_contract() -> None:

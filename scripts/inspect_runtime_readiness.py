@@ -24,7 +24,8 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 from src.agent.graph import clinical_graph  # noqa: E402
 from src.agent.state import ClinicalState  # noqa: E402
-from src.ingestion.manifest import validate_build_id  # noqa: E402
+from src.ingestion.manifest import load_build_manifest  # noqa: E402
+from src.knowledge.versioning import resolve_active_knowledge_build_id  # noqa: E402
 from src.observability.versioning import build_pipeline_version_manifest  # noqa: E402
 
 
@@ -70,22 +71,24 @@ def inspect_readiness() -> dict[str, Any]:
 def _knowledge_manifest_check() -> dict[str, Any]:
     path = PROJECT_ROOT / "data" / "knowledge_build_manifest.json"
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = load_build_manifest(path)
         counts = data.get("counts") or {}
-        configured_build = validate_build_id(os.getenv("KB_VERSION"))
+        active_build = resolve_active_knowledge_build_id(path)
         details = {
             "build_id": data.get("build_id"),
-            "configured_kb_version": configured_build,
+            "active_knowledge_build_id": active_build,
+            "legacy_kb_version": os.getenv("KB_VERSION"),
             "phase1_frozen": data.get("phase1_frozen"),
             "status": data.get("status"),
             "counts": counts,
         }
         passed = (
-            data.get("build_id") == configured_build
+            data.get("build_id") == active_build
             and data.get("phase1_frozen") is True
             and data.get("status") == "activated"
             and counts.get("sources") == 4
-            and counts.get("knowledge_chunks") == 512
+            and isinstance(counts.get("knowledge_chunks"), int)
+            and counts.get("knowledge_chunks", 0) > 0
             and counts.get("entities") == 32
             and counts.get("graph_nodes") == 32
             and counts.get("graph_relationships") == 27
@@ -111,6 +114,22 @@ def _qdrant_check() -> dict[str, Any]:
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
             payload = json.loads(response.read().decode("utf-8"))["result"]
+        alias_request = urllib.request.Request(f"{url}/aliases", method="GET")
+        if api_key:
+            alias_request.add_header("api-key", api_key)
+        with urllib.request.urlopen(alias_request, timeout=5) as response:
+            alias_payload = json.loads(response.read().decode("utf-8"))["result"]
+        aliases = {
+            str(item.get("alias_name")): str(item.get("collection_name"))
+            for item in alias_payload.get("aliases", [])
+        }
+        manifest_path = PROJECT_ROOT / "data" / "knowledge_build_manifest.json"
+        manifest = load_build_manifest(manifest_path)
+        build_id = resolve_active_knowledge_build_id(manifest_path)
+        manifest_collections = manifest.get("collections") or {}
+        logical_collection = str(manifest_collections.get("knowledge_logical") or "")
+        expected_target = str(manifest_collections.get("knowledge_physical") or "")
+        active_target = aliases.get(logical_collection)
         config = payload.get("config") or {}
         params = config.get("params") or {}
         vectors = params.get("vectors") or {}
@@ -122,12 +141,15 @@ def _qdrant_check() -> dict[str, Any]:
             "dense_size": dense.get("size"),
             "dense_distance": dense.get("distance"),
             "sparse_vectors": sorted(sparse),
+            "knowledge_build_id": build_id,
+            "active_alias_target": active_target,
         }
         passed = (
-            payload.get("points_count") == 512
+            payload.get("points_count") == (manifest.get("counts") or {}).get("knowledge_chunks")
             and dense.get("size") == 3072
             and str(dense.get("distance") or "").casefold() == "cosine"
             and sorted(sparse) == ["bm25"]
+            and active_target == expected_target
         )
         return {"name": "qdrant_frozen_knowledge", "passed": passed, "details": details}
     except Exception as exc:

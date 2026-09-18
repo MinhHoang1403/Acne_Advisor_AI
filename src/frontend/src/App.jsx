@@ -32,6 +32,7 @@ import {
   deriveChatTitleFromFirstUserMessage,
   shouldGenerateSessionTitle,
 } from './utils/chatTitle.js';
+import { mergeSessionMessages, mergeSessionSummaries } from './utils/sessionMerge.js';
 
 // App sở hữu session state, request lifecycle và đồng bộ localStorage/backend.
 // Component con chỉ nhận dữ liệu/handler để render; HTTP contract thuộc chatApi.
@@ -167,14 +168,7 @@ export default function App() {
           _fromBackend: true,
         }));
 
-        setSessions((prev) => {
-          const localOnly = prev.filter((session) => !session._fromBackend);
-          const backendIds = new Set(normalizedBackendSessions.map((session) => session.id));
-          return [
-            ...localOnly.filter((session) => !backendIds.has(session.id)),
-            ...normalizedBackendSessions,
-          ];
-        });
+        setSessions((prev) => mergeSessionSummaries(prev, normalizedBackendSessions));
 
         const backendIds = new Set(normalizedBackendSessions.map((s) => s.id));
         if (!activeSessionId || !backendIds.has(activeSessionId)) {
@@ -210,7 +204,11 @@ export default function App() {
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === sessionId) {
-              return { ...s, messages: formattedMsgs, _fromBackend: true };
+              return {
+                ...s,
+                messages: mergeSessionMessages(formattedMsgs, s.messages || []),
+                _fromBackend: true,
+              };
             }
             return s;
           })

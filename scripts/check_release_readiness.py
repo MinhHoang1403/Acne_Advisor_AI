@@ -35,12 +35,20 @@ except ImportError:
 
 EXPECTED_VERSION = "end_to_end_release_readiness_v1"
 EXPECTED_CACHE_VERSION = "v10"
-EXPECTED_COUNTS = {
-    "acne_knowledge": 512,
-    "acne_entities": 32,
-    "neo4j_nodes": 32,
-    "neo4j_relationships": 27,
-}
+def _expected_counts_from_manifest() -> dict[str, int]:
+    manifest = json.loads(
+        (PROJECT_ROOT / "data" / "knowledge_build_manifest.json").read_text(encoding="utf-8")
+    )
+    counts = manifest.get("counts") or {}
+    return {
+        "acne_knowledge": int(counts["knowledge_chunks"]),
+        "acne_entities": int(counts["entities"]),
+        "neo4j_nodes": int(counts["graph_nodes"]),
+        "neo4j_relationships": int(counts["graph_relationships"]),
+    }
+
+
+EXPECTED_COUNTS = _expected_counts_from_manifest()
 SECRET_PATTERNS = ("AI" + "za",)
 
 

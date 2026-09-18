@@ -12,6 +12,12 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from src.ingestion.manifest import load_build_manifest
+from src.knowledge.versioning import (
+    DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
+    resolve_active_knowledge_build_id,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +143,15 @@ def check_generation_provider(
         )
     if provider == "ollama":
         if ollama.status == "ok":
-            return CheckResult("ok", extra={"provider": "ollama", "connectivity_probed": True})
+            return CheckResult(
+                "ok",
+                "Ollama service and model presence are verified; generation is not probed by health.",
+                {
+                    "provider": "ollama",
+                    "connectivity_probed": True,
+                    "generation_probed": False,
+                },
+            )
         return CheckResult(
             "unavailable",
             f"Configured Ollama runtime is unavailable: {ollama.detail or ollama.status}",
@@ -225,6 +239,24 @@ async def check_qdrant() -> CheckResult:
             bm25_config = _get_named_config(sparse_vectors_config, "bm25")
             errors: list[str] = []
 
+            manifest = load_build_manifest(DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST)
+            build_id = resolve_active_knowledge_build_id(
+                DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
+            )
+            collections = manifest.get("collections") or {}
+            logical_collection = str(collections.get("knowledge_logical") or "")
+            expected_target = str(collections.get("knowledge_physical") or "")
+            aliases = {
+                str(alias.alias_name): str(alias.collection_name)
+                for alias in (await client.get_aliases()).aliases
+            }
+            active_target = aliases.get(logical_collection)
+            if active_target != expected_target:
+                errors.append(
+                    f"alias {logical_collection} resolves to {active_target!r}, "
+                    f"expected {expected_target!r}"
+                )
+
             if dense_config is None:
                 errors.append("missing named vector dense")
                 dense_size = None
@@ -246,6 +278,8 @@ async def check_qdrant() -> CheckResult:
                 "dense_dim": dense_size,
                 "has_bm25": bm25_config is not None,
                 "points_count": points_count,
+                "knowledge_build_id": build_id,
+                "active_alias_target": active_target,
             }
             if errors:
                 return CheckResult("schema_mismatch", "; ".join(errors), extra)
@@ -308,7 +342,15 @@ async def check_ollama() -> CheckResult:
                 f"{OLLAMA_MODEL} not found",
                 {"available_models": sorted(names)},
             )
-        return CheckResult("ok", extra={"model": OLLAMA_MODEL})
+        return CheckResult(
+            "ok",
+            "Ollama tags endpoint and model presence verified; generation is not probed.",
+            {
+                "model": OLLAMA_MODEL,
+                "model_list_probed": True,
+                "generation_probed": False,
+            },
+        )
     except (OSError, urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         return CheckResult("unavailable", _safe_dependency_error("Ollama", exc))
 
