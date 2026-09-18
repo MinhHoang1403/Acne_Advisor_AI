@@ -8,16 +8,18 @@ kê trong report, không phải chứng nhận nội dung đúng y khoa.
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from src.agent.answer_formatting import assess_structural_quality, infer_response_profile
 from src.quality.contracts import AnswerQualityIssue, AnswerVerificationReport
+from src.knowledge.normalizer import DrugEntityNormalizer
 from src.retrieval.contracts import PackedContext
 
 
 ERROR = "error"
 WARNING = "warning"
-ANSWER_VALIDATION_VERSION = "structural_provenance_locality_validation_v2"
+ANSWER_VALIDATION_VERSION = "structural_provenance_requested_entity_scope"
 
 
 def verify_answer_quality(
@@ -44,6 +46,7 @@ def verify_answer_quality(
     ]
     provenance_errors = _packed_context_provenance_errors(packed_context)
     issues.extend(provenance_errors)
+    issues.extend(_requested_entity_scope_errors(query, answer or ""))
     has_error = any(issue.severity == ERROR for issue in issues)
     return AnswerVerificationReport(
         passed=not has_error,
@@ -51,7 +54,12 @@ def verify_answer_quality(
         checked_answer=answer or "",
         issues=issues,
         metadata={
-            "verification_scope": ["presentation", "structural_contract", "provenance_identity"],
+            "verification_scope": [
+                "presentation",
+                "structural_contract",
+                "provenance_identity",
+                "requested_entity_scope",
+            ],
             "medical_semantic_verification": False,
             "packed_context_items": len(packed_context.items) if packed_context else 0,
             "retrieval_trace_available": retrieval_trace is not None,
@@ -63,6 +71,49 @@ def verify_answer_quality(
             ),
         },
     )
+
+
+def _requested_entity_scope_errors(query: str, answer: str) -> list[AnswerQualityIssue]:
+    """Catch explicit entity omissions without claiming semantic entailment."""
+
+    requested = _matched_entity_names(query)
+    addressed = _matched_entity_names(answer)
+    missing = sorted(set(requested) - set(addressed))
+    if len(requested) >= 2 and missing:
+        return [
+            _issue(
+                "requested_entity_scope_incomplete",
+                ERROR,
+                "Answer omits one or more explicitly requested entities.",
+                {"requested_entities": sorted(requested), "missing_entities": missing},
+            )
+        ]
+    if len(requested) == 1 and missing and addressed:
+        return [
+            _issue(
+                "answer_entity_off_scope",
+                ERROR,
+                "Answer discusses a different known entity without addressing the requested one.",
+                {
+                    "requested_entities": sorted(requested),
+                    "answer_entities": sorted(addressed),
+                },
+            )
+        ]
+    return []
+
+
+def _matched_entity_names(text: str) -> dict[str, str]:
+    matches: dict[str, str] = {}
+    for card in _scope_normalizer().match_alias(text):
+        key = f"{card.entity_type}:{card.canonical_name.casefold()}"
+        matches[key] = card.canonical_name
+    return matches
+
+
+@lru_cache(maxsize=1)
+def _scope_normalizer() -> DrugEntityNormalizer:
+    return DrugEntityNormalizer()
 
 def _packed_context_provenance_errors(packed_context: PackedContext | None) -> list[AnswerQualityIssue]:
     if packed_context is None:

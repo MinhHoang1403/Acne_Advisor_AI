@@ -21,7 +21,7 @@ ResponseProfile = Literal[
     "safe_fallback",
 ]
 
-ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
+ANSWER_FORMATTING_CONTRACT_VERSION = "bounded_list_and_terminal_qualifier_formatting"
 
 CANONICAL_DISCLAIMER = (
     "Thông tin chỉ mang tính tham khảo và hỗ trợ tìm hiểu, không thay thế tư vấn, "
@@ -291,11 +291,17 @@ def _enforce_requested_maximum_items(answer: str, user_question: str) -> str:
         return answer
     output: list[str] = []
     count = 0
+    skipping_removed_item = False
     for line in answer.splitlines():
         if re.match(r"^\s*(?:[-*+] |\d+[.)] )", line):
             count += 1
-            if count > expected:
+            skipping_removed_item = count > expected
+        elif skipping_removed_item:
+            if line.strip():
                 continue
+            skipping_removed_item = False
+        if skipping_removed_item:
+            continue
         output.append(line)
     return "\n".join(output).strip()
 
@@ -422,10 +428,10 @@ def _dedupe_disclaimer(text: str, disclaimer: str) -> str:
 def _trim_incomplete_terminal_paragraph(text: str) -> str:
     if not _has_incomplete_terminal_sentence(text):
         return text
-    paragraphs = [part for part in re.split(r"\n{2,}", text.strip()) if part.strip()]
-    if len(paragraphs) <= 1:
-        return repair_terminal_punctuation(text)
-    return "\n\n".join(paragraphs[:-1]).strip()
+    # A dangling ending may be a provider truncation, but deleting the whole
+    # terminal block can also delete a medical qualifier or list continuation.
+    # Preserve the content and let structural verification report truncation.
+    return repair_terminal_punctuation(text)
 
 
 def _has_incomplete_terminal_sentence(text: str) -> bool:

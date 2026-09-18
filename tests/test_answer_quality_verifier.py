@@ -34,4 +34,37 @@ def test_validator_has_one_structural_provenance_scope() -> None:
         "presentation",
         "structural_contract",
         "provenance_identity",
+        "requested_entity_scope",
     ]
+
+
+def test_validator_detects_partial_multi_entity_answer() -> None:
+    report = verify_answer_quality(
+        query="So sánh adapalene và benzoyl peroxide.",
+        answer="Adapalene là một retinoid bôi tại chỗ.",
+    )
+
+    assert report.passed is False
+    assert any(issue.code == "requested_entity_scope_incomplete" for issue in report.issues)
+
+
+def test_validator_detects_source_supported_but_off_scope_entity() -> None:
+    report = verify_answer_quality(
+        query="Adapalene thuộc nhóm nào?",
+        answer="Benzoyl peroxide là một chất kháng khuẩn dùng tại chỗ.",
+    )
+
+    assert report.passed is False
+    assert any(issue.code == "answer_entity_off_scope" for issue in report.issues)
+
+
+def test_validator_passes_when_all_explicit_entities_are_addressed() -> None:
+    report = verify_answer_quality(
+        query="So sánh adapalene và benzoyl peroxide.",
+        answer="Adapalene là retinoid bôi; benzoyl peroxide là chất kháng khuẩn dùng tại chỗ.",
+    )
+
+    assert not any(
+        issue.code in {"requested_entity_scope_incomplete", "answer_entity_off_scope"}
+        for issue in report.issues
+    )

@@ -95,7 +95,12 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
                     }
                 ],
                 "metadata": {
-                    "verification_scope": ["presentation", "structural_contract", "provenance_identity"],
+                    "verification_scope": [
+                        "presentation",
+                        "structural_contract",
+                        "provenance_identity",
+                        "requested_entity_scope",
+                    ],
                     "medical_semantic_verification": False,
                 },
             },

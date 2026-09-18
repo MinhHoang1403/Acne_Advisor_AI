@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Callable, Literal
+from typing import Any, Callable, Iterable, Literal
 
 from src.agent.semantic_signals import (
     BREATHING_DIFFICULTY_CONCEPTS,
@@ -28,7 +28,7 @@ from src.agent.semantic_signals import (
 )
 
 SafetySeverity = Literal["policy", "urgent", "emergency"]
-SAFETY_POLICY_VERSION = "source_mapped_composite_safety_policy"
+SAFETY_POLICY_VERSION = "source_mapped_current_context_safety_policy"
 
 
 @dataclass(frozen=True)
@@ -54,12 +54,36 @@ class SafetyDecision:
     source_urls: tuple[str, ...]
 
 
-def evaluate_safety(query: str) -> SafetyDecision | None:
-    """Trả một override hẹp; semantics thông thường vẫn thuộc Agent."""
+def evaluate_safety(
+    query: str,
+    *,
+    conversation_history: Iterable[dict[str, Any]] | None = None,
+) -> SafetyDecision | None:
+    """Return a current-risk override, including one adjacent split turn.
+
+    A prior user turn is considered only when neither turn independently
+    triggers. Adjacent facts can compose without leaking a completed safety
+    event into an unrelated later topic.
+    """
+
+    direct = _evaluate_single_safety_query(query)
+    if direct is not None or not conversation_history or _explicit_topic_reset(query):
+        return direct
+
+    previous = _latest_user_message(conversation_history)
+    if not previous or _evaluate_single_safety_query(previous) is not None:
+        return None
+    return _evaluate_single_safety_query(f"{previous}. {query}")
+
+
+def _evaluate_single_safety_query(query: str) -> SafetyDecision | None:
+    """Evaluate one bounded text after subject and intent safeguards."""
 
     text = normalize_text(query, preserve_boundaries=True)
     for rule in SAFETY_RULES:
-        if rule.trigger(text):
+        if rule.trigger(text) and not (
+            rule.severity != "policy" and _non_current_information_request(query, text)
+        ):
             return SafetyDecision(
                 rule_id=rule.rule_id,
                 severity=rule.severity,
@@ -69,6 +93,72 @@ def evaluate_safety(query: str) -> SafetyDecision | None:
                 source_urls=rule.source_urls,
             )
     return None
+
+
+def _non_current_information_request(raw_query: str, normalized: str) -> bool:
+    """Recognize explicit educational or third-person framing, not medical facts."""
+
+    current_personal = (
+        re.search(
+            r"\b(?:toi|minh|em|tui|i)\s+(?:dang|hien|vua|van|bi|co thai|co bau|muon|sap)\b",
+            normalized,
+        )
+        is not None
+        and has_first_person_reference(normalized)
+    )
+    if current_personal:
+        return False
+
+    informational_markers = (
+        "vi sao",
+        "tai sao",
+        "giai thich",
+        "tim hieu",
+        "thong tin",
+        "tai lieu",
+        "nghien cuu",
+        "khuyen cao noi gi",
+        "quan ly nguy co",
+        "co the gay",
+        "noi gi ve",
+    )
+    normalized_plain = normalize_text(raw_query)
+    informational_question = (
+        re.search(
+            r"\bco (?:nen )?(?:dung|boi|uong).{0,80}\bkhong\b",
+            normalized_plain,
+        )
+        is not None
+        and not has_first_person_reference(normalized_plain)
+    )
+    explicit_third_person = (
+        re.search(
+            r"\b(?:ban|me|bo|anh|chi|be|benh nhan|friend|mother|father|patient)\s+(?:cua\s+)?toi\b",
+            normalized_plain,
+        )
+        is not None
+        or re.search(r"\b(?:nguoi khac|someone else)\b", normalized_plain) is not None
+    )
+    return (
+        informational_question
+        or explicit_third_person
+        or any(marker in normalized_plain for marker in informational_markers)
+    )
+
+
+def _latest_user_message(history: Iterable[dict[str, Any]]) -> str:
+    for item in reversed(list(history)):
+        if str(item.get("role") or "") != "user":
+            continue
+        content = " ".join(str(item.get("content") or "").split())
+        if content:
+            return content
+    return ""
+
+
+def _explicit_topic_reset(query: str) -> bool:
+    normalized = normalize_text(query)
+    return normalized.startswith(("bo qua ", "ignore ", "chuyen chu de "))
 
 
 def safety_rule_inventory() -> tuple[SafetyRule, ...]:

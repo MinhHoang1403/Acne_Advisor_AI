@@ -16,7 +16,10 @@ from src.agent.prompts.medical_answer import MEDICAL_RAG_SYSTEM_PROMPT
 
 def test_formatting_contract_version_and_comparison_shape_are_current() -> None:
     instruction = answer_format_instruction_for_question("A và B khác nhau thế nào?")
-    assert ANSWER_FORMATTING_CONTRACT_VERSION == "answer_formatting_contract_v16"
+    assert (
+        ANSWER_FORMATTING_CONTRACT_VERSION
+        == "bounded_list_and_terminal_qualifier_formatting"
+    )
     assert "đối chiếu" in instruction
     assert "evidence" in instruction
 
@@ -91,6 +94,28 @@ def test_exact_count_truncates_existing_bullets_without_inventing_content() -> N
         "- Ý B",
         "- Ý C",
     ]
+
+
+def test_exact_count_removes_extra_item_continuation_as_one_block() -> None:
+    answer = finalize_answer_presentation(
+        "- Ý A\n  qualifier A\n- Ý B\n  qualifier B\n- Ý C\n  must not attach to B",
+        user_question="Liệt kê đúng 2 ý.",
+    )
+
+    assert "qualifier A" in answer
+    assert "qualifier B" in answer
+    assert "must not attach to B" not in answer
+
+
+def test_formatter_preserves_incomplete_terminal_medical_qualifier() -> None:
+    qualifier = "Không dùng đơn trị liệu vì nguy cơ kháng thuốc và"
+    answer = finalize_answer_presentation(
+        f"Khuyến nghị có điều kiện.\n\n{qualifier}",
+        user_question="Khuyến nghị dùng thuốc thế nào?",
+        add_disclaimer=False,
+    )
+
+    assert qualifier in answer
 
 
 def test_markdown_cleanup_repairs_surface_form_only() -> None:

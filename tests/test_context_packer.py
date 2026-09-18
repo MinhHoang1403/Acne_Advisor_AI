@@ -107,6 +107,19 @@ def test_packer_item_limit_keeps_exact_supplied_order() -> None:
     ]
 
 
+def test_default_budget_can_admit_required_evidence_at_rank_nine() -> None:
+    candidates = [
+        _candidate(f"chunk-{index}", "bounded evidence " * 24, index)
+        for index in range(1, 10)
+    ]
+
+    packed = pack_context(_query(), candidates)
+
+    assert len(packed.items) == 9
+    assert packed.items[-1].item_id == "chunk-9"
+    assert len(packed.context_text) <= 7000
+
+
 def test_packer_is_deterministic_for_identical_ordered_input() -> None:
     candidates = [
         _candidate("too-large", "X" * 500, 1),

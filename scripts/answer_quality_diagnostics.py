@@ -188,8 +188,8 @@ async def collect_live_retrieval_observation(
 
     query = " ".join(case["question"].split())
     candidate_limit = _bounded_env("RETRIEVAL_CANDIDATE_LIMIT", 16, 1, 50)
-    context_items = min(8, _bounded_env("RETRIEVAL_CONTEXT_MAX_ITEMS", 8, 1, 20))
-    context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 6000, 512, 20000)
+    context_items = min(9, _bounded_env("RETRIEVAL_CONTEXT_MAX_ITEMS", 9, 1, 20))
+    context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 7000, 512, 20000)
     dense_results, sparse_results = await asyncio.gather(
         retriever._dense_search(query, candidate_limit),
         retriever._vector_store.search_sparse(query, top_k=candidate_limit),
