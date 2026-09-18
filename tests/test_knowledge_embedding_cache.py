@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from types import SimpleNamespace
 
 from src.ingestion.embedding import EMBEDDING_DIMENSIONS, EmbeddingCache
 from src.ingestion import index as ingestion_index
@@ -162,3 +163,30 @@ async def test_embedding_resolution_stops_after_retry_limit(
             batch_delay_seconds=0,
             max_retries=2,
         )
+
+
+@pytest.mark.asyncio
+async def test_legacy_raw_vectors_are_not_seeded_into_instruction_cache(tmp_path) -> None:
+    class FakeClient:
+        async def retrieve(self, *args, **kwargs):
+            return [
+                SimpleNamespace(
+                    payload={
+                        "text": "content",
+                        "source_title": "source",
+                        "embedding_contract_id": "google_gemini_embedding_2_3072_cosine",
+                    },
+                    vector={"dense": [0.0] * EMBEDDING_DIMENSIONS},
+                )
+            ]
+
+    cache = EmbeddingCache(tmp_path)
+    result = await ingestion_index.seed_embedding_cache_from_collection(
+        FakeClient(),
+        collection_name="knowledge",
+        point_ids=["point"],
+        cache=cache,
+    )
+
+    assert result == {"loaded": 0, "unreadable": 0, "incompatible": 1}
+    assert not list(tmp_path.glob("*.json"))

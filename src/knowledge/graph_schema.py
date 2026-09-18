@@ -166,8 +166,8 @@ def build_entity_graph_records(
 ) -> dict[str, list[dict[str, Any]]]:
     """Tạo Neo4j node/relationship records deterministic từ entity cards."""
 
-    versions = get_knowledge_versions()
-    resolved_kb_version = kb_version or versions["kb_version"]
+    versions = get_knowledge_versions(build_id=kb_version)
+    resolved_kb_version = versions["kb_version"]
     cards_by_key = {
         _entity_key(ENTITY_TYPE_TO_LABEL[card.entity_type], card.canonical_name): card
         for card in cards

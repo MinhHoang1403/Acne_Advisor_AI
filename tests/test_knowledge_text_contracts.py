@@ -39,6 +39,96 @@ def test_normalization_is_conservative_and_deterministic() -> None:
     assert normalize_parsed_text(normalize_parsed_text(raw)) == normalize_parsed_text(raw)
 
 
+def test_normalization_removes_only_confirmed_quoted_and_unquoted_nice_artifacts() -> None:
+    raw = """# Safety
+
+> © NICE 2026. All rights reserved. Subject to Notice of rights (https://example.test).
+> Page 8 of 56 1.4.3
+Page 9 of 56
+
+> Clinicians should preserve this normal medical blockquote.
+
+- Keep this list item.
+- Keep the next item.
+
+The patient-facing page explains when to seek help.
+"""
+
+    normalized = normalize_parsed_text(raw)
+
+    assert "© NICE" not in normalized
+    assert "Page 8 of 56" not in normalized
+    assert "Page 9 of 56" not in normalized
+    assert "> 1.4.3" in normalized
+    assert "> Clinicians should preserve this normal medical blockquote." in normalized
+    assert "# Safety" in normalized
+    assert "- Keep this list item." in normalized
+    assert "The patient-facing page explains when to seek help." in normalized
+
+
+def test_structure_preserving_chunking_keeps_claim_qualifier_and_list_intro() -> None:
+    text = (
+        "# Treatment\n\n"
+        + ("Background sentence. " * 7)
+        + "\n\nOnly continue antibiotics in exceptional circumstances; review regularly,"
+        + "\n\nand stop the antibiotic as soon as possible."
+        + "\n\nUse the following precautions:\n\n"
+        + "• start gradually.\n\n• stop if a serious reaction occurs."
+    )
+
+    chunks = structural_chunks(text, max_chars=190)
+
+    qualifier_chunk = next(chunk.text for chunk in chunks if "Only continue" in chunk.text)
+    assert "and stop the antibiotic as soon as possible" in qualifier_chunk
+    list_chunk = next(chunk.text for chunk in chunks if "Use the following precautions:" in chunk.text)
+    assert "• start gradually." in list_chunk
+
+
+def test_structure_preserving_chunking_splits_markdown_table_between_rows() -> None:
+    text = """# Options
+
+| Treatment | Important qualifier |
+| --- | --- |
+| Adapalene | Do not use during pregnancy. |
+| Benzoyl peroxide | May bleach hair and fabrics. |
+"""
+
+    chunks = structural_chunks(text, max_chars=95)
+
+    assert all(len(chunk.text) <= 95 for chunk in chunks)
+    assert any(
+        "| Adapalene | Do not use during pregnancy. |" in chunk.text
+        for chunk in chunks
+    )
+    assert any(
+        "| Benzoyl peroxide | May bleach hair and fabrics. |" in chunk.text
+        for chunk in chunks
+    )
+
+
+def test_parent_list_introduction_is_carried_into_each_child_section() -> None:
+    text = """# Systemic treatment
+
+## Antibiotics
+
+Choose one of the following options:
+
+### Doxycycline
+
+- Use the source-backed regimen.
+
+### Lymecycline
+
+- Use the alternative source-backed regimen.
+"""
+
+    chunks = structural_chunks(text)
+    child_chunks = [chunk for chunk in chunks if len(chunk.section_path) == 3]
+
+    assert len(child_chunks) == 2
+    assert all("Choose one of the following options:" in chunk.text for chunk in child_chunks)
+
+
 def test_exact_deduplication_keeps_first_occurrence() -> None:
     assert deduplicate_chunks(["a", "b", "a"]) == (["a", "b"], [2])
 

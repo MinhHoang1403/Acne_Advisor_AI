@@ -20,6 +20,7 @@ from src.knowledge.versioning import (
     expected_kb_payload_metadata,
     get_embedding_metadata,
     get_knowledge_versions,
+    resolve_active_knowledge_build_id,
     validate_embedding_config_compatibility,
 )
 
@@ -40,6 +41,7 @@ __all__ = [
     "get_entity_graph_constraints",
     "get_entity_graph_indexes",
     "get_knowledge_versions",
+    "resolve_active_knowledge_build_id",
     "normalize_text_key",
     "validate_embedding_config_compatibility",
 ]

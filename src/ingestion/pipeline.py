@@ -20,7 +20,7 @@ from qdrant_client import AsyncQdrantClient
 
 from src.database.vector_store import qdrant_client_kwargs
 from src.ingestion.build import compile_knowledge, compute_build_identity
-from src.ingestion.embedding import EmbeddingCache
+from src.ingestion.embedding import EmbeddingCache, format_embedding_document
 from src.ingestion.filtering import load_claim_exclusions
 from src.ingestion.index import (
     build_entity_candidate,
@@ -69,7 +69,7 @@ DEFAULT_BUILD_MANIFEST = Path("data/knowledge_build_manifest.json")
 LEGACY_INGESTION_MANIFEST = Path("data/ingestion_manifest.json")
 KNOWLEDGE_LOGICAL_COLLECTION = "acne_knowledge"
 ENTITY_LOGICAL_COLLECTION = "acne_entities"
-EXPECTED_KNOWLEDGE_POINTS = 512
+EXPECTED_KNOWLEDGE_POINTS = 536
 EXPECTED_ENTITY_POINTS = 32
 EXPECTED_GRAPH_NODES = 32
 EXPECTED_GRAPH_RELATIONSHIPS = 27
@@ -224,10 +224,18 @@ async def inspect_embedding_cache_reuse(
     )
     cache = EmbeddingCache(embedding_cache)
     knowledge_hits = sum(
-        cache.get(record["text"]) is not None for record in prepared["compiled"].records
+        cache.get(
+            format_embedding_document(record["text"], title=record["source_title"])
+        ) is not None
+        for record in prepared["compiled"].records
     )
     entity_hits = sum(
-        cache.get(entity_card_to_text(card)) is not None for card in prepared["cards"]
+        cache.get(
+            format_embedding_document(
+                entity_card_to_text(card), title=card.canonical_name
+            )
+        ) is not None
+        for card in prepared["cards"]
     )
     result = {
         "passed": prepared["offline_validation"]["passed"],
@@ -266,7 +274,7 @@ async def build_knowledge(
     cards = prepared["cards"]
     cache = EmbeddingCache(DEFAULT_EMBEDDING_CACHE)
     qdrant = AsyncQdrantClient(**qdrant_client_kwargs())
-    legacy_reuse = {"loaded": 0, "unreadable": 0}
+    legacy_reuse = {"loaded": 0, "unreadable": 0, "incompatible": 0}
     try:
         names = {item.name for item in (await qdrant.get_collections()).collections}
         if "acne_knowledge" in names and LEGACY_INGESTION_MANIFEST.is_file():
@@ -279,12 +287,20 @@ async def build_knowledge(
 
         api_key = os.getenv("GOOGLE_API_KEY", "").strip()
         knowledge_vectors, knowledge_embedding_stats = await resolve_embeddings(
-            [record["text"] for record in compiled.records],
+            [
+                format_embedding_document(record["text"], title=record["source_title"])
+                for record in compiled.records
+            ],
             cache=cache,
             api_key=api_key,
         )
         entity_vectors, entity_embedding_stats = await resolve_embeddings(
-            [entity_card_to_text(card) for card in cards],
+            [
+                format_embedding_document(
+                    entity_card_to_text(card), title=card.canonical_name
+                )
+                for card in cards
+            ],
             cache=cache,
             api_key=api_key,
         )
@@ -497,12 +513,12 @@ async def finalize_knowledge_activation(
         raise RuntimeError("Knowledge manifest must have status activated before finalization")
 
     try:
-        configured_build = validate_build_id(os.getenv("KB_VERSION"))
+        manifest_build = validate_build_id(
+            manifest.get("build_id"),
+            setting_name="knowledge manifest build_id",
+        )
     except ValueError as exc:
         raise RuntimeError(str(exc)) from exc
-    manifest_build = manifest.get("build_id")
-    if manifest_build != configured_build:
-        raise RuntimeError("Activated manifest build_id does not match configured KB_VERSION")
 
     identity = compute_build_identity(source_manifest_path, taxonomy_path)
     if manifest_build != identity.build_id:

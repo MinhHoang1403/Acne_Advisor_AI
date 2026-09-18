@@ -96,7 +96,7 @@ def test_compiled_web_provenance_and_claim_curation_are_exact() -> None:
     web_records = [record for record in records if record.get("parent_source_id")]
     curated = [record for record in records if record.get("curation_action_ids")]
 
-    assert len(records) == 512
+    assert len(records) == 536
     assert len(curated) == 5
     assert all(record["pre_curation_content_hash"] for record in curated)
     assert all(record["parent_source_id"] == "aad_public_acne_2026_07" for record in web_records)
@@ -141,7 +141,7 @@ def test_approved_build_cache_reuse_gate(monkeypatch: pytest.MonkeyPatch) -> Non
     assert snapshot() == cache_before
 
     assert result["passed"] is True
-    assert result["build_id"] == "94d613bc9b33628de3ef"
+    assert result["build_id"] == "d4a1819fe7fb77fe1f40"
     assert result["parsed"] == {
         "hits": 4,
         "misses": 0,
@@ -150,12 +150,10 @@ def test_approved_build_cache_reuse_gate(monkeypatch: pytest.MonkeyPatch) -> Non
     }
     knowledge_embeddings = result["knowledge_embeddings"]
     assert knowledge_embeddings["inspected"] is True
-    assert knowledge_embeddings["total"] == 512
-    assert knowledge_embeddings["hits"] + knowledge_embeddings["misses"] == 512
-    assert result["entity_embeddings"] == {
-        "inspected": True,
-        "hits": 32,
-        "misses": 0,
-        "total": 32,
-    }
+    assert knowledge_embeddings["total"] == 536
+    assert knowledge_embeddings["hits"] + knowledge_embeddings["misses"] == 536
+    entity_embeddings = result["entity_embeddings"]
+    assert entity_embeddings["inspected"] is True
+    assert entity_embeddings["total"] == 32
+    assert entity_embeddings["hits"] + entity_embeddings["misses"] == 32
     assert result["provider_calls"] == 0
