@@ -58,6 +58,13 @@ observability event. Request-complete telemetry is emitted only after Agent and
 best-effort persistence timings are available. Telemetry construction and sink
 failures remain non-fatal to the chat response.
 
+When a client supplies that UUID again for the same canonical request, database
+persistence derives stable user/assistant message IDs and replays the existing
+logical turn instead of duplicating it. Different request IDs keep identical
+text as distinct legitimate turns. The frontend reconciles server and local
+history by message ID, preserving an unsynchronized local tail across refreshes
+without merging repeated text or leaking state across a new chat/session switch.
+
 ## Package Boundaries
 
 | Package | Current responsibility |

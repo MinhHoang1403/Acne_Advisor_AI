@@ -1,80 +1,67 @@
 # Method Traceability
 
-Tài liệu này nối từng phương pháp hoặc công thức với code owner, nguồn hỗ trợ và
-phần thích nghi riêng của Acne Advisor AI. Việc implementation có test không đồng
-nghĩa phương pháp đã được chứng minh tối ưu, cải thiện chất lượng trên corpus này,
-hay được xác nhận hiệu quả lâm sàng.
+Tài liệu này nối từng phương pháp với code owner, nguồn hỗ trợ, phần thích nghi
+của Acne Advisor AI và giới hạn diễn giải. Một implementation có test không đồng
+nghĩa phương pháp đã tối ưu hoặc được xác nhận hiệu quả lâm sàng.
 
-## Classification
+## Phân loại
 
-- `IMPLEMENTED_RESEARCH_METHOD`: phương pháp có nguồn nghiên cứu và có mặt trong code.
-- `OFFICIAL_PROVIDER_CONTRACT`: hành vi do tài liệu chính thức của provider định nghĩa.
-- `OFFICIAL_FRAMEWORK_CONTRACT`: hành vi do framework chính thức định nghĩa.
-- `CLINICAL_SAFETY_SOURCE`: nguồn y khoa/y tế công cộng hỗ trợ một safety action hẹp.
-- `RELATED_LITERATURE`: ý tưởng liên quan nhưng project không tuyên bố tái hiện paper.
-- `ENGINEERING_POLICY`: quyết định hữu hạn của project, không phải hằng số khoa học.
-- `EMPIRICAL_PROJECT_DECISION`: quyết định dựa trên đo lường nội bộ và chỉ có phạm vi project.
+- `IMPLEMENTED_RESEARCH_METHOD`: phương pháp nghiên cứu có mặt trong code.
+- `OFFICIAL_PROVIDER_CONTRACT`: hành vi do tài liệu chính thức của provider mô tả.
+- `RELATED_LITERATURE`: nghiên cứu liên quan nhưng không được tuyên bố là đã tái hiện.
+- `ENGINEERING_POLICY`: quyết định hữu hạn của project.
+- `EMPIRICAL_PROJECT_DECISION`: quyết định từ đo lường nội bộ, chỉ có phạm vi project.
+- `CLINICAL_SAFETY_SOURCE`: nguồn hỗ trợ một safety action hẹp.
 
-## Canonical Matrix
+## Phương pháp đang hoạt động
 
-| Method / Formula | Code owner | Purpose | Source | Classification | Project adaptation | Source does NOT validate |
-|---|---|---|---|---|---|---|
-| Dense retrieval | `src/database/vector_store.py`, `src/retrieval/service.py` | Tìm chunk gần query theo biểu diễn dense | `karpukhin_dpr_2020` | `IMPLEMENTED_RESEARCH_METHOD` | Dùng Gemini Embedding 2 và Qdrant thay cho DPR encoder/index | Chất lượng Gemini, tiếng Việt hoặc corpus mụn |
-| Gemini Embedding 2 provider contract | `src/integrations/google_genai.py`, `src/ingestion/embedding.py` | Gửi text, nhận và kiểm vector 3072 chiều | `google_gemini_embedding2_2026` | `OFFICIAL_PROVIDER_CONTRACT` | Project kiểm batch count/dimension; model không nhận `task_type` | Chất lượng cross-lingual hoặc format text hiện tại là tối ưu |
-| Cosine vector search | `src/ingestion/index.py`, `src/database/vector_store.py` | Cấu hình và gọi Dense similarity search | `qdrant_cosine_search_2026` | `OFFICIAL_PROVIDER_CONTRACT` | Qdrant sở hữu normalization/search; project gửi query vector | Relevance của vector hoặc ngưỡng chất lượng project |
-| BM25 | `src/ingestion/bm25.py` | Biểu diễn sparse với IDF, TF saturation và length normalization | `robertson_zaragoza_bm25_2009` | `IMPLEMENTED_RESEARCH_METHOD` | Python formula chỉ là reference test; runtime do Qdrant thực thi | Qdrant details hoặc `k1=1.2`, `b=0.75`, `avg_len=256` là tối ưu |
-| Qdrant native BM25 | `src/ingestion/bm25.py`, `src/database/vector_store.py` | Giữ document/query preprocessing parity và sparse search | `qdrant_bm25_2026` | `OFFICIAL_PROVIDER_CONTRACT` | Tokenizer `word`, lowercase, language `none`, IDF collection-side | Chất lượng retrieval trên corpus mụn hoặc parameter optimality |
-| Reciprocal Rank Fusion | `src/retrieval/rrf.py` | Hợp nhất Dense/BM25 bằng rank, không cộng raw score | `cormack_clarke_buettcher_rrf_2009` | `IMPLEMENTED_RESEARCH_METHOD` | `k=60`, hai weight bằng `1.0` | Các giá trị project là tối ưu hoặc có medical-confidence semantics |
-| Local cross-encoder reranking | `src/retrieval/reranker.py`, `src/retrieval/service.py` | Sắp lại RRF candidates theo query trước khi packing | Configured local model contract; không có project research claim riêng | `ENGINEERING_POLICY` | `BAAI/bge-reranker-v2-m3`, local-files-only, bounded timeout; lỗi giữ deterministic pre-reranker order | Raw score là probability/medical confidence, model là tối ưu hoặc cải thiện chất lượng trên corpus này |
-| LangGraph orchestration / conditional routing | `src/agent/graph.py` | Thực thi graph/state và conditional routing giữa các node | LangGraph Graph API / StateGraph documentation | `OFFICIAL_FRAMEWORK_CONTRACT` | Project khai báo topology và route conditions trên cơ chế orchestration của LangGraph | Không định nghĩa schema `retrieve/retry/generate/abstain`, không chứng minh transition policy của project là tối ưu hoặc xác minh chất lượng quyết định y khoa |
-| Bounded Agent action policy | `src/agent/action_decision.py`, `src/agent/graph.py` | Model chọn semantic action; Python kiểm schema, state, evidence requirements, retrieval budget và legal transitions | ReAct / Active RAG / Adaptive-RAG là related literature được map ở các row riêng | `ENGINEERING_POLICY` | Acne Advisor AI định nghĩa bốn action `retrieve/retry/generate/abstain` và thực thi policy hữu hạn bằng Python | Literature liên quan không định nghĩa exact 4-action schema hoặc tối đa 2 retrieval executions, không chứng minh policy tối ưu cho Acne Advisor AI hay clinical correctness |
-| Decision evidence visibility | `src/agent/action_decision.py` | Giới hạn evidence gửi cho model chọn action | Không có source định lượng | `ENGINEERING_POLICY` | Chỉ gửi 5 item đầu, tối đa 1200 ký tự/item; generation có thể thấy nhiều packed evidence hơn | Evidence sufficiency, medical confidence hoặc hai giới hạn này là tối ưu |
-| ReAct relationship | `src/agent/action_decision.py` | Nêu quan hệ với reasoning/action interleaving | `yao_react_2023` | `RELATED_LITERATURE` | Chỉ nhận strict JSON decision, không thu/lưu free-form chain of thought | Action schema, topology hoặc safety policy của project |
-| Active RAG relationship | `src/agent/action_decision.py`, `src/agent/nodes/workflow.py` | Cho model quyết định nhu cầu retrieve/retry | `jiang_active_rag_2023` | `RELATED_LITERATURE` | Retrieval theo request nhưng hữu hạn, không dùng FLARE token-level trigger | Giới hạn hai retrieval hoặc cơ chế generation của project |
-| Adaptive-RAG relationship | `src/agent/action_decision.py` | Thích nghi action theo state/request | `jeong_adaptive_rag_2024` | `RELATED_LITERATURE` | Không có complexity classifier; model chọn trong schema đóng | Strategy set hoặc classifier của project |
-| Context packing | `src/retrieval/context_packer.py` | Giữ post-rerank input order, dedupe identity, bảo toàn provenance | Không có claim nghiên cứu riêng | `ENGINEERING_POLICY` | Tối đa 8 item và 6000 ký tự theo mặc định | Semantic sufficiency, entailment hoặc budget tối ưu |
-| Maximum retrieval attempts | `src/agent/action_decision.py`, `src/agent/graph.py` | Chặn loop retrieval vô hạn | Không có source định lượng | `ENGINEERING_POLICY` | Tối đa 2 retrieval executions | Hai lần là tối ưu cho latency/quality |
-| Per-channel retrieval timeout | `src/retrieval/service.py` | Cô lập Dense/BM25 failure và giữ evidence channel còn lại | `aws_timeouts_retries_backoff_jitter_2019` | `ENGINEERING_POLICY` | Mặc định 20 giây cho mỗi channel | Timeout 20 giây là tối ưu cho hạ tầng hiện tại |
-| Exact cache normalization | `src/cache/exact_cache.py` | Case-fold, thay dấu câu và collapse whitespace trước exact match | Không có semantic-cache claim | `ENGINEERING_POLICY` | Không dùng embedding hoặc near-match | Hai câu chuẩn hóa giống nhau luôn đồng nghĩa về y khoa |
-| SHA-256 cache identity | `src/cache/exact_cache.py` | Tạo key cố định từ version, fingerprint, question, provider/model | `nist_fips_180_4_sha256` | `ENGINEERING_POLICY` | Hash canonical payload bằng SHA-256 theo technical standard | Field selection, normalization, authenticity hoặc cache correctness |
-| Pipeline fingerprint | `src/observability/versioning.py` | Phân vùng cache theo canonical secret-free manifest | `nist_fips_180_4_sha256` | `ENGINEERING_POLICY` | Lấy 24 hex đầu của SHA-256 trên canonical JSON | Digest truncation là security signature hoặc version manifest đầy đủ |
-| UUIDv5 EntityCard identity | `src/knowledge/entity_identity.py` | Tạo Qdrant point ID ổn định từ entity identity | `ietf_rfc9562_uuidv5` | `ENGINEERING_POLICY` | Namespace project cố định + canonical entity name theo technical standard | Canonical-name policy, provenance hoặc data authenticity |
-| Exponential backoff | `src/resilience/retry.py` | Giãn retry cho transient provider failure | `aws_timeouts_retries_backoff_jitter_2019` | `ENGINEERING_POLICY` | Một retry, base 1 giây, cap 4 giây | Số retry và delay project là tối ưu |
-| Positive jitter | `src/resilience/retry.py` | Giảm retry đồng pha | `aws_timeouts_retries_backoff_jitter_2019` | `ENGINEERING_POLICY` | Cộng `U(0, capped * 0.1)` rồi giới hạn bởi cap/deadline | Tỷ lệ `0.1` là tối ưu hoặc phù hợp mọi workload |
-| Deadline budgeting | `src/resilience/budget.py`, `src/agent/graph.py` | Chia sẻ finite request deadline giữa stage/retry/fallback | `aws_timeouts_retries_backoff_jitter_2019` | `ENGINEERING_POLICY` | `effective_timeout=min(configured_timeout, remaining_deadline)` | Tổng 210 giây hay stage deadlines là tối ưu |
-| Ollama truncation retry | `src/agent/llm/ollama_client.py` | Thử tạo lại câu trả lời gọn khi provider báo truncated | Không có source định lượng | `ENGINEERING_POLICY` | Tối đa 1 compact retry với instruction giới hạn 160 từ | Completeness, style, latency hoặc giới hạn 160 từ là tối ưu |
-| Structure-aware chunking | `src/ingestion/chunking.py` | Ưu tiên heading/paragraph/sentence boundary | `wang_segmentation_2025` | `RELATED_LITERATURE` | Heuristic deterministic của project, không triển khai PIC | Heuristic này cải thiện retrieval hoặc generation trên corpus hiện tại |
-| 2400-character chunk cap | `src/ingestion/chunking.py`, `src/knowledge/versioning.py` | Giới hạn kích thước chunk build | Không có nguồn chứng minh optimum | `ENGINEERING_POLICY` | Cap theo Unicode characters, nằm trong build identity | 2400 là độ dài tối ưu hoặc generalizable |
-| Zero chunk overlap | `src/ingestion/chunking.py`, `src/knowledge/versioning.py` | Tránh lặp text giữa chunks trong build hiện tại | Không có nguồn chứng minh optimum | `ENGINEERING_POLICY` | Overlap bằng 0 và được version hóa | Zero overlap không làm mất context ở mọi source |
-| Metadata coverage heuristic | `src/ingestion/domain_metadata.py` | Biểu diễn mức phủ của entity fields đã match | Không có source nghiên cứu | `ENGINEERING_POLICY` | `0` khi không match; ngược lại `min(0.3 + 0.1*n, 1.0)` | Xác suất đúng, confidence y khoa hoặc calibration |
-| Deterministic safety rules | `src/agent/safety_policy.py` | Override hẹp cho emergency/pregnancy/isotretinoin và no-prescription | Các nguồn tại `docs/REFERENCES.md`, gồm `nhs_anaphylaxis_shortness_of_breath_2026` và `st_john_ambulance_severe_bleeding_2025` | `CLINICAL_SAFETY_SOURCE` | Chín rule source-mapped; Python quyết định trigger/action | General medical reasoning, diagnosis hoặc độ bao phủ mọi tình huống |
-| Disclaimer applicability | `src/agent/answer_formatting.py`, `src/agent/nodes/respond.py` | Chỉ hiển thị thông báo giới hạn cho urgent/emergency hoặc medication-advice rõ ràng | Không có source định lượng | `ENGINEERING_POLICY` | Dùng safety severity và tín hiệu ngôn ngữ trực tiếp; không gọi LLM, retrieval hoặc taxonomy | Medical-intent classification, clinical correctness hoặc precision/recall tối ưu |
-| Provenance identity | `src/ingestion/provenance.py` | Nối source, document, record, chunk và point identity | NIST SHA-256 qua `nist_fips_180_4_sha256` | `ENGINEERING_POLICY` | Hash canonical inputs để tái tạo identity và phát hiện thay đổi | Nội dung nguồn đúng, đầy đủ hoặc đáng tin cậy |
-| Answer verification boundary | `src/quality/answer_verifier.py` | Kiểm structure, source allowlist và provenance-related contract | Không có clinical validation claim | `ENGINEERING_POLICY` | Technical verifier sau generation; fail closed theo contract | Medical truth, claim-level entailment hoặc evidence completeness |
+| Phương pháp | Code owner | Nguồn | Phân loại | Thích nghi và giới hạn |
+|---|---|---|---|---|
+| Dense retrieval | `src/database/vector_store.py`, `src/retrieval/service.py` | `karpukhin_dpr_2020`, `qdrant_cosine_search_2026` | `IMPLEMENTED_RESEARCH_METHOD` + `OFFICIAL_PROVIDER_CONTRACT` | Gemini Embedding 2 và Qdrant thay DPR encoder/index; không chứng minh chất lượng tiếng Việt hoặc y khoa. |
+| Gemini Embedding 2 | `src/integrations/google_genai.py`, `src/ingestion/embedding.py` | `google_gemini_embedding2_2026` | `OFFICIAL_PROVIDER_CONTRACT` | 3072 chiều, cosine, không dùng `task_type`; document là `title: {title} \| text: {content}`, query là `task: question answering \| query: {content}`. Provider docs không chứng minh format này tối ưu. |
+| Native BM25 | `src/ingestion/bm25.py`, `src/database/vector_store.py` | `robertson_zaragoza_bm25_2009`, `qdrant_bm25_2026` | `IMPLEMENTED_RESEARCH_METHOD` + `OFFICIAL_PROVIDER_CONTRACT` | Qdrant thực thi; tokenizer `word`, lowercase, ASCII folding, language `none`, IDF collection-side. `k1=1.2`, `b=0.75`, `avg_len=256` không được tuyên bố tối ưu. |
+| Reciprocal Rank Fusion | `src/retrieval/rrf.py` | `cormack_clarke_buettcher_rrf_2009` | `IMPLEMENTED_RESEARCH_METHOD` | `k=60`, hai weight `1.0`; source không chứng minh các giá trị project là tối ưu hoặc mang nghĩa medical confidence. |
+| Local cross-encoder | `src/retrieval/reranker.py`, `src/retrieval/service.py` | `bge_reranker_v2_m3_model_card` | `OFFICIAL_PROVIDER_CONTRACT` + `ENGINEERING_POLICY` | `BAAI/bge-reranker-v2-m3`, local-files-only, timeout hữu hạn; lỗi giữ thứ tự deterministic trước rerank. Raw score không phải xác suất. |
+| Whole-chunk packing | `src/retrieval/context_packer.py` | `lost_in_the_middle_2024` chỉ là related context | `EMPIRICAL_PROJECT_DECISION` | Giữ nguyên chunk và provenance, tối đa 9 item/7000 ký tự; không tuyên bố semantic sufficiency hoặc optimality. |
+| Bounded Agent actions | `src/agent/action_decision.py`, `src/agent/nodes/workflow.py` | `yao_react_2023`, `jiang_active_rag_2023`, `jeong_adaptive_rag_2024` | `ENGINEERING_POLICY` | Bốn action `retrieve/retry/generate/abstain`, tối đa hai lần retrieval. Project không tái hiện prompt, classifier hoặc strategy set của các paper. |
+| Purposeful evidence retry | `src/agent/action_decision.py`, `src/agent/nodes/workflow.py`, `src/retrieval/service.py` | `rewrite_retrieve_read_2023`, `conqrr_2022`, `itercqr_2024` là related literature | `ENGINEERING_POLICY` | Một retry khi không có evidence; giữ stable overall query cho rerank, dedupe/rerank/repack bounded. Không có dedicated query rewriter. |
+| Structure-aware chunking | `src/ingestion/chunking.py`, `src/ingestion/parser.py` | `wang_segmentation_2025` | `RELATED_LITERATURE` + `ENGINEERING_POLICY` | Block, list lead-in và table row; cap 2400 Unicode chars, overlap 0. Không triển khai PIC và không tuyên bố cap tối ưu. |
+| Exact cache/fingerprint | `src/cache/exact_cache.py`, `src/observability/versioning.py` | `nist_fips_180_4_sha256` | `ENGINEERING_POLICY` | SHA-256 trên payload canonical secret-free; fingerprint 24 hex là compatibility partition, không phải authentication signature. |
+| Bounded resilience | `src/resilience/`, `src/api/preflight.py` | `aws_timeouts_retries_backoff_jitter_2019` | `ENGINEERING_POLICY` | Deadline, retry/backoff và jitter đều hữu hạn theo từng provider; tài liệu AWS là nguồn thiết kế liên quan, không chứng minh các ngưỡng của project là tối ưu. |
+| Stable request persistence | `src/api/app.py`, `src/database/repositories/chat_history.py`, `src/frontend/src/utils/sessionMerge.js` | `ietf_rfc9562_uuidv5` cho UUID construction | `ENGINEERING_POLICY` | UUID request id tạo stable message IDs; replay không nhân đôi turn, nhưng request khác có cùng text vẫn tách biệt. |
+| Deterministic safety boundaries | `src/agent/safety_policy.py` | các `CLINICAL_SAFETY_SOURCE` trong registry | `CLINICAL_SAFETY_SOURCE` + `ENGINEERING_POLICY` | Chín rule hẹp, current-question-first, không trộn third-person/resolved/topic-reset; không phải general medical classifier. |
+| Answer verification | `src/quality/answer_verifier.py` | không có clinical validation claim | `ENGINEERING_POLICY` | Kiểm structure, provenance/source allowlist, explicit requested-entity omission và off-scope substitution; không kiểm medical truth hoặc entailment tổng quát. |
+| RAG evaluation | `evaluation/` | `ragchecker_2024` | `IMPLEMENTED_RESEARCH_METHOD` | Historical package dùng Claim Recall, Context Precision, Faithfulness, F1 và NRR; không phải clinical validation và không tự giải quyết benchmark-label ambiguity. |
+| Request observability | `src/observability/` | Langfuse/OpenTelemetry entries trong registry | `OFFICIAL_PROVIDER_CONTRACT` + `ENGINEERING_POLICY` | Một identity từ `request_id`, không export raw content, fail-open; không chứng minh privacy tuyệt đối hoặc quality improvement. |
 
-## Gemini Retrieval-Instruction Evaluation Question
+## Quyết định thực nghiệm hiện tại
 
-Google ghi nhận `gemini-embedding-2` không hỗ trợ trường `task_type` và khuyến
-nghị prefix instruction trực tiếp vào text cho text-only retrieval, ví dụ phân
-biệt query với document. Build và query hiện tại của Acne Advisor AI dùng text
-không có prefix instruction. Chưa có A/B test trên corpus hiện tại chứng minh
-instruction prefix cải thiện hay làm giảm chất lượng tiếng Việt. Vì thay format
-document sẽ yêu cầu re-embed/reindex, đây chỉ là câu hỏi đánh giá sau này; tài
-liệu này không thay đổi embedding request, stored vector hoặc index.
+- Embedding instruction representation được giữ: trên 14 gold identities,
+  recall@8/16/32 giữ 14/14, MRR tăng từ 0.6444 lên 0.7556 và source diversity
+  top-16 tăng từ 5.467 lên 7.467.
+- BM25 giữ tokenizer `word` và bật ASCII folding. Trên 15 cặp, tiếng Việt có
+  dấu giữ 8/15 ở top-16 và 9/15 ở top-32; query không dấu đạt cùng mức đó.
+- Candidate depth giữ 16. Depth 24/32 chỉ cứu thêm một case/nhóm trong phép thử
+  nhỏ và tăng cost/noise; RRF vẫn `k=60`, weight 1:1.
+- Packer tăng từ 8/6000 lên 9/7000 vì cứu hai evidence ở rank 9 mà không cắt
+  chunk; candidate thật pack đầy đủ 13/15 case source-grounded.
+- Query prompt B bị loại và revert vì completeness top-9 giảm từ 5/9 xuống 3/9,
+  dù top-16 giữ 5/9. Không thêm dedicated rewriter.
 
-## Cách đọc kết quả kiểm thử
+Các số trên là development diagnostics của corpus này, không phải benchmark
+chính thức hoặc tuyên bố tối ưu phổ quát.
 
-- Unit/formula test chứng minh implementation tuân theo contract đã viết.
-- Provider-contract test chứng minh assumption tích hợp trong test environment.
-- Các test đó không chứng minh retrieval quality, answer quality, clinical
-  effectiveness hoặc parameter optimality.
+## Nghiên cứu liên quan nhưng không triển khai
 
-Chi tiết công thức nằm tại [Methods and Formulas](METHODS_AND_FORMULAS.md); metadata
-nguồn nằm tại `data/method_sources.json` và [References](REFERENCES.md).
+| Nguồn | Vai trò | Trạng thái project |
+|---|---|---|
+| Rewrite-Retrieve-Read, CONQRR, IterCQR | query/conversational reformulation | Đã dùng để định hướng thí nghiệm; prompt B bị loại, không thêm rewriter. |
+| Adaptive-RAG | request-dependent retrieval strategy | Chỉ là context; không có complexity classifier. |
+| `question_decomposition_2025`, `subquestion_coverage_2025` | multi-part retrieval | Đã xem xét, hoãn; không có decomposition agent/framework. |
+| Lost in the Middle | context-position sensitivity | Context cho packing; không chứng minh budget 9/7000 tối ưu. |
+| RAGChecker | fine-grained RAG diagnosis | Dùng ở package đánh giá lịch sử; sáu GAP-ABS vẫn chờ researcher adjudication. |
 
-## Observability contracts
-
-| Method | Code owner | Source | Classification | Project adaptation | Source does NOT validate |
-|---|---|---|---|---|---|
-| Langfuse observability export | `src/observability/langfuse_sink.py` | `langfuse_python_sdk_4_15_4`, `langfuse_observability_features_2026`, `opentelemetry_trace_api_2026` | `OFFICIAL_PROVIDER_CONTRACT` + `ENGINEERING_POLICY` | One SDK boundary, deterministic trace ID from request ID, async batch, fail-open, no content export | Absolute privacy/availability, medical quality, capacity, or alert thresholds |
-| Dashboard and alert policy | `docs/OBSERVABILITY.md` | `google_sre_monitoring_alerting` | `ENGINEERING_POLICY` | Built-in dashboard; threshold activation deferred until a representative baseline exists | Numeric thresholds for this workload or production readiness |
+MMR, GraphRAG, CRAG, Self-RAG, HyDE, extra reranker, decomposition agent và
+observability queue không được thêm. Chi tiết công thức nằm tại
+[Methods and Formulas](METHODS_AND_FORMULAS.md); metadata nguồn nằm tại
+`data/method_sources.json` và [References](REFERENCES.md).

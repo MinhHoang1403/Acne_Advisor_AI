@@ -17,6 +17,13 @@ Key invariants:
 - EntityCards and graph structure are not medical evidence;
 - observability redacts raw queries and secret-like values.
 
+The current direct question is evaluated before bounded history. Informational,
+hypothetical, negated, resolved, and explicit third-person clauses do not become
+first-person emergencies. An incomplete immediately prior fact may compose with
+the current clause, but a completed prior safety response or explicit topic
+reset isolates the new turn. These ownership and chronology boundaries narrow
+false positives without weakening the positive controls for current emergencies.
+
 Regression tests cover all nine narrow rules, fallback, source validation,
 Markdown presentation, and cache eligibility. Regression fixtures protect
 software behavior; they are not clinical gold and do not establish answer

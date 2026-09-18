@@ -3,7 +3,7 @@
 The canonical pipeline is implemented under `src/ingestion/` and exposed by
 `scripts/knowledge_build.py` through the `build`, `validate`, and `status` commands. The
 current validated build is recorded in `data/knowledge_build_manifest.json` as
-`94d613bc9b33628de3ef`: four sources, 512 knowledge chunks, 32 EntityCards, and
+`d4a1819fe7fb77fe1f40`: four sources, 536 knowledge chunks, 32 EntityCards, and
 a Neo4j graph with 32 nodes and 27 relationships.
 
 ## NICE Source Provenance
@@ -61,10 +61,14 @@ The diagram describes the current knowledge-build workflow.
 
 - four-source registry with SHA-256 content identity;
 - conservative Unicode normalization;
-- structure-aware chunks capped at 2400 Unicode characters with zero overlap;
+- structure-aware blocks, list lead-ins, and table rows capped at 2400 Unicode
+  characters with zero overlap;
 - proof-based filtering, exact deduplication, and complete provenance;
-- Gemini Embedding 2, 3072 dimensions, cosine distance, and no task type;
-- Qdrant-native BM25 using the parameters in
+- Gemini Embedding 2, 3072 dimensions, cosine distance, no task type, document
+  text `title: {title} | text: {content}`, and query text
+  `task: question answering | query: {content}`;
+- Qdrant-native BM25 with tokenizer `word`, lowercase and ASCII folding enabled,
+  using the parameters in
   [Methods and Formulas](METHODS_AND_FORMULAS.md);
 - source-backed taxonomy, 32 EntityCards, and a deterministic 32/27 graph;
 - logical aliases `acne_knowledge` and `acne_entities`.
