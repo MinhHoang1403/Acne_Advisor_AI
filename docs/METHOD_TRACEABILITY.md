@@ -71,3 +71,10 @@ liệu này không thay đổi embedding request, stored vector hoặc index.
 
 Chi tiết công thức nằm tại [Methods and Formulas](METHODS_AND_FORMULAS.md); metadata
 nguồn nằm tại `data/method_sources.json` và [References](REFERENCES.md).
+
+## Observability contracts
+
+| Method | Code owner | Source | Classification | Project adaptation | Source does NOT validate |
+|---|---|---|---|---|---|
+| Langfuse observability export | `src/observability/langfuse_sink.py` | `langfuse_python_sdk_4_15_4`, `langfuse_observability_features_2026`, `opentelemetry_trace_api_2026` | `OFFICIAL_PROVIDER_CONTRACT` + `ENGINEERING_POLICY` | One SDK boundary, deterministic trace ID from request ID, async batch, fail-open, no content export | Absolute privacy/availability, medical quality, capacity, or alert thresholds |
+| Dashboard and alert policy | `docs/OBSERVABILITY.md` | `google_sre_monitoring_alerting` | `ENGINEERING_POLICY` | Built-in dashboard; threshold activation deferred until a representative baseline exists | Numeric thresholds for this workload or production readiness |

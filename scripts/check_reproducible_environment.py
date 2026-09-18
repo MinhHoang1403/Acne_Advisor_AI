@@ -29,12 +29,15 @@ REQUIRED_ENV_EXAMPLE_KEYS = {
     "EVIDENCE_GROUNDING_VERSION": "evidence_grounded_runtime_v2",
     "REPRODUCIBLE_ENVIRONMENT_VERSION": "reproducible_environment_v1",
     "END_TO_END_RELEASE_READINESS_VERSION": "end_to_end_release_readiness_v1",
+    "LANGFUSE_ENABLED": "false",
+    "LANGFUSE_BASE_URL": "http://localhost:3001",
 }
 
 IMPORTANT_LOCK_PACKAGES = {
     "fastapi",
     "google-genai",
     "langgraph",
+    "langfuse",
     "qdrant-client",
     "neo4j",
     "redis",
@@ -54,6 +57,7 @@ RUNTIME_IMPORTS = [
     "sqlalchemy",
     "src.agent.llm.provider",
     "src.database.vector_store",
+    "src.observability.langfuse_sink",
     "src.api.app",
 ]
 
@@ -93,6 +97,15 @@ def check_reproducible_environment(root: Path = PROJECT_ROOT, *, run_pip_check: 
 
     compose_report = inspect_compose_images(root / "docker-compose.yml")
     add("compose_images_pinned", compose_report["passed"], compose_report)
+
+    observability_compose_report = inspect_compose_images(
+        root / "docker-compose.observability.yml"
+    )
+    add(
+        "observability_compose_images_pinned",
+        observability_compose_report["passed"],
+        observability_compose_report,
+    )
 
     env_report = inspect_env_example(root / ".env.example")
     add("env_example_contract", env_report["passed"], env_report)

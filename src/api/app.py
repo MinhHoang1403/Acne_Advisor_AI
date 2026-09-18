@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 from src.agent.graph import run_clinical_agent
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
 from src.agent.text_encoding import repair_mojibake
+from src.observability.langfuse_sink import (
+    begin_langfuse_request,
+    langfuse_backend_status,
+    shutdown_langfuse,
+)
 from src.observability.trace_exporter import emit_request_completion
 from src.observability.versioning import get_answer_cache_version
 from src.quality.safe_fallback import fallback_reason_label
@@ -198,6 +203,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.router.add_event_handler("shutdown", shutdown_langfuse)
 
 
 # --- Pydantic Models ---
@@ -540,6 +546,7 @@ async def health_check():
             "neo4j": {"status": "ok"},
             "redis": {"status": "ok"},
             "ollama": {"status": "ok"},
+            "langfuse": langfuse_backend_status(),
         }
         return HealthResponse(
             status="ok",
@@ -556,7 +563,7 @@ async def health_check():
     from src.api.preflight import run_runtime_preflight
 
     preflight = await run_runtime_preflight()
-    checks = preflight["checks"]
+    checks = {**preflight["checks"], "langfuse": langfuse_backend_status()}
     cache_enabled = os.getenv("CACHE_ENABLED", "true").lower() == "true"
     
     return HealthResponse(
@@ -737,6 +744,7 @@ async def chat_endpoint(request: ChatRequest):
         )
         
     active_requests.add(session_id)
+    langfuse_handle = begin_langfuse_request(request_id)
     
     try:
         logger.info(
@@ -943,6 +951,7 @@ async def chat_endpoint(request: ChatRequest):
             request_id=request_id,
             result=result,
             session_id=session_id,
+            langfuse_handle=langfuse_handle,
         )
         result["observability_exported"] = observability_exported
         if phase2_debug is not None:
@@ -1019,6 +1028,7 @@ async def chat_endpoint(request: ChatRequest):
             session_id=session_id,
             error=e,
             error_stage="agent",
+            langfuse_handle=langfuse_handle,
         )
         logger.warning(
             "Runtime resilience error processing chat request: error_type=%s",
@@ -1039,11 +1049,14 @@ async def chat_endpoint(request: ChatRequest):
             session_id=session_id,
             error=e,
             error_stage="api",
+            langfuse_handle=langfuse_handle,
         )
         _log_error_type("Error processing chat request:", e)
         # Return generic 500 error without leaking sensitive info
         raise HTTPException(status_code=500, detail="Internal server error processing the request.")
     finally:
+        if langfuse_handle is not None:
+            langfuse_handle.close()
         active_requests.discard(session_id)
 
 
