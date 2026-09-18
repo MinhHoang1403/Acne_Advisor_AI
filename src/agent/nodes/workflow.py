@@ -1,8 +1,8 @@
 """Các node điều phối workflow Agent từ request đến response.
 
 Module nối các owner chuyên biệt: preparation, safety/exact cache, action model,
-retrieval, evidence presence, generation, fallback, presentation, verifier và
-observability. Nó không tự triển khai Dense/BM25 hay nội dung prompt y khoa.
+retrieval, evidence presence, generation, fallback, presentation và verifier.
+Nó không tự triển khai Dense/BM25 hay nội dung prompt y khoa.
 """
 
 from __future__ import annotations
@@ -13,7 +13,6 @@ from typing import Any
 
 from src.agent.nodes.cache import cache_lookup_node, cache_store_node
 from src.agent.nodes.fallback import generation_fallback_decision_node, safe_fallback_node
-from src.agent.nodes.observability import observability_export_node
 from src.agent.nodes.quality import answer_quality_node
 from src.agent.nodes.reason import generate_answer_node
 from src.agent.nodes.respond import finalize_response_node
@@ -126,6 +125,11 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
     if attempts_used > 0 and isinstance(evidence_trace, dict):
         evidence_traces.append(
             {
+                **(
+                    {"request_id": state["request_id"]}
+                    if state.get("request_id")
+                    else {}
+                ),
                 "decision_index": len(decision_history) + 1,
                 "retrieval_attempts_used": attempts_used,
                 **evidence_trace,
@@ -147,6 +151,11 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
         "agent_decision_history": [
             *decision_history,
             {
+                **(
+                    {"request_id": state["request_id"]}
+                    if state.get("request_id")
+                    else {}
+                ),
                 "action": action,
                 "reason_code": decision.get("reason_code"),
                 "retrieval_query": decision.get("retrieval_query"),
@@ -194,7 +203,14 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             }
         )
         metadata = payload.get("metadata") or {}
-        trace = metadata.get("retrieval_trace") or {}
+        trace = {
+            **(metadata.get("retrieval_trace") or {}),
+            **(
+                {"request_id": state["request_id"]}
+                if state.get("request_id")
+                else {}
+            ),
+        }
         status = metadata.get("retrieval_status") or ("ok" if payload.get("vector_contexts") else "no_evidence")
         history_entry = {
             "attempt": attempt,
@@ -211,6 +227,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             status=status,
             trace=trace,
             packed_context=metadata.get("packed_context"),
+            request_id=state.get("request_id"),
         )
         return {
             "retrieval_attempt": attempt,
@@ -241,14 +258,24 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         raise
     except Exception as exc:
         error = sanitize_fallback_reason(exc)
+        failed_trace = {
+            "architecture": "dense_bm25_rrf",
+            "error": error,
+            **(
+                {"request_id": state["request_id"]}
+                if state.get("request_id")
+                else {}
+            ),
+        }
         attempt_trace = _retrieval_attempt_trace(
             attempt=attempt,
             decision=decision,
             current_question=state.get("normalized_question") or state.get("user_question") or "",
             retrieval_query=question,
             status="failed",
-            trace={"architecture": "dense_bm25_rrf", "error": error},
+            trace=failed_trace,
             packed_context=None,
+            request_id=state.get("request_id"),
         )
         return {
             "retrieval_attempt": attempt,
@@ -257,7 +284,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "retrieval_status": "failed",
             "retrieval_error": error,
             "fallback_reason_code": "retrieval_unavailable",
-            "retrieval_trace": {"architecture": "dense_bm25_rrf", "error": error},
+            "retrieval_trace": failed_trace,
             "packed_context": None,
             "retained_retrieval_candidates": retained_candidates,
             "retry_history": [
@@ -301,11 +328,13 @@ def _retrieval_attempt_trace(
     status: str,
     trace: dict[str, Any],
     packed_context: Any,
+    request_id: str | None,
 ) -> dict[str, Any]:
     """Preserve one bounded retrieval execution for internal diagnostics."""
 
     packed = packed_context if isinstance(packed_context, dict) else {}
     return {
+        **({"request_id": request_id} if request_id else {}),
         "attempt_index": attempt,
         "initiating_action": decision.get("action"),
         "initiating_reason": decision.get("reason_code"),
@@ -465,7 +494,7 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
 
 
 async def finalize_node(state: ClinicalState) -> dict[str, Any]:
-    """Áp dụng presentation, verifier, exact cache và observability theo thứ tự."""
+    """Áp dụng presentation, verifier và exact cache theo thứ tự."""
 
     started = time.perf_counter()
     updates = await finalize_response_node(state)
@@ -473,7 +502,6 @@ async def finalize_node(state: ClinicalState) -> dict[str, Any]:
     updates.update(quality)
     cache = await cache_store_node({**state, **updates})
     updates.update(cache)
-    updates.update(await observability_export_node({**state, **updates}))
     updates["performance_timings"] = {
         **(state.get("performance_timings") or {}),
         **(updates.get("performance_timings") or {}),

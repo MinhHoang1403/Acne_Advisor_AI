@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import uuid
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph  # type: ignore[import]
@@ -91,6 +92,7 @@ async def run_clinical_agent(
     allow_model_fallback: bool = False,
     bypass_cache: bool = False,
     include_generation_diagnostics: bool = False,
+    request_id: str | None = None,
 ) -> dict[str, Any]:
     """Chạy một request trong deadline chung và trả contract ổn định cho API.
 
@@ -101,6 +103,7 @@ async def run_clinical_agent(
     """
 
     started = time.perf_counter()
+    canonical_request_id = request_id or str(uuid.uuid4())
     manifest = build_pipeline_version_manifest()
     fingerprint = compute_pipeline_fingerprint(manifest)
     settings = runtime_resilience_settings_from_env()
@@ -109,6 +112,7 @@ async def run_clinical_agent(
     )
     budget = DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
     initial_state: ClinicalState = {
+        "request_id": canonical_request_id,
         "user_question": message,
         "user_id": user_id,
         "session_id": session_id,
@@ -176,6 +180,7 @@ async def run_clinical_agent(
         "agent_total": round((time.perf_counter() - started) * 1000, 3),
     }
     result = {
+        "request_id": canonical_request_id,
         "answer": final.get("final_answer", ""),
         "user_id": final.get("user_id"),
         "session_id": final.get("session_id"),

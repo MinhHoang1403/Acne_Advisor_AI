@@ -23,7 +23,9 @@ User -> FastAPI -> LangGraph
                      +-> assess evidence presence and source identity
                      +-> retrieve again when requested (maximum two executions)
                      +-> generate or abstain
-                     +-> presentation, provenance, cache, and observability
+                     +-> presentation, provenance, and cache
+       -> best-effort PostgreSQL persistence
+       -> request-complete observability event
 ```
 
 | Responsibility | Canonical location |
@@ -48,6 +50,13 @@ The architecture marker and pipeline fingerprint are computed in
 `src/observability/versioning.py`. Their serialized values are cache and
 diagnostic compatibility contracts; they do not select alternate runtime
 implementations.
+
+The FastAPI boundary creates one opaque UUID `request_id` before invoking the
+Agent. The same identity is retained in Agent state, retrieval/generation
+diagnostics, safe database metadata, the HTTP response metadata, and the final
+observability event. Request-complete telemetry is emitted only after Agent and
+best-effort persistence timings are available. Telemetry construction and sink
+failures remain non-fatal to the chat response.
 
 ## Package Boundaries
 

@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+StageStatus = Literal["success", "degraded", "failed", "skipped"]
+
+
+class StageTelemetry(BaseModel):
+    """Safe operational facts for one observed runtime stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    component: str
+    stage: str
+    status: StageStatus
+    duration_ms: float | None = Field(default=None, ge=0)
+    attempt: int | None = Field(default=None, ge=1)
+    error_family: str | None = None
+    error_owner: str | None = None
+    error_type: str | None = None
+    fallback: bool | None = None
+    provider: str | None = None
+    model: str | None = None
+    candidate_count: int | None = Field(default=None, ge=0)
+    candidate_ids: list[str] = Field(default_factory=list)
 
 
 class PipelineTraceSummary(BaseModel):
@@ -21,8 +43,14 @@ class PipelineTraceSummary(BaseModel):
     warnings_count: int = 0
     cache_hit: bool | None = None
     pipeline_fingerprint: str | None = None
+    knowledge_build_id: str | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    stages: list[StageTelemetry] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    status: StageStatus = "success"
+    error_family: str | None = None
+    error_owner: str | None = None
+    complete: bool = False
 
 
 class ObservabilityEvent(BaseModel):
@@ -30,11 +58,10 @@ class ObservabilityEvent(BaseModel):
 
     event_type: str
     timestamp: str
-    trace_id: str
+    request_id: str
     session_id: str | None = None
     query_hash: str
     summary: PipelineTraceSummary
     safe_payload: dict[str, Any] = Field(default_factory=dict)
 
-
-__all__ = ["ObservabilityEvent", "PipelineTraceSummary"]
+__all__ = ["ObservabilityEvent", "PipelineTraceSummary", "StageStatus", "StageTelemetry"]
