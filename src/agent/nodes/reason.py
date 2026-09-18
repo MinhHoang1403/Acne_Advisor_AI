@@ -83,6 +83,11 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         generation_evidence_trace = {
+            **(
+                {"request_id": state["request_id"]}
+                if state.get("request_id")
+                else {}
+            ),
             "current_question": question,
             "conversation_history_messages": len(conversation_history),
             "answer_context_ids": [_context_id(context) for context in answer_contexts],

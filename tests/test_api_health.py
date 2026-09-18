@@ -4,6 +4,9 @@ tests/test_api_health.py – API Health Endpoint Tests
 
 from __future__ import annotations
 
+import json
+import uuid
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -377,6 +380,113 @@ async def test_chat_rejects_unknown_provider_before_runtime():
         )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_chat_creates_and_propagates_canonical_request_id(monkeypatch, tmp_path):
+    captured_agent: dict = {}
+    captured_db: dict = {}
+    query = "Benzoyl peroxide có phải kháng sinh không?"
+
+    async def fake_run_clinical_agent(**kwargs):
+        captured_agent.update(kwargs)
+        return {
+            "request_id": kwargs["request_id"],
+            "answer": "Benzoyl peroxide không phải là kháng sinh.",
+            "session_id": kwargs["session_id"],
+            "sources": [],
+            "retrieval_status": "no_evidence",
+            "fallback_applied": False,
+            "is_in_domain": True,
+            "actual_provider": "gemini",
+            "actual_model": "gemini-3.5-flash-lite",
+            "generation_invoked": True,
+            "generation_provider": "gemini",
+            "generation_model": "gemini-3.5-flash-lite",
+            "agent_decision": {
+                "action": "generate",
+                "provider": "gemini",
+                "model": "gemini-3.5-flash-lite",
+            },
+            "pipeline_manifest": {"phase": "production", "kb_version": "test-build"},
+            "pipeline_fingerprint": "test-fingerprint",
+            "answer_quality_report": {"passed": True, "issues": []},
+            "performance_timings": {"agent_total": 1.0},
+        }
+
+    async def fake_persist_chat_to_db(**kwargs):
+        captured_db.update(kwargs)
+
+    monkeypatch.setattr("src.api.app.run_clinical_agent", fake_run_clinical_agent)
+    monkeypatch.setattr("src.api.app._persist_chat_to_db", fake_persist_chat_to_db)
+    monkeypatch.setenv("RELEASE_READINESS_TEST_MODE", "")
+    monkeypatch.setenv("OBSERVABILITY_ENABLED", "true")
+    monkeypatch.setenv("OBSERVABILITY_TRACE_DIR", str(tmp_path))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/chat", json={"message": query})
+
+    assert response.status_code == 200
+    request_id = response.json()["metadata"]["request_id"]
+    assert str(uuid.UUID(request_id)) == request_id
+    assert query not in request_id
+    assert captured_agent["request_id"] == request_id
+    assert captured_db["db_metadata"]["request_id"] == request_id
+
+    files = list(tmp_path.glob("phase2_traces-*.jsonl"))
+    assert len(files) == 1
+    event = json.loads(files[0].read_text(encoding="utf-8").splitlines()[0])
+    assert event["request_id"] == request_id
+    assert event["summary"]["complete"] is True
+    assert event["summary"]["timings_ms"]["agent_total"] == 1.0
+    assert event["summary"]["timings_ms"]["persistence"] >= 0
+    assert event["summary"]["timings_ms"]["total_request"] >= 0
+    assert event["summary"]["pipeline_fingerprint"] == "test-fingerprint"
+    assert event["summary"]["knowledge_build_id"] == "test-build"
+    assert query not in json.dumps(event, ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+async def test_observability_sink_failure_does_not_fail_chat(monkeypatch, tmp_path):
+    async def fake_run_clinical_agent(**kwargs):
+        return {
+            "request_id": kwargs["request_id"],
+            "answer": "Câu trả lời kiểm thử.",
+            "session_id": kwargs["session_id"],
+            "sources": [],
+            "retrieval_status": "no_evidence",
+            "fallback_applied": False,
+            "is_in_domain": True,
+            "actual_provider": "gemini",
+            "actual_model": "gemini-3.5-flash-lite",
+            "generation_invoked": True,
+            "answer_quality_report": {"passed": True, "issues": []},
+            "pipeline_manifest": {"phase": "production"},
+            "performance_timings": {"agent_total": 1.0},
+        }
+
+    async def fake_persist_chat_to_db(**_kwargs):
+        return None
+
+    def broken_export(*_args, **_kwargs):
+        raise OSError("sink unavailable")
+
+    monkeypatch.setattr("src.api.app.run_clinical_agent", fake_run_clinical_agent)
+    monkeypatch.setattr("src.api.app._persist_chat_to_db", fake_persist_chat_to_db)
+    monkeypatch.setattr(
+        "src.observability.trace_exporter.export_observability_event",
+        broken_export,
+    )
+    monkeypatch.setenv("RELEASE_READINESS_TEST_MODE", "")
+    monkeypatch.setenv("OBSERVABILITY_ENABLED", "true")
+    monkeypatch.setenv("OBSERVABILITY_TRACE_DIR", str(tmp_path))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.post("/chat", json={"message": "Mụn đầu đen là gì?"})
+
+    assert response.status_code == 200
+    assert response.json()["answer"] == "Câu trả lời kiểm thử."
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_openapi_has_explicit_success_schemas_for_active_endpoints():

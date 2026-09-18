@@ -10,6 +10,7 @@ import importlib
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -251,8 +252,14 @@ def check_runtime_imports() -> dict[str, Any]:
 
 
 def run_pip_check_command(root: Path) -> dict[str, Any]:
+    uv_executable = shutil.which("uv")
+    command = (
+        [uv_executable, "pip", "check", "--python", sys.executable]
+        if uv_executable
+        else [sys.executable, "-m", "pip", "check"]
+    )
     completed = subprocess.run(
-        [sys.executable, "-m", "pip", "check"],
+        command,
         cwd=root,
         text=True,
         capture_output=True,
@@ -260,6 +267,7 @@ def run_pip_check_command(root: Path) -> dict[str, Any]:
     return {
         "passed": completed.returncode == 0,
         "returncode": completed.returncode,
+        "checker": "uv" if uv_executable else "pip",
         "stdout": completed.stdout.strip(),
         "stderr": completed.stderr.strip(),
     }

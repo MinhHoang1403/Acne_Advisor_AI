@@ -86,6 +86,7 @@ class ClinicalState(TypedDict, total=False):
     fallback_chain: list[dict[str, Any]] | None
 
     # Deadline dùng chung, version identity và telemetry có giới hạn.
+    request_id: str | None
     pipeline_manifest: dict[str, Any]
     pipeline_fingerprint: str
     runtime_budget: Any

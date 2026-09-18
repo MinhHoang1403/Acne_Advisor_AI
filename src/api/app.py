@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 from src.agent.graph import run_clinical_agent
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
 from src.agent.text_encoding import repair_mojibake
+from src.observability.trace_exporter import emit_request_completion
 from src.observability.versioning import get_answer_cache_version
 from src.quality.safe_fallback import fallback_reason_label
 from src.resilience.exceptions import (
@@ -114,7 +115,11 @@ def _env_enabled(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-async def _run_release_readiness_agent_override(request: "ChatRequest", session_id: str) -> dict[str, Any]:
+async def _run_release_readiness_agent_override(
+    request: "ChatRequest",
+    session_id: str,
+    request_id: str,
+) -> dict[str, Any]:
     """HTTP-boundary test double deterministic chỉ dành cho readiness check."""
 
     if not _release_readiness_test_mode_enabled():
@@ -145,6 +150,7 @@ async def _run_release_readiness_agent_override(request: "ChatRequest", session_
     )
 
     return {
+        "request_id": request_id,
         "answer": answer,
         "session_id": session_id,
         "sources": [] if fallback_applied else ["release_readiness_fixture"],
@@ -233,6 +239,7 @@ class ChatCacheMetadata(BaseModel):
     pipeline_fingerprint: Optional[str] = None
 
 class ChatMetadata(BaseModel):
+    request_id: str
     provider: str
     model: Optional[str] = None
     requested_provider: Optional[str] = None
@@ -689,7 +696,9 @@ async def chat_endpoint(request: ChatRequest):
     After the agent responds, awaits persistence of the user message and
     assistant response to PostgreSQL. Persistence errors remain non-fatal.
     """
+    request_id = str(uuid.uuid4())
     request_started = time.perf_counter()
+    result: dict[str, Any] = {"request_id": request_id}
     request.message = repair_mojibake(request.message)
     request.conversation_history = _repair_history_messages(request.conversation_history)
 
@@ -737,10 +746,11 @@ async def chat_endpoint(request: ChatRequest):
             len(request.message),
         )
         if _release_readiness_test_mode_enabled():
-            result = await _run_release_readiness_agent_override(request, session_id)
+            result = await _run_release_readiness_agent_override(request, session_id, request_id)
         else:
             result = await run_clinical_agent(
                 message=request.message,
+                request_id=request_id,
                 user_id=request.user_id,
                 session_id=session_id,
                 conversation_history=history,
@@ -749,6 +759,13 @@ async def chat_endpoint(request: ChatRequest):
                 allow_model_fallback=request.allow_model_fallback,
                 bypass_cache=request.bypass_cache
             )
+
+        returned_request_id = result.get("request_id")
+        if returned_request_id and returned_request_id != request_id:
+            logger.warning(
+                "Agent returned a non-canonical request identity; API identity retained."
+            )
+        result["request_id"] = request_id
         
         model_name = os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
         if model_name == "gemini-1.5-flash":
@@ -805,6 +822,7 @@ async def chat_endpoint(request: ChatRequest):
 
         # Build safe metadata dict for DB storage (no API keys, no raw exceptions)
         safe_db_metadata = {
+            "request_id": request_id,
             "provider": response_provider,
             "model": response_model,
             "requested_provider": result.get("requested_provider") or request.llm_provider or "gemini",
@@ -832,7 +850,6 @@ async def chat_endpoint(request: ChatRequest):
                 "answer_cache_version": pipeline_manifest.get("answer_cache_version") if isinstance(pipeline_manifest, dict) else None,
                 "retrieval_architecture": pipeline_manifest.get("retrieval_architecture") if isinstance(pipeline_manifest, dict) else None,
             },
-            "observability_exported": result.get("observability_exported"),
             "answer_quality": {
                 "checked": bool(answer_quality_report),
                 "passed": answer_quality_report.get("passed") if isinstance(answer_quality_report, dict) else None,
@@ -881,8 +898,11 @@ async def chat_endpoint(request: ChatRequest):
         
         # Persistence hoàn tất trước khi trả response, nhưng lỗi PostgreSQL là
         # non-fatal để không làm mất answer đã được Agent tạo thành công.
-        if _release_readiness_test_mode_enabled():
+        persistence_error_type = None
+        persistence_skipped = _release_readiness_test_mode_enabled()
+        if persistence_skipped:
             logger.info("Skipping DB persistence in release-readiness test mode.")
+            performance_timings["persistence"] = 0.0
         else:
             persistence_started = time.perf_counter()
             try:
@@ -899,6 +919,7 @@ async def chat_endpoint(request: ChatRequest):
                 )
                 logger.debug("Chat exchange persisted for session %s", session_id)
             except Exception as db_err:
+                persistence_error_type = db_err.__class__.__name__
                 logger.warning(
                     "Failed to persist chat to DB for session %s (non-fatal): error_type=%s",
                     session_id,
@@ -914,6 +935,18 @@ async def chat_endpoint(request: ChatRequest):
             (time.perf_counter() - request_started) * 1000,
             3,
         )
+        result["performance_timings"] = performance_timings
+        result["persistence_error_type"] = persistence_error_type
+        result["persistence_skipped"] = persistence_skipped
+        observability_exported = emit_request_completion(
+            query=request.message,
+            request_id=request_id,
+            result=result,
+            session_id=session_id,
+        )
+        result["observability_exported"] = observability_exported
+        if phase2_debug is not None:
+            phase2_debug["observability_exported"] = observability_exported
         
         return ChatResponse(
             answer=answer_text,
@@ -921,6 +954,7 @@ async def chat_endpoint(request: ChatRequest):
             sources=sources_list,
             source_metadata=source_metadata,
             metadata=ChatMetadata(
+                request_id=request_id,
                 provider=response_provider,
                 model=response_model,
                 requested_provider=result.get("requested_provider") or request.llm_provider or "gemini",
@@ -974,15 +1008,38 @@ async def chat_endpoint(request: ChatRequest):
     except asyncio.CancelledError:
         raise
     except RuntimeResilienceError as e:
+        result["performance_timings"] = {
+            **(result.get("performance_timings") or {}),
+            "total_request": round((time.perf_counter() - request_started) * 1000, 3),
+        }
+        emit_request_completion(
+            query=request.message,
+            request_id=request_id,
+            result=result,
+            session_id=session_id,
+            error=e,
+            error_stage="agent",
+        )
         logger.warning(
             "Runtime resilience error processing chat request: error_type=%s",
             e.__class__.__name__,
         )
-        raise HTTPException(
-            status_code=_http_status_for_resilience_error(e),
-            detail=_safe_resilience_detail(e),
-        )
+        detail = _safe_resilience_detail(e)
+        detail["request_id"] = request_id
+        raise HTTPException(status_code=_http_status_for_resilience_error(e), detail=detail)
     except Exception as e:
+        result["performance_timings"] = {
+            **(result.get("performance_timings") or {}),
+            "total_request": round((time.perf_counter() - request_started) * 1000, 3),
+        }
+        emit_request_completion(
+            query=request.message,
+            request_id=request_id,
+            result=result,
+            session_id=session_id,
+            error=e,
+            error_stage="api",
+        )
         _log_error_type("Error processing chat request:", e)
         # Return generic 500 error without leaking sensitive info
         raise HTTPException(status_code=500, detail="Internal server error processing the request.")

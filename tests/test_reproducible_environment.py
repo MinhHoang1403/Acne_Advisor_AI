@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from scripts import check_reproducible_environment as checker
 from src.observability.versioning import (
@@ -65,6 +66,30 @@ def test_checker_passes_without_network_or_pip_check() -> None:
     report = checker.check_reproducible_environment(run_pip_check=False)
 
     assert report["passed"] is True
+
+
+def test_dependency_check_supports_uv_managed_virtualenv(monkeypatch, tmp_path: Path) -> None:
+    captured: dict = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(returncode=0, stdout="All packages compatible", stderr="")
+
+    monkeypatch.setattr(checker.shutil, "which", lambda name: "C:/tools/uv.exe")
+    monkeypatch.setattr(checker.subprocess, "run", fake_run)
+
+    report = checker.run_pip_check_command(tmp_path)
+
+    assert report["passed"] is True
+    assert report["checker"] == "uv"
+    assert captured["command"] == [
+        "C:/tools/uv.exe",
+        "pip",
+        "check",
+        "--python",
+        checker.sys.executable,
+    ]
 
 
 def test_checker_reports_invalid_fixture(tmp_path: Path) -> None:

@@ -135,7 +135,7 @@ async def run_offline(*, run_pip_check: bool = True) -> dict[str, Any]:
 
     checks.append(check("python_3_11", sys.version_info[:2] == (3, 11), {"version": sys.version.split()[0]}))
     if run_pip_check:
-        pip_report = run_command([sys.executable, "-m", "pip", "check"], timeout=90)
+        pip_report = reproducible.run_pip_check_command(PROJECT_ROOT)
         checks.append(check("pip_check", pip_report["passed"], pip_report))
 
     repro_report = reproducible.check_reproducible_environment(run_pip_check=run_pip_check)

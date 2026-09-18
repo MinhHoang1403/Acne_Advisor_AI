@@ -56,6 +56,30 @@ Dense + native BM25 + RRF, local BGE reranking, and whole-chunk packing over
 activation, reindexing, and embedding are separate maintenance operations rather
 than application-startup steps.
 
+## Request Observability
+
+Runtime observability is disabled by default. When explicitly enabled, the
+JSONL sink receives one `chat_request_completed` event after Agent execution
+and best-effort chat persistence. Its canonical correlation key is the opaque
+API-generated `request_id`; no separate trace/correlation identifier is
+created for the same request.
+
+The event contains statuses, durations, safe error type/family/owner,
+provider/model identity, pipeline and knowledge identities, candidate IDs and
+counts, and bounded fallback metadata. It does not persist the raw question,
+conversation history, prompt, model reasoning, credentials, or raw exception
+messages. Query text is represented only by a redacted length summary and the
+pre-existing short hash. Export, serialization, and sink failures fail open and
+must not change the business response.
+
+The formal evaluation artifact records fingerprint
+`f93ad3e8dfb2c39f403b0794`, while the current effective environment computes
+`3d883e5ad78622579ed01850`. The evaluated commit's versioning code and
+`.env.example` defaults, combined with the active knowledge build, reproduce the
+latter, but the formal artifact does not contain its complete effective
+manifest. The exact historical differing field therefore remains `UNKNOWN`;
+never hard-code either digest or remove manifest fields to force equality.
+
 ## Supported Commands
 
 Application logic lives under `src/`; scripts are thin operators or bounded

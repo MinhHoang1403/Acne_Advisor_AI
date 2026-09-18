@@ -55,6 +55,8 @@ def test_clinical_state_has_no_retired_fallback_or_error_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_run_clinical_agent_returns_prompt_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    request_id = "79aa7410-b3bd-4431-9aed-609ff1ef9c20"
+
     class FakeGraph:
         async def ainvoke(self, state):
             return {
@@ -64,8 +66,12 @@ async def test_run_clinical_agent_returns_prompt_budget(monkeypatch: pytest.Monk
             }
 
     monkeypatch.setattr(graph_module, "clinical_graph", FakeGraph())
-    result = await graph_module.run_clinical_agent("Mụn đầu đen là gì?")
+    result = await graph_module.run_clinical_agent(
+        "Mụn đầu đen là gì?",
+        request_id=request_id,
+    )
 
+    assert result["request_id"] == request_id
     assert result["prompt_budget"] == {"accounting_mode": "observation_only"}
     assert "answerability" not in result
     assert "errors" not in result
@@ -266,7 +272,12 @@ async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: py
 
     monkeypatch.setattr(workflow, "retrieve_evidence", FakeTool())
     result = await workflow.retrieve_node(
-        {"user_question": "Mụn là gì?", "standalone_question": "Mụn là gì?", "retrieval_attempt": 0}
+        {
+            "request_id": "79aa7410-b3bd-4431-9aed-609ff1ef9c20",
+            "user_question": "Mụn là gì?",
+            "standalone_question": "Mụn là gì?",
+            "retrieval_attempt": 0,
+        }
     )
 
     assert result["retrieval_attempt"] == 1
@@ -276,6 +287,8 @@ async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: py
     trace = result["retrieval_attempt_traces"]
     assert len(trace) == 1
     assert trace[0]["attempt_index"] == 1
+    assert trace[0]["request_id"] == "79aa7410-b3bd-4431-9aed-609ff1ef9c20"
+    assert result["retrieval_trace"]["request_id"] == trace[0]["request_id"]
     assert trace[0]["candidate_trace"]["dense"][0]["candidate_id"] == "chunk-1"
     assert trace[0]["packed_evidence"] == [
         {"item_id": "chunk-1", "source_id": "guideline", "section": "Treatment"}
@@ -417,8 +430,6 @@ async def test_graph_cannot_execute_a_third_retrieval(monkeypatch: pytest.Monkey
     monkeypatch.setattr(workflow, "finalize_response_node", fake_finalize)
     monkeypatch.setattr(workflow, "answer_quality_node", no_updates)
     monkeypatch.setattr(workflow, "cache_store_node", no_updates)
-    monkeypatch.setattr(workflow, "observability_export_node", no_updates)
-
     bounded_graph = graph_module.build_clinical_graph()
     result = await bounded_graph.ainvoke(
         {

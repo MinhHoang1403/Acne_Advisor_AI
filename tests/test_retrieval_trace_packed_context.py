@@ -33,6 +33,7 @@ def test_retrieval_trace_and_packed_context_have_one_obvious_contract() -> None:
 
     event = build_observability_event(
         query=query.original_query,
+        request_id="8d88ca48-18e3-45b9-a08d-b034d85ef71d",
         state={
             "retrieval_trace": trace,
             "packed_context": packed.model_dump(mode="json"),
