@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 StageStatus = Literal["success", "degraded", "failed", "skipped"]
+AgentAction = Literal["retrieve", "retry", "generate", "abstain", "finalize"]
 
 
 class StageTelemetry(BaseModel):
@@ -26,7 +27,19 @@ class StageTelemetry(BaseModel):
     provider: str | None = None
     model: str | None = None
     candidate_count: int | None = Field(default=None, ge=0)
+    retained_candidate_count: int | None = Field(default=None, ge=0)
+    duplicate_candidate_count: int | None = Field(default=None, ge=0)
     candidate_ids: list[str] = Field(default_factory=list)
+
+
+class AgentDecisionTelemetry(BaseModel):
+    """Allowlisted decision facts; free-form model reasoning is intentionally absent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    attempt: int = Field(ge=1)
+    action: AgentAction
+    reason_code: str | None = None
 
 
 class PipelineTraceSummary(BaseModel):
@@ -46,6 +59,7 @@ class PipelineTraceSummary(BaseModel):
     knowledge_build_id: str | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
     stages: list[StageTelemetry] = Field(default_factory=list)
+    decisions: list[AgentDecisionTelemetry] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     status: StageStatus = "success"
     error_family: str | None = None
@@ -64,4 +78,10 @@ class ObservabilityEvent(BaseModel):
     summary: PipelineTraceSummary
     safe_payload: dict[str, Any] = Field(default_factory=dict)
 
-__all__ = ["ObservabilityEvent", "PipelineTraceSummary", "StageStatus", "StageTelemetry"]
+__all__ = [
+    "AgentDecisionTelemetry",
+    "ObservabilityEvent",
+    "PipelineTraceSummary",
+    "StageStatus",
+    "StageTelemetry",
+]

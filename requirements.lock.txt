@@ -25,6 +25,8 @@ asyncpg==0.31.0
     # via -r requirements.txt
 attrs==26.1.0
     # via aiohttp
+backoff==2.2.1
+    # via langfuse
 banks==2.4.5
     # via llama-index-core
 certifi==2026.6.17
@@ -92,6 +94,8 @@ google-auth==2.55.2
     # via google-genai
 google-genai==1.75.0
     # via -r requirements.txt
+googleapis-common-protos==1.75.3
+    # via opentelemetry-exporter-otlp-proto-http
 greenlet==3.5.3
     # via sqlalchemy
 griffe==2.1.0
@@ -125,6 +129,7 @@ httpx==0.28.1
     #   -r requirements.txt
     #   google-genai
     #   huggingface-hub
+    #   langfuse
     #   langgraph-sdk
     #   langsmith
     #   llama-cloud
@@ -168,6 +173,8 @@ langchain-protocol==0.0.18
     # via
     #   langchain-core
     #   langgraph-sdk
+langfuse==4.15.4
+    # via -r requirements.txt
 langgraph==1.2.9
     # via -r requirements.txt
 langgraph-checkpoint==4.1.1
@@ -228,6 +235,26 @@ numpy==2.4.6
     #   scipy
     #   sentence-transformers
     #   transformers
+opentelemetry-api==1.44.0
+    # via
+    #   langfuse
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
+opentelemetry-exporter-otlp-proto-common==1.44.0
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-http==1.44.0
+    # via langfuse
+opentelemetry-proto==1.44.0
+    # via
+    #   opentelemetry-exporter-otlp-proto-common
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-sdk==1.44.0
+    # via
+    #   langfuse
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-semantic-conventions==0.65b0
+    # via opentelemetry-sdk
 orjson==3.11.9
     # via
     #   langgraph-sdk
@@ -238,6 +265,7 @@ packaging==26.2
     # via
     #   huggingface-hub
     #   langchain-core
+    #   langfuse
     #   langsmith
     #   llama-cloud-services
     #   marshmallow
@@ -261,7 +289,10 @@ propcache==0.5.2
     #   aiohttp
     #   yarl
 protobuf==7.35.1
-    # via qdrant-client
+    # via
+    #   googleapis-common-protos
+    #   opentelemetry-proto
+    #   qdrant-client
 psycopg2-binary==2.9.12
     # via -r requirements.txt
 pyasn1==0.6.4
@@ -277,6 +308,7 @@ pydantic==2.13.4
     #   fastapi
     #   google-genai
     #   langchain-core
+    #   langfuse
     #   langgraph
     #   langsmith
     #   llama-cloud
@@ -332,6 +364,7 @@ requests==2.34.2
     #   google-genai
     #   langsmith
     #   llama-index-core
+    #   opentelemetry-exporter-otlp-proto-http
     #   requests-toolbelt
     #   tiktoken
 requests-toolbelt==1.0.0
@@ -406,9 +439,14 @@ typing-extensions==4.16.0
     #   huggingface-hub
     #   langchain-core
     #   langchain-protocol
+    #   langfuse
     #   langsmith
     #   llama-index-core
     #   llama-index-workflows
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
     #   pytest-asyncio
@@ -447,6 +485,7 @@ websockets==15.0.1
 wrapt==2.2.2
     # via
     #   deprecated
+    #   langfuse
     #   llama-index-core
 xxhash==3.8.1
     # via

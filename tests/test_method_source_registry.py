@@ -87,10 +87,30 @@ def test_method_traceability_covers_methods_and_technical_standards() -> None:
         "ietf_rfc9562_uuidv5",
     }
 
-    assert registry["verified_through"] == "2026-08-16"
+    assert registry["verified_through"] == "2026-09-18"
     assert required <= records.keys()
     for source_id in required:
         assert source_id in traceability
+        assert records[source_id]["limitations"]
+
+
+def test_observability_sources_are_authoritative_and_scope_limitations() -> None:
+    registry = json.loads(
+        Path("data/method_sources.json").read_text(encoding="utf-8")
+    )
+    records = {record["source_id"]: record for record in registry["sources"]}
+    required = {
+        "langfuse_python_sdk_4_15_4",
+        "langfuse_server_4_38_0",
+        "langfuse_self_host_v4_2026",
+        "langfuse_observability_features_2026",
+        "opentelemetry_trace_api_2026",
+        "google_sre_monitoring_alerting",
+    }
+
+    assert required <= records.keys()
+    for source_id in required:
+        assert records[source_id]["date_verified"] == "2026-09-18"
         assert records[source_id]["limitations"]
 
 

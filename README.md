@@ -480,6 +480,7 @@ These benchmark results are research evidence, not clinical validation.
 - [Vietnamese Source Code Guide](docs/CODE_GUIDE_VI.md)
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
+- [AI Observability and Langfuse](docs/OBSERVABILITY.md)
 - [References](docs/REFERENCES.md)
 - [Method and source registry](data/method_sources.json)
 - [Source manifest](data/sources/manifest.yaml)

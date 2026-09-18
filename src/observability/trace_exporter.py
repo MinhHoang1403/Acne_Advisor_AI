@@ -15,8 +15,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from src.observability.contracts import ObservabilityEvent, PipelineTraceSummary, StageTelemetry
+from src.observability.contracts import (
+    AgentDecisionTelemetry,
+    ObservabilityEvent,
+    PipelineTraceSummary,
+    StageTelemetry,
+)
 from src.observability.error_taxonomy import classify_error
+from src.observability.langfuse_sink import LangfuseRequestHandle, export_event_to_langfuse
 from src.observability.versioning import (
     build_pipeline_version_manifest,
     compute_pipeline_fingerprint,
@@ -35,6 +41,9 @@ SECRET_KEY_MARKERS = (
     "bearer",
     "cookie",
 )
+
+# Operational payload bound only; this is not a retrieval relevance threshold.
+MAX_OBSERVABILITY_CANDIDATE_IDS = 20
 
 
 def sanitize_for_observability(data: Any, max_text_chars: int = 500) -> Any:
@@ -159,6 +168,10 @@ def build_observability_event(
         knowledge_build_id=str(manifest.get("kb_version") or "") or None,
         timings_ms=timings,
         stages=stages,
+        decisions=_safe_agent_decisions(
+            result.get("agent_decision_history", state.get("agent_decision_history", [])),
+            decision,
+        ),
         status=request_status,
         error_family=err_family,
         error_owner=err_owner,
@@ -244,6 +257,7 @@ def emit_request_completion(
     error: BaseException | str | None = None,
     error_stage: str | None = None,
     enabled: bool | None = None,
+    langfuse_handle: LangfuseRequestHandle | None = None,
 ) -> bool:
     """Build and export the request-complete event without affecting chat."""
 
@@ -255,6 +269,8 @@ def emit_request_completion(
             "on",
         }
     if not enabled:
+        if langfuse_handle is not None:
+            langfuse_handle.close()
         return False
     try:
         event = build_observability_event(
@@ -267,12 +283,16 @@ def emit_request_completion(
             error=error,
             error_stage=error_stage,
         )
-        return export_observability_event(
+        file_exported = export_observability_event(
             event,
             output_dir=os.getenv("OBSERVABILITY_TRACE_DIR", "logs/phase2_traces"),
             enabled=True,
         )
+        langfuse_exported = export_event_to_langfuse(event, handle=langfuse_handle)
+        return file_exported or langfuse_exported
     except Exception as exc:  # fail-open includes serialization/contract failures
+        if langfuse_handle is not None:
+            langfuse_handle.close()
         logger.warning(
             "Observability event construction failed safely: error_family=observability "
             "owner=observability error_type=%s",
@@ -356,7 +376,15 @@ def _build_stage_telemetry(
                 )
             )
         both_failed = all(stage.status == "failed" for stage in stages[-2:])
-        stages.append(_stage("retrieval/fusion", "rrf", "skipped" if both_failed else "success"))
+        stages.append(
+            _stage(
+                "retrieval/fusion",
+                "rrf",
+                "skipped" if both_failed else "success",
+                candidate_count=int(retrieval.get("fused_candidate_count") or 0),
+                candidate_ids=_candidate_ids(retrieval, "fused"),
+            )
+        )
         reranker_info = _as_dict(retrieval.get("reranker"))
         if reranker_info.get("enabled"):
             rerank_fallback = bool(reranker_info.get("fallback_used"))
@@ -390,12 +418,20 @@ def _build_stage_telemetry(
                 "pack",
                 "skipped" if both_failed else "success",
                 candidate_count=len(retrieval.get("selected_ids") or []),
-                candidate_ids=[str(item) for item in retrieval.get("selected_ids") or []],
+                candidate_ids=[
+                    str(item)
+                    for item in (retrieval.get("selected_ids") or [])[
+                        :MAX_OBSERVABILITY_CANDIDATE_IDS
+                    ]
+                ],
             )
         )
 
     if r_status:
         retrieval_status = _retrieval_stage_status(str(r_status))
+        retry_evidence = _as_dict(retrieval.get("retry_evidence"))
+        retained_ids = retry_evidence.get("retained_candidate_ids")
+        duplicate_ids = retry_evidence.get("duplicate_candidate_ids")
         error_type = _safe_error_type(
             result.get("retrieval_error") or state.get("retrieval_error")
         )
@@ -414,7 +450,18 @@ def _build_stage_telemetry(
                 error_owner=owner,
                 error_type=error_type,
                 candidate_count=len(retrieval.get("selected_ids") or []),
-                candidate_ids=[str(item) for item in retrieval.get("selected_ids") or []],
+                retained_candidate_count=(
+                    len(retained_ids) if isinstance(retained_ids, list) else None
+                ),
+                duplicate_candidate_count=(
+                    len(duplicate_ids) if isinstance(duplicate_ids, list) else None
+                ),
+                candidate_ids=[
+                    str(item)
+                    for item in (retrieval.get("selected_ids") or [])[
+                        :MAX_OBSERVABILITY_CANDIDATE_IDS
+                    ]
+                ],
             )
         )
 
@@ -546,7 +593,7 @@ def _candidate_ids(retrieval: dict[str, Any], channel: str) -> list[str]:
         return []
     return [
         str(item.get("candidate_id"))
-        for item in values
+        for item in values[:MAX_OBSERVABILITY_CANDIDATE_IDS]
         if isinstance(item, dict) and item.get("candidate_id")
     ]
 
@@ -558,7 +605,12 @@ def _safe_retry_attempts(value: Any) -> list[dict[str, Any]]:
         {
             "attempt": item.get("attempt"),
             "status": item.get("status"),
-            "selected_ids": [str(candidate_id) for candidate_id in item.get("selected_ids") or []],
+            "selected_ids": [
+                str(candidate_id)
+                for candidate_id in (item.get("selected_ids") or [])[
+                    :MAX_OBSERVABILITY_CANDIDATE_IDS
+                ]
+            ],
         }
         for item in value
         if isinstance(item, dict)
@@ -573,6 +625,41 @@ def _safe_quality_issues(value: Any) -> list[dict[str, Any]]:
         for item in value
         if isinstance(item, dict)
     ]
+
+
+def _safe_agent_decisions(
+    value: Any,
+    final_decision: dict[str, Any],
+) -> list[AgentDecisionTelemetry]:
+    """Project only the validated action schema; never copy reasoning/query fields."""
+
+    source = value if isinstance(value, list) and value else [final_decision]
+    decisions: list[AgentDecisionTelemetry] = []
+    allowed_actions = {"retrieve", "retry", "generate", "abstain", "finalize"}
+    for index, item in enumerate(source, start=1):
+        if not isinstance(item, dict):
+            continue
+        action = str(item.get("action") or "")
+        if action not in allowed_actions:
+            continue
+        reason_code = item.get("reason_code")
+        decisions.append(
+            AgentDecisionTelemetry(
+                attempt=index,
+                action=action,
+                reason_code=_safe_categorical(reason_code),
+            )
+        )
+    return decisions
+
+
+def _safe_categorical(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text and len(text) <= 80 and all(char.isalnum() or char in "._-" for char in text):
+        return text
+    return None
 
 
 def _safe_error_type(value: Any) -> str | None:
@@ -619,6 +706,7 @@ def _safe_query_summary(query: str) -> str:
 
 
 __all__ = [
+    "MAX_OBSERVABILITY_CANDIDATE_IDS",
     "build_observability_event",
     "emit_request_completion",
     "export_observability_event",

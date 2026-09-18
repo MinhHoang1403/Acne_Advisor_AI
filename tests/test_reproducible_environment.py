@@ -34,6 +34,16 @@ def test_compose_images_are_digest_pinned_without_latest() -> None:
     assert all(":latest" not in image for image in report["images"].values())
 
 
+def test_observability_compose_images_are_digest_pinned_without_latest() -> None:
+    report = checker.inspect_compose_images(
+        checker.PROJECT_ROOT / "docker-compose.observability.yml"
+    )
+
+    assert report["passed"] is True
+    assert report["invalid"] == {}
+    assert len(report["images"]) == 6
+
+
 def test_env_example_has_reproducible_version_contract() -> None:
     report = checker.inspect_env_example(checker.PROJECT_ROOT / ".env.example")
 
@@ -116,6 +126,7 @@ def test_checker_reports_invalid_fixture(tmp_path: Path) -> None:
     assert "lock_no_local_paths" in failed
     assert "lock_no_legacy_google_sdk" in failed
     assert "compose_images_pinned" in failed
+    assert "observability_compose_images_pinned" in failed
     assert "env_example_contract" in failed
     assert "python_version_file" in failed
 
