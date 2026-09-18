@@ -366,7 +366,7 @@ def test_retrieval_transition_contract_enforces_action_and_budget() -> None:
     assert exhausted_generate.action == "generate"
 
 
-def test_retry_requires_prior_usable_evidence() -> None:
+def test_retry_allows_one_revised_search_after_completed_zero_evidence() -> None:
     decision = AgentDecision(
         action="retry",
         retrieval_query="adapalene pregnancy",
@@ -380,12 +380,23 @@ def test_retry_requires_prior_usable_evidence() -> None:
         {
             "retrieval_attempt": 1,
             "evidence_assessment": {"usable": False},
+            "retrieval_status": "no_evidence",
+            "retry_history": [{"query": "adapalene"}],
+        },
+    )
+    failed_retrieval = validate_agent_decision(
+        decision,
+        {
+            "retrieval_attempt": 1,
+            "evidence_assessment": {"usable": False},
+            "retrieval_status": "failed",
             "retry_history": [{"query": "adapalene"}],
         },
     )
 
     assert before_first_retrieval.action == "abstain"
-    assert after_first_retrieval.action == "abstain"
+    assert after_first_retrieval.action == "retry"
+    assert failed_retrieval.action == "abstain"
 
 
 def test_decision_schema_allows_omitted_conditionally_required_fields() -> None:

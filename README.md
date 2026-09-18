@@ -62,22 +62,25 @@ not rebuild, re-embed, reindex, activate, or write to the knowledge indexes.
 
 ## Knowledge Preparation and Indexing
 
-The current validated build is `94d613bc9b33628de3ef`:
+The current validated build is `d4a1819fe7fb77fe1f40`:
 
 | Artifact | Count or contract |
 |---|---|
 | Curated source snapshots | 4 |
-| Knowledge chunks | 512 |
+| Knowledge chunks | 536 |
 | EntityCards | 32 |
 | Neo4j graph | 32 nodes / 27 relationships |
-| Qdrant knowledge index | 512 points |
+| Qdrant knowledge index | 536 points |
 | Qdrant entity index | 32 points |
-| Dense vectors | `models/gemini-embedding-2`, 3072 dimensions, cosine distance |
-| Sparse vectors | Qdrant-native BM25 |
+| Dense vectors | `models/gemini-embedding-2`, asymmetric question-answering text representation, 3072 dimensions, cosine distance |
+| Sparse vectors | Qdrant-native BM25, tokenizer `word`, lowercase and ASCII folding enabled |
 
 Source, document, record, and chunk identities are content-bound. The pipeline
-uses structure-aware chunks capped at 2400 Unicode characters with zero overlap,
-proof-based artifact filtering, exact deduplication, and complete provenance.
+uses structure-aware blocks, list lead-ins, and table rows capped at 2400 Unicode
+characters with zero overlap, proof-based artifact filtering, exact
+deduplication, and complete provenance. Dense documents are represented as
+`title: {title} | text: {content}` and queries as
+`task: question answering | query: {content}`.
 The deterministic graph is built from source-backed taxonomy data; no LLM graph
 extraction runs in the current pipeline.
 
@@ -157,8 +160,8 @@ query
 | Default | Value |
 |---|---:|
 | Candidate limit per channel | 16 |
-| Selected context items | 8 |
-| Packed context characters | 6000 |
+| Selected context items | 9 |
+| Packed context characters | 7000 |
 | Timeout per channel | 20 seconds |
 | RRF `k` | 60 |
 | Dense / BM25 weights | 1.0 / 1.0 |
@@ -173,7 +176,7 @@ The reranker uses `BAAI/bge-reranker-v2-m3` from an already available local
 model artifact. Its raw score is used only to order candidates; it is not a
 probability or medical-confidence score. A bounded operational failure preserves
 the deterministic pre-reranker order. Packing then keeps complete chunk text and
-provenance while enforcing the 8-item and 6000-character limits.
+provenance while enforcing the 9-item and 7000-character limits.
 
 The formulas, provider contracts, and parameter classifications are documented
 in [Methods and Formulas](docs/METHODS_AND_FORMULAS.md).
@@ -224,8 +227,9 @@ evidence identifiers and the source allowlist. Answers involving history,
 safety overrides, fallback, failed retrieval, or failed quality checks are not
 reused as ordinary cache entries.
 
-The effective answer-cache namespace is `v10`. The pipeline fingerprint is
-computed from a secret-free runtime manifest. Provider calls, retrieval
+The effective answer-cache namespace is `v10`. The current pipeline fingerprint
+is `0a8d129a215c884f2d9654e9`, computed from a secret-free runtime manifest that
+includes the activated knowledge embedding and BM25 contracts. Provider calls, retrieval
 channels, the overall Agent request, and frontend requests use finite timeouts.
 Retries are bounded, and provider fallback requires both server configuration
 and request-level opt-in.
@@ -234,6 +238,10 @@ The evaluated generation chain is `gemini-3.5-flash-lite`, then
 `gemini-3.1-flash-lite`, then local `qwen3:8b` when fallback is enabled and the
 request opts in. This fallback order does not change retrieval or evidence
 requirements.
+
+Health output distinguishes configured/tag-visible model availability from a
+generation probe. `generation_probed=false` means readiness did not execute a
+paid or local generation request; it is not a claim that generation succeeded.
 
 ## Data Stores and Providers
 
@@ -278,6 +286,11 @@ metadata for local research, debugging, and provenance inspection. The current
 API is not hardened as an untrusted multi-tenant public interface. Local OpenAPI
 documentation is available at `http://127.0.0.1:8000/docs`.
 
+`ChatRequest.request_id` is an optional UUID idempotency key. Replaying the same
+canonical request produces one logical user/assistant pair, while different
+request IDs remain distinct even when their text is identical. Persistence is
+best effort: a database failure does not discard the current answer.
+
 ## Frontend
 
 The React request and render path is:
@@ -291,6 +304,10 @@ Source metadata is converted to friendly labels for display while the backend
 retains raw source identity. `VITE_API_URL` is the only browser configuration.
 All `VITE_*` values are visible to browser users, so provider keys and database
 credentials belong only in backend configuration.
+
+Session reconciliation is ID-based. It preserves an unsynchronized local tail,
+does not merge repeated text with different message IDs, and isolates new chats
+and session switches.
 
 ## Deployment Boundary
 
@@ -430,7 +447,7 @@ review.
 
 ## Official Formal Evaluation
 
-The completed official run is
+The completed official historical run is
 [`formal_run_2d5f0124`](evaluation/results/formal_run_2d5f0124/). It evaluated
 commit `2d5f0124dc532a4970a4b08dcd6cf846389a03ff` with pipeline fingerprint
 `f93ad3e8dfb2c39f403b0794`, knowledge build `94d613bc9b33628de3ef`,
@@ -448,6 +465,10 @@ All 100 cases completed with zero infrastructure failures. The raw outputs,
 case-level metrics, checkpoint, calibration evidence, hashes, and interpretation
 boundary are listed in [Official Evaluation Results](evaluation/results/README.md).
 These benchmark results are research evidence, not clinical validation.
+They do not describe the current `d4a1819fe7fb77fe1f40` knowledge build or its
+current pipeline fingerprint. A new formal result has not been declared: six
+evidence-gap rows require researcher adjudication, documented in
+[`evaluation/benchmark_adjudication.md`](evaluation/benchmark_adjudication.md).
 
 ## Limitations
 
@@ -464,10 +485,12 @@ These benchmark results are research evidence, not clinical validation.
   and evaluator claim extraction has observed variability.
 - End-to-end medical quality and clinical safety effectiveness have not been
   clinically validated.
-- Dense query embedding uses the external Gemini Embedding 2 provider under the
-  current configuration. The current query/document contract does not prepend
-  Google's retrieval-specific task instructions; their effect on this corpus
-  remains an evaluation question that would require controlled re-embedding.
+- Dense query embedding uses the external Gemini Embedding 2 provider. The
+  current asymmetric text representation was selected by a bounded development
+  comparison; it is not a formal or clinical quality result.
+- The current build has development retrieval regression evidence, but no new
+  immutable formal RAGChecker result while benchmark adjudication remains
+  pending researcher review.
 - Deployment assumptions target trusted, local, single-user use.
 
 ## References and Technical Documentation

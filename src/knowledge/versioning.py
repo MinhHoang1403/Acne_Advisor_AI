@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 
@@ -13,8 +14,13 @@ DEFAULT_EMBEDDING_DIMENSIONS = 3072
 DEFAULT_KB_VERSION = "frozen_phase1_build"
 DEFAULT_TAXONOMY_VERSION = "acne_taxonomy_2026_08"
 DEFAULT_ENTITY_SCHEMA_VERSION = "source_backed_entity_card"
-DEFAULT_CHUNK_SCHEMA_VERSION = "structure_first_chars_2400_no_overlap"
+DEFAULT_CHUNK_SCHEMA_VERSION = (
+    "structure_preserving_blocks_and_lead_ins_chars_2400_no_overlap"
+)
 DEFAULT_INGESTION_PIPELINE_VERSION = "frozen_phase1_build"
+DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST = (
+    Path(__file__).resolve().parents[2] / "data" / "knowledge_build_manifest.json"
+)
 
 
 def _env_str(name: str, default: str) -> str:
@@ -42,11 +48,50 @@ def get_embedding_metadata() -> dict[str, Any]:
     }
 
 
-def get_knowledge_versions() -> dict[str, str]:
+def resolve_active_knowledge_build_id(manifest_path: Path | None = None) -> str:
+    """Return the activated manifest build ID or fail closed.
+
+    The persisted manifest is the runtime authority. ``KB_VERSION`` remains a
+    legacy deployment setting, but it cannot override the activated build and
+    therefore cannot silently reuse a stale cache namespace.
+    """
+
+    # Import lazily to avoid loading the ingestion graph while this package is
+    # still initializing.
+    from src.ingestion.manifest import load_build_manifest, validate_build_id
+
+    path = manifest_path or DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
+    manifest = load_build_manifest(path)
+    if manifest.get("status") != "activated":
+        raise ValueError(f"Knowledge-build manifest at {path} is not activated")
+
+    build_id = validate_build_id(
+        manifest.get("build_id"),
+        setting_name="knowledge manifest build_id",
+    )
+    collections = manifest.get("collections") or {}
+    expected = {
+        "knowledge_logical": "acne_knowledge",
+        "knowledge_physical": f"acne_knowledge__{build_id}",
+        "entity_logical": "acne_entities",
+        "entity_physical": f"acne_entities__{build_id}",
+    }
+    if any(collections.get(name) != value for name, value in expected.items()):
+        raise ValueError(
+            "Activated knowledge manifest collection identity does not match build_id"
+        )
+    return build_id
+
+
+def get_knowledge_versions(
+    *,
+    manifest_path: Path | None = None,
+    build_id: str | None = None,
+) -> dict[str, str]:
     """Trả version tags dùng để kiểm tính tương thích của KB build."""
 
     return {
-        "kb_version": _env_str("KB_VERSION", DEFAULT_KB_VERSION),
+        "kb_version": build_id or resolve_active_knowledge_build_id(manifest_path),
         "taxonomy_version": _env_str("TAXONOMY_VERSION", DEFAULT_TAXONOMY_VERSION),
         "entity_schema_version": _env_str(
             "ENTITY_SCHEMA_VERSION",
@@ -112,5 +157,6 @@ __all__ = [
     "expected_kb_payload_metadata",
     "get_embedding_metadata",
     "get_knowledge_versions",
+    "resolve_active_knowledge_build_id",
     "validate_embedding_config_compatibility",
 ]

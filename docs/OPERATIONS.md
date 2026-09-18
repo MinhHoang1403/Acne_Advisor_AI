@@ -72,13 +72,18 @@ messages. Query text is represented only by a redacted length summary and the
 pre-existing short hash. Export, serialization, and sink failures fail open and
 must not change the business response.
 
-The formal evaluation artifact records fingerprint
-`f93ad3e8dfb2c39f403b0794`, while the current effective environment computes
-`3d883e5ad78622579ed01850`. The evaluated commit's versioning code and
-`.env.example` defaults, combined with the active knowledge build, reproduce the
-latter, but the formal artifact does not contain its complete effective
-manifest. The exact historical differing field therefore remains `UNKNOWN`;
-never hard-code either digest or remove manifest fields to force equality.
+The current effective environment computes fingerprint
+`0a8d129a215c884f2d9654e9` for active knowledge build
+`d4a1819fe7fb77fe1f40`. The immutable historical formal evaluation artifact
+records fingerprint `f93ad3e8dfb2c39f403b0794` and build
+`94d613bc9b33628de3ef`; it must not be presented as the current system. Never
+hard-code either digest or remove manifest fields to force equality.
+
+Readiness reports provider/model configuration separately from an actual
+generation probe. `generation_probed=false` is truthful evidence that no probe
+ran, not evidence that generation succeeded or failed. Chat persistence uses an
+optional UUID request id as an idempotency key and remains fail-open for the
+current response.
 
 ## Supported Commands
 

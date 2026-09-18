@@ -22,7 +22,8 @@ from src.resilience.budget import DeadlineBudget
 from src.resilience.contracts import runtime_resilience_settings_from_env
 from src.resilience.provider import call_provider_with_resilience
 from src.resilience.retry import RetryPolicy
-from src.ingestion.bm25 import BM25_VECTOR_NAME, bm25_document
+from src.ingestion.bm25 import BM25_VECTOR_NAME, active_bm25_document
+from src.ingestion.embedding import active_query_embedding_text
 
 try:
     from dotenv import load_dotenv
@@ -74,7 +75,7 @@ def _embed_sync(text: str) -> list[float]:
         )
 
     vectors = embed_texts_sync(
-        [text],
+        [active_query_embedding_text(text)],
         model_name=EMBEDDING_MODEL,
         task_type=None,
         expected_dimensions=EMBEDDING_DIMENSIONS,
@@ -195,7 +196,7 @@ class QdrantVectorStore:
 
         response = await self._client.query_points(
             collection_name=self._collection,
-            query=bm25_document(text),
+            query=active_bm25_document(text),
             using=BM25_VECTOR_NAME,
             limit=top_k,
         )

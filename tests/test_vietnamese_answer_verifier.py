@@ -32,6 +32,7 @@ def test_verifier_checks_structure_and_provenance_without_medical_truth_table() 
         "presentation",
         "structural_contract",
         "provenance_identity",
+        "requested_entity_scope",
     ]
 
 

@@ -26,7 +26,7 @@ def test_native_bm25_document_has_explicit_shared_options() -> None:
     assert document.options.tokenizer == models.TokenizerType.WORD
     assert document.options.language == BM25_LANGUAGE == "none"
     assert document.options.lowercase is True
-    assert document.options.ascii_folding is False
+    assert document.options.ascii_folding is True
     assert bm25_document("query").options == document.options
 
 

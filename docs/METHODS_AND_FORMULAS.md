@@ -9,17 +9,23 @@ contract. Runtime retrieval does not rebuild or alter stored vectors.
 Google owns vector generation; the project sends text and validates output count
 and dimension; Qdrant owns cosine search over stored vectors. Official Gemini
 Embedding 2 documentation does not accept `task_type` and recommends embedding
-task instructions as text prefixes for text-only retrieval. The current build and
-runtime query path use unprefixed text. Whether query/document prefixes improve
-Vietnamese acne retrieval is an unmeasured evaluation question that would require
-a controlled re-embedding experiment; this documentation does not change the
-current vectors or index.
+task instructions as text prefixes for text-only retrieval. Build
+`d4a1819fe7fb77fe1f40` therefore uses the exact representations
+`title: {title} | text: {content}` for documents and
+`task: question answering | query: {content}` for queries. Model, dimension,
+distance, representation identifier, and represented text all participate in
+embedding-cache identity, so legacy raw vectors cannot be mixed into this build.
+The representation was selected by a bounded project comparison; provider
+documentation does not establish its quality or optimality on this corpus.
 
 ## Native BM25
 
 The sparse channel is Qdrant-native BM25 with collection-side IDF and the current
 build configuration: `k1=1.2`, `b=0.75`, `avg_len=256`, tokenizer `word`, lowercase
-enabled, language `none`, no stemming, and no stopword list. Here `avg_len=256` is
+and ASCII folding enabled, language `none`, no stemming, and no stopword list.
+ASCII folding was retained because the bounded accented/unaccented comparison
+preserved accented evidence visibility and improved unaccented parity; it is not
+claimed as a language-independent optimum. Here `avg_len=256` is
 a configured provider/index baseline. It is not asserted to be the measured true
 average of the current corpus. Neither the BM25 literature nor Qdrant provider
 documentation proves these values optimal for Acne Advisor AI.
@@ -63,7 +69,7 @@ or Neo4j score participates in this step.
 `src/retrieval/context_packer.py` preserves its input order after reranking (or
 the deterministic fallback order), deduplicates only by stable item identity,
 retains provenance, and enforces finite item/character budgets. The defaults are
-8 packed items and 6000 characters from an initial candidate pool of 16. These
+9 packed items and 7000 characters from an initial candidate pool of 16. These
 are resource policies, not relevance thresholds.
 Evidence is marked usable only when at least one packed item has both
 text and a source identifier. This is a deterministic presence/provenance check,
@@ -108,6 +114,12 @@ fail-closed behavior. This is an engineering policy: `retrieve` means the first
 evidence acquisition, `retry` means the later acquisition, and the retrieval
 tool can execute no more than two times. The model cannot bypass the budget by
 selecting `retrieve` after the first execution.
+
+When the first attempt contains no evidence, the Agent may make one purposeful
+retry. Candidates from a prior attempt are retained only when acquisition
+itself fails, then deduplicated, reranked, and repacked. Provider errors do not
+cause an unbounded or semantically blind retry, and the stable overall user
+question remains the rerank context for a targeted retry.
 
 ## Exact Cache Identity
 
@@ -161,7 +173,7 @@ pattern; it does not prescribe this project's exact retry count or timing values
 The Agent decision model sees at most the first 5 evidence items and the first
 1200 characters of each item. This bounded visibility is an engineering policy,
 not evidence sufficiency or a scientific optimum. The generation path can see
-more packed evidence through its separate limit of 8 items and 6000 characters;
+more packed evidence through its separate limit of 9 items and 7000 characters;
 that asymmetry remains an evaluation question.
 
 When Ollama reports truncated generation, the client performs at most one compact
@@ -176,9 +188,16 @@ clinical/public-health sources or an explicit no-prescription engineering
 policy. It is not a general medical reasoner. Ordinary answer meaning remains
 `source evidence -> LLM synthesis`.
 
+Safety composition prioritizes the current direct question. Informational,
+hypothetical, resolved, negated, and explicit third-person clauses do not become
+first-person emergencies. Adjacent incomplete facts may compose across bounded
+history, while a completed prior safety exchange or explicit topic reset does
+not leak into the current turn.
+
 `src/quality/answer_verifier.py` checks answer structure, source allowlisting,
-and provenance-related contracts. It does not prove medical truth, semantic
-entailment, or evidence completeness.
+provenance-related contracts, explicit requested-entity omission, and off-scope
+entity substitution. It does not prove medical truth, semantic entailment, or
+general evidence completeness.
 
 ## Knowledge Build Contracts
 
@@ -213,7 +232,7 @@ medical confidence, source reliability score, or scientific formula.
 | RRF `k` | 60 | runtime engineering policy |
 | channel weights | 1.0 / 1.0 | runtime engineering policy |
 | retrieval candidates | default 16 | runtime resource policy |
-| context items/chars | defaults 8 / 6000 | runtime resource policy |
+| context items/chars | defaults 9 / 7000 | runtime resource policy selected by bounded packing comparison |
 | retrieval attempts | maximum 2 | bounded safety/latency policy |
 | decision evidence visibility | first 5 items; 1200 chars/item | runtime engineering policy |
 | agent action schema | 4 semantic actions | implemented research method + engineering contract |

@@ -98,8 +98,9 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
         "At retrieval_attempt 0, choose retrieve with an effective standalone search query or "
         "abstain; for retrieve, set missing_evidence to null. After the first retrieval execution, "
         "use retry, never retrieve, for a later "
-        "evidence acquisition. Choose retry only when some potentially useful evidence exists, "
-        "retrieval budget remains, missing_evidence names the specific unsupported relationship, "
+        "evidence acquisition. Choose retry only when retrieval budget remains and either some "
+        "potentially useful evidence exists or the first completed search returned no evidence. "
+        "For retry, missing_evidence names the specific unsupported relationship, "
         "qualifier, condition, comparison, attribution, or numeric requirement, and a materially "
         "improved query targets that gap. Generic text such as 'need more evidence', 'need more "
         "information', 'not enough context', or 'search again' is not a valid missing_evidence. "
@@ -486,7 +487,7 @@ def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> Ag
         decision.action != "retry"
         or attempt <= 0
         or attempt >= MAX_RETRIEVAL_ATTEMPTS
-        or not has_evidence
+        or (not has_evidence and state.get("retrieval_status") != "no_evidence")
         or not query
         or not missing_evidence
     ):

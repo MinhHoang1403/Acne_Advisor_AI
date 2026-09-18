@@ -11,17 +11,25 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from pathlib import Path
 from typing import Any, Mapping
 
+from src.knowledge.versioning import (
+    DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
+    resolve_active_knowledge_build_id,
+)
+
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
-DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = "answer_formatting_contract_v16"
+DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = (
+    "bounded_list_and_terminal_qualifier_formatting"
+)
 DEFAULT_SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v4"
 DEFAULT_PROMPT_VERSION = "requested_scope_medical_prompt"
 DEFAULT_EVIDENCE_GROUNDING_VERSION = "evidence_grounded_runtime_v2"
 DEFAULT_SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
 LEGACY_ANSWER_CACHE_VERSIONS = {f"v{version}" for version in range(1, 10)}
 LEGACY_ANSWER_FORMATTING_CONTRACT_VERSIONS = {
-    f"answer_formatting_contract_v{version}" for version in range(1, 16)
+    f"answer_formatting_contract_v{version}" for version in range(1, 17)
 }
 LEGACY_PROMPT_VERSIONS = {f"medical_prompt_v{version}" for version in range(1, 7)}
 ARCHITECTURE_VERSION = "minimal_agentic_rag_v1"
@@ -38,7 +46,11 @@ _SECRET_KEY_MARKERS = (
 )
 
 
-def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def build_pipeline_version_manifest(
+    settings: Mapping[str, Any] | None = None,
+    *,
+    knowledge_manifest_path: Path | None = None,
+) -> dict[str, Any]:
     """Tạo runtime contract ổn định tham gia vào cache identity."""
 
     settings = settings or {}
@@ -48,6 +60,14 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
 
     reranker_enabled = _env_bool(value("RERANKER_ENABLED", "false"), False)
     reranker_model = str(value("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3") or "").strip()
+    active_manifest_path = knowledge_manifest_path or DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
+    active_build_id = resolve_active_knowledge_build_id(active_manifest_path)
+    from src.ingestion.manifest import load_build_manifest
+
+    active_knowledge_manifest = load_build_manifest(active_manifest_path)
+    active_contracts = active_knowledge_manifest.get("contracts") or {}
+    active_embedding_contract = active_contracts.get("embedding") or {}
+    active_bm25_contract = active_contracts.get("bm25") or {}
     manifest = {
         "phase": "production",
         "architecture_version": ARCHITECTURE_VERSION,
@@ -67,8 +87,8 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         },
         "context_packer_version": "bounded_whole_chunk_admission",
         "retrieval_candidate_limit": _env_int(value("RETRIEVAL_CANDIDATE_LIMIT", "16"), 16),
-        "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "8"), 8),
-        "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "6000"), 6000),
+        "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "9"), 9),
+        "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "7000"), 7000),
         "max_retrieval_attempts": 2,
         "retry_evidence_policy": "retain_deduplicate_rerank_repack",
         "agent_decision_version": "direct_proposition_support_action_decision",
@@ -78,14 +98,14 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
             legacy={"evidence_grounded_runtime_v1"},
             default=DEFAULT_EVIDENCE_GROUNDING_VERSION,
         ),
-        "answer_validation_version": "structural_provenance_locality_validation_v2",
+        "answer_validation_version": "structural_provenance_requested_entity_scope",
         "answer_formatting_contract_version": _effective_answer_formatting_contract_version(
             value(
                 "ANSWER_FORMATTING_CONTRACT_VERSION",
                 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION,
             )
         ),
-        "safety_policy_version": "source_mapped_composite_safety_policy",
+        "safety_policy_version": "source_mapped_current_context_safety_policy",
         "safe_fallback_flow_version": _effective_contract_version(
             value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
             legacy={"safe_fallback_flow_v1", "safe_fallback_flow_v2", "safe_fallback_flow_v3"},
@@ -108,8 +128,10 @@ def build_pipeline_version_manifest(settings: Mapping[str, Any] | None = None) -
         "cache_schema_version": value("CACHE_SCHEMA_VERSION", "v3"),
         "embedding_model": value("EMBEDDING_MODEL", "models/gemini-embedding-2"),
         "embedding_dimensions": _env_int(value("EMBEDDING_DIMENSIONS", "3072"), 3072),
+        "knowledge_embedding_contract_id": active_embedding_contract.get("id"),
+        "knowledge_bm25_contract_id": active_bm25_contract.get("id"),
         "qdrant_collection_name": _runtime_chunk_collection_name(settings),
-        "kb_version": value("KB_VERSION", "frozen_phase1_build"),
+        "kb_version": active_build_id,
         "prompt_version": _effective_prompt_version(
             value("PROMPT_VERSION", DEFAULT_PROMPT_VERSION)
         ),

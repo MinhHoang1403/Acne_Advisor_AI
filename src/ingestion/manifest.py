@@ -27,6 +27,7 @@ from src.ingestion.embedding import (
     EMBEDDING_DISTANCE,
     EMBEDDING_MODEL,
     EMBEDDING_PROVIDER,
+    EMBEDDING_REPRESENTATION,
 )
 from src.ingestion.filtering import CLAIM_CURATION_CONTRACT_ID, FILTER_CONTRACT_ID
 from src.ingestion.normalization import NORMALIZATION_CONTRACT_ID
@@ -91,6 +92,9 @@ def build_manifest(
                 "dimensions": EMBEDDING_DIMENSIONS,
                 "distance": EMBEDDING_DISTANCE,
                 "task_type": None,
+                "representation": EMBEDDING_REPRESENTATION,
+                "document_format": "title: {title} | text: {content}",
+                "query_format": "task: question answering | query: {content}",
             },
             "bm25": {
                 "id": BM25_CONTRACT_ID,

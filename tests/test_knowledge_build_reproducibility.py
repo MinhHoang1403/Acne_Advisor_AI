@@ -262,7 +262,7 @@ def test_frozen_actual_corpus_compiles_reproducibly_with_complete_provenance() -
     assert [record["chunk_id"] for record in first.records] == [
         record["chunk_id"] for record in second.records
     ]
-    assert len(first.records) == 512
+    assert len(first.records) == 536
     assert all(not validate_provenance(record) for record in first.records)
     represented_parents = {
         record.get("parent_source_id") or record["source_id"] for record in first.records

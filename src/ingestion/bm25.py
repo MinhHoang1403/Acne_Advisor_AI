@@ -18,11 +18,12 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from pathlib import Path
 
 from qdrant_client import models
 
 
-BM25_CONTRACT_ID = "qdrant_native_bm25_word_language_none"
+BM25_CONTRACT_ID = "qdrant_native_bm25_word_language_none_ascii_folding"
 BM25_MODEL = "qdrant/bm25"
 BM25_VECTOR_NAME = "bm25"
 # ``k1`` điều khiển mức bão hòa của term frequency; ``b`` điều khiển mức
@@ -47,14 +48,36 @@ def bm25_config() -> models.Bm25Config:
         tokenizer=BM25_TOKENIZER,
         language=BM25_LANGUAGE,
         lowercase=True,
-        ascii_folding=False,
+        ascii_folding=True,
     )
 
 
-def bm25_document(text: str) -> models.Document:
+def bm25_document(
+    text: str, *, config: models.Bm25Config | None = None,
+) -> models.Document:
     """Bọc text và BM25 contract thành ``Document`` cho Qdrant inference."""
 
-    return models.Document(text=text, model=BM25_MODEL, options=bm25_config())
+    return models.Document(text=text, model=BM25_MODEL, options=config or bm25_config())
+
+
+def active_bm25_document(text: str, *, manifest_path: Path | None = None) -> models.Document:
+    """Build a query document from the activated manifest's BM25 options."""
+
+    from src.ingestion.manifest import load_build_manifest
+    from src.knowledge.versioning import (
+        DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
+        resolve_active_knowledge_build_id,
+    )
+
+    path = manifest_path or DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
+    resolve_active_knowledge_build_id(path)
+    manifest = load_build_manifest(path)
+    contract = (manifest.get("contracts") or {}).get("bm25") or {}
+    raw_config = contract.get("configuration")
+    if not isinstance(raw_config, dict):
+        raise ValueError("Activated knowledge manifest has no BM25 configuration")
+    config = models.Bm25Config.model_validate(raw_config)
+    return bm25_document(text, config=config)
 
 
 def bm25_sparse_vector_config() -> models.SparseVectorParams:
@@ -114,6 +137,7 @@ __all__ = [
     "BM25_MODEL",
     "BM25_TOKENIZER",
     "BM25_VECTOR_NAME",
+    "active_bm25_document",
     "bm25_config",
     "bm25_document",
     "bm25_sparse_vector_config",

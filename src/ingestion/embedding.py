@@ -20,11 +20,13 @@ from typing import Any
 from src.integrations.google_genai import embed_texts_sync
 
 
-EMBEDDING_CONTRACT_ID = "google_gemini_embedding_2_3072_cosine"
+EMBEDDING_CONTRACT_ID = "google_gemini_embedding_2_qa_instruction_3072_cosine"
+LEGACY_RAW_EMBEDDING_CONTRACT_ID = "google_gemini_embedding_2_3072_cosine"
 EMBEDDING_PROVIDER = "google"
 EMBEDDING_MODEL = "models/gemini-embedding-2"
 EMBEDDING_DIMENSIONS = 3072
 EMBEDDING_DISTANCE = "cosine"
+EMBEDDING_REPRESENTATION = "question_answering_asymmetric_text"
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,7 @@ class EmbeddingContract:
     dimensions: int = EMBEDDING_DIMENSIONS
     distance: str = EMBEDDING_DISTANCE
     task_type: None = None
+    representation: str = EMBEDDING_REPRESENTATION
 
     def identity(self, text: str) -> str:
         """Hash canonical JSON của contract và text để định danh cache chính xác."""
@@ -46,6 +49,7 @@ class EmbeddingContract:
             "dimensions": self.dimensions,
             "distance": self.distance,
             "task_type": self.task_type,
+            "representation": self.representation,
             "text": text,
         }
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -63,6 +67,43 @@ def embed_documents(texts: list[str], *, api_key: str) -> list[list[float]]:
         output_dimensions=EMBEDDING_DIMENSIONS,
         api_key=api_key,
     )
+
+
+def format_embedding_document(text: str, *, title: str) -> str:
+    """Apply Gemini's text-only question-answering document representation."""
+
+    return f"title: {title.strip()} | text: {text.strip()}"
+
+
+def format_embedding_query(text: str) -> str:
+    """Apply Gemini's text-only question-answering query representation."""
+
+    return f"task: question answering | query: {text.strip()}"
+
+
+def active_query_embedding_text(text: str, *, manifest_path: Path | None = None) -> str:
+    """Represent a query exactly as required by the activated knowledge build.
+
+    The activated manifest is authoritative during migration: the legacy raw
+    index keeps receiving raw queries until the candidate with the asymmetric
+    representation is activated.
+    """
+
+    from src.ingestion.manifest import load_build_manifest
+    from src.knowledge.versioning import (
+        DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
+        resolve_active_knowledge_build_id,
+    )
+
+    path = manifest_path or DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
+    resolve_active_knowledge_build_id(path)
+    manifest = load_build_manifest(path)
+    contract_id = ((manifest.get("contracts") or {}).get("embedding") or {}).get("id")
+    if contract_id == EMBEDDING_CONTRACT_ID:
+        return format_embedding_query(text)
+    if contract_id == LEGACY_RAW_EMBEDDING_CONTRACT_ID:
+        return text
+    raise ValueError(f"Unsupported active embedding contract: {contract_id!r}")
 
 
 class EmbeddingCache:
@@ -115,7 +156,12 @@ __all__ = [
     "EMBEDDING_DISTANCE",
     "EMBEDDING_MODEL",
     "EMBEDDING_PROVIDER",
+    "EMBEDDING_REPRESENTATION",
+    "LEGACY_RAW_EMBEDDING_CONTRACT_ID",
     "EmbeddingCache",
     "EmbeddingContract",
+    "active_query_embedding_text",
     "embed_documents",
+    "format_embedding_document",
+    "format_embedding_query",
 ]

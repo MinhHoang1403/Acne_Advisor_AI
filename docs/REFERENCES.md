@@ -1,6 +1,6 @@
 # Method, Provider, and Medical Sources
 
-Verified through 2026-08-16. Machine-readable claim mapping lives in
+Verified through 2026-09-18. Machine-readable claim mapping lives in
 `data/method_sources.json`; canonical corpus metadata lives in
 `data/sources/manifest.yaml`. Scientific evidence, provider contracts, and
 clinical sources are deliberately separated.
@@ -33,6 +33,26 @@ clinical sources are deliberately separated.
   Large Language Models through Question Complexity*. NAACL. Supports bounded
   adaptation of retrieval behavior to the request. The project does not
   implement the paper's complexity classifier or strategy set.
+- Ma, X. et al. (2023). *Query Rewriting in Retrieval-Augmented Large Language
+  Models*. EMNLP. https://aclanthology.org/2023.emnlp-main.322/; Wu, Z. et al.
+  (2022). *CONQRR*. EMNLP. https://aclanthology.org/2022.emnlp-main.679/; and
+  Jang, Y. et al. (2024). *IterCQR: Iterative Conversational Query Reformulation
+  with Retrieval Guidance*. NAACL.
+  https://aclanthology.org/2024.naacl-long.449/. These
+  sources motivate evaluating conversational query reformulation. Acne Advisor
+  AI rejected the tested prompt rewrite because it reduced top-9 completeness
+  and did not add a dedicated rewriter.
+- Liu, N. F. et al. (2024). *Lost in the Middle: How Language Models Use Long
+  Contexts*. TACL. https://aclanthology.org/2024.tacl-1.9/. This is related
+  context-position literature, not evidence that the project's 9-item/7000-char
+  budget is optimal.
+- Ammann, P. J. L., Golde, J., and Akbik, A. (2025). *Question Decomposition for
+  Retrieval-Augmented Generation*; and Xie, K. et al. (2025). *Do RAG Systems
+  Cover What Matters? Evaluating and Optimizing Responses with Sub-Question
+  Coverage*:
+  https://aclanthology.org/2025.acl-srw.32/ and
+  https://aclanthology.org/2025.naacl-long.301/. Decomposition remains deferred;
+  no decomposition agent or framework is implemented.
 
 ## Framework Contracts
 
@@ -71,7 +91,17 @@ clinical sources are deliberately separated.
   Embedding 2 does not accept `task_type`, and recommends text-prefix retrieval
   instructions for text-only use cases. It does not validate Vietnamese acne
   retrieval quality or whether such prefixes improve this corpus. The current
-  index remains unprefixed pending a controlled evaluation.
+  asymmetric document/query prefixes were retained only after a bounded project
+  comparison and are not a formal or clinical result.
+- BAAI, *bge-reranker-v2-m3* model card.
+  https://huggingface.co/BAAI/bge-reranker-v2-m3. The model card documents the
+  configured local cross-encoder; it does not calibrate raw scores as medical
+  confidence or prove project-specific quality gains.
+- Ru, D. et al. (2024). *RAGChecker: A Fine-grained Framework for Diagnosing
+  Retrieval-Augmented Generation*. NeurIPS.
+  https://proceedings.neurips.cc/paper_files/paper/2024/hash/27245589131d17368cccdfa990cbf16e-Abstract.html.
+  This supports the historical evaluator's fine-grained metrics, not clinical
+  validation or automatic approval of disputed benchmark labels.
 - LlamaIndex, `llama-parse` 0.6.94 package contract. Verified 2026-08-14.
   https://pypi.org/project/llama-parse/0.6.94/
 

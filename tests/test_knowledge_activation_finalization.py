@@ -32,7 +32,7 @@ def _manifest(*, build_id: str = BUILD_ID, status: str = "activated") -> dict[st
         },
         "counts": {
             "sources": 4,
-            "knowledge_chunks": 512,
+            "knowledge_chunks": 536,
             "entities": 32,
             "graph_nodes": 32,
             "graph_relationships": 27,
@@ -54,7 +54,6 @@ def _patch_successful_finalization_dependencies(
     *,
     prepared_build_id: str = BUILD_ID,
 ) -> None:
-    monkeypatch.setenv("KB_VERSION", BUILD_ID)
     monkeypatch.setattr(
         pipeline,
         "compute_build_identity",
@@ -66,7 +65,7 @@ def _patch_successful_finalization_dependencies(
             "passed": True,
             "build_id": BUILD_ID,
             "parsed": {"hits": 4, "misses": 0, "total": 4},
-            "knowledge_embeddings": {"hits": 507, "misses": 5, "total": 512},
+            "knowledge_embeddings": {"hits": 531, "misses": 5, "total": 536},
             "entity_embeddings": {"hits": 32, "misses": 0, "total": 32},
             "provider_calls": 0,
         }
@@ -85,7 +84,7 @@ def test_runtime_readiness_has_no_hardcoded_expected_build() -> None:
     assert "ec0a6de32d58ac181af6" not in source
 
 
-def test_runtime_readiness_follows_configured_kb_version(
+def test_runtime_readiness_uses_activated_manifest_identity(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -96,11 +95,12 @@ def test_runtime_readiness_follows_configured_kb_version(
     check = inspect_runtime_readiness._knowledge_manifest_check()
 
     assert check["passed"] is True
-    assert check["details"]["configured_kb_version"] == BUILD_ID
+    assert check["details"]["active_knowledge_build_id"] == BUILD_ID
+    assert check["details"]["legacy_kb_version"] == BUILD_ID
 
 
 @pytest.mark.parametrize("configured", [OTHER_BUILD_ID, "", "not-a-build-id"])
-def test_runtime_readiness_fails_closed_for_mismatched_or_invalid_kb_version(
+def test_runtime_readiness_legacy_kb_version_cannot_override_manifest(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     configured: str,
@@ -114,7 +114,8 @@ def test_runtime_readiness_fails_closed_for_mismatched_or_invalid_kb_version(
 
     check = inspect_runtime_readiness._knowledge_manifest_check()
 
-    assert check["passed"] is False
+    assert check["passed"] is True
+    assert check["details"]["active_knowledge_build_id"] == BUILD_ID
 
 
 def test_finalize_activation_cli_is_explicit_operator_command() -> None:
@@ -135,32 +136,32 @@ def test_finalization_refuses_non_activated_manifest_without_writing(
     assert manifest_path.read_bytes() == before
 
 
-def test_finalization_refuses_configured_build_mismatch_without_writing(
+def test_finalization_ignores_legacy_build_setting(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     manifest_path = tmp_path / "manifest.json"
-    before = _write_manifest(manifest_path)
+    _write_manifest(manifest_path)
     monkeypatch.setenv("KB_VERSION", OTHER_BUILD_ID)
+    _patch_successful_finalization_dependencies(monkeypatch)
 
-    with pytest.raises(RuntimeError, match="KB_VERSION"):
-        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
+    result = asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
-    assert manifest_path.read_bytes() == before
+    assert result["build_id"] == BUILD_ID
 
 
-def test_finalization_fails_closed_when_kb_version_is_missing(
+def test_finalization_does_not_require_legacy_build_setting(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     manifest_path = tmp_path / "manifest.json"
-    before = _write_manifest(manifest_path)
+    _write_manifest(manifest_path)
     monkeypatch.delenv("KB_VERSION", raising=False)
+    _patch_successful_finalization_dependencies(monkeypatch)
 
-    with pytest.raises(RuntimeError, match="KB_VERSION"):
-        asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
+    result = asyncio.run(pipeline.finalize_knowledge_activation(manifest_path=manifest_path))
 
-    assert manifest_path.read_bytes() == before
+    assert result["build_id"] == BUILD_ID
 
 
 def test_finalization_refuses_prepared_identity_mismatch_without_writing(

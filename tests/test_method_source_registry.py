@@ -67,7 +67,7 @@ def test_corrected_source_and_curation_contracts_have_expected_build_identity() 
         Path("data/taxonomy/drug_aliases.yaml"),
     )
 
-    assert identity.build_id == "94d613bc9b33628de3ef"
+    assert identity.build_id == "d4a1819fe7fb77fe1f40"
 
 
 def test_method_traceability_covers_methods_and_technical_standards() -> None:
@@ -114,7 +114,7 @@ def test_observability_sources_are_authoritative_and_scope_limitations() -> None
         assert records[source_id]["limitations"]
 
 
-def test_gemini_retrieval_instruction_is_an_evaluation_question_only() -> None:
+def test_gemini_retrieval_instruction_contract_is_bounded_and_traceable() -> None:
     registry = json.loads(
         Path("data/method_sources.json").read_text(encoding="utf-8")
     )
@@ -123,5 +123,7 @@ def test_gemini_retrieval_instruction_is_an_evaluation_question_only() -> None:
 
     google = records["google_gemini_embedding2_2026"]
     assert "does not accept task_type" in google["claim_supported"]
-    assert "unprefixed" in google["limitations"]
-    assert "unmeasured evaluation question" in methods
+    assert "does not validate Vietnamese acne retrieval quality" in google["limitations"]
+    assert "title: {title} | text: {content}" in methods
+    assert "task: question answering | query: {content}" in methods
+    assert "does not establish its quality or optimality" in methods

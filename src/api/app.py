@@ -225,6 +225,7 @@ class ChatHistoryMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+    request_id: Optional[uuid.UUID] = None
     user_id: Optional[str] = None
     session_id: Optional[str] = None
     conversation_history: list[ChatHistoryMessage] = Field(default_factory=list)
@@ -703,7 +704,7 @@ async def chat_endpoint(request: ChatRequest):
     After the agent responds, awaits persistence of the user message and
     assistant response to PostgreSQL. Persistence errors remain non-fatal.
     """
-    request_id = str(uuid.uuid4())
+    request_id = str(request.request_id or uuid.uuid4())
     request_started = time.perf_counter()
     result: dict[str, Any] = {"request_id": request_id}
     request.message = repair_mojibake(request.message)
@@ -918,6 +919,7 @@ async def chat_endpoint(request: ChatRequest):
                 # Persistence được await nhưng lỗi DB bị giữ ở nhánh best-effort,
                 # nên response Agent vẫn trả được khi PostgreSQL tạm thời lỗi.
                 await _persist_chat_to_db(
+                    request_id=request_id,
                     session_id=session_id,
                     user_id=request.user_id,
                     user_message=request.message,
@@ -1061,6 +1063,7 @@ async def chat_endpoint(request: ChatRequest):
 
 
 async def _persist_chat_to_db(
+    request_id: str,
     session_id: str,
     user_id: Optional[str],
     user_message: str,
@@ -1100,6 +1103,7 @@ async def _persist_chat_to_db(
                 session_id=session_id,
                 role="user",
                 content=user_message,
+                message_id=str(uuid.uuid5(uuid.UUID(request_id), "user")),
             )
             
             # Save assistant message
@@ -1108,6 +1112,7 @@ async def _persist_chat_to_db(
                 session_id=session_id,
                 role="assistant",
                 content=assistant_answer,
+                message_id=str(uuid.uuid5(uuid.UUID(request_id), "assistant")),
                 sources=sources,
                 metadata=db_metadata,
             )

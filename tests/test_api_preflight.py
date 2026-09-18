@@ -1,10 +1,34 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+import qdrant_client
 
 from src.api import preflight
+from src.ingestion.build import BUILD_MANIFEST_SCHEMA
+
+
+def _write_active_manifest(path: Path, build_id: str) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema": BUILD_MANIFEST_SCHEMA,
+                "status": "activated",
+                "build_id": build_id,
+                "collections": {
+                    "knowledge_logical": "acne_knowledge",
+                    "knowledge_physical": f"acne_knowledge__{build_id}",
+                    "entity_logical": "acne_entities",
+                    "entity_physical": f"acne_entities__{build_id}",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_dependency_error_detail_does_not_expose_raw_credentials(caplog):
@@ -16,6 +40,132 @@ def test_dependency_error_detail_does_not_expose_raw_credentials(caplog):
     assert "secret-password" not in detail
     assert "secret-password" not in caplog.text
     assert "RuntimeError" in detail
+
+
+@pytest.mark.asyncio
+async def test_ollama_health_is_truthful_about_not_probing_generation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        preflight,
+        "_http_get_json",
+        lambda *_args, **_kwargs: {"models": [{"name": preflight.OLLAMA_MODEL}]},
+    )
+
+    result = await preflight.check_ollama()
+
+    assert result.status == "ok"
+    assert result.extra == {
+        "model": preflight.OLLAMA_MODEL,
+        "model_list_probed": True,
+        "generation_probed": False,
+    }
+    generation = preflight.check_generation_provider(
+        {
+            "provider": "ollama",
+            "fallback_enabled": False,
+            "fallback_provider": None,
+            "ollama_required": True,
+            "ollama_requirement_reason": "configured primary provider is ollama",
+        },
+        result,
+    )
+    assert generation.status == "ok"
+    assert generation.extra["generation_probed"] is False
+
+
+@pytest.mark.asyncio
+async def test_qdrant_preflight_reports_active_manifest_build(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    build_id = "a" * 20
+    manifest_path = tmp_path / "manifest.json"
+    _write_active_manifest(manifest_path, build_id)
+    monkeypatch.setattr(preflight, "DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST", manifest_path)
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def get_collection(self, *, collection_name):
+            assert collection_name == "acne_knowledge"
+            return SimpleNamespace(
+                config=SimpleNamespace(
+                    params={
+                        "vectors": {"dense": {"size": 3072}},
+                        "sparse_vectors": {"bm25": {}},
+                    }
+                ),
+                points_count=512,
+            )
+
+        async def get_aliases(self):
+            return SimpleNamespace(
+                aliases=[
+                    SimpleNamespace(
+                        alias_name="acne_knowledge",
+                        collection_name=f"acne_knowledge__{build_id}",
+                    )
+                ]
+            )
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(qdrant_client, "AsyncQdrantClient", FakeClient)
+
+    result = await preflight.check_qdrant()
+
+    assert result.status == "ok"
+    assert result.extra["knowledge_build_id"] == build_id
+    assert result.extra["active_alias_target"] == f"acne_knowledge__{build_id}"
+
+
+@pytest.mark.asyncio
+async def test_qdrant_preflight_detects_alias_build_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    build_id = "a" * 20
+    manifest_path = tmp_path / "manifest.json"
+    _write_active_manifest(manifest_path, build_id)
+    monkeypatch.setattr(preflight, "DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST", manifest_path)
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def get_collection(self, *, collection_name):
+            return SimpleNamespace(
+                config=SimpleNamespace(
+                    params={
+                        "vectors": {"dense": {"size": 3072}},
+                        "sparse_vectors": {"bm25": {}},
+                    }
+                ),
+                points_count=512,
+            )
+
+        async def get_aliases(self):
+            return SimpleNamespace(
+                aliases=[
+                    SimpleNamespace(
+                        alias_name="acne_knowledge",
+                        collection_name="acne_knowledge__" + "b" * 20,
+                    )
+                ]
+            )
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(qdrant_client, "AsyncQdrantClient", FakeClient)
+
+    result = await preflight.check_qdrant()
+
+    assert result.status == "schema_mismatch"
+    assert "alias acne_knowledge" in result.detail
 
 
 @pytest.mark.asyncio

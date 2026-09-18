@@ -668,7 +668,7 @@ async def test_safety_override_precedes_agent_and_is_not_cacheable() -> None:
 
 def test_isotretinoin_combined_safety_need_covers_pregnancy_and_mental_health() -> None:
     decision = evaluate_safety(
-        "Tôi cần hiểu đồng thời nguy cơ mang thai và sức khỏe tâm thần khi dùng isotretinoin."
+        "Tôi đang dùng isotretinoin, hiện có thể mang thai và đang lo âu về sức khỏe tâm thần."
     )
 
     assert decision is not None
@@ -678,6 +678,49 @@ def test_isotretinoin_combined_safety_need_covers_pregnancy_and_mental_health() 
     assert "sức khỏe tâm thần" in folded
     assert "đánh giá" in folded
     assert "theo dõi" in folded
+
+
+def test_informational_risk_management_question_does_not_short_circuit() -> None:
+    assert evaluate_safety(
+        "Còn isotretinoin thì vì sao phải quản lý nguy cơ thai kỳ và tâm thần?"
+    ) is None
+
+
+def test_explicit_third_person_risk_context_does_not_use_second_person_override() -> None:
+    assert evaluate_safety("Chị tôi đang dùng isotretinoin và đang mang thai.") is None
+
+
+def test_adjacent_split_safety_facts_can_compose() -> None:
+    decision = evaluate_safety(
+        "Sau đó tôi bắt đầu khó thở.",
+        conversation_history=[
+            {"role": "user", "content": "Tôi vừa dùng thuốc trị mụn."},
+            {"role": "assistant", "content": "Bạn muốn hỏi điều gì?"},
+        ],
+    )
+
+    assert decision is not None
+    assert decision.rule_id == "breathing_difficulty_after_medication"
+
+
+def test_prior_complete_risk_or_explicit_topic_reset_does_not_leak() -> None:
+    complete_prior = [
+        {"role": "user", "content": "Tôi đang dùng isotretinoin và đang mang thai."},
+        {"role": "assistant", "content": "Đã cung cấp hướng dẫn an toàn."},
+    ]
+    partial_prior = [
+        {"role": "user", "content": "Tôi đang dùng isotretinoin."},
+        {"role": "assistant", "content": "Đã ghi nhận."},
+    ]
+
+    assert evaluate_safety(
+        "Kem chống nắng cho da mụn nên chọn thế nào?",
+        conversation_history=complete_prior,
+    ) is None
+    assert evaluate_safety(
+        "Bỏ qua chuyện đó. Tôi đang mang thai.",
+        conversation_history=partial_prior,
+    ) is None
 
 
 def test_combined_isotretinoin_safety_rule_does_not_capture_ordinary_information() -> None:

@@ -19,8 +19,8 @@ from src.retrieval.contracts import ContextItem, NormalizedQuery, PackedContext,
 def pack_context(
     normalized_query: NormalizedQuery,
     candidates: list[RetrievedCandidate],
-    max_items: int = 8,
-    max_chars: int = 6000,
+    max_items: int = 9,
+    max_chars: int = 7000,
 ) -> PackedContext:
     """Đóng gói nguyên candidate mà không đổi supplied relevance order.
 

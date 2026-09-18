@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from src.database.repositories.chat_history import get_messages, get_recent_messages
+from src.database.repositories.chat_history import get_messages, get_recent_messages, save_message
 
 
 async def _session_with_messages(count: int) -> tuple[AsyncSession, object]:
@@ -94,3 +94,32 @@ async def test_complete_history_reader_keeps_earliest_first_semantics() -> None:
         await engine.dispose()
 
     assert [row["id"] for row in rows] == [f"message-{index:02d}" for index in range(5)]
+
+
+@pytest.mark.asyncio
+async def test_save_message_replay_with_same_identity_creates_one_logical_turn() -> None:
+    session, engine = await _session_with_messages(0)
+    try:
+        first = await save_message(
+            session,
+            "session-a",
+            "user",
+            "same content",
+            message_id="stable-request-user",
+        )
+        replay = await save_message(
+            session,
+            "session-a",
+            "user",
+            "same content",
+            message_id="stable-request-user",
+        )
+        await session.commit()
+        rows = await get_messages(session, "session-a")
+    finally:
+        await session.close()
+        await engine.dispose()
+
+    assert first["id"] == "stable-request-user"
+    assert replay == {"id": "stable-request-user", "duplicate": True}
+    assert [row["id"] for row in rows] == ["stable-request-user"]

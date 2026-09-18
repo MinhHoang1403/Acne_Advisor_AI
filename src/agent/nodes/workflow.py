@@ -51,7 +51,10 @@ async def guard_node(state: ClinicalState) -> dict[str, Any]:
 
     started = time.perf_counter()
     question = state.get("normalized_question") or state.get("user_question") or ""
-    safety = evaluate_safety(question)
+    safety = evaluate_safety(
+        question,
+        conversation_history=state.get("conversation_history") or [],
+    )
     if safety is not None:
         structured_decision = {
             "version": AGENT_DECISION_VERSION,
@@ -196,7 +199,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         payload = await retrieve_evidence.ainvoke(
             {
                 "query": question,
-                "top_k": 8,
+                "top_k": 9,
                 "retained_retrieval_candidates": retained_candidates,
                 "rerank_query": rerank_query,
                 "retrieval_attempt": attempt,

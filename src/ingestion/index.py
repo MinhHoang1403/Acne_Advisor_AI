@@ -25,7 +25,13 @@ from qdrant_client import AsyncQdrantClient, models
 from src.database.vector_store import qdrant_client_kwargs
 from src.ingestion.bm25 import BM25_VECTOR_NAME, bm25_document, bm25_sparse_vector_config
 from src.ingestion.build import CompiledKnowledge
-from src.ingestion.embedding import EMBEDDING_DIMENSIONS, EmbeddingCache, embed_documents
+from src.ingestion.embedding import (
+    EMBEDDING_CONTRACT_ID,
+    EMBEDDING_DIMENSIONS,
+    EmbeddingCache,
+    embed_documents,
+    format_embedding_document,
+)
 from src.knowledge.entity_cards import entity_card_to_text
 from src.knowledge.entity_identity import entity_point_id
 from src.knowledge.schemas import EntityCard
@@ -57,6 +63,7 @@ async def seed_embedding_cache_from_collection(
 
     loaded = 0
     failed = 0
+    incompatible = 0
     for start in range(0, len(point_ids), 64):
         points, batch_failed = await _retrieve_dense_resilient(
             client, collection_name, point_ids[start:start + 64]
@@ -65,11 +72,15 @@ async def seed_embedding_cache_from_collection(
         for point in points:
             payload = point.payload or {}
             text = str(payload.get("text") or payload.get("content") or "")
+            title = str(payload.get("source_title") or payload.get("canonical_name") or "")
             vector = point.vector.get(DENSE_VECTOR_NAME) if isinstance(point.vector, dict) else None
-            if text and isinstance(vector, list) and len(vector) == EMBEDDING_DIMENSIONS:
-                cache.put(text, vector)
+            if payload.get("embedding_contract_id") != EMBEDDING_CONTRACT_ID:
+                incompatible += 1
+                continue
+            if text and title and isinstance(vector, list) and len(vector) == EMBEDDING_DIMENSIONS:
+                cache.put(format_embedding_document(text, title=title), vector)
                 loaded += 1
-    return {"loaded": loaded, "unreadable": failed}
+    return {"loaded": loaded, "unreadable": failed, "incompatible": incompatible}
 
 
 async def _retrieve_dense_resilient(
@@ -270,6 +281,7 @@ async def build_entity_candidate(
                     "source_ids": card.source_ids,
                     "taxonomy_hash": taxonomy_hash,
                     "entity_schema": "source_backed_entity_card",
+                    "embedding_contract_id": EMBEDDING_CONTRACT_ID,
                     "build_id": build_id,
                     "medical_evidence_eligible": False,
                 }
