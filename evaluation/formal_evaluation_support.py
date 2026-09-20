@@ -601,11 +601,6 @@ def _extraction_assessment(item: dict[str, Any], claims: list[str]) -> tuple[str
     return "accepted", []
 
 
-def _extraction_acceptable(item: dict[str, Any], claims: list[str]) -> tuple[bool, list[str]]:
-    status, reasons = _extraction_assessment(item, claims)
-    return status == "accepted", reasons
-
-
 def _checker_label(raw: Any) -> str:
     values = raw if isinstance(raw, list) else [raw]
     labels: list[str] = []

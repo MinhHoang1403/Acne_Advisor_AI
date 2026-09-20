@@ -122,18 +122,6 @@ async def _setup_postgres() -> None:
 
         await conn.execute(_raw_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'))
 
-        logger.info("Creating SQLAlchemy model tables if available...")
-
-        try:
-            from src.database.models import metadata  # type: ignore
-
-            await conn.run_sync(metadata.create_all)
-            logger.info("✓ Tables created from src.database.models metadata.")
-        except ImportError:
-            logger.warning(
-                "src.database.models not found yet. Skipping model table creation."
-            )
-
         await _seed_reference_data(conn)
 
     await engine.dispose()

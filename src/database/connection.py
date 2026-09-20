@@ -1,17 +1,14 @@
 """Khởi tạo SQLAlchemy engine và factory cho PostgreSQL sessions.
 
 Connection URL đến từ ``DATABASE_URL``. Long-running API dùng connection pool;
-test/script có thể bật ``DB_USE_NULL_POOL``. ``get_session`` sở hữu transaction:
-commit khi dependency hoàn tất, rollback khi exception và đóng session khi thoát.
-Module không chứa query nghiệp vụ; query chat nằm trong repositories.
+test/script có thể bật ``DB_USE_NULL_POOL``. Module không chứa query nghiệp vụ;
+query chat và transaction ownership nằm trong repositories/API callers.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import AsyncGenerator
-
 try:
     from dotenv import load_dotenv
 
@@ -52,14 +49,3 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
     autocommit=False,
 )
-
-
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Yield một session và sở hữu commit/rollback cho FastAPI dependency."""
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise

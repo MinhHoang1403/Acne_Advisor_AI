@@ -182,6 +182,10 @@ def _neo4j_check() -> dict[str, Any]:
 def _architecture_check() -> dict[str, Any]:
     nodes = set(clinical_graph.get_graph().nodes) - {"__start__", "__end__"}
     removed_paths = (
+        "src/agent/nodes/observability.py",
+        "src/database/models/__init__.py",
+        "src/database/models/base.py",
+        "src/ingestion/dermatology_taxonomy.py",
         "src/retrieval/candidate_policy.py",
         "src/retrieval/evidence_selector.py",
         "src/retrieval/v5_contracts.py",

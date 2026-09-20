@@ -180,11 +180,6 @@ Mỗi stage dùng `effective_timeout = min(configured_timeout, remaining_deadlin
 Retry và provider fallback tiếp tục dùng phần deadline còn lại, không khởi tạo lại
 tổng thời gian request. Đây là resource policy, không phải confidence formula.
 
-Metadata ingestion có field compatibility tên `confidence`, nhưng giá trị chỉ là
-coverage heuristic: bằng 0 khi không có nhóm metadata nào, nếu không thì bằng
-`min(0.3 + 0.1*n, 1.0)` với `n` là số nhóm có giá trị. Nó không tham gia retrieval
-score và không phải xác suất, source confidence hay medical confidence.
-
 ## Structural knowledge và verifier
 
 Taxonomy normalizer, EntityCards và Neo4j graph giúp build/validate các quan hệ

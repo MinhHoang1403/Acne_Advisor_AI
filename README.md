@@ -88,8 +88,8 @@ The supported operator interface is
 [`scripts/knowledge_build.py`](scripts/knowledge_build.py):
 
 ```powershell
-.\venv\Scripts\python.exe scripts\knowledge_build.py status
-.\venv\Scripts\python.exe scripts\knowledge_build.py validate
+.\.venv\Scripts\python.exe scripts\knowledge_build.py status
+.\.venv\Scripts\python.exe scripts\knowledge_build.py validate
 ```
 
 Normal application development uses the existing indexed build. A controlled
@@ -359,8 +359,8 @@ hardening.
 git clone https://github.com/MinhHoang1403/Acne_Advisor_AI.git
 Set-Location Acne_Advisor_AI
 
-py -3.11 -m venv venv
-.\venv\Scripts\Activate.ps1
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip==26.1.2
 python -m pip install -r requirements.lock.txt
 Copy-Item .env.example .env
@@ -376,8 +376,8 @@ Start the backing services and initialize application schemas:
 docker compose pull
 docker compose up -d --pull never --no-build
 docker compose ps
-.\venv\Scripts\python.exe scripts\init_schema.py
-.\venv\Scripts\python.exe scripts\init_chat_schema.py
+.\.venv\Scripts\python.exe scripts\init_schema.py
+.\.venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
 
 These commands initialize application infrastructure but do not create the
@@ -395,7 +395,7 @@ Start the application with the bounded local launcher:
 Or start each layer manually:
 
 ```powershell
-.\venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
 
 Set-Location src\frontend
 npm ci
@@ -410,21 +410,21 @@ embedding, retrieval, datastore, reliability, versioning, and observability.
 Backend and runtime contracts:
 
 ```powershell
-.\venv\Scripts\python.exe -m pip check
-.\venv\Scripts\python.exe -m compileall -q src scripts tests
-.\venv\Scripts\python.exe -m ruff check src scripts tests
-.\venv\Scripts\python.exe -m pytest -q
-.\venv\Scripts\python.exe scripts\check_runtime_contracts.py
-.\venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
-.\venv\Scripts\python.exe scripts\check_reproducible_environment.py
-.\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m compileall -q src scripts tests
+.\.venv\Scripts\python.exe -m ruff check src scripts tests
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe scripts\check_runtime_contracts.py
+.\.venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
+.\.venv\Scripts\python.exe scripts\check_reproducible_environment.py
+.\.venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
 ```
 
 Knowledge build validation:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\knowledge_build.py status
-.\venv\Scripts\python.exe scripts\knowledge_build.py validate
+.\.venv\Scripts\python.exe scripts\knowledge_build.py status
+.\.venv\Scripts\python.exe scripts\knowledge_build.py validate
 ```
 
 Frontend:

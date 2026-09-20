@@ -1,27 +1,15 @@
-"""Trích xuất dermatology metadata deterministic bằng keyword/regex.
+"""Enrich knowledge chunks with deterministic taxonomy metadata.
 
-Module enrich ``SemanticChunk.metadata`` trong knowledge preparation và có thể
-dùng taxonomy normalizer để map alias. Nó không gọi LLM, không tham gia runtime
-reranking và confidence ở đây chỉ đo số nhóm metadata được điền, không phải xác
-suất đúng hay độ tin cậy y khoa.
+The active implementation maps aliases through ``DrugEntityNormalizer``. It
+does not call an LLM or participate in runtime retrieval and reranking.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 from typing import Any
 
-from src.ingestion.dermatology_taxonomy import (
-    BODY_AREA_KEYWORDS,
-    CONCERN_KEYWORDS,
-    CONTENT_TYPE_KEYWORDS,
-    DOMAIN_TOPIC_KEYWORDS,
-    INGREDIENT_KEYWORDS,
-    SAFETY_CONTEXT_KEYWORDS,
-    SKIN_TYPE_KEYWORDS,
-)
 from src.knowledge import DrugEntityNormalizer
 
 
@@ -35,110 +23,6 @@ NEW_DOMAIN_METADATA_LIST_FIELDS = (
     "safety_context",
     "query_intent_hint",
 )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Data structure
-# ─────────────────────────────────────────────────────────────────────────────
-
-@dataclass
-class DermatologyChunkMetadata:
-    """Các nhóm metadata rule-based của một dermatology content chunk."""
-
-    domain_topic: list[str] = field(default_factory=list)
-    content_type: list[str] = field(default_factory=list)
-    concern: list[str] = field(default_factory=list)
-    ingredient: list[str] = field(default_factory=list)
-    skin_type: list[str] = field(default_factory=list)
-    body_area: list[str] = field(default_factory=list)
-    safety_context: list[str] = field(default_factory=list)
-    evidence_type: str | None = None
-    confidence: float = 0.0
-    extraction_method: str = "rule_based"
-
-    def to_dict(self) -> dict[str, Any]:
-        """Chuyển dataclass thành dictionary có thể serialize sang JSON."""
-        return asdict(self)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Internal helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _match_keywords(
-    text_lower: str,
-    keyword_dict: dict[str, list[str]],
-) -> list[str]:
-    """Trả canonical values đã match, loại trùng nhưng giữ thứ tự ổn định."""
-    matched: list[str] = []
-    for canonical, keywords in keyword_dict.items():
-        for kw in keywords:
-            if kw in text_lower:
-                if canonical not in matched:
-                    matched.append(canonical)
-                break  # one keyword is enough per canonical value
-    return matched
-
-
-def _detect_evidence_type(text_lower: str) -> str | None:
-    """Suy ra evidence type bằng keyword heuristic, không phân loại bằng model."""
-    evidence_patterns: list[tuple[str, list[str]]] = [
-        ("clinical_study", [
-            "clinical trial", "thử nghiệm lâm sàng",
-            "randomized", "rct", "double-blind", "placebo",
-            "nghiên cứu lâm sàng",
-        ]),
-        ("systematic_review", [
-            "systematic review", "meta-analysis", "meta analysis",
-            "tổng quan hệ thống",
-        ]),
-        ("guideline", [
-            "guideline", "hướng dẫn điều trị", "phác đồ",
-            "consensus", "recommendation",
-        ]),
-        ("expert_opinion", [
-            "expert opinion", "ý kiến chuyên gia",
-            "according to dermatologist", "bác sĩ khuyên",
-        ]),
-        ("in_vitro", [
-            "in vitro", "in-vitro", "cell culture", "nuôi cấy tế bào",
-        ]),
-    ]
-
-    for evidence_type, patterns in evidence_patterns:
-        for pattern in patterns:
-            if pattern in text_lower:
-                return evidence_type
-    return None
-
-
-def _compute_confidence(meta: DermatologyChunkMetadata) -> float:
-    """Tính coverage indicator từ số nhóm metadata có giá trị.
-
-    Nếu ``n=0`` thì kết quả bằng 0; ngược lại
-    ``confidence = min(0.3 + 0.1*n, 1.0)`` với tối đa bảy field được đếm. Tên
-    field được giữ vì compatibility; giá trị không phải calibrated probability.
-    """
-    populated_fields = 0
-    for field_name in (
-        "domain_topic",
-        "content_type",
-        "concern",
-        "ingredient",
-        "skin_type",
-        "body_area",
-        "safety_context",
-    ):
-        values = getattr(meta, field_name)
-        if values:
-            populated_fields += 1
-
-    if populated_fields == 0:
-        return 0.0
-
-    # Engineering coverage heuristic, không tham gia retrieval score.
-    confidence = 0.3 + (populated_fields * 0.1)
-    return min(confidence, 1.0)
 
 
 def _dedupe(values: list[Any]) -> list[str]:
@@ -349,44 +233,3 @@ def enrich_domain_metadata(
 
     enriched.update(taxonomy_metadata)
     return enriched
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Public API
-# ─────────────────────────────────────────────────────────────────────────────
-
-def extract_dermatology_metadata(
-    text: str,
-    header_path: str | list[str] = "",
-) -> dict[str, Any]:
-    """Trích xuất dermatology metadata bằng rule-based keyword matching.
-
-    ``header_path`` có thể là Markdown path dạng string hoặc danh sách heading;
-    nó được ghép với ``text`` trước khi match. Kết quả là dictionary phẳng theo
-    ``DermatologyChunkMetadata``; list values được loại trùng, giữ thứ tự và dùng
-    lowercase snake_case. Hàm không gọi model và không tạo relevance score.
-    """
-    # Chuẩn hóa header_path thành string trước khi match.
-    if isinstance(header_path, list):
-        header_str = " ".join(header_path)
-    else:
-        header_str = header_path or ""
-
-    # Header và body cùng tham gia rule matching sau khi lowercase.
-    combined = f"{header_str} {text}".lower()
-
-    meta = DermatologyChunkMetadata(
-        domain_topic=_match_keywords(combined, DOMAIN_TOPIC_KEYWORDS),
-        content_type=_match_keywords(combined, CONTENT_TYPE_KEYWORDS),
-        concern=_match_keywords(combined, CONCERN_KEYWORDS),
-        ingredient=_match_keywords(combined, INGREDIENT_KEYWORDS),
-        skin_type=_match_keywords(combined, SKIN_TYPE_KEYWORDS),
-        body_area=_match_keywords(combined, BODY_AREA_KEYWORDS),
-        safety_context=_match_keywords(combined, SAFETY_CONTEXT_KEYWORDS),
-        evidence_type=_detect_evidence_type(combined),
-        extraction_method="rule_based",
-    )
-
-    meta.confidence = _compute_confidence(meta)
-
-    return meta.to_dict()

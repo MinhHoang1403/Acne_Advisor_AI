@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $backendUrl = "http://$ApiHost`:$ApiPort"
 $frontendUrl = "http://localhost:$FrontendPort"
-$pythonExe = Join-Path $repoRoot "venv\Scripts\python.exe"
+$pythonExe = Join-Path $repoRoot ".venv\Scripts\python.exe"
 $frontendDir = Join-Path $repoRoot "src\frontend"
 
 function Write-Step {
