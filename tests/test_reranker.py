@@ -11,6 +11,7 @@ from src.retrieval.contracts import RetrievedCandidate
 from src.retrieval import service as retrieval_service
 from src.retrieval.reranker import (
     CandidateReranker,
+    DEFAULT_RERANKER_DEVICE,
     RerankerOperationalError,
     RerankerSettings,
     rerank_candidates,
@@ -152,6 +153,97 @@ def test_candidate_reranker_is_lazy() -> None:
     )
 
     assert reranker._model is None
+    assert reranker.device == "cpu"
+    assert reranker.model_load_count == 0
+
+
+def test_reranker_defaults_to_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RERANKER_DEVICE", raising=False)
+
+    settings = RerankerSettings.from_env()
+
+    assert DEFAULT_RERANKER_DEVICE == "cuda"
+    assert settings.device == "cuda"
+
+
+def test_explicit_cpu_device_does_not_probe_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import torch
+
+    def unexpected_probe() -> bool:
+        raise AssertionError("CPU configuration must not probe CUDA")
+
+    monkeypatch.setattr(torch.cuda, "is_available", unexpected_probe)
+
+    reranker = CandidateReranker(RerankerSettings(device="cpu"))
+
+    assert reranker.requested_device == "cpu"
+    assert reranker.device == "cpu"
+    assert reranker.device_fallback_reason is None
+
+
+def test_cuda_configuration_falls_back_truthfully_when_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import torch
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+    reranker = CandidateReranker(RerankerSettings(device="cuda"))
+
+    assert reranker.requested_device == "cuda"
+    assert reranker.device == "cpu"
+    assert reranker.device_fallback_reason == "cuda_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_prepare_loads_model_once_and_reuses_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sentence_transformers
+
+    constructions = 0
+
+    class FakeCrossEncoder:
+        def __init__(self, *_args, **_kwargs) -> None:
+            nonlocal constructions
+            constructions += 1
+
+    monkeypatch.setattr(sentence_transformers, "CrossEncoder", FakeCrossEncoder)
+    reranker = CandidateReranker(
+        RerankerSettings(enabled=True, model_name="fake-local-model", device="cpu")
+    )
+
+    await reranker.prepare()
+    await reranker.prepare()
+
+    assert constructions == 1
+    assert reranker.model_load_count == 1
+
+
+@pytest.mark.asyncio
+async def test_startup_warm_uses_process_reranker_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepare_calls = 0
+
+    class WarmableScorer:
+        async def prepare(self) -> None:
+            nonlocal prepare_calls
+            prepare_calls += 1
+
+    scorer = WarmableScorer()
+    monkeypatch.setenv("RERANKER_ENABLED", "true")
+    monkeypatch.setattr(
+        retrieval_service,
+        "_get_process_reranker",
+        lambda _settings: scorer,
+    )
+
+    await retrieval_service.warm_process_reranker()
+
+    assert prepare_calls == 1
 
 
 @pytest.mark.asyncio
@@ -183,6 +275,7 @@ async def test_candidate_reranker_initializes_model_once_under_concurrency(
     )
 
     assert constructions == 1
+    assert reranker.model_load_count == 1
     assert isinstance(reranker._model_init_lock, type(threading.Lock()))
 
 

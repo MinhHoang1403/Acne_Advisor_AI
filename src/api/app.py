@@ -36,6 +36,7 @@ from src.observability.langfuse_sink import (
 from src.observability.trace_exporter import emit_request_completion
 from src.observability.versioning import get_answer_cache_version
 from src.quality.safe_fallback import fallback_reason_label
+from src.retrieval.service import warm_process_reranker
 from src.resilience.exceptions import (
     AgentTimeoutError,
     ProviderTimeoutError,
@@ -204,6 +205,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.router.add_event_handler("shutdown", shutdown_langfuse)
+app.router.add_event_handler("startup", warm_process_reranker)
 
 
 # --- Pydantic Models ---

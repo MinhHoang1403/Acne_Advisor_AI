@@ -8,6 +8,7 @@ local cache/path; lỗi vận hành có kiểu để caller có thể giữ nguy
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
 import threading
@@ -19,6 +20,10 @@ from typing import Any, Protocol
 from src.retrieval.contracts import RetrievedCandidate
 
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
+DEFAULT_RERANKER_DEVICE = "cuda"
+SUPPORTED_RERANKER_DEVICES = frozenset({"cpu", "cuda"})
+
+logger = logging.getLogger(__name__)
 
 
 class RerankerOperationalError(RuntimeError):
@@ -45,7 +50,7 @@ class CandidateScorer(Protocol):
 class RerankerSettings:
     enabled: bool = False
     model_name: str = DEFAULT_RERANKER_MODEL
-    device: str = "cpu"
+    device: str = DEFAULT_RERANKER_DEVICE
     batch_size: int = 4
     timeout_seconds: float = 20.0
 
@@ -55,7 +60,7 @@ class RerankerSettings:
             enabled=_env_bool("RERANKER_ENABLED", False),
             model_name=os.getenv("RERANKER_MODEL", DEFAULT_RERANKER_MODEL).strip()
             or DEFAULT_RERANKER_MODEL,
-            device=os.getenv("RERANKER_DEVICE", "cpu").strip() or "cpu",
+            device=_configured_device(),
             batch_size=_bounded_int_env("RERANKER_BATCH_SIZE", 4, 1, 64),
             timeout_seconds=_bounded_float_env(
                 "RERANKER_TIMEOUT_SECONDS", 20.0, 0.1, 120.0
@@ -83,8 +88,20 @@ class CandidateReranker:
     def __init__(self, settings: RerankerSettings | None = None) -> None:
         self.settings = settings or RerankerSettings.from_env()
         self.model_name = self.settings.model_name
+        self.requested_device = self.settings.device
+        self.device, self.device_fallback_reason = _resolve_device(
+            self.requested_device
+        )
+        self.model_load_count = 0
         self._model: Any | None = None
         self._model_init_lock = threading.Lock()
+        if self.device_fallback_reason is not None:
+            logger.warning(
+                "Local reranker requested %s but will use %s: %s",
+                self.requested_device,
+                self.device,
+                self.device_fallback_reason,
+            )
 
     async def score(
         self,
@@ -114,6 +131,11 @@ class CandidateReranker:
                 "inference_failed", "Local reranker inference failed."
             ) from exc
 
+    async def prepare(self) -> None:
+        """Load the process model before the API accepts its first request."""
+
+        await asyncio.to_thread(self._get_model)
+
     def _predict(self, pairs: list[tuple[str, str]]) -> Sequence[float]:
         model = self._get_model()
         return model.predict(
@@ -129,11 +151,13 @@ class CandidateReranker:
                 if self._model is None:
                     from sentence_transformers import CrossEncoder
 
-                    self._model = CrossEncoder(
+                    model = CrossEncoder(
                         self.settings.model_name,
-                        device=self.settings.device,
+                        device=self.device,
                         local_files_only=True,
                     )
+                    self._model = model
+                    self.model_load_count += 1
         return self._model
 
 
@@ -228,6 +252,38 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().casefold() in {"1", "true", "yes", "on"}
 
 
+def _configured_device() -> str:
+    value = os.getenv("RERANKER_DEVICE", DEFAULT_RERANKER_DEVICE).strip().casefold()
+    if value in SUPPORTED_RERANKER_DEVICES:
+        return value
+    logger.warning(
+        "Unsupported RERANKER_DEVICE=%r; using %s.",
+        value,
+        DEFAULT_RERANKER_DEVICE,
+    )
+    return DEFAULT_RERANKER_DEVICE
+
+
+def _resolve_device(requested_device: str) -> tuple[str, str | None]:
+    """Resolve the configured device without ever claiming unavailable CUDA."""
+
+    if requested_device == "cpu":
+        return "cpu", None
+    try:
+        import torch
+    except (ImportError, ModuleNotFoundError):
+        return "cpu", "cuda_runtime_unavailable"
+    if not torch.cuda.is_available():
+        return "cpu", "cuda_unavailable"
+    try:
+        probe = torch.ones(1, device="cuda")
+        _ = probe + 1
+        torch.cuda.synchronize()
+    except (AssertionError, RuntimeError):
+        return "cpu", "cuda_probe_failed"
+    return "cuda", None
+
+
 def _bounded_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
     try:
         value = int(os.getenv(name, str(default)))
@@ -247,6 +303,7 @@ def _bounded_float_env(name: str, default: float, minimum: float, maximum: float
 __all__ = [
     "CandidateReranker",
     "CandidateScorer",
+    "DEFAULT_RERANKER_DEVICE",
     "DEFAULT_RERANKER_MODEL",
     "RerankerOperationalError",
     "RerankerSettings",
