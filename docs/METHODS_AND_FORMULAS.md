@@ -210,17 +210,6 @@ literature supports the claim that segmentation can affect RAG, but the project
 does not implement PIC and has not established the 2400-character cap or zero
 overlap as optimal.
 
-Domain metadata retains a compatibility field named `confidence`, calculated
-only as a coverage heuristic over `n` populated metadata groups:
-
-```text
-metadata_coverage(n) = 0                              if n = 0
-metadata_coverage(n) = min(0.3 + 0.1 * n, 1.0)       otherwise
-```
-
-This value does not enter retrieval scoring and is not a calibrated probability,
-medical confidence, source reliability score, or scientific formula.
-
 ## Parameter Classification
 
 | Parameter | Value | Classification |

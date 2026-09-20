@@ -3,8 +3,8 @@
 ## Install
 
 ```powershell
-py -3.11 -m venv venv
-.\venv\Scripts\Activate.ps1
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip==26.1.2
 python -m pip install -r requirements.lock.txt
 Copy-Item .env.example .env
@@ -15,24 +15,24 @@ Keep secrets only in `.env`. Start pinned local services and initialize SQL:
 ```powershell
 docker compose up -d --pull never --no-build
 docker compose ps
-.\venv\Scripts\python.exe scripts\init_schema.py
-.\venv\Scripts\python.exe scripts\init_chat_schema.py
+.\.venv\Scripts\python.exe scripts\init_schema.py
+.\.venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
 
 ## Knowledge Build
 
 ```powershell
-.\venv\Scripts\python.exe scripts\knowledge_build.py build --source sample_data
-.\venv\Scripts\python.exe scripts\knowledge_build.py validate --offline
-.\venv\Scripts\python.exe scripts\knowledge_build.py validate
-.\venv\Scripts\python.exe scripts\knowledge_build.py status
+.\.venv\Scripts\python.exe scripts\knowledge_build.py build --source sample_data
+.\.venv\Scripts\python.exe scripts\knowledge_build.py validate --offline
+.\.venv\Scripts\python.exe scripts\knowledge_build.py validate
+.\.venv\Scripts\python.exe scripts\knowledge_build.py status
 ```
 
 Activation is intentionally guarded and requires verified native Qdrant
 snapshots plus a Neo4j cold backup:
 
 ```powershell
-.\venv\Scripts\python.exe scripts\knowledge_build.py build --activate --rollback-root data\backups\<snapshot>
+.\.venv\Scripts\python.exe scripts\knowledge_build.py build --activate --rollback-root data\backups\<snapshot>
 ```
 
 Starting the UI or API normally reuses the existing indexed knowledge.
@@ -42,10 +42,10 @@ recreate, or delete the Qdrant knowledge index.
 ## Runtime Checks
 
 ```powershell
-.\venv\Scripts\python.exe scripts\inspect_runtime_readiness.py
-.\venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
-.\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
-.\venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe scripts\inspect_runtime_readiness.py
+.\.venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
+.\.venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
 The runtime uses exact normalized answer cache `v10`. Cache identity
@@ -111,7 +111,7 @@ checks.
 Or start components manually:
 
 ```powershell
-.\venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
 Set-Location src\frontend
 npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
@@ -124,8 +124,8 @@ disconnects.
 ## Validation Modes
 
 ```powershell
-.\venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
-.\venv\Scripts\python.exe scripts\check_release_readiness.py --mode local-services
+.\.venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
+.\.venv\Scripts\python.exe scripts\check_release_readiness.py --mode local-services
 ```
 
 `--mode live` performs bounded provider smoke calls; it does not run ingestion,
