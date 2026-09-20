@@ -18,7 +18,6 @@ from src.knowledge.versioning import (
     get_embedding_metadata,
     get_knowledge_versions,
     resolve_active_knowledge_build_id,
-    validate_embedding_config_compatibility,
 )
 
 
@@ -128,15 +127,6 @@ def test_active_knowledge_build_rejects_collection_identity_mismatch(
 
     with pytest.raises(ValueError, match="collection identity"):
         resolve_active_knowledge_build_id(manifest_path)
-
-
-def test_compatibility_guard_detects_embedding_model_mismatch() -> None:
-    common = {"embedding_provider": "google", "embedding_dimensions": 3072, "kb_version": "build"}
-    issues = validate_embedding_config_compatibility(
-        {**common, "embedding_model": "models/gemini-embedding-001"},
-        {**common, "embedding_model": "models/gemini-embedding-2"},
-    )
-    assert any("embedding_model mismatch" in issue for issue in issues)
 
 
 def test_embedding_instruction_format_is_exact() -> None:

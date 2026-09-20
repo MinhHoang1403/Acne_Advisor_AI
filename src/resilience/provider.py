@@ -97,12 +97,4 @@ async def call_provider_with_resilience(
     raise RetryExhaustedError(f"Retry exhausted for provider {provider_name}.") from last_error
 
 
-def safe_resilience_failure_metadata(exc: BaseException) -> dict[str, object]:
-    return {
-        "failure_class": exc.__class__.__name__,
-        "error_code": getattr(exc, "error_code", "runtime_resilience_error"),
-        "retryable": bool(getattr(exc, "retryable", True)),
-    }
-
-
-__all__ = ["call_provider_with_resilience", "safe_resilience_failure_metadata"]
+__all__ = ["call_provider_with_resilience"]

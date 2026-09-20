@@ -18,7 +18,6 @@ from dataclasses import dataclass
 
 CHUNK_CONTRACT_ID = "structure_preserving_blocks_and_lead_ins_chars_2400_no_overlap"
 CHUNK_MAX_CHARS = 2400
-CHUNK_OVERLAP_CHARS = 0
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+(?=[^\s])")
@@ -223,23 +222,9 @@ def _hard_split(text: str, *, max_chars: int) -> list[str]:
     return parts
 
 
-def naive_split(text: str, size: int, overlap: int) -> list[str]:
-    """Helper tương thích cho test; build thật dùng ``structural_chunks``."""
-
-    parts: list[str] = []
-    start = 0
-    step = max(1, size - overlap)
-    while start < len(text):
-        parts.append(text[start:start + size])
-        start += step
-    return parts
-
-
 __all__ = [
     "CHUNK_CONTRACT_ID",
     "CHUNK_MAX_CHARS",
-    "CHUNK_OVERLAP_CHARS",
     "StructuralChunk",
-    "naive_split",
     "structural_chunks",
 ]

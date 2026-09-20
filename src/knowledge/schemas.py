@@ -49,106 +49,6 @@ def _dedupe_strings(values: list[str]) -> list[str]:
     return cleaned
 
 
-class KnowledgeEntityBase(BaseModel):
-    """Shared normalization behavior for knowledge entity schemas."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    canonical_name: str
-    aliases: list[str] = Field(default_factory=list)
-    source_ids: list[str] = Field(default_factory=list)
-
-    @field_validator("canonical_name", mode="before")
-    @classmethod
-    def _normalize_canonical_name(cls, value: Any) -> str:
-        if not isinstance(value, str):
-            raise TypeError("canonical_name must be a string")
-        cleaned = _clean_string(value)
-        if not cleaned:
-            raise ValueError("canonical_name cannot be empty")
-        return cleaned
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def _normalize_string_lists(cls, value: Any) -> Any:
-        if isinstance(value, list):
-            return _dedupe_strings(value)
-        return value
-
-
-class DrugProduct(KnowledgeEntityBase):
-    aliases: list[str] = Field(default_factory=list)
-    active_ingredients: list[str] = Field(default_factory=list)
-    drug_class: list[str] = Field(default_factory=list)
-    product_type: str | None = None
-    source_ids: list[str] = Field(default_factory=list)
-
-    @field_validator("product_type", mode="before")
-    @classmethod
-    def _normalize_optional_string(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        if not isinstance(value, str):
-            raise TypeError("product_type must be a string")
-        cleaned = _clean_string(value)
-        return cleaned or None
-
-
-class ActiveIngredient(KnowledgeEntityBase):
-    aliases: list[str] = Field(default_factory=list)
-    drug_class: list[str] = Field(default_factory=list)
-    used_for: list[str] = Field(default_factory=list)
-    side_effects: list[str] = Field(default_factory=list)
-    contraindications: list[str] = Field(default_factory=list)
-    safety_contexts: list[str] = Field(default_factory=list)
-    source_ids: list[str] = Field(default_factory=list)
-
-
-class DrugClass(KnowledgeEntityBase):
-    aliases: list[str] = Field(default_factory=list)
-    description: str | None = None
-    examples: list[str] = Field(default_factory=list)
-    used_for: list[str] = Field(default_factory=list)
-    safety_notes: list[str] = Field(default_factory=list)
-    source_ids: list[str] = Field(default_factory=list)
-
-    @field_validator("description", mode="before")
-    @classmethod
-    def _normalize_optional_string(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        if not isinstance(value, str):
-            raise TypeError("description must be a string")
-        cleaned = _clean_string(value)
-        return cleaned or None
-
-
-class Condition(KnowledgeEntityBase):
-    aliases: list[str] = Field(default_factory=list)
-    symptoms: list[str] = Field(default_factory=list)
-    severity_markers: list[str] = Field(default_factory=list)
-    red_flags: list[str] = Field(default_factory=list)
-    source_ids: list[str] = Field(default_factory=list)
-
-
-class SafetyContext(KnowledgeEntityBase):
-    aliases: list[str] = Field(default_factory=list)
-    context_type: str | None = None
-    cautions: list[str] = Field(default_factory=list)
-    contraindicated_items: list[str] = Field(default_factory=list)
-    source_ids: list[str] = Field(default_factory=list)
-
-    @field_validator("context_type", mode="before")
-    @classmethod
-    def _normalize_optional_string(cls, value: Any) -> str | None:
-        if value is None:
-            return None
-        if not isinstance(value, str):
-            raise TypeError("context_type must be a string")
-        cleaned = canonical_text_key(value).replace(" ", "_")
-        return cleaned or None
-
-
 class EntityCard(BaseModel):
     """Flattened entity card used as payload for retrieval and future KG enrichment."""
 
@@ -205,12 +105,7 @@ class EntityCard(BaseModel):
 
 
 __all__ = [
-    "ActiveIngredient",
-    "Condition",
-    "DrugClass",
-    "DrugProduct",
     "EntityCard",
     "EntityType",
-    "SafetyContext",
     "canonical_text_key",
 ]

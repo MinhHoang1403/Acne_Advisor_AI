@@ -11,7 +11,6 @@ DEFAULT_EMBEDDING_PROVIDER = "google"
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSIONS = 3072
 
-DEFAULT_KB_VERSION = "frozen_phase1_build"
 DEFAULT_TAXONOMY_VERSION = "acne_taxonomy_2026_08"
 DEFAULT_ENTITY_SCHEMA_VERSION = "source_backed_entity_card"
 DEFAULT_CHUNK_SCHEMA_VERSION = (
@@ -105,46 +104,6 @@ def get_knowledge_versions(
     }
 
 
-def expected_kb_payload_metadata() -> dict[str, Any]:
-    """Trả metadata tổng hợp bắt buộc trên chunk/entity payload."""
-
-    return {
-        **get_embedding_metadata(),
-        **get_knowledge_versions(),
-    }
-
-
-def validate_embedding_config_compatibility(
-    chunk_config: dict[str, Any],
-    entity_config: dict[str, Any],
-) -> list[str]:
-    """Liệt kê mismatch khi đối chiếu tương thích chunk/entity collections."""
-
-    issues: list[str] = []
-    for field in (
-        "embedding_provider",
-        "embedding_model",
-        "embedding_dimensions",
-        "kb_version",
-    ):
-        chunk_value = chunk_config.get(field)
-        entity_value = entity_config.get(field)
-        if _normalize_value(chunk_value) != _normalize_value(entity_value):
-            issues.append(
-                f"{field} mismatch: chunk={chunk_value!r}, entity={entity_value!r}"
-            )
-    return issues
-
-
-def _normalize_value(value: Any) -> Any:
-    if isinstance(value, str):
-        stripped = value.strip()
-        if stripped.isdigit():
-            return int(stripped)
-        return stripped
-    return value
-
-
 __all__ = [
     "DEFAULT_CHUNK_SCHEMA_VERSION",
     "DEFAULT_EMBEDDING_DIMENSIONS",
@@ -152,11 +111,8 @@ __all__ = [
     "DEFAULT_EMBEDDING_PROVIDER",
     "DEFAULT_ENTITY_SCHEMA_VERSION",
     "DEFAULT_INGESTION_PIPELINE_VERSION",
-    "DEFAULT_KB_VERSION",
     "DEFAULT_TAXONOMY_VERSION",
-    "expected_kb_payload_metadata",
     "get_embedding_metadata",
     "get_knowledge_versions",
     "resolve_active_knowledge_build_id",
-    "validate_embedding_config_compatibility",
 ]

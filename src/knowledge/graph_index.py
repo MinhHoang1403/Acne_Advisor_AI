@@ -28,9 +28,6 @@ NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
-PrimitiveNeo4jValue = str | int | float | bool
-
-
 def get_neo4j_driver() -> Any:
     """Tạo async Neo4j driver từ cấu hình môi trường của project."""
 
@@ -187,79 +184,6 @@ async def replace_entity_graph(
         "stale_nodes_removed": removed,
         "validation": validation,
     }
-
-
-async def validate_entity_graph(driver: Any) -> dict[str, Any]:
-    """Kiểm các quan hệ deterministic tối thiểu trong Neo4j."""
-
-    required_checks = {
-        "clindamycin_topical_antibiotic": (
-            "MATCH (:ActiveIngredient {canonical_name:'clindamycin'})"
-            "-[:BELONGS_TO_CLASS]->"
-            "(:DrugClass {canonical_name:'topical_antibiotic'}) RETURN count(*) AS count"
-        ),
-        "epiduo_has_adapalene": (
-            "MATCH (:DrugProduct {canonical_name:'Epiduo'})"
-            "-[:HAS_ACTIVE_INGREDIENT]->"
-            "(:ActiveIngredient {canonical_name:'adapalene'}) RETURN count(*) AS count"
-        ),
-        "epiduo_has_bpo": (
-            "MATCH (:DrugProduct {canonical_name:'Epiduo'})"
-            "-[:HAS_ACTIVE_INGREDIENT]->"
-            "(:ActiveIngredient {canonical_name:'benzoyl_peroxide'}) RETURN count(*) AS count"
-        ),
-        "differin_has_adapalene": (
-            "MATCH (:DrugProduct {canonical_name:'Differin'})"
-            "-[:HAS_ACTIVE_INGREDIENT]->"
-            "(:ActiveIngredient {canonical_name:'adapalene'}) RETURN count(*) AS count"
-        ),
-        "tazorac_has_tazarotene": (
-            "MATCH (:DrugProduct {canonical_name:'Tazorac'})"
-            "-[:HAS_ACTIVE_INGREDIENT]->"
-            "(:ActiveIngredient {canonical_name:'tazarotene'}) RETURN count(*) AS count"
-        ),
-        "tazarotene_topical_retinoid": (
-            "MATCH (:ActiveIngredient {canonical_name:'tazarotene'})"
-            "-[:BELONGS_TO_CLASS]->"
-            "(:DrugClass {canonical_name:'topical_retinoid'}) RETURN count(*) AS count"
-        ),
-        "bpo_not_topical_or_oral_antibiotic": (
-            "MATCH (:ActiveIngredient {canonical_name:'benzoyl_peroxide'})"
-            "-[:BELONGS_TO_CLASS]->"
-            "(c:DrugClass) "
-            "WHERE c.canonical_name IN ['topical_antibiotic', 'oral_antibiotic'] "
-            "RETURN count(*) AS count"
-        ),
-    }
-
-    results: dict[str, Any] = {"checks": {}, "passed": True}
-    async with driver.session() as session:
-        for name, cypher in required_checks.items():
-            result = await session.run(cypher)
-            record = await result.single()
-            count = int(record["count"]) if record else 0
-            if name == "bpo_not_topical_or_oral_antibiotic":
-                passed = count == 0
-            else:
-                passed = count > 0
-            results["checks"][name] = {"count": count, "passed": passed}
-            results["passed"] = results["passed"] and passed
-
-        label_counts: dict[str, int] = {}
-        for label in ENTITY_GRAPH_LABELS:
-            result = await session.run(f"MATCH (n:{label}) RETURN count(n) AS count")
-            record = await result.single()
-            label_counts[label] = int(record["count"]) if record else 0
-        results["nodes_by_label"] = label_counts
-
-        relationship_counts: dict[str, int] = {}
-        for rel_type in ENTITY_GRAPH_RELATIONSHIPS:
-            result = await session.run(f"MATCH ()-[r:{rel_type}]->() RETURN count(r) AS count")
-            record = await result.single()
-            relationship_counts[rel_type] = int(record["count"]) if record else 0
-        results["relationships_by_type"] = relationship_counts
-
-    return results
 
 
 async def validate_entity_graph_records(
@@ -447,6 +371,5 @@ __all__ = [
     "sanitize_neo4j_properties",
     "replace_entity_graph",
     "upsert_entity_graph",
-    "validate_entity_graph",
     "validate_entity_graph_records",
 ]

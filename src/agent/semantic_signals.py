@@ -149,41 +149,6 @@ def contains_bounded_sequence(
     return bool(ends)
 
 
-def has_unnegated_concept(
-    text: str,
-    concepts: Iterable[str],
-    *,
-    negation_window: int = 3,
-) -> bool:
-    """Nhận diện concept không bị phủ định hoặc đánh dấu đã hết ngay trước nó."""
-
-    normalized = normalize_text(text)
-    tokens = normalized.split()
-    for concept in concepts:
-        phrase = normalize_text(concept).split()
-        for start, _ in _phrase_spans(tokens, phrase):
-            direct_prefix = tokens[max(0, start - negation_window) : start]
-            if NEGATION_TOKENS.intersection(direct_prefix):
-                continue
-            state_start = max(0, start - 10)
-            current_end = _latest_marker_end(
-                tokens,
-                CURRENT_STATE_MARKERS,
-                start=state_start,
-                stop=start,
-            )
-            inactive_end = _latest_marker_end(
-                tokens,
-                (*HISTORICAL_STATE_MARKERS, *RESOLVED_STATE_MARKERS),
-                start=state_start,
-                stop=start,
-            )
-            if inactive_end > current_end:
-                continue
-            return True
-    return False
-
-
 def has_active_symptom(text: str, concepts: Iterable[str]) -> bool:
     """Trả true khi ít nhất một occurrence của symptom đang hoạt động."""
 
@@ -246,15 +211,6 @@ def has_local_concept_groups(
     return False
 
 
-def has_past_or_resolved_symptom(text: str, concepts: Iterable[str]) -> bool:
-    tokens = normalize_text(text).split()
-    return any(
-        not _occurrence_is_active(tokens, start, end)
-        for concept in concepts
-        for start, end in _phrase_spans(tokens, normalize_text(concept).split())
-    )
-
-
 def has_first_person_reference(
     text: str,
     related_concepts: Iterable[str] | None = None,
@@ -272,15 +228,6 @@ def has_first_person_reference(
         for concept in related_concepts
         for start, _ in _phrase_spans(tokens, normalize_text(concept).split())
     )
-
-
-def is_medication_use_event(text: str) -> bool:
-    """Nhận diện người dùng mô tả hành vi dùng thuốc, không phải nhắc thuốc chung."""
-
-    normalized = normalize_text(text)
-    if not has_first_person_reference(normalized):
-        return False
-    return bool(_medication_event_spans(normalized.split()))
 
 
 def has_medication_related_active_symptom(
@@ -864,11 +811,8 @@ __all__ = [
     "has_first_person_reference",
     "has_local_concept_groups",
     "has_medication_related_active_symptom",
-    "has_past_or_resolved_symptom",
-    "has_unnegated_concept",
     "is_comparison_intent",
     "is_medication_management_intent",
-    "is_medication_use_event",
     "is_prescription_execution_request",
     "normalize_text",
 ]

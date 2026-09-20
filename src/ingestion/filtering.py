@@ -126,29 +126,6 @@ def is_noisy_chunk(text: str, header: str | None = None) -> tuple[bool, str]:
     return False, ""
 
 
-def is_short_medical_safety_statement(text: str, header: str | None = None) -> bool:
-    """Helper tương thích: mọi text ngắn không rỗng đều được giữ lại."""
-
-    del header
-    return bool(text.strip())
-
-
-def deduplicate_chunks(texts: list[str]) -> tuple[list[str], list[int]]:
-    """Giữ exact normalized chunk đầu tiên và trả index của bản trùng bị bỏ."""
-
-    seen: set[str] = set()
-    kept: list[str] = []
-    removed: list[int] = []
-    for index, text in enumerate(texts):
-        key = text.strip()
-        if key in seen:
-            removed.append(index)
-            continue
-        seen.add(key)
-        kept.append(text)
-    return kept, removed
-
-
 def _claim_exclusion(record: Any, source: CanonicalSource) -> ClaimExclusion:
     if not isinstance(record, dict):
         raise ValueError("Every claim exclusion action must be an object")
@@ -177,8 +154,6 @@ __all__ = [
     "ClaimExclusion",
     "FILTER_CONTRACT_ID",
     "apply_claim_exclusion",
-    "deduplicate_chunks",
     "is_noisy_chunk",
-    "is_short_medical_safety_statement",
     "load_claim_exclusions",
 ]

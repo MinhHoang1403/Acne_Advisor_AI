@@ -5,7 +5,6 @@ from src.knowledge.graph_index import sanitize_neo4j_properties
 from src.knowledge.graph_schema import (
     build_entity_graph_records,
     get_entity_graph_constraints,
-    summarize_graph_records,
 )
 
 
@@ -164,12 +163,9 @@ def test_constraints_have_unique_canonical_name() -> None:
 
 def test_dry_run_build_entity_graph_no_neo4j_required() -> None:
     records = _records()
-    counts = summarize_graph_records(records)
 
     assert len(records["nodes"]) == 32
     assert len(records["relationships"]) == 27
-    assert counts["nodes_by_label"]["DrugProduct"] == 4
-    assert "HAS_ACTIVE_INGREDIENT" in counts["relationships_by_type"]
     preview_names = {node["canonical_name"] for node in records["nodes"]}
     assert {"Dalacin T", "Epiduo", "Differin", "benzoyl_peroxide"}.issubset(preview_names)
 

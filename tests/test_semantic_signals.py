@@ -7,7 +7,6 @@ from src.agent.semantic_signals import (
     contains_bounded_sequence,
     has_active_symptom,
     has_medication_related_active_symptom,
-    has_unnegated_concept,
     is_comparison_intent,
     is_medication_management_intent,
     is_prescription_execution_request,
@@ -65,18 +64,6 @@ def test_bounded_sequence_allows_narrow_modifiers_but_not_unbounded_distance() -
         ("uong", "thuoc", "kho tho"),
         max_gap=8,
     )
-
-
-@pytest.mark.parametrize(
-    ("text", "expected"),
-    [
-        ("Tôi đang rất khó thở.", True),
-        ("Tôi không khó thở.", False),
-        ("Tôi đã hết khó thở.", False),
-    ],
-)
-def test_unnegated_concept_respects_local_negation(text: str, expected: bool) -> None:
-    assert has_unnegated_concept(text, ("kho tho",)) is expected
 
 
 @pytest.mark.parametrize(

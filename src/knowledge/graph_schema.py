@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
@@ -313,19 +312,6 @@ def build_entity_graph_records(
     }
 
 
-def summarize_graph_records(records: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, int]]:
-    """Trả count summary cho dry-run output."""
-
-    return {
-        "nodes_by_label": dict(
-            sorted(Counter(node["label"] for node in records["nodes"]).items())
-        ),
-        "relationships_by_type": dict(
-            sorted(Counter(rel["relationship"] for rel in records["relationships"]).items())
-        ),
-    }
-
-
 def _dedupe(values: list[str]) -> list[str]:
     seen: set[str] = set()
     output: list[str] = []
@@ -379,5 +365,4 @@ __all__ = [
     "build_entity_graph_records",
     "get_entity_graph_constraints",
     "get_entity_graph_indexes",
-    "summarize_graph_records",
 ]
