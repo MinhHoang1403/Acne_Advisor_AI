@@ -263,6 +263,12 @@ class EvidenceRetriever:
                 "enabled": rerank_outcome.enabled,
                 "status": rerank_outcome.status,
                 "model": rerank_outcome.model_name,
+                "requested_device": self._reranker_settings.device,
+                "device": getattr(scorer, "device", None),
+                "device_fallback_reason": getattr(
+                    scorer, "device_fallback_reason", None
+                ),
+                "model_load_count": getattr(scorer, "model_load_count", None),
                 "fallback_used": rerank_outcome.fallback_used,
                 "fallback_reason": rerank_outcome.fallback_reason,
                 "elapsed_ms": rerank_outcome.elapsed_ms,
@@ -372,6 +378,25 @@ def _get_process_reranker(settings: RerankerSettings) -> CandidateScorer:
             _process_reranker = CandidateReranker(settings)
             _process_reranker_settings = settings
         return _process_reranker
+
+
+async def warm_process_reranker() -> None:
+    """Preload the enabled process reranker so model loading is not request latency."""
+
+    settings = RerankerSettings.from_env()
+    if not settings.enabled:
+        return
+    scorer = _get_process_reranker(settings)
+    prepare = getattr(scorer, "prepare", None)
+    if prepare is None:
+        return
+    try:
+        await prepare()
+    except (ImportError, ModuleNotFoundError, OSError, RuntimeError, ValueError) as exc:
+        logger.warning(
+            "Local reranker startup preload failed; request-time fallback remains active: %s",
+            exc.__class__.__name__,
+        )
 
 
 def _to_candidate(item: dict[str, Any], rank: int) -> RetrievedCandidate:
@@ -619,4 +644,5 @@ __all__ = [
     "RetrievalResult",
     "merge_retrieval_candidates",
     "retrieve_evidence",
+    "warm_process_reranker",
 ]

@@ -178,6 +178,13 @@ probability or medical-confidence score. A bounded operational failure preserves
 the deterministic pre-reranker order. Packing then keeps complete chunk text and
 provenance while enforcing the 9-item and 7000-character limits.
 
+`RERANKER_DEVICE` accepts `cuda` or `cpu` and defaults to `cuda`. When CUDA is
+requested but unavailable, the reranker truthfully reports the reason and uses
+CPU; inference failures still preserve the deterministic pre-reranker order.
+The default batch size (`4`), precision, and timeout (`20` seconds) are unchanged.
+When reranking is enabled, FastAPI preloads the same process-wide model during
+startup so the first request does not spend its reranker timeout loading weights.
+
 The formulas, provider contracts, and parameter classifications are documented
 in [Methods and Formulas](docs/METHODS_AND_FORMULAS.md).
 
@@ -351,6 +358,7 @@ hardening.
 - Docker Desktop with Compose
 - a Gemini API key for live Gemini generation and Dense query embeddings
 - a local `BAAI/bge-reranker-v2-m3` artifact when reranking is enabled
+- an NVIDIA driver and CUDA-capable PyTorch build when `RERANKER_DEVICE=cuda`
 - Ollama with `qwen3:8b` when Ollama generation or fallback is enabled
 
 ### Installation
@@ -364,6 +372,16 @@ py -3.11 -m venv .venv
 python -m pip install --upgrade pip==26.1.2
 python -m pip install -r requirements.lock.txt
 Copy-Item .env.example .env
+```
+
+The lock file fixes `torch`, `sentence-transformers`, and `transformers`; no
+separate CUDA Toolkit or cuDNN installation is required by this repository.
+Before enabling GPU reranking, verify the active environment directly:
+
+```powershell
+nvidia-smi
+python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu')"
+python -m pip check
 ```
 
 Fill only the secrets required by the selected providers, and keep `.env` out
