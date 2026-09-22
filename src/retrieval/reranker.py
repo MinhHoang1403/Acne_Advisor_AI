@@ -14,6 +14,7 @@ import os
 import threading
 import time
 from collections.abc import Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -24,6 +25,58 @@ DEFAULT_RERANKER_DEVICE = "cuda"
 SUPPORTED_RERANKER_DEVICES = frozenset({"cpu", "cuda"})
 
 logger = logging.getLogger(__name__)
+
+_inference_executor: ThreadPoolExecutor | None = None
+_inference_executor_lock = threading.Lock()
+_running_native_inference = 0
+
+
+def _get_inference_executor() -> ThreadPoolExecutor:
+    """Return the one process executor used by local reranker inference."""
+
+    global _inference_executor
+    with _inference_executor_lock:
+        if _inference_executor is None:
+            if _running_native_inference:
+                raise RerankerOperationalError(
+                    "executor_shutdown",
+                    "Local reranker is finishing inference during shutdown.",
+                )
+            _inference_executor = ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix="bge-reranker",
+            )
+        return _inference_executor
+
+
+def _run_native_inference(
+    predict: Any,
+    pairs: list[tuple[str, str]],
+) -> Sequence[float]:
+    global _running_native_inference
+    with _inference_executor_lock:
+        _running_native_inference += 1
+    try:
+        return predict(pairs)
+    finally:
+        with _inference_executor_lock:
+            _running_native_inference -= 1
+
+
+def shutdown_reranker_executor() -> None:
+    """Stop accepting inference without waiting on uninterruptible native code.
+
+    Queued work is cancelled. A native call that already started is allowed to
+    finish because Python cannot safely pre-empt it; until then a replacement
+    executor cannot be created, preventing overlap across a runtime restart.
+    """
+
+    global _inference_executor
+    with _inference_executor_lock:
+        executor = _inference_executor
+        _inference_executor = None
+    if executor is not None:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 class RerankerOperationalError(RuntimeError):
@@ -95,6 +148,7 @@ class CandidateReranker:
         self.model_load_count = 0
         self._model: Any | None = None
         self._model_init_lock = threading.Lock()
+        self._inference_gate = asyncio.Lock()
         if self.device_fallback_reason is not None:
             logger.warning(
                 "Local reranker requested %s but will use %s: %s",
@@ -109,15 +163,46 @@ class CandidateReranker:
         candidates: Sequence[RetrievedCandidate],
     ) -> Sequence[float]:
         pairs = [(query, candidate.text) for candidate in candidates]
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.settings.timeout_seconds
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self._predict, pairs),
+            await asyncio.wait_for(
+                self._inference_gate.acquire(),
                 timeout=self.settings.timeout_seconds,
             )
         except TimeoutError as exc:
             raise RerankerOperationalError(
                 "timeout", "Local reranker exceeded its bounded timeout."
             ) from exc
+
+        submitted: Future[Sequence[float]] | None = None
+        release_owned_by_future = False
+        try:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError
+            submitted = _get_inference_executor().submit(
+                _run_native_inference,
+                self._predict,
+                pairs,
+            )
+            submitted.add_done_callback(
+                lambda _future: self._release_inference_gate(loop)
+            )
+            release_owned_by_future = True
+            wrapped = asyncio.wrap_future(submitted, loop=loop)
+            return await asyncio.wait_for(
+                asyncio.shield(wrapped),
+                timeout=remaining,
+            )
+        except TimeoutError as exc:
+            if submitted is not None:
+                submitted.cancel()
+            raise RerankerOperationalError(
+                "timeout", "Local reranker exceeded its bounded timeout."
+            ) from exc
+        except RerankerOperationalError:
+            raise
         except (ImportError, ModuleNotFoundError) as exc:
             raise RerankerOperationalError(
                 "model_unavailable", "Local reranker dependency is unavailable."
@@ -130,6 +215,21 @@ class CandidateReranker:
             raise RerankerOperationalError(
                 "inference_failed", "Local reranker inference failed."
             ) from exc
+        finally:
+            if not release_owned_by_future and self._inference_gate.locked():
+                self._inference_gate.release()
+
+    def _release_inference_gate(self, loop: asyncio.AbstractEventLoop) -> None:
+        def release() -> None:
+            if self._inference_gate.locked():
+                self._inference_gate.release()
+
+        try:
+            loop.call_soon_threadsafe(release)
+        except RuntimeError:
+            # The event loop already owns default-executor shutdown. No later
+            # request can observe this instance once that loop is closed.
+            return
 
     async def prepare(self) -> None:
         """Load the process model before the API accepts its first request."""
@@ -309,4 +409,5 @@ __all__ = [
     "RerankerSettings",
     "RerankOutcome",
     "rerank_candidates",
+    "shutdown_reranker_executor",
 ]

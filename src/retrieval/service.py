@@ -304,6 +304,7 @@ class EvidenceRetriever:
                 "context_chars": len(packed.context_text),
                 "selected_ids": list(packed.debug.get("selected_ids") or []),
                 "dropped": list(packed.debug.get("dropped") or []),
+                "not_examined": list(packed.debug.get("not_examined") or []),
             },
             "warnings": [*warnings, *packed.warnings],
             "elapsed_ms": elapsed_ms,
@@ -567,6 +568,11 @@ def _fused_candidate_trace(
         for entry in packed.debug.get("dropped") or []
         if isinstance(entry, dict)
     }
+    not_examined_by_id = {
+        str(entry.get("candidate_id") or ""): str(entry.get("reason") or "")
+        for entry in packed.debug.get("not_examined") or []
+        if isinstance(entry, dict)
+    }
     trace: list[dict[str, Any]] = []
     for candidate in candidates:
         payload = candidate.payload
@@ -574,6 +580,9 @@ def _fused_candidate_trace(
         section = payload.get("header") or (
             section_path[-1] if isinstance(section_path, list) and section_path else None
         )
+        is_selected = candidate.candidate_id in selected_ids
+        drop_reason = dropped_by_id.get(candidate.candidate_id)
+        not_examined_reason = not_examined_by_id.get(candidate.candidate_id)
         trace.append(
             {
                 "candidate_id": candidate.candidate_id,
@@ -588,8 +597,18 @@ def _fused_candidate_trace(
                 "rank_by_attempt": dict(candidate.debug.get("rank_by_attempt") or {}),
                 "source_id": _source_id(payload),
                 "section": section,
-                "packed": candidate.candidate_id in selected_ids,
-                "drop_reason": dropped_by_id.get(candidate.candidate_id),
+                "packed": is_selected,
+                "packing_status": (
+                    "selected"
+                    if is_selected
+                    else "dropped"
+                    if drop_reason is not None
+                    else "not_examined"
+                    if not_examined_reason is not None
+                    else "unknown"
+                ),
+                "drop_reason": drop_reason,
+                "not_examined_reason": not_examined_reason,
             }
         )
     return trace
