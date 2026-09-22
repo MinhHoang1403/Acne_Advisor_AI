@@ -8,6 +8,7 @@ from collections.abc import Sequence
 import pytest
 
 from src.retrieval.contracts import RetrievedCandidate
+from src.retrieval import reranker as reranker_module
 from src.retrieval import service as retrieval_service
 from src.retrieval.reranker import (
     CandidateReranker,
@@ -15,6 +16,7 @@ from src.retrieval.reranker import (
     RerankerOperationalError,
     RerankerSettings,
     rerank_candidates,
+    shutdown_reranker_executor,
 )
 from src.retrieval.service import EvidenceRetriever
 
@@ -246,6 +248,12 @@ async def test_startup_warm_uses_process_reranker_once(
     assert prepare_calls == 1
 
 
+def test_api_shutdown_registers_reranker_executor_cleanup() -> None:
+    from src.api.app import app
+
+    assert shutdown_reranker_executor in app.router.on_shutdown
+
+
 @pytest.mark.asyncio
 async def test_candidate_reranker_initializes_model_once_under_concurrency(
     monkeypatch: pytest.MonkeyPatch,
@@ -253,6 +261,9 @@ async def test_candidate_reranker_initializes_model_once_under_concurrency(
     import sentence_transformers
 
     constructions = 0
+
+    state_lock = threading.Lock()
+    state = {"active": 0, "max_active": 0}
 
     class FakeCrossEncoder:
         def __init__(self, *_args, **kwargs) -> None:
@@ -262,7 +273,15 @@ async def test_candidate_reranker_initializes_model_once_under_concurrency(
             time.sleep(0.05)
 
         def predict(self, pairs, **_kwargs):
-            return [0.5] * len(pairs)
+            with state_lock:
+                state["active"] += 1
+                state["max_active"] = max(state["max_active"], state["active"])
+            try:
+                time.sleep(0.05)
+                return [0.5] * len(pairs)
+            finally:
+                with state_lock:
+                    state["active"] -= 1
 
     monkeypatch.setattr(sentence_transformers, "CrossEncoder", FakeCrossEncoder)
     reranker = CandidateReranker(
@@ -277,6 +296,166 @@ async def test_candidate_reranker_initializes_model_once_under_concurrency(
     assert constructions == 1
     assert reranker.model_load_count == 1
     assert isinstance(reranker._model_init_lock, type(threading.Lock()))
+    assert state["max_active"] == 1
+
+
+@pytest.mark.asyncio
+async def test_timeout_does_not_allow_overlapping_background_inference() -> None:
+    reranker = CandidateReranker(
+        RerankerSettings(
+            enabled=True,
+            model_name="fake-local-model",
+            device="cpu",
+            timeout_seconds=0.05,
+        )
+    )
+    release = threading.Event()
+    state_lock = threading.Lock()
+    state = {"active": 0, "entered": 0, "max_active": 0}
+
+    def blocking_predict(_pairs):
+        with state_lock:
+            state["active"] += 1
+            state["entered"] += 1
+            state["max_active"] = max(state["max_active"], state["active"])
+        release.wait(1)
+        with state_lock:
+            state["active"] -= 1
+        return [0.5]
+
+    reranker._predict = blocking_predict
+    outcomes = await asyncio.gather(
+        reranker.score("query one", [_candidate("a", 1)]),
+        reranker.score("query two", [_candidate("b", 1)]),
+        reranker.score("query three", [_candidate("c", 1)]),
+        return_exceptions=True,
+    )
+
+    try:
+        assert all(isinstance(item, RerankerOperationalError) for item in outcomes)
+        assert all(item.reason == "timeout" for item in outcomes)
+        assert state["entered"] == 1
+        assert state["max_active"] == 1
+    finally:
+        release.set()
+        await asyncio.sleep(0.05)
+
+    assert state["entered"] == 1
+
+
+@pytest.mark.asyncio
+async def test_queued_inference_is_cancelled_when_its_request_times_out() -> None:
+    running = CandidateReranker(
+        RerankerSettings(device="cpu", timeout_seconds=0.05)
+    )
+    queued = CandidateReranker(
+        RerankerSettings(device="cpu", timeout_seconds=0.05)
+    )
+    first_entered = threading.Event()
+    release = threading.Event()
+    queued_entries = 0
+
+    def blocking_predict(_pairs):
+        first_entered.set()
+        release.wait(1)
+        return [0.4]
+
+    def queued_predict(_pairs):
+        nonlocal queued_entries
+        queued_entries += 1
+        return [0.6]
+
+    running._predict = blocking_predict
+    queued._predict = queued_predict
+    first_request = asyncio.create_task(
+        running.score("running", [_candidate("running", 1)])
+    )
+    while not first_entered.is_set():
+        await asyncio.sleep(0.005)
+
+    try:
+        with pytest.raises(RerankerOperationalError, match="bounded timeout") as exc_info:
+            await queued.score("queued", [_candidate("queued", 1)])
+        assert exc_info.value.reason == "timeout"
+        assert queued_entries == 0
+        with pytest.raises(RerankerOperationalError):
+            await first_request
+    finally:
+        release.set()
+        await asyncio.sleep(0.05)
+
+    assert queued_entries == 0
+
+
+@pytest.mark.asyncio
+async def test_native_timeout_is_reported_as_rrf_fallback_not_success() -> None:
+    reranker = CandidateReranker(
+        RerankerSettings(device="cpu", timeout_seconds=0.05)
+    )
+    release = threading.Event()
+    reranker._predict = lambda _pairs: (release.wait(1), [0.9])[1]
+    candidates = [_candidate("a", 1)]
+
+    try:
+        outcome = await rerank_candidates(
+            "query",
+            candidates,
+            scorer=reranker,
+            enabled=True,
+        )
+        assert outcome.status == "fallback"
+        assert outcome.fallback_used is True
+        assert outcome.fallback_reason == "timeout"
+        assert outcome.candidates == candidates
+    finally:
+        release.set()
+        await asyncio.sleep(0.05)
+
+
+@pytest.mark.asyncio
+async def test_executor_shutdown_is_non_blocking_and_prevents_restart_overlap() -> None:
+    reranker = CandidateReranker(
+        RerankerSettings(device="cpu", timeout_seconds=0.05)
+    )
+    release = threading.Event()
+    finished = threading.Event()
+
+    def blocking_predict(_pairs):
+        try:
+            release.wait(1)
+            return [0.5]
+        finally:
+            finished.set()
+
+    reranker._predict = blocking_predict
+    try:
+        with pytest.raises(RerankerOperationalError):
+            await reranker.score("query", [_candidate("a", 1)])
+
+        started = time.perf_counter()
+        shutdown_reranker_executor()
+        assert time.perf_counter() - started < 0.2
+
+        replacement = CandidateReranker(
+            RerankerSettings(device="cpu", timeout_seconds=0.05)
+        )
+        replacement._predict = lambda _pairs: [0.7]
+        with pytest.raises(RerankerOperationalError) as exc_info:
+            await replacement.score("query", [_candidate("b", 1)])
+        assert exc_info.value.reason == "executor_shutdown"
+    finally:
+        release.set()
+        for _ in range(100):
+            if finished.is_set() and reranker_module._running_native_inference == 0:
+                break
+            await asyncio.sleep(0.01)
+
+    restarted = CandidateReranker(
+        RerankerSettings(device="cpu", timeout_seconds=0.2)
+    )
+    restarted._predict = lambda _pairs: [0.8]
+    assert await restarted.score("query", [_candidate("c", 1)]) == [0.8]
+    shutdown_reranker_executor()
 
 
 def _evidence(candidate_id: str, text: str) -> dict[str, object]:
