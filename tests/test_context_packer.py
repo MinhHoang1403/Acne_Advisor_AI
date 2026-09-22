@@ -105,6 +105,30 @@ def test_packer_item_limit_keeps_exact_supplied_order() -> None:
         "chunk-7",
         "chunk-8",
     ]
+    assert packed.debug["not_examined"] == [
+        {"candidate_id": "chunk-9", "reason": "item_limit_reached"},
+        {"candidate_id": "chunk-10", "reason": "item_limit_reached"},
+    ]
+
+
+def test_item_limit_stops_before_validating_remaining_candidates() -> None:
+    selected = _candidate("selected", "usable evidence", 1)
+    duplicate = _candidate("selected", "duplicate evidence", 2)
+    empty = _candidate("empty", "placeholder", 3)
+    empty.text = ""
+
+    packed = pack_context(
+        _query(),
+        [selected, duplicate, empty],
+        max_items=1,
+        max_chars=1000,
+    )
+
+    assert packed.debug["dropped"] == []
+    assert packed.debug["not_examined"] == [
+        {"candidate_id": "selected", "reason": "item_limit_reached"},
+        {"candidate_id": "empty", "reason": "item_limit_reached"},
+    ]
 
 
 def test_default_budget_can_admit_required_evidence_at_rank_nine() -> None:
@@ -174,3 +198,6 @@ def test_empty_or_missing_source_text_is_not_prompt_evidence() -> None:
 
     assert packed.items == []
     assert packed.warnings == ["No usable source evidence was available for the prompt."]
+    assert packed.debug["dropped"] == [
+        {"candidate_id": "empty", "reason": "missing_id_or_text"}
+    ]

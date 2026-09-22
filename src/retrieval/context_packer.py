@@ -34,6 +34,7 @@ def pack_context(
     selected: list[ContextItem] = []
     warnings: list[str] = []
     dropped: list[dict[str, Any]] = []
+    not_examined: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     rendered_chars = 0
 
@@ -44,7 +45,16 @@ def pack_context(
     )
     # Không cắt medical evidence vì phần bị cắt có thể chứa qualifier/negation.
     # Candidate không vừa bị bỏ nguyên khối và scan tiếp để item nhỏ hơn vẫn vào.
-    for candidate in candidates:
+    for candidate_index, candidate in enumerate(candidates):
+        if len(selected) >= item_limit:
+            not_examined.extend(
+                {
+                    "candidate_id": remaining.candidate_id.strip(),
+                    "reason": "item_limit_reached",
+                }
+                for remaining in candidates[candidate_index:]
+            )
+            break
         candidate_id = candidate.candidate_id.strip()
         text = candidate.text.strip()
         if not candidate_id or not text:
@@ -53,8 +63,6 @@ def pack_context(
         if candidate_id in seen_ids:
             dropped.append({"candidate_id": candidate_id, "reason": "duplicate_id"})
             continue
-        if len(selected) >= item_limit:
-            break
 
         index = len(selected) + 1
         block = _render_block(candidate, index)
@@ -104,6 +112,7 @@ def pack_context(
             "limits": {"max_items": item_limit, "max_chars": char_limit},
             "selected_ids": [item.item_id for item in selected],
             "dropped": dropped,
+            "not_examined": not_examined,
             "ordering": ordering,
         },
     )
