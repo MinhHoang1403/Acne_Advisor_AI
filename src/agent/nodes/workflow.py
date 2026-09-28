@@ -16,11 +16,8 @@ from src.agent.nodes.fallback import generation_fallback_decision_node, safe_fal
 from src.agent.nodes.quality import answer_quality_node
 from src.agent.nodes.reason import generate_answer_node
 from src.agent.nodes.respond import finalize_response_node
-from src.agent.action_decision import (
-    AGENT_DECISION_VERSION,
-    MAX_RETRIEVAL_ATTEMPTS,
-    select_agent_action,
-)
+from src.agent.action_decision import AGENT_DECISION_VERSION, select_agent_action
+from src.agent.action_policy import MAX_RETRIEVAL_ATTEMPTS
 from src.agent.nodes.preparation import prepare_request_node
 from src.agent.source_presentation import build_source_allowlist
 from src.agent.safety_policy import evaluate_safety
