@@ -5,8 +5,9 @@ Model chỉ chọn một trong bốn action ``retrieve``, ``retry``, ``generate`
 trạng thái hiện tại, sự hiện diện của evidence và giới hạn số lần retrieval.
 Vì vậy output của model không thể tự mở rộng graph hay bỏ qua resource budget.
 
-Muốn đổi tập action hoặc luật chuyển trạng thái, bắt đầu từ ``AgentDecision`` và
-``validate_agent_decision()``; muốn đổi topology thực thi, đọc ``agent/graph.py``.
+Muốn đổi semantic proposal/prompt, bắt đầu từ ``AgentDecision`` và facade trong
+module này. Muốn đổi luật thực thi, bắt đầu từ ``agent/action_policy.py``; muốn
+đổi topology, đọc ``agent/graph.py``.
 """
 
 from __future__ import annotations
@@ -15,10 +16,22 @@ import json
 import logging
 import re
 import time
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from src.agent.action_policy import (
+    LEGAL_REASONS_BY_ACTION,
+    MAX_RETRIEVAL_ATTEMPTS,
+    ActionPolicyContext,
+    ActionPolicyResult,
+    ActionProposal,
+    DecisionAction,
+    DecisionReason,
+    comparison_key,
+    invalid_action_proposal,
+    validate_action_proposal,
+)
 from src.agent.llm.provider import generate_llm_response
 from src.agent.state import ClinicalState
 from src.quality.safe_fallback import (
@@ -30,32 +43,12 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIEVAL_ATTEMPTS = 2
 AGENT_DECISION_VERSION = "direct_proposition_support_action_decision"
 DECISION_EVIDENCE_MAX_ITEMS = 8
 _EXPLICIT_TOPIC_RESET = re.compile(
     r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b[^.!?;\n]*[.!?;\n]+\s*(?P<question>.+)$",
     flags=re.IGNORECASE | re.DOTALL,
 )
-
-# Đây là engineering limit cho số lần gọi retrieval trong một request, không phải
-# ngưỡng confidence hay đánh giá mức độ đúng y khoa của evidence.
-
-DecisionAction = Literal["retrieve", "retry", "generate", "abstain"]
-DecisionReason = Literal[
-    "needs_evidence",
-    "evidence_sufficient",
-    "evidence_gap",
-    "out_of_scope",
-    "cannot_safely_proceed",
-]
-
-LEGAL_REASONS_BY_ACTION: dict[DecisionAction, frozenset[DecisionReason]] = {
-    "retrieve": frozenset({"needs_evidence"}),
-    "retry": frozenset({"evidence_gap"}),
-    "generate": frozenset({"evidence_sufficient"}),
-    "abstain": frozenset({"evidence_gap", "out_of_scope", "cannot_safely_proceed"}),
-}
 
 
 class AgentDecision(BaseModel):
@@ -191,6 +184,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
     model_decision: dict[str, Any] | None = None
     topic_reset_applied: bool | None = None
     validation_changed: bool | None = None
+    policy_validation: dict[str, Any] | None = None
     try:
         settings = _runtime_settings(state)
         response = await generate_llm_response(
@@ -226,10 +220,17 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             before_topic_reset = decision
             decision = _apply_explicit_topic_reset(decision, state)
             topic_reset_applied = decision != before_topic_reset
-            validated = validate_agent_decision(decision, state)
+            validated, policy_result = _validate_agent_decision_with_policy(decision, state)
             validation_changed = validated != decision
+            policy_validation = {
+                "changed_by_policy": policy_result.changed_by_policy,
+                "policy_reason_code": policy_result.policy_reason_code,
+                "attempt_index": int(state.get("retrieval_attempt", 0) or 0),
+            }
         except Exception as exc:
-            logger.warning("Agent action output failed bounded validation: %s", sanitize_fallback_reason(exc))
+            logger.warning(
+                "Agent action output failed bounded validation: %s", sanitize_fallback_reason(exc)
+            )
             validated = _invalid_action_abstention()
             provider_metadata["error"] = sanitize_fallback_reason(exc)
 
@@ -246,6 +247,7 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             "model_decision": model_decision,
             "topic_reset_applied": topic_reset_applied,
             "validation_changed": validation_changed,
+            "policy_validation": policy_validation,
             "evidence_trace": evidence_trace,
         },
         "is_in_domain": validated.reason_code != "out_of_scope",
@@ -281,8 +283,7 @@ def _decision_evidence_view(
         packed_items = [item for item in packed.get("items") or [] if isinstance(item, dict)]
         if str(packed.get("context_text") or "") and packed_items:
             visible_items = [
-                _packed_item_trace(item, position)
-                for position, item in enumerate(packed_items, 1)
+                _packed_item_trace(item, position) for position, item in enumerate(packed_items, 1)
             ]
             visible_items = [item for item in visible_items if item is not None]
             packed_ids = [str(item["item_id"]) for item in visible_items if item.get("item_id")]
@@ -292,16 +293,20 @@ def _decision_evidence_view(
             ]
             packed_text = "\n\n".join(block for block in evidence_blocks if block)
             limits = dict((packed.get("debug") or {}).get("limits") or {})
-            return packed_text, len(packed_items), {
-                "packed_evidence_count": len(packed_items),
-                "packed_evidence_ids": packed_ids,
-                "decision_visible_evidence_count": len(visible_items),
-                "decision_visible_evidence_ids": packed_ids,
-                "decision_visible_items": visible_items,
-                "decision_visible_text_length": len(packed_text),
-                "uses_generation_packed_context": True,
-                "limits": limits,
-            }
+            return (
+                packed_text,
+                len(packed_items),
+                {
+                    "packed_evidence_count": len(packed_items),
+                    "packed_evidence_ids": packed_ids,
+                    "decision_visible_evidence_count": len(visible_items),
+                    "decision_visible_evidence_ids": packed_ids,
+                    "decision_visible_items": visible_items,
+                    "decision_visible_text_length": len(packed_text),
+                    "uses_generation_packed_context": True,
+                    "limits": limits,
+                },
+            )
 
     contexts = list(state.get("vector_contexts") or [])
     packed_ids: list[str] = []
@@ -348,21 +353,25 @@ def _decision_evidence_view(
         )
 
     evidence_text = "\n\n".join(evidence_blocks)
-    return evidence_text, len(visible_items), {
-        "packed_evidence_count": len(contexts),
-        "packed_evidence_ids": packed_ids,
-        "decision_visible_evidence_count": len(visible_items),
-        "decision_visible_evidence_ids": [
-            item["item_id"] for item in visible_items if item.get("item_id")
-        ],
-        "decision_visible_items": visible_items,
-        "decision_visible_text_length": len(evidence_text),
-        "uses_generation_packed_context": False,
-        "limits": {
-            "max_items": DECISION_EVIDENCE_MAX_ITEMS,
-            "max_chars": None,
+    return (
+        evidence_text,
+        len(visible_items),
+        {
+            "packed_evidence_count": len(contexts),
+            "packed_evidence_ids": packed_ids,
+            "decision_visible_evidence_count": len(visible_items),
+            "decision_visible_evidence_ids": [
+                item["item_id"] for item in visible_items if item.get("item_id")
+            ],
+            "decision_visible_items": visible_items,
+            "decision_visible_text_length": len(evidence_text),
+            "uses_generation_packed_context": False,
+            "limits": {
+                "max_items": DECISION_EVIDENCE_MAX_ITEMS,
+                "max_chars": None,
+            },
         },
-    }
+    )
 
 
 def _packed_item_trace(item: dict[str, Any], position: int) -> dict[str, Any] | None:
@@ -424,105 +433,76 @@ def parse_agent_decision(value: Any) -> AgentDecision:
 
 
 def validate_agent_decision(decision: AgentDecision, state: ClinicalState) -> AgentDecision:
-    """Loại action bất khả thi mà không thay model bằng heuristic ngữ nghĩa.
+    """Compatibility facade over the deterministic execution-policy owner."""
 
-    ``retrieve`` chỉ hợp lệ ở lần đầu; các lần lấy evidence tiếp theo phải là
-    ``retry`` với query khác. ``generate`` cần evidence đã qua kiểm tra hiện diện,
-    provenance và ít nhất một ID mà semantic decision đã xác nhận hỗ trợ trực
-    tiếp. Model sở hữu đánh giá ngữ nghĩa; Python chỉ kiểm identity của evidence,
-    không giả vờ tự suy luận entailment.
-    """
+    validated, _ = _validate_agent_decision_with_policy(decision, state)
+    return validated
 
-    attempt = int(state.get("retrieval_attempt", 0) or 0)
-    has_evidence = bool((state.get("evidence_assessment") or {}).get("usable"))
-    query = " ".join(str(decision.retrieval_query or "").split()) or None
-    missing_evidence = " ".join(str(decision.missing_evidence or "").split()) or None
-    direct_support_ids = list(
-        dict.fromkeys(
-            str(item).strip()
-            for item in decision.direct_supporting_evidence_ids or []
-            if str(item).strip()
+
+def _validate_agent_decision_with_policy(
+    decision: AgentDecision,
+    state: ClinicalState,
+) -> tuple[AgentDecision, ActionPolicyResult]:
+    """Adapt typed semantic output and bounded state facts to the pure policy."""
+
+    visible_ids = (
+        frozenset(
+            str(item)
+            for item in _decision_evidence_view(state)[2]["decision_visible_evidence_ids"]
+            if item
         )
+        if decision.action == "generate"
+        else frozenset()
     )
-    if decision.reason_code not in LEGAL_REASONS_BY_ACTION[decision.action]:
-        return _invalid_action_abstention()
-
-    if decision.action == "abstain":
-        return decision.model_copy(
-            update={
-                "retrieval_query": None,
-                "missing_evidence": missing_evidence,
-                "direct_supporting_evidence_ids": None,
-            }
-        )
-    if decision.action == "generate":
-        visible_ids = set(_decision_evidence_view(state)[2]["decision_visible_evidence_ids"])
-        if (
-            has_evidence
-            and missing_evidence is None
-            and direct_support_ids
-            and set(direct_support_ids).issubset(visible_ids)
-        ):
-            return decision.model_copy(
-                update={
-                    "retrieval_query": None,
-                    "missing_evidence": None,
-                    "direct_supporting_evidence_ids": direct_support_ids,
-                }
-            )
-        return _invalid_action_abstention()
-
-    if decision.action == "retrieve":
-        if attempt == 0 and not has_evidence and query and missing_evidence is None:
-            return decision.model_copy(
-                update={
-                    "retrieval_query": query,
-                    "missing_evidence": None,
-                    "direct_supporting_evidence_ids": None,
-                }
-            )
-        return _invalid_action_abstention()
-
-    if (
-        decision.action != "retry"
-        or attempt <= 0
-        or attempt >= MAX_RETRIEVAL_ATTEMPTS
-        or (not has_evidence and state.get("retrieval_status") != "no_evidence")
-        or not query
-        or not missing_evidence
-    ):
-        return _invalid_action_abstention()
-
-    previous = {
-        _comparison_key(str(item.get("query") or ""))
-        for item in state.get("retry_history") or []
-        if isinstance(item, dict)
-    }
-    current_key = _comparison_key(query)
-    if not current_key or current_key in previous:
-        return _invalid_action_abstention()
-    return decision.model_copy(
-        update={
-            "retrieval_query": query,
-            "missing_evidence": missing_evidence,
-            "direct_supporting_evidence_ids": None,
-        }
+    result = validate_action_proposal(
+        ActionProposal(
+            action=decision.action,
+            retrieval_query=decision.retrieval_query,
+            missing_evidence=decision.missing_evidence,
+            reason_code=decision.reason_code,
+            direct_supporting_evidence_ids=(
+                tuple(decision.direct_supporting_evidence_ids)
+                if decision.direct_supporting_evidence_ids is not None
+                else None
+            ),
+        ),
+        ActionPolicyContext(
+            attempt_index=int(state.get("retrieval_attempt", 0) or 0),
+            evidence_available=bool((state.get("evidence_assessment") or {}).get("usable")),
+            retrieval_status=state.get("retrieval_status"),
+            visible_evidence_ids=visible_ids,
+            previous_queries=tuple(
+                str(item.get("query") or "")
+                for item in state.get("retry_history") or []
+                if isinstance(item, dict)
+            ),
+        ),
     )
+    return AgentDecision.model_validate(_proposal_payload(result.decision)), result
 
 
 def _invalid_action_abstention() -> AgentDecision:
     """Fail closed without mislabelling a technical invalidity as a safety refusal."""
 
-    return AgentDecision(
-        action="abstain",
-        retrieval_query=None,
-        missing_evidence=None,
-        reason_code="evidence_gap",
-    )
+    return AgentDecision.model_validate(_proposal_payload(invalid_action_proposal()))
 
 
 def _comparison_key(value: str) -> str:
-    return " ".join(re.findall(r"\w+", value.casefold(), flags=re.UNICODE))
+    return comparison_key(value)
+
+
+def _proposal_payload(proposal: ActionProposal) -> dict[str, Any]:
+    return {
+        "action": proposal.action,
+        "retrieval_query": proposal.retrieval_query,
+        "missing_evidence": proposal.missing_evidence,
+        "reason_code": proposal.reason_code,
+        "direct_supporting_evidence_ids": (
+            list(proposal.direct_supporting_evidence_ids)
+            if proposal.direct_supporting_evidence_ids is not None
+            else None
+        ),
+    }
 
 
 def _decision_question(state: ClinicalState) -> tuple[str, bool]:
