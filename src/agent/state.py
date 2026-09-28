@@ -21,11 +21,14 @@ class ClinicalState(TypedDict, total=False):
     user_id: str | None
     session_id: str | None
     conversation_history: list[dict[str, str]]
+    # LEGACY_COMPATIBILITY: retained until a later zero-consumer migration.
     standalone_question: str | None
     retrieval_query: str | None
     missing_evidence: str | None
     normalized_question: str
     conversation_context: dict[str, Any] | None
+    # CANONICAL: explicit presentation facts parsed once during preparation.
+    request_shape: dict[str, Any] | None
 
     # Kết quả safety deterministic và action đã qua Python validation.
     is_in_domain: bool | None
@@ -44,8 +47,12 @@ class ClinicalState(TypedDict, total=False):
     retrieval_error: str | None
     retrieval_trace: dict[str, Any] | None
     packed_context: dict[str, Any] | None
+    # CANONICAL: current/acquisition/rerank identities for the latest attempt.
+    query_identity: dict[str, str] | None
     retained_retrieval_candidates: list[dict[str, Any]]
+    # LEGACY_COMPATIBILITY: evidence_assessment aliases evidence_availability.
     evidence_assessment: dict[str, Any] | None
+    evidence_availability: dict[str, Any] | None
     retrieval_attempt: int
     retry_history: list[dict[str, Any]]
     agent_decision_history: list[dict[str, Any]]
@@ -55,7 +62,9 @@ class ClinicalState(TypedDict, total=False):
     # Bản nháp, câu trả lời trình bày cuối cùng và trạng thái fallback.
     draft_answer: str
     final_answer: str
+    # LEGACY_COMPATIBILITY: answer_quality_report aliases the structural report.
     answer_quality_report: dict[str, Any] | None
+    structural_verification_report: dict[str, Any] | None
     fallback_applied: bool
     fallback_type: str | None
     fallback_reason: str | None
@@ -98,5 +107,6 @@ class ClinicalState(TypedDict, total=False):
     response_profile: str | None
     response_contract: str | None
     observability_exported: bool | None
+
 
 __all__ = ["AgentAction", "ClinicalState"]

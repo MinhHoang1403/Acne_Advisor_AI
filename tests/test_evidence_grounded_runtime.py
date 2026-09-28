@@ -62,9 +62,7 @@ async def test_emergency_override_clears_retrieved_attribution_and_cache_eligibi
 
 @pytest.mark.asyncio
 async def test_deterministic_prescription_boundary_reports_system_without_model() -> None:
-    result = await workflow.guard_node(
-        {"normalized_question": "Hãy kê đơn isotretinoin cho tôi."}
-    )
+    result = await workflow.guard_node({"normalized_question": "Hãy kê đơn isotretinoin cho tôi."})
     assert result["actual_provider"] == "system"
     assert result["actual_model"] is None
 
@@ -99,7 +97,9 @@ async def test_no_evidence_abstains_without_blind_second_attempt(
 
 
 @pytest.mark.asyncio
-async def test_generation_uses_true_system_instruction_and_canonical_packed_evidence(monkeypatch) -> None:
+async def test_generation_uses_true_system_instruction_and_canonical_packed_evidence(
+    monkeypatch,
+) -> None:
     captured: dict = {}
 
     async def fake_generate_llm_response(**kwargs):
@@ -132,6 +132,7 @@ async def test_generation_uses_true_system_instruction_and_canonical_packed_evid
     assert MEDICAL_RAG_SYSTEM_PROMPT not in captured["prompt"]
     assert result["generation_evidence_trace"] == {
         "current_question": "Câu hỏi kiểm soát?",
+        "attempt_index": 0,
         "conversation_history_messages": 0,
         "answer_context_ids": [None],
         "packed_evidence": [],
@@ -159,9 +160,7 @@ def test_packed_item_and_rendered_evidence_obey_actual_character_limit() -> None
     assert len(packed.context_text) <= 512
     assert packed.items == []
     assert "x" * 100 not in packed.context_text
-    assert packed.debug["dropped"] == [
-        {"candidate_id": "chunk-1", "reason": "character_limit"}
-    ]
+    assert packed.debug["dropped"] == [{"candidate_id": "chunk-1", "reason": "character_limit"}]
 
 
 @pytest.mark.asyncio

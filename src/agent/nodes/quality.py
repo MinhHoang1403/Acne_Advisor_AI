@@ -28,16 +28,18 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
         return {}
 
     if state.get("safety_override"):
-        return {
-            "answer_quality_report": {
-                "passed": True,
-                "original_query": query,
-                "issues": [],
-                "metadata": {
-                    "verification_scope": ["deterministic_safety_origin"],
-                    "safety_decision": state.get("safety_decision"),
-                },
+        report = {
+            "passed": True,
+            "original_query": query,
+            "issues": [],
+            "metadata": {
+                "verification_scope": ["deterministic_safety_origin"],
+                "safety_decision": state.get("safety_decision"),
             },
+        }
+        return {
+            "answer_quality_report": report,
+            "structural_verification_report": report,
             "source_validation": {
                 "version": "source_validation_v1",
                 "allowlist_source_ids": [],
@@ -55,11 +57,13 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             packed_context=packed_context,
             retrieval_trace=state.get("retrieval_trace"),
             final_source_ids=list(state.get("sources") or []),
+            request_shape=state.get("request_shape"),
         )
         profile = state.get("response_profile") or infer_response_profile(
             query,
             severity=state.get("safety_severity"),
             fallback_type=state.get("fallback_type") if state.get("fallback_applied") else None,
+            request_shape=state.get("request_shape"),
         )
         presented = finalize_answer_presentation(
             answer,
@@ -67,6 +71,7 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             response_profile=profile,
             severity=state.get("safety_severity"),
             fallback_type=state.get("fallback_type") if state.get("fallback_applied") else None,
+            request_shape=state.get("request_shape"),
         )
         report = report_model.model_dump(mode="json")
         report.setdefault("metadata", {})["source_validation"] = dict(
@@ -75,35 +80,38 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
         return {
             "final_answer": presented,
             "answer_quality_report": report,
+            "structural_verification_report": report,
             "response_profile": profile,
         }
     except Exception as exc:
         safe_error = sanitize_fallback_reason(exc)
         logger.warning("Answer quality verifier failed safely: %s", safe_error)
-        return {
-            "answer_quality_report": {
-                "passed": False,
-                "original_query": query,
-                "checked_answer": answer,
-                "issues": [
-                    {
-                        "code": "answer_verifier_runtime_error",
-                        "severity": "warning",
-                        "message": safe_error,
-                        "evidence": {},
-                        "suggested_fix": None,
-                    }
+        report = {
+            "passed": False,
+            "original_query": query,
+            "checked_answer": answer,
+            "issues": [
+                {
+                    "code": "answer_verifier_runtime_error",
+                    "severity": "warning",
+                    "message": safe_error,
+                    "evidence": {},
+                    "suggested_fix": None,
+                }
+            ],
+            "metadata": {
+                "verification_scope": [
+                    "presentation",
+                    "structural_contract",
+                    "provenance_identity",
+                    "requested_entity_scope",
                 ],
-                "metadata": {
-                    "verification_scope": [
-                        "presentation",
-                        "structural_contract",
-                        "provenance_identity",
-                        "requested_entity_scope",
-                    ],
-                    "medical_semantic_verification": False,
-                },
+                "medical_semantic_verification": False,
             },
+        }
+        return {
+            "answer_quality_report": report,
+            "structural_verification_report": report,
         }
 
 

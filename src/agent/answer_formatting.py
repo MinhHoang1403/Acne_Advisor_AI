@@ -6,7 +6,11 @@ import re
 import unicodedata
 from typing import Any, Literal
 
-from src.agent.requested_structure import parse_requested_structure
+from src.agent.requested_structure import (
+    RequestShape,
+    coerce_request_shape,
+    parse_requested_structure,
+)
 from src.agent.semantic_signals import (
     is_comparison_intent,
     is_medication_management_intent,
@@ -58,10 +62,32 @@ ANSWER PRESENTATION CONTRACT V16:
 """
 
 
-def answer_format_instruction_for_question(question: str) -> str:
-    """Trả instruction chỉ về hình thức, không nhúng medical facts."""
+def build_request_shape(question: str) -> RequestShape:
+    """Parse the canonical structural request shape once at the request boundary."""
 
     structure = parse_requested_structure(question)
+    profile: ResponseProfile = (
+        "comparison" if _is_comparison_question(_fold(question)) else "routine"
+    )
+    return RequestShape(
+        wants_table=structure.wants_table,
+        required_columns=structure.required_columns,
+        exact_column_count=structure.exact_column_count,
+        exact_item_count=structure.exact_item_count,
+        style_constraints=structure.style_constraints,
+        response_profile=profile,
+    )
+
+
+def answer_format_instruction_for_question(
+    question: str,
+    *,
+    request_shape: RequestShape | dict[str, Any] | None = None,
+) -> str:
+    """Trả instruction chỉ về hình thức, không nhúng medical facts."""
+
+    shape = _request_shape_or_build(question, request_shape)
+    structure = shape.requested_structure()
     hints: list[str] = []
     if structure.wants_table:
         if structure.required_columns:
@@ -75,7 +101,7 @@ def answer_format_instruction_for_question(question: str) -> str:
         hints.append("Dùng Markdown **Tiêu đề** cho các heading ngắn được yêu cầu.")
 
     folded = _fold(question)
-    if _is_comparison_question(folded):
+    if shape.response_profile == "comparison":
         hints.append(
             "Bắt đầu bằng khác biệt chính, sau đó đối chiếu đầy đủ từng đối tượng. "
             "Nếu evidence thiếu cho một bên, nói rõ phần evidence còn thiếu thay vì bỏ đối tượng đó."
@@ -95,19 +121,17 @@ def infer_response_profile(
     *,
     severity: str | None = None,
     fallback_type: str | None = None,
+    request_shape: RequestShape | dict[str, Any] | None = None,
 ) -> ResponseProfile:
     """Suy ra presentation shape từ request và safety state đã được quyết định."""
 
-    text = _fold(question)
     if fallback_type and fallback_type != "none":
         return "safe_fallback"
     if severity == "emergency":
         return "emergency"
     if severity == "urgent":
         return "urgent"
-    if _is_comparison_question(text):
-        return "comparison"
-    return "routine"
+    return _request_shape_or_build(question, request_shape).response_profile
 
 
 def finalize_answer_presentation(
@@ -118,20 +142,27 @@ def finalize_answer_presentation(
     severity: str | None = None,
     fallback_type: str | None = None,
     add_disclaimer: bool | None = None,
+    request_shape: RequestShape | dict[str, Any] | None = None,
 ) -> str:
     """Dọn hình thức mà không đổi semantics của provider draft."""
 
+    shape = _request_shape_or_build(user_question, request_shape)
     profile = response_profile or infer_response_profile(
         user_question,
         severity=severity,
         fallback_type=fallback_type,
+        request_shape=shape,
     )
     draft = _remove_known_disclaimers(_normalize_newlines(answer))
     draft = strip_leading_question_echo(draft, user_question)
     draft = _remove_source_lines(draft)
     draft = normalize_answer_markdown(draft, disclaimer=CANONICAL_DISCLAIMER)
     draft = _remove_legacy_boilerplate_headings(draft, profile)
-    draft = _enforce_requested_maximum_items(draft, user_question)
+    draft = _enforce_requested_maximum_items(
+        draft,
+        user_question,
+        request_shape=shape,
+    )
     draft = _dedupe_exact_paragraphs(draft)
     draft = _trim_incomplete_terminal_paragraph(draft)
     draft = normalize_answer_markdown(draft, disclaimer=CANONICAL_DISCLAIMER)
@@ -209,16 +240,25 @@ def assess_structural_quality(
     *,
     user_question: str = "",
     response_profile: ResponseProfile | None = None,
+    request_shape: RequestShape | dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Báo presentation/shape violation mà không đánh giá medical truth."""
 
+    shape = _request_shape_or_build(user_question, request_shape)
     text = _normalize_newlines(answer)
-    profile = response_profile or infer_response_profile(user_question)
+    profile = response_profile or infer_response_profile(
+        user_question,
+        request_shape=shape,
+    )
     issues: list[dict[str, Any]] = []
     lines = text.splitlines()
     first_line = next((line.strip() for line in lines if line.strip()), "")
-    if user_question and _normalized_match_text(first_line) == _normalized_match_text(user_question):
-        issues.append(_issue("leading_question_echo", "error", "Answer repeats the full user question."))
+    if user_question and _normalized_match_text(first_line) == _normalized_match_text(
+        user_question
+    ):
+        issues.append(
+            _issue("leading_question_echo", "error", "Answer repeats the full user question.")
+        )
 
     heading_counts: dict[str, int] = {}
     for index, line in enumerate(lines):
@@ -239,19 +279,25 @@ def assess_structural_quality(
     ):
         issues.append(_issue("duplicate_disclaimer", "warning", "Answer repeats the disclaimer."))
     if sum(heading in text for heading in LEGACY_BOILERPLATE_HEADINGS) >= 4:
-        issues.append(_issue("legacy_boilerplate", "error", "Answer uses the legacy five-section template."))
+        issues.append(
+            _issue("legacy_boilerplate", "error", "Answer uses the legacy five-section template.")
+        )
     if _has_incomplete_terminal_sentence(text):
         issues.append(_issue("incomplete_terminal_sentence", "error", "Answer appears truncated."))
     if re.search(r"\[?truncated(?:_generation)?\]?", text, flags=re.IGNORECASE):
-        issues.append(_issue("truncated_generation", "error", "Answer contains a truncation marker."))
+        issues.append(
+            _issue("truncated_generation", "error", "Answer contains a truncation marker.")
+        )
     if re.search(
         r"(?:system\s+(?:prompt|instruction)|<USER_DATA>|<EVIDENCE>|AVAILABLE_SOURCES)",
         text,
         flags=re.IGNORECASE,
     ):
-        issues.append(_issue("internal_prompt_leak", "error", "Answer exposes an internal prompt marker."))
+        issues.append(
+            _issue("internal_prompt_leak", "error", "Answer exposes an internal prompt marker.")
+        )
 
-    structure = parse_requested_structure(user_question)
+    structure = shape.requested_structure()
     if structure.exact_item_count:
         actual = _count_markdown_items(text)
         if actual != structure.exact_item_count:
@@ -263,9 +309,17 @@ def assess_structural_quality(
                 )
             )
     if structure.wants_table and not _contains_markdown_table(text):
-        issues.append(_issue("requested_table_missing", "error", "Requested Markdown table is missing."))
-    if "bold_headings" in structure.style_constraints and not any(_is_heading(line) for line in lines):
-        issues.append(_issue("requested_bold_heading_missing", "error", "Requested Markdown heading is missing."))
+        issues.append(
+            _issue("requested_table_missing", "error", "Requested Markdown table is missing.")
+        )
+    if "bold_headings" in structure.style_constraints and not any(
+        _is_heading(line) for line in lines
+    ):
+        issues.append(
+            _issue(
+                "requested_bold_heading_missing", "error", "Requested Markdown heading is missing."
+            )
+        )
     if profile != "safe_fallback" and not text.strip():
         issues.append(_issue("empty_answer", "error", "Answer is empty."))
     return issues
@@ -284,8 +338,13 @@ def repair_terminal_punctuation(text: str) -> str:
     return text
 
 
-def _enforce_requested_maximum_items(answer: str, user_question: str) -> str:
-    structure = parse_requested_structure(user_question)
+def _enforce_requested_maximum_items(
+    answer: str,
+    user_question: str,
+    *,
+    request_shape: RequestShape | dict[str, Any] | None = None,
+) -> str:
+    structure = _request_shape_or_build(user_question, request_shape).requested_structure()
     expected = structure.exact_item_count
     if not expected or _count_markdown_items(answer) <= expected:
         return answer
@@ -326,7 +385,9 @@ def _remove_greetings(text: str) -> str:
 
 
 def _remove_source_lines(text: str) -> str:
-    return "\n".join(line for line in text.splitlines() if not line.strip().casefold().startswith("nguồn:"))
+    return "\n".join(
+        line for line in text.splitlines() if not line.strip().casefold().startswith("nguồn:")
+    )
 
 
 def _normalize_table_spacing(text: str) -> str:
@@ -360,17 +421,23 @@ def _remove_terminal_generic_boilerplate(text: str) -> str:
 def _is_generic_disclaimer_paragraph(paragraph: str) -> bool:
     folded = _fold(paragraph)
     safety_markers = (
-        "goi cap cuu", "di kham ngay", "ngung thuoc", "mang thai",
-        "lien he bac si ke don", "neu ",
+        "goi cap cuu",
+        "di kham ngay",
+        "ngung thuoc",
+        "mang thai",
+        "lien he bac si ke don",
+        "neu ",
     )
     if any(marker in folded for marker in safety_markers) or len(folded.split()) > 45:
         return False
-    return bool(re.fullmatch(
-        r"(?:thong tin (?:nay|tren) (?:chi )?(?:mang tinh tham khao|mang tinh chat ho tro tim hieu).*)|"
-        r"(?:viec chan doan va dieu tri nen do bac si.*)|"
-        r"(?:ban nen tham khao bac si da lieu de duoc tu van phac do phu hop[.!]?)",
-        folded,
-    ))
+    return bool(
+        re.fullmatch(
+            r"(?:thong tin (?:nay|tren) (?:chi )?(?:mang tinh tham khao|mang tinh chat ho tro tim hieu).*)|"
+            r"(?:viec chan doan va dieu tri nen do bac si.*)|"
+            r"(?:ban nen tham khao bac si da lieu de duoc tu van phac do phu hop[.!]?)",
+            folded,
+        )
+    )
 
 
 def _remove_empty_markdown_headings(text: str) -> str:
@@ -388,7 +455,9 @@ def _remove_empty_markdown_headings(text: str) -> str:
 def _remove_legacy_boilerplate_headings(text: str, profile: ResponseProfile) -> str:
     if profile == "safe_fallback":
         return text
-    return "\n".join(line for line in text.splitlines() if line.strip() not in LEGACY_BOILERPLATE_HEADINGS)
+    return "\n".join(
+        line for line in text.splitlines() if line.strip() not in LEGACY_BOILERPLATE_HEADINGS
+    )
 
 
 def _dedupe_exact_headings(text: str) -> str:
@@ -443,12 +512,17 @@ def _has_incomplete_terminal_sentence(text: str) -> bool:
         return True
     if _is_table_row(last):
         return False
-    return _has_dangling_ending(last) or (len(last.split()) >= 8 and not re.search(r"[.!?…)]$", last))
+    return _has_dangling_ending(last) or (
+        len(last.split()) >= 8 and not re.search(r"[.!?…)]$", last)
+    )
 
 
 def _has_dangling_ending(text: str) -> bool:
     folded = _fold(text)
-    return any(folded.endswith(ending) for ending in (" va", " nhung", " co the", " voi", " do", " vi", " trong khi"))
+    return any(
+        folded.endswith(ending)
+        for ending in (" va", " nhung", " co the", " voi", " do", " vi", " trong khi")
+    )
 
 
 def _is_heading(line: str) -> bool:
@@ -469,7 +543,10 @@ def _contains_markdown_table(text: str) -> bool:
     return any(
         _is_table_row(lines[index])
         and _is_table_row(lines[index + 1])
-        and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in lines[index + 1].strip("|").split("|"))
+        and all(
+            re.fullmatch(r":?-{3,}:?", cell.strip())
+            for cell in lines[index + 1].strip("|").split("|")
+        )
         for index in range(len(lines) - 1)
     )
 
@@ -487,7 +564,17 @@ def _is_comparison_question(text: str) -> bool:
 
 
 def _is_direct_question(text: str) -> bool:
-    return any(marker in text for marker in ("co phai", "co nen", "phai la", "la gi", "thuoc nhom", "duoc khong"))
+    return any(
+        marker in text
+        for marker in ("co phai", "co nen", "phai la", "la gi", "thuoc nhom", "duoc khong")
+    )
+
+
+def _request_shape_or_build(
+    question: str,
+    value: RequestShape | dict[str, Any] | None,
+) -> RequestShape:
+    return coerce_request_shape(value) or build_request_shape(question)
 
 
 def _question_tail_candidates(question: str) -> set[str]:
@@ -511,7 +598,13 @@ def _normalized_match_text(text: str) -> str:
 
 
 def _issue(code: str, severity: str, message: str) -> dict[str, Any]:
-    return {"code": code, "severity": severity, "message": message, "evidence": {}, "suggested_fix": None}
+    return {
+        "code": code,
+        "severity": severity,
+        "message": message,
+        "evidence": {},
+        "suggested_fix": None,
+    }
 
 
 __all__ = [
@@ -521,6 +614,7 @@ __all__ = [
     "ResponseProfile",
     "answer_format_instruction_for_question",
     "assess_structural_quality",
+    "build_request_shape",
     "finalize_answer_presentation",
     "infer_response_profile",
     "normalize_answer_markdown",

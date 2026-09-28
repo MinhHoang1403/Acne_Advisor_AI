@@ -30,7 +30,9 @@ from src.quality.safe_fallback import (
     fallback_type_for_reason,
     sanitize_fallback_reason,
 )
+from src.retrieval.contracts import CanonicalQueryIdentity
 from src.retrieval.service import retrieve_evidence
+
 
 async def prepare_node(state: ClinicalState) -> dict[str, Any]:
     """Chuẩn hóa request và chỉ đưa conversation context hữu hạn vào state."""
@@ -128,12 +130,9 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
     if attempts_used > 0 and isinstance(evidence_trace, dict):
         evidence_traces.append(
             {
-                **(
-                    {"request_id": state["request_id"]}
-                    if state.get("request_id")
-                    else {}
-                ),
+                **({"request_id": state["request_id"]} if state.get("request_id") else {}),
                 "decision_index": len(decision_history) + 1,
+                "attempt_index": attempts_used,
                 "retrieval_attempts_used": attempts_used,
                 **evidence_trace,
                 "action": action,
@@ -154,11 +153,7 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
         "agent_decision_history": [
             *decision_history,
             {
-                **(
-                    {"request_id": state["request_id"]}
-                    if state.get("request_id")
-                    else {}
-                ),
+                **({"request_id": state["request_id"]} if state.get("request_id") else {}),
                 "action": action,
                 "reason_code": decision.get("reason_code"),
                 "retrieval_query": decision.get("retrieval_query"),
@@ -183,6 +178,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
 
     attempt = state.get("retrieval_attempt", 0) + 1
     decision = state.get("agent_decision") or {}
+    current_question = str(state.get("normalized_question") or state.get("user_question") or "")
     question = str(
         decision.get("retrieval_query")
         or state.get("retrieval_query")
@@ -192,32 +188,43 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
     ).strip()
     retry_reason = str(decision.get("reason_code") or "needs_evidence")
     rerank_query = _overall_information_need(state, question, attempt)
+    intended_query_identity = CanonicalQueryIdentity(
+        current_question=current_question,
+        acquisition_query=question,
+        overall_rerank_query=rerank_query,
+    )
     retained_candidates = list(state.get("retained_retrieval_candidates") or [])
 
     started = time.perf_counter()
     try:
         payload = await retrieve_evidence.ainvoke(
             {
-                "query": question,
+                "query": intended_query_identity.acquisition_query,
                 "top_k": 9,
                 "retained_retrieval_candidates": retained_candidates,
-                "rerank_query": rerank_query,
+                "rerank_query": intended_query_identity.overall_rerank_query,
                 "retrieval_attempt": attempt,
             }
         )
         metadata = payload.get("metadata") or {}
+        raw_trace = metadata.get("retrieval_trace") or {}
+        query_identity = CanonicalQueryIdentity(
+            current_question=current_question,
+            acquisition_query=str(raw_trace.get("query") or question),
+            overall_rerank_query=str(raw_trace.get("rerank_query") or rerank_query),
+        )
         trace = {
-            **(metadata.get("retrieval_trace") or {}),
-            **(
-                {"request_id": state["request_id"]}
-                if state.get("request_id")
-                else {}
-            ),
+            **raw_trace,
+            "query_identity": query_identity.model_dump(mode="json"),
+            **({"request_id": state["request_id"]} if state.get("request_id") else {}),
         }
-        status = metadata.get("retrieval_status") or ("ok" if payload.get("vector_contexts") else "no_evidence")
+        status = metadata.get("retrieval_status") or (
+            "ok" if payload.get("vector_contexts") else "no_evidence"
+        )
         history_entry = {
             "attempt": attempt,
             "query": question,
+            "query_identity": query_identity.model_dump(mode="json"),
             "status": status,
             "reason": retry_reason,
             "selected_ids": trace.get("selected_ids", []),
@@ -225,8 +232,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         attempt_trace = _retrieval_attempt_trace(
             attempt=attempt,
             decision=decision,
-            current_question=state.get("normalized_question") or state.get("user_question") or "",
-            retrieval_query=question,
+            query_identity=query_identity,
             status=status,
             trace=trace,
             packed_context=metadata.get("packed_context"),
@@ -244,9 +250,8 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "retrieval_error": None,
             "retrieval_trace": trace,
             "packed_context": metadata.get("packed_context"),
-            "retained_retrieval_candidates": metadata.get(
-                "retained_retrieval_candidates", []
-            ),
+            "query_identity": query_identity.model_dump(mode="json"),
+            "retained_retrieval_candidates": metadata.get("retained_retrieval_candidates", []),
             "retry_history": [*(state.get("retry_history") or []), history_entry],
             "retrieval_attempt_traces": [
                 *(state.get("retrieval_attempt_traces") or []),
@@ -264,17 +269,13 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         failed_trace = {
             "architecture": "dense_bm25_rrf",
             "error": error,
-            **(
-                {"request_id": state["request_id"]}
-                if state.get("request_id")
-                else {}
-            ),
+            "query_identity": intended_query_identity.model_dump(mode="json"),
+            **({"request_id": state["request_id"]} if state.get("request_id") else {}),
         }
         attempt_trace = _retrieval_attempt_trace(
             attempt=attempt,
             decision=decision,
-            current_question=state.get("normalized_question") or state.get("user_question") or "",
-            retrieval_query=question,
+            query_identity=intended_query_identity,
             status="failed",
             trace=failed_trace,
             packed_context=None,
@@ -289,12 +290,14 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
             "fallback_reason_code": "retrieval_unavailable",
             "retrieval_trace": failed_trace,
             "packed_context": None,
+            "query_identity": intended_query_identity.model_dump(mode="json"),
             "retained_retrieval_candidates": retained_candidates,
             "retry_history": [
                 *(state.get("retry_history") or []),
                 {
                     "attempt": attempt,
                     "query": question,
+                    "query_identity": intended_query_identity.model_dump(mode="json"),
                     "status": "failed",
                     "reason": retry_reason,
                     "error": error,
@@ -326,8 +329,7 @@ def _retrieval_attempt_trace(
     *,
     attempt: int,
     decision: dict[str, Any],
-    current_question: str,
-    retrieval_query: str,
+    query_identity: CanonicalQueryIdentity,
     status: str,
     trace: dict[str, Any],
     packed_context: Any,
@@ -341,10 +343,18 @@ def _retrieval_attempt_trace(
         "attempt_index": attempt,
         "initiating_action": decision.get("action"),
         "initiating_reason": decision.get("reason_code"),
-        "current_question": str(current_question),
-        "retrieval_query": retrieval_query,
-        "normalized_retrieval_query": trace.get("query") or retrieval_query,
-        "rerank_query": trace.get("rerank_query") or retrieval_query,
+        "current_question": query_identity.current_question,
+        "acquisition_query": query_identity.acquisition_query,
+        "overall_rerank_query": query_identity.overall_rerank_query,
+        # LEGACY_COMPATIBILITY: these names retain their previous values.
+        "retrieval_query": query_identity.acquisition_query,
+        "normalized_retrieval_query": trace.get("query") or query_identity.acquisition_query,
+        "rerank_query": trace.get("rerank_query") or query_identity.overall_rerank_query,
+        "legacy_field_mappings": {
+            "retrieval_query": "acquisition_query",
+            "rerank_query": "overall_rerank_query",
+            "retry_history.query": "acquisition_query",
+        },
         "status": status,
         "channels": dict(trace.get("channels") or {}),
         "candidate_trace": dict(trace.get("candidate_trace") or {}),
@@ -405,17 +415,24 @@ async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
             source_ids.append(source_id)
 
     evidence_usable = bool(usable)
-    reason = "provenance_complete_evidence_available" if evidence_usable else "no_provenance_complete_evidence"
+    reason = (
+        "provenance_complete_evidence_available"
+        if evidence_usable
+        else "no_provenance_complete_evidence"
+    )
+    availability = {
+        "usable": evidence_usable,
+        "assessment_kind": "provenance_complete_evidence_presence",
+        "reason": reason,
+        "usable_items": len(usable),
+        "source_ids": list(dict.fromkeys(source_ids)),
+        "attempt": state.get("retrieval_attempt", 0),
+        "max_attempts": MAX_RETRIEVAL_ATTEMPTS,
+    }
     return {
-        "evidence_assessment": {
-            "usable": evidence_usable,
-            "assessment_kind": "provenance_complete_evidence_presence",
-            "reason": reason,
-            "usable_items": len(usable),
-            "source_ids": list(dict.fromkeys(source_ids)),
-            "attempt": state.get("retrieval_attempt", 0),
-            "max_attempts": MAX_RETRIEVAL_ATTEMPTS,
-        }
+        "evidence_availability": availability,
+        # LEGACY_COMPATIBILITY: ActionDecision still consumes this field unchanged.
+        "evidence_assessment": availability,
     }
 
 
@@ -477,14 +494,17 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
         else fallback_reason_code_from_agent_reason(decision_reason)
     )
     fallback_type = fallback_type_for_reason(reason_code)  # type: ignore[arg-type]
-    reason = retrieval_error or {
-        "provider_unavailable": "The configured action provider was unavailable.",
-        "out_of_scope": "The request is outside the supported acne-information scope.",
-        "insufficient_evidence": "Bounded retrieval did not establish sufficient evidence.",
-        "cannot_safely_proceed": "The bounded Agent could not establish a legal safe transition.",
-        "retrieval_unavailable": "The retrieval service was unavailable.",
-        "generation_unavailable": "The generation provider was unavailable.",
-    }[reason_code]
+    reason = (
+        retrieval_error
+        or {
+            "provider_unavailable": "The configured action provider was unavailable.",
+            "out_of_scope": "The request is outside the supported acne-information scope.",
+            "insufficient_evidence": "Bounded retrieval did not establish sufficient evidence.",
+            "cannot_safely_proceed": "The bounded Agent could not establish a legal safe transition.",
+            "retrieval_unavailable": "The retrieval service was unavailable.",
+            "generation_unavailable": "The generation provider was unavailable.",
+        }[reason_code]
+    )
     fallback_state = {
         **state,
         "fallback_applied": True,

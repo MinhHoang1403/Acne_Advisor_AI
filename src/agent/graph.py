@@ -30,7 +30,10 @@ from src.agent.nodes.workflow import (
     retrieve_node,
 )
 from src.agent.state import AgentAction, ClinicalState
-from src.observability.versioning import build_pipeline_version_manifest, compute_pipeline_fingerprint
+from src.observability.versioning import (
+    build_pipeline_version_manifest,
+    compute_pipeline_fingerprint,
+)
 from src.resilience.budget import DeadlineBudget
 from src.resilience.contracts import runtime_resilience_settings_from_env
 from src.resilience.exceptions import AgentTimeoutError
@@ -107,9 +110,7 @@ async def run_clinical_agent(
     manifest = build_pipeline_version_manifest()
     fingerprint = compute_pipeline_fingerprint(manifest)
     settings = runtime_resilience_settings_from_env()
-    effective_model_fallback = bool(
-        allow_model_fallback and settings.llm_provider_fallback_enabled
-    )
+    effective_model_fallback = bool(allow_model_fallback and settings.llm_provider_fallback_enabled)
     budget = DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
     initial_state: ClinicalState = {
         "request_id": canonical_request_id,
@@ -122,6 +123,7 @@ async def run_clinical_agent(
         "missing_evidence": None,
         "normalized_question": "",
         "conversation_context": None,
+        "request_shape": None,
         "is_in_domain": None,
         "agent_decision": None,
         "safety_override": False,
@@ -130,16 +132,20 @@ async def run_clinical_agent(
         "sources": [],
         "source_allowlist": [],
         "retrieval_status": "not_started",
+        "query_identity": None,
         "retrieval_attempt": 0,
         "retry_history": [],
         "agent_decision_history": [],
         "agent_decision_evidence_traces": [],
         "retrieval_attempt_traces": [],
         "evidence_assessment": None,
+        "evidence_availability": None,
         "safety_severity": None,
         "safety_decision": None,
         "draft_answer": "",
         "final_answer": "",
+        "answer_quality_report": None,
+        "structural_verification_report": None,
         "fallback_applied": False,
         "fallback_type": "none",
         "fallback_reason_code": None,
@@ -163,6 +169,7 @@ async def run_clinical_agent(
             "deadline_started": True,
         },
         "performance_timings": {},
+        "response_profile": None,
     }
 
     try:
@@ -195,7 +202,9 @@ async def run_clinical_agent(
         "retrieval_error": final.get("retrieval_error"),
         "retrieval_trace": final.get("retrieval_trace"),
         "packed_context": final.get("packed_context"),
+        "query_identity": final.get("query_identity"),
         "evidence_assessment": final.get("evidence_assessment"),
+        "evidence_availability": final.get("evidence_availability"),
         "agent_decision": final.get("agent_decision"),
         "agent_decision_history": final.get("agent_decision_history", []),
         "agent_decision_evidence_traces": final.get("agent_decision_evidence_traces", []),
@@ -211,6 +220,9 @@ async def run_clinical_agent(
         "prompt_budget": final.get("prompt_budget"),
         "generation_evidence_trace": final.get("generation_evidence_trace"),
         "answer_quality_report": final.get("answer_quality_report"),
+        "structural_verification_report": final.get("structural_verification_report"),
+        "request_shape": final.get("request_shape"),
+        "response_profile": final.get("response_profile"),
         "safety_severity": final.get("safety_severity"),
         "fallback_applied": final.get("fallback_applied", False),
         "fallback_type": final.get("fallback_type"),

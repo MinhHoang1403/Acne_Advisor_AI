@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from src.agent.answer_formatting import build_request_shape
 from src.agent.state import ClinicalState
 
 
@@ -21,10 +22,14 @@ async def prepare_request_node(state: ClinicalState) -> dict[str, object]:
         content = " ".join(str(item.get("content") or "").split())[:max_chars]
         if content:
             history.append({"role": role, "content": content})
+    request_shape = build_request_shape(question)
     return {
         "normalized_question": question,
         "standalone_question": question,
         "conversation_context": {"messages": history, "message_count": len(history)},
+        # CANONICAL: parsed once; downstream consumers retain a legacy fallback.
+        "request_shape": request_shape.model_dump(mode="json"),
+        "response_profile": request_shape.response_profile,
     }
 
 
