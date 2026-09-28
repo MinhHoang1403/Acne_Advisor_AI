@@ -20,6 +20,16 @@ class NormalizedQuery(BaseModel):
     normalized_text: str
 
 
+class CanonicalQueryIdentity(BaseModel):
+    """Executed query identities for one bounded retrieval attempt."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_question: str
+    acquisition_query: str
+    overall_rerank_query: str
+
+
 class RetrievedCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -64,6 +74,7 @@ class PackedContext(BaseModel):
 
 
 __all__ = [
+    "CanonicalQueryIdentity",
     "ContextItem",
     "NormalizedQuery",
     "PackedContext",

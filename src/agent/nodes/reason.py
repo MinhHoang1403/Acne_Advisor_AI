@@ -37,11 +37,14 @@ def _runtime_budget(state: ClinicalState, settings: RuntimeResilienceSettings) -
     return DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
 
 
-def _select_answer_contexts(contexts: list[dict[str, Any]], limit: int = 5, query: str = "") -> list[dict[str, Any]]:
+def _select_answer_contexts(
+    contexts: list[dict[str, Any]], limit: int = 5, query: str = ""
+) -> list[dict[str, Any]]:
     """Giữ nguyên fused order của context packer khi lấy tối đa ``limit`` item."""
 
     del query
     return [dict(context) for context in contexts[:limit]]
+
 
 async def generate_answer_node(state: ClinicalState) -> dict:
     """Sinh draft cho câu hỏi hiện tại từ chunk evidence đã retrieval.
@@ -67,7 +70,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         answer_contexts = _select_answer_contexts(contexts, limit=5, query=question)
         packed_context = state.get("packed_context") or {}
         packed_context_text = str(packed_context.get("context_text") or "")
-        
+
         prompt_started = time.perf_counter()
         prompt = build_medical_prompt(
             question=question,
@@ -79,28 +82,26 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         system_prompt = build_medical_system_instruction(
             question,
             response_contract=state.get("response_contract"),
+            request_shape=state.get("request_shape"),
         )
         prompt_budget = observe_medical_prompt_budget(prompt)
         prompt_ms = round((time.perf_counter() - prompt_started) * 1000, 3)
         generation_evidence_trace = {
-            **(
-                {"request_id": state["request_id"]}
-                if state.get("request_id")
-                else {}
-            ),
+            **({"request_id": state["request_id"]} if state.get("request_id") else {}),
             "current_question": question,
+            "attempt_index": int(state.get("retrieval_attempt", 0) or 0),
             "conversation_history_messages": len(conversation_history),
             "answer_context_ids": [_context_id(context) for context in answer_contexts],
             "packed_evidence": _packed_evidence_identity(packed_context),
         }
-        
+
         llm_provider = state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")
         llm_model = state.get("llm_model")
         allow_model_fallback = state.get("allow_model_fallback", False)
         settings = _runtime_settings(state)
-        
+
         logger.info(f"Generating answer with LLM: provider={llm_provider}, model={llm_model}")
-        
+
         generation_started = time.perf_counter()
         response_data = await generate_llm_response(
             prompt=prompt,
@@ -113,10 +114,10 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             resilience_settings=settings,
         )
         generation_ms = round((time.perf_counter() - generation_started) * 1000, 3)
-        
+
         draft = response_data.get("text")
         logger.info("LLM generation successful.")
-        
+
         return {
             "draft_answer": draft,
             "sources": [
@@ -124,11 +125,14 @@ async def generate_answer_node(state: ClinicalState) -> dict:
                 for entry in source_allowlist
                 if entry.get("source_id") and not str(entry.get("source_id")).startswith("entity:")
             ]
-            or list(dict.fromkeys(
-                ctx.get("source_file", "")
-                for ctx in answer_contexts
-                if ctx.get("source_file") and not str(ctx.get("source_file")).startswith("entity:")
-            ))
+            or list(
+                dict.fromkeys(
+                    ctx.get("source_file", "")
+                    for ctx in answer_contexts
+                    if ctx.get("source_file")
+                    and not str(ctx.get("source_file")).startswith("entity:")
+                )
+            )
             or state.get("sources", []),
             "requested_provider": response_data.get("requested_provider"),
             "requested_model": response_data.get("requested_model"),
@@ -151,7 +155,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
                 "llm_generation": generation_ms,
             },
         }
-        
+
     except RuntimeResilienceError:
         raise
     except Exception as e:

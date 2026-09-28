@@ -8,6 +8,7 @@ from src.agent.answer_formatting import (
     ANSWER_FORMATTING_CONTRACT,
     answer_format_instruction_for_question,
 )
+from src.agent.requested_structure import RequestShape
 
 
 MEDICAL_RAG_SYSTEM_PROMPT = """\
@@ -40,13 +41,17 @@ POLICY:
 def build_medical_system_instruction(
     question: str,
     response_contract: str | None = None,
+    request_shape: RequestShape | dict[str, Any] | None = None,
 ) -> str:
     """Ghép policy và answer-shape instructions cho system channel của provider."""
 
     parts = [
         MEDICAL_RAG_SYSTEM_PROMPT.strip(),
         ANSWER_FORMATTING_CONTRACT.strip(),
-        answer_format_instruction_for_question(question).strip(),
+        answer_format_instruction_for_question(
+            question,
+            request_shape=request_shape,
+        ).strip(),
     ]
     if response_contract == "evidence_gap_with_related_context":
         parts.append(

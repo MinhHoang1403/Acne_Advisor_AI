@@ -39,12 +39,14 @@ SOURCE_TYPE_ORDER = {
 }
 
 SOURCE_NORMALIZATION_VERSION = "source_normalization_v2"
-_KNOWN_SOURCE_IDS = {
-    source_id.casefold(): source_id
-    for source_id in FILE_SOURCE_DISPLAY_NAMES
-}
-_SOURCE_FILENAME_RE = re.compile(r"(?<![\w-])([\wÀ-ỹ][\wÀ-ỹ_()\-]{0,180}\.(?:pdf|json))(?![\w-])", re.IGNORECASE)
-_GENERIC_SOURCE_LABEL_RE = re.compile(r"\b(?:tài\s+liệu|tai\s+lieu|document)\s+\d+\b", re.IGNORECASE)
+SOURCE_IDENTITY_CONTRACT_VERSION = "stable_source_id_with_presentation_metadata"
+_KNOWN_SOURCE_IDS = {source_id.casefold(): source_id for source_id in FILE_SOURCE_DISPLAY_NAMES}
+_SOURCE_FILENAME_RE = re.compile(
+    r"(?<![\w-])([\wÀ-ỹ][\wÀ-ỹ_()\-]{0,180}\.(?:pdf|json))(?![\w-])", re.IGNORECASE
+)
+_GENERIC_SOURCE_LABEL_RE = re.compile(
+    r"\b(?:tài\s+liệu|tai\s+lieu|document)\s+\d+\b", re.IGNORECASE
+)
 _UNATTRIBUTED_SOURCE_CLAIM_RE = re.compile(
     r"\b(?:the|this)\s+(?:guideline|document)\s+(?:says|states)\b|"
     r"\b(?:theo\s+)?(?:hướng\s+dẫn|tài\s+liệu)\s+(?:này|đó)\s+(?:cho\s+biết|nêu|nói)\b",
@@ -106,7 +108,13 @@ def build_source_metadata(
             continue
         seen_identities.add(identity)
         entries.append(_source_entry(source_id, context_by_id.get(source_id, {})))
-    entries.sort(key=lambda item: (SOURCE_TYPE_ORDER.get(item["source_type"], 99), item["display_name"].casefold(), item["source_id"]))
+    entries.sort(
+        key=lambda item: (
+            SOURCE_TYPE_ORDER.get(item["source_type"], 99),
+            item["display_name"].casefold(),
+            item["source_id"],
+        )
+    )
     return entries
 
 
@@ -119,16 +127,18 @@ def build_source_allowlist(
     return build_source_metadata(sources, contexts)
 
 
-def normalize_source_identifier(value: Any) -> str:
-    """Chuẩn hóa source ID qua path separator, case và Unicode form."""
+def canonical_source_id(value: Any) -> str:
+    """Chuẩn hóa machine identity mà không suy ra identity từ presentation label."""
 
     if isinstance(value, dict):
-        raw = _first_text(
-            value.get("source_id"),
-            value.get("source_file"),
-            value.get("source_path"),
-            value.get("display_name"),
-        ) or ""
+        raw = (
+            _first_text(
+                value.get("source_id"),
+                value.get("source_file"),
+                value.get("source_path"),
+            )
+            or ""
+        )
     else:
         raw = str(value or "").strip()
     if not raw:
@@ -139,6 +149,14 @@ def normalize_source_identifier(value: Any) -> str:
     if not filename:
         return ""
     return _KNOWN_SOURCE_IDS.get(filename.casefold(), filename)
+
+
+def normalize_source_identifier(value: Any) -> str:
+    """Legacy-compatible normalization, including the historical display fallback."""
+
+    if isinstance(value, dict) and not canonical_source_id(value):
+        return canonical_source_id(value.get("display_name"))
+    return canonical_source_id(value)
 
 
 def is_source_request(question: str) -> bool:
@@ -164,9 +182,8 @@ def build_grounded_source_answer(question: str, allowlist: list[dict[str, Any]] 
         return "Tài liệu hiện được truy hồi chưa cung cấp nguồn phù hợp để trả lời câu hỏi này."
 
     labels = [str(entry.get("display_name") or entry["source_id"]).strip() for entry in entries]
-    return (
-        "Các nguồn đang được truy hồi cho câu hỏi này:\n"
-        + "\n".join(f"- {label}" for label in labels)
+    return "Các nguồn đang được truy hồi cho câu hỏi này:\n" + "\n".join(
+        f"- {label}" for label in labels
     )
 
 
@@ -181,7 +198,9 @@ def validate_answer_source_mentions(
     context đã retrieval.
     """
 
-    allowed_ids = tuple(str(entry.get("source_id") or "") for entry in allowlist or [] if entry.get("source_id"))
+    allowed_ids = tuple(
+        str(entry.get("source_id") or "") for entry in allowlist or [] if entry.get("source_id")
+    )
     allowed = {
         _source_match_key(candidate)
         for entry in allowlist or []
@@ -262,7 +281,9 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
     )
     return {
         "source_id": source_id,
-        "canonical_filename": Path(source_id.replace("\\", "/")).name if source_type in {"document", "dataset"} else None,
+        "canonical_filename": Path(source_id.replace("\\", "/")).name
+        if source_type in {"document", "dataset"}
+        else None,
         "source_type": source_type,
         "source_path": source_path,
         "document_title": document_title,
@@ -271,7 +292,8 @@ def _source_entry(source_id: str, context: dict[str, Any]) -> dict[str, Any]:
         "source_url": source_url,
         "chunk_id": _first_text(context.get("chunk_id"), _metadata_value(context, "chunk_id")),
         "page": context.get("page") or _metadata_value(context, "page"),
-        "origin": _first_text(context.get("source_type"), _metadata_value(context, "source_type")) or source_type,
+        "origin": _first_text(context.get("source_type"), _metadata_value(context, "source_type"))
+        or source_type,
     }
 
 
@@ -299,19 +321,29 @@ def _display_name(
 
 
 def _source_id_from_context(context: dict[str, Any]) -> str:
-    return normalize_source_identifier(_first_text(
-        context.get("source_id"),
-        context.get("source_file"),
-        context.get("source_path"),
-        _metadata_value(context, "source_id"),
-        _metadata_value(context, "source_file"),
-        _metadata_value(context, "source_path"),
-    ))
+    return normalize_source_identifier(
+        _first_text(
+            context.get("source_id"),
+            context.get("source_file"),
+            context.get("source_path"),
+            _metadata_value(context, "source_id"),
+            _metadata_value(context, "source_file"),
+            _metadata_value(context, "source_path"),
+        )
+    )
 
 
 def _source_id_from_value(source: Any) -> str:
     if isinstance(source, dict):
-        raw = _first_text(source.get("source_id"), source.get("source_file"), source.get("source_path"), source.get("display_name")) or ""
+        raw = (
+            _first_text(
+                source.get("source_id"),
+                source.get("source_file"),
+                source.get("source_path"),
+                source.get("display_name"),
+            )
+            or ""
+        )
     else:
         raw = str(source or "").strip()
     return normalize_source_identifier(raw) if raw else ""
@@ -376,11 +408,13 @@ def _fold_source_text(value: Any) -> str:
 
 
 __all__ = [
+    "SOURCE_IDENTITY_CONTRACT_VERSION",
     "SOURCE_NORMALIZATION_VERSION",
     "SourceValidationResult",
     "build_grounded_source_answer",
     "build_source_allowlist",
     "build_source_metadata",
+    "canonical_source_id",
     "display_names_for_sources",
     "is_source_request",
     "normalize_source_identifier",

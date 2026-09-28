@@ -157,8 +157,10 @@ class EvidenceRetriever:
         warnings: list[str] = []
         dense_results = _channel_or_warning("dense", dense_result, warnings)
         bm25_results = _channel_or_warning("bm25", bm25_result, warnings)
-        acquisition_failed = not dense_results and not bm25_results and (
-            isinstance(dense_result, BaseException) or isinstance(bm25_result, BaseException)
+        acquisition_failed = (
+            not dense_results
+            and not bm25_results
+            and (isinstance(dense_result, BaseException) or isinstance(bm25_result, BaseException))
         )
         retained_recovery = acquisition_failed and bool(retained_candidates)
         if acquisition_failed and not retained_candidates:
@@ -219,7 +221,9 @@ class EvidenceRetriever:
             max_chars=context_chars,
         )
         contexts = packed_context_to_response_contexts(packed)
-        sources = list(dict.fromkeys(_source_id(context) for context in contexts if _source_id(context)))
+        sources = list(
+            dict.fromkeys(_source_id(context) for context in contexts if _source_id(context))
+        )
         elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
         dense_failed = isinstance(dense_result, BaseException)
         bm25_failed = isinstance(bm25_result, BaseException)
@@ -247,6 +251,10 @@ class EvidenceRetriever:
             "status": retrieval_status,
             "query": clean_query,
             "rerank_query": effective_rerank_query,
+            "query_identity": {
+                "acquisition_query": clean_query,
+                "overall_rerank_query": effective_rerank_query,
+            },
             "channels": {
                 "dense": {"count": len(dense_results), "error": _error_name(dense_result)},
                 "bm25": {"count": len(bm25_results), "error": _error_name(bm25_result)},
@@ -265,9 +273,7 @@ class EvidenceRetriever:
                 "model": rerank_outcome.model_name,
                 "requested_device": self._reranker_settings.device,
                 "device": getattr(scorer, "device", None),
-                "device_fallback_reason": getattr(
-                    scorer, "device_fallback_reason", None
-                ),
+                "device_fallback_reason": getattr(scorer, "device_fallback_reason", None),
                 "model_load_count": getattr(scorer, "model_load_count", None),
                 "fallback_used": rerank_outcome.fallback_used,
                 "fallback_reason": rerank_outcome.fallback_reason,
@@ -337,7 +343,9 @@ class EvidenceRetriever:
         try:
             await self._vector_store.close()
         except Exception as exc:
-            logger.warning("Failed to close retrieval vector store: %s", sanitize_fallback_reason(exc))
+            logger.warning(
+                "Failed to close retrieval vector store: %s", sanitize_fallback_reason(exc)
+            )
 
 
 # Đây là evidence tool duy nhất mà Agent gọi. LangChain dùng docstring bên dưới
@@ -476,11 +484,7 @@ def _candidate_with_attempt_metadata(
     retrieval_attempt: int,
 ) -> RetrievedCandidate:
     debug = dict(candidate.debug)
-    seen = {
-        int(value)
-        for value in debug.get("seen_in_attempts", [])
-        if str(value).isdigit()
-    }
+    seen = {int(value) for value in debug.get("seen_in_attempts", []) if str(value).isdigit()}
     seen.add(retrieval_attempt)
     ranks = {
         str(key): int(value)
@@ -496,9 +500,7 @@ def _candidate_with_attempt_metadata(
             "first_seen_attempt": min(seen),
         }
     )
-    return candidate.model_copy(
-        update={"debug": debug, "rerank_score": None, "rerank_rank": None}
-    )
+    return candidate.model_copy(update={"debug": debug, "rerank_score": None, "rerank_rank": None})
 
 
 def _merge_candidate_debug(first: dict[str, Any], duplicate: dict[str, Any]) -> dict[str, Any]:
@@ -532,9 +534,7 @@ def _cross_attempt_fallback_key(candidate: RetrievedCandidate) -> tuple[int, int
         if str(value).isdigit()
     ]
     seen = [
-        int(value)
-        for value in candidate.debug.get("seen_in_attempts", [])
-        if str(value).isdigit()
+        int(value) for value in candidate.debug.get("seen_in_attempts", []) if str(value).isdigit()
     ]
     return (
         min(ranks, default=candidate.rank or 1_000_000),
@@ -617,7 +617,9 @@ def _fused_candidate_trace(
 def _channel_or_warning(name: str, value: Any, warnings: list[str]) -> list[dict[str, Any]]:
     if isinstance(value, BaseException):
         warnings.append(f"{name} channel unavailable: {sanitize_fallback_reason(value)}")
-        logger.warning("%s retrieval channel unavailable: %s", name, sanitize_fallback_reason(value))
+        logger.warning(
+            "%s retrieval channel unavailable: %s", name, sanitize_fallback_reason(value)
+        )
         return []
     return list(value or [])
 

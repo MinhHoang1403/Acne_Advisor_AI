@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+from typing import Any, Literal
 import unicodedata
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 @dataclass(frozen=True)
@@ -24,6 +27,49 @@ class RequestedStructure:
             or self.exact_item_count
             or self.style_constraints
         )
+
+
+BaseResponseProfile = Literal["routine", "comparison"]
+
+
+class RequestShape(BaseModel):
+    """Canonical structural/presentation facts parsed from the current question.
+
+    This contract is intentionally limited to explicit response-shape facts already
+    recognized by the runtime. It does not classify clinical complexity, domain,
+    polarity, evidence sufficiency, or retrieval route.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    wants_table: bool = False
+    required_columns: tuple[str, ...] = Field(default_factory=tuple)
+    exact_column_count: int | None = None
+    exact_item_count: int | None = None
+    style_constraints: tuple[str, ...] = Field(default_factory=tuple)
+    response_profile: BaseResponseProfile = "routine"
+
+    def requested_structure(self) -> RequestedStructure:
+        return RequestedStructure(
+            wants_table=self.wants_table,
+            required_columns=self.required_columns,
+            exact_column_count=self.exact_column_count,
+            exact_item_count=self.exact_item_count,
+            style_constraints=self.style_constraints,
+        )
+
+
+def coerce_request_shape(value: Any) -> RequestShape | None:
+    """Validate an additive state value while retaining legacy caller fallbacks."""
+
+    if isinstance(value, RequestShape):
+        return value
+    if isinstance(value, dict):
+        try:
+            return RequestShape.model_validate(value)
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 _NUMBER_WORDS = {
@@ -48,6 +94,7 @@ _NUMBER_WORDS = {
     "muoi": 10,
     "mười": 10,
 }
+
 
 def parse_requested_structure(question: str) -> RequestedStructure:
     """Suy ra table/list/style constraints từ câu hỏi tiếng Việt hoặc tiếng Anh."""
@@ -149,7 +196,9 @@ def _extract_style_constraints(text: str) -> list[str]:
 
 
 def _extract_number_before_unit(text: str, unit: str) -> int | None:
-    match = re.search(rf"\b(?P<count>\d+|mot|hai|ba|bon|tu|nam|sau|bay|tam|chin|muoi)\s+{unit}\b", text)
+    match = re.search(
+        rf"\b(?P<count>\d+|mot|hai|ba|bon|tu|nam|sau|bay|tam|chin|muoi)\s+{unit}\b", text
+    )
     if not match:
         return None
     return _parse_number(match.group("count"))
@@ -178,11 +227,12 @@ def _accentless(text: str) -> str:
     value = unicodedata.normalize("NFKC", text or "")
     value = value.replace("đ", "d").replace("Đ", "D")
     value = "".join(
-        char for char in unicodedata.normalize("NFD", value)
-        if unicodedata.category(char) != "Mn"
+        char for char in unicodedata.normalize("NFD", value) if unicodedata.category(char) != "Mn"
     )
     value = value.lower()
-    value = value.translate(str.maketrans({"—": "-", "–": "-", "−": "-", "(": " ", ")": " ", "/": " "}))
+    value = value.translate(
+        str.maketrans({"—": "-", "–": "-", "−": "-", "(": " ", ")": " ", "/": " "})
+    )
     return re.sub(r"\s+", " ", value).strip()
 
 
@@ -190,4 +240,11 @@ def _dedupe(values: list[str]) -> list[str]:
     return list(dict.fromkeys(value for value in values if value))
 
 
-__all__ = ["RequestedStructure", "canonical_column_name", "parse_requested_structure"]
+__all__ = [
+    "BaseResponseProfile",
+    "RequestedStructure",
+    "RequestShape",
+    "canonical_column_name",
+    "coerce_request_shape",
+    "parse_requested_structure",
+]

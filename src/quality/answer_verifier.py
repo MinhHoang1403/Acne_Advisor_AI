@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any
 
 from src.agent.answer_formatting import assess_structural_quality, infer_response_profile
+from src.agent.requested_structure import RequestShape
 from src.quality.contracts import AnswerQualityIssue, AnswerVerificationReport
 from src.knowledge.normalizer import DrugEntityNormalizer
 from src.retrieval.contracts import PackedContext
@@ -28,6 +29,7 @@ def verify_answer_quality(
     packed_context: PackedContext | None = None,
     retrieval_trace: Any | None = None,
     final_source_ids: list[str] | None = None,
+    request_shape: RequestShape | dict[str, Any] | None = None,
 ) -> AnswerVerificationReport:
     """Kiểm tra shape và evidence identity mà không phán xét medical truth."""
 
@@ -41,7 +43,11 @@ def verify_answer_quality(
         for item in assess_structural_quality(
             answer or "",
             user_question=query,
-            response_profile=infer_response_profile(query),
+            response_profile=infer_response_profile(
+                query,
+                request_shape=request_shape,
+            ),
+            request_shape=request_shape,
         )
     ]
     provenance_errors = _packed_context_provenance_errors(packed_context)
@@ -115,7 +121,10 @@ def _matched_entity_names(text: str) -> dict[str, str]:
 def _scope_normalizer() -> DrugEntityNormalizer:
     return DrugEntityNormalizer()
 
-def _packed_context_provenance_errors(packed_context: PackedContext | None) -> list[AnswerQualityIssue]:
+
+def _packed_context_provenance_errors(
+    packed_context: PackedContext | None,
+) -> list[AnswerQualityIssue]:
     if packed_context is None:
         return []
     issues: list[AnswerQualityIssue] = []
@@ -133,7 +142,11 @@ def _packed_context_provenance_errors(packed_context: PackedContext | None) -> l
                     "packed_evidence_missing_identity",
                     ERROR,
                     "Packed evidence is missing text, item identity, or source identity.",
-                    {"item_id": item.item_id, "has_text": bool(item.text.strip()), "has_source_id": bool(source_id)},
+                    {
+                        "item_id": item.item_id,
+                        "has_text": bool(item.text.strip()),
+                        "has_source_id": bool(source_id),
+                    },
                 )
             )
     return issues

@@ -11,7 +11,16 @@ from src.agent.nodes import workflow
 
 def test_graph_has_eight_semantic_nodes() -> None:
     nodes = set(clinical_graph.get_graph().nodes) - {"__start__", "__end__"}
-    assert nodes == {"prepare", "guard", "decide", "retrieve", "assess", "generate", "abstain", "finalize"}
+    assert nodes == {
+        "prepare",
+        "guard",
+        "decide",
+        "retrieve",
+        "assess",
+        "generate",
+        "abstain",
+        "finalize",
+    }
 
 
 @pytest.mark.asyncio
@@ -132,9 +141,7 @@ async def test_generation_diagnostics_fall_back_to_final_for_safety_verification
         include_generation_diagnostics=True,
     )
 
-    assert result["generation_diagnostics"]["pre_verifier_answer"] == (
-        "Presented safety answer."
-    )
+    assert result["generation_diagnostics"]["pre_verifier_answer"] == ("Presented safety answer.")
 
 
 @pytest.mark.asyncio
@@ -143,12 +150,18 @@ async def test_assessment_requires_text_and_provenance() -> None:
         {"vector_contexts": [{"text": "Medical text"}], "retrieval_attempt": 1}
     )
     complete = await workflow.assess_evidence_node(
-        {"vector_contexts": [{"text": "Medical text", "source_id": "guideline"}], "retrieval_attempt": 1}
+        {
+            "vector_contexts": [{"text": "Medical text", "source_id": "guideline"}],
+            "retrieval_attempt": 1,
+        }
     )
 
     assert missing_source["evidence_assessment"]["usable"] is False
     assert complete["evidence_assessment"]["usable"] is True
-    assert complete["evidence_assessment"]["assessment_kind"] == "provenance_complete_evidence_presence"
+    assert (
+        complete["evidence_assessment"]["assessment_kind"]
+        == "provenance_complete_evidence_presence"
+    )
     assert complete["evidence_assessment"]["source_ids"] == ["guideline"]
 
 
@@ -200,6 +213,7 @@ async def test_decide_node_records_post_retrieval_decision_visible_evidence(
     assert result["agent_decision_evidence_traces"] == [
         {
             "decision_index": 2,
+            "attempt_index": 1,
             "retrieval_attempts_used": 1,
             "packed_evidence_count": 2,
             "packed_evidence_ids": ["chunk-1", "chunk-2"],
@@ -233,7 +247,9 @@ async def test_decide_node_records_post_retrieval_decision_visible_evidence(
 
 
 @pytest.mark.asyncio
-async def test_retrieve_action_uses_tool_and_never_injects_graph(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_retrieve_action_uses_tool_and_never_injects_graph(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_ainvoke(_payload):
         return {
             "vector_contexts": [
