@@ -33,7 +33,7 @@ quality or external validity.
 
 | Override | Trigger boundary | Authoritative policy source |
 |---|---|---|
-| anaphylaxis-like emergency | breathing difficulty with swelling of the lips/mouth/tongue/throat or rapidly spreading hives | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) |
+| anaphylaxis-like emergency | current breathing difficulty with face/eyelid/lip/mouth/tongue/throat swelling, rapid/generalized rash or hives, difficulty swallowing, or altered consciousness | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) |
 | breathing difficulty after medication | personal, current, unnegated breathing difficulty after taking or using medication | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) and [NHS Shortness of breath](https://www.nhs.uk/symptoms/shortness-of-breath/) |
 | significant bleeding after acne manipulation | current heavy or uncontrolled bleeding after squeezing or puncturing acne | [St John Ambulance severe bleeding](https://www.sja.org.uk/first-aid-advice/severe-bleeding/) |
 | chest pain with breathlessness | unnegated chest pain/tightness plus breathlessness | [NHS Chest pain](https://www.nhs.uk/symptoms/chest-pain/) |
@@ -42,6 +42,12 @@ quality or external validity.
 | isotretinoin and pregnancy | pregnancy context plus isotretinoin/oral retinoid | [NICE NG198 recommendation 1.5.22](https://www.nice.org.uk/guidance/ng198/chapter/Recommendations) and [MHRA oral-retinoid pregnancy prevention](https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk) |
 | isotretinoin with severe headache and visual/GI symptoms | isotretinoin plus severe headache and blurred vision or nausea/vomiting | [DailyMed isotretinoin medication guide](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72867c88-070f-4608-bfef-cc5225ebce6d) |
 | prescription execution request | explicit request to prescribe, choose a drug, or choose a dose | project `ENGINEERING_POLICY_NO_PRESCRIPTION`; no external clinical-source claim |
+
+Accent-folded matching keeps the bounded symptom phrases `mề đay`, `phát ban`,
+and `khắp người` separate from coincident third-person words. Suspected acne
+fulminans additionally requires an acne eruption/lesion phrase; a
+medication-purpose phrase such as `thuốc trị mụn` cannot satisfy that lesion
+boundary by itself.
 
 These rules are action-oriented safety boundaries, not a general medical answer
 engine. A full deterministic replacement is attributed to provider `system`,

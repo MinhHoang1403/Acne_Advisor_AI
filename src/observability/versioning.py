@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from src.agent.safety_policy import SAFETY_POLICY_VERSION
 from src.knowledge.versioning import (
     DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
     resolve_active_knowledge_build_id,
@@ -105,7 +106,7 @@ def build_pipeline_version_manifest(
                 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION,
             )
         ),
-        "safety_policy_version": "source_mapped_current_context_safety_policy",
+        "safety_policy_version": SAFETY_POLICY_VERSION,
         "safe_fallback_flow_version": _effective_contract_version(
             value("SAFE_FALLBACK_FLOW_VERSION", DEFAULT_SAFE_FALLBACK_FLOW_VERSION),
             legacy={"safe_fallback_flow_v1", "safe_fallback_flow_v2", "safe_fallback_flow_v3"},

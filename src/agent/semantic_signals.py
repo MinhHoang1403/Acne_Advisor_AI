@@ -102,6 +102,7 @@ BREATHING_DIFFICULTY_CONCEPTS = (
     "tho gap",
     "kho khe",
     "nghet tho",
+    "ngat tho",
     "tho rit",
     "tho khong ra hoi",
 )
@@ -582,12 +583,12 @@ def _first_marker_start(
 
 
 def _is_possessive_first_person(tokens: list[str], index: int) -> bool:
-    if index > 0 and tokens[index - 1] in THIRD_PERSON_SUBJECTS:
+    if index > 0 and _is_third_person_subject(tokens, index - 1):
         return True
     return (
         index > 1
         and tokens[index - 1] == "cua"
-        and tokens[index - 2] in THIRD_PERSON_SUBJECTS
+        and _is_third_person_subject(tokens, index - 2)
     )
 
 
@@ -613,9 +614,28 @@ def _nearest_subject_owner(tokens: list[str], concept_start: int) -> bool | None
             and not _is_reported_first_person(tokens, index, window_start=window_start)
         ):
             owners.append((index, True))
-        elif token in THIRD_PERSON_SUBJECTS:
+        elif _is_third_person_subject(tokens, index):
             owners.append((index, False))
     return max(owners, key=lambda owner: owner[0])[1] if owners else None
+
+
+def _is_third_person_subject(tokens: list[str], index: int) -> bool:
+    """Disambiguate accent-folded subject words from bounded medical phrases."""
+
+    token = tokens[index]
+    # Accent folding makes several symptom tokens collide with subject words:
+    # "mẹ"/"mề", "bạn"/"ban", and the noun in "khắp người". Keep the
+    # exceptions phrase-bounded instead of weakening third-person detection.
+    if token == "me" and index + 1 < len(tokens) and tokens[index + 1] == "day":
+        return False
+    if token == "ban" and (
+        (index > 0 and tokens[index - 1] in {"phat", "noi"})
+        or (index + 1 < len(tokens) and tokens[index + 1] == "noi")
+    ):
+        return False
+    if token == "nguoi" and index > 0 and tokens[index - 1] == "khap":
+        return False
+    return token in THIRD_PERSON_SUBJECTS
 
 
 def _is_reported_first_person(
@@ -635,7 +655,7 @@ def _is_reported_first_person(
     if tokens[report_position] == "noi" and QUOTE_BOUNDARY not in tokens[report_position:index]:
         return False
     return any(
-        tokens[position] in THIRD_PERSON_SUBJECTS
+        _is_third_person_subject(tokens, position)
         for position in range(max(window_start, report_position - 4), report_position)
     )
 
