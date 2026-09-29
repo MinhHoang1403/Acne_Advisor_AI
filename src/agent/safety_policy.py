@@ -28,7 +28,9 @@ from src.agent.semantic_signals import (
 )
 
 SafetySeverity = Literal["policy", "urgent", "emergency"]
-SAFETY_POLICY_VERSION = "source_mapped_current_context_safety_policy"
+SAFETY_POLICY_VERSION = (
+    "source_mapped_current_context_emergency_surface_policy"
+)
 
 
 @dataclass(frozen=True)
@@ -121,6 +123,7 @@ def _non_current_information_request(raw_query: str, normalized: str) -> bool:
         "quan ly nguy co",
         "co the gay",
         "noi gi ve",
+        "la dau hieu gi",
     )
     normalized_plain = normalize_text(raw_query)
     informational_question = (
@@ -175,8 +178,21 @@ def _anaphylaxis(text: str) -> bool:
                 "sung mieng",
                 "sung luoi",
                 "sung hong",
+                "sung mat",
+                "mat sung",
+                "sung mi mat",
+                "mi mat sung",
                 "noi me day",
+                "noi ban nhanh",
+                "ban noi nhanh",
                 "phat ban ngua lan nhanh",
+                "phat ban toan than",
+                "kho nuot",
+                "nuot kho",
+                "khong tinh tao",
+                "khong con tinh tao",
+                "lo mo",
+                "mat y thuc",
                 "soc phan ve",
             ),
         ),
@@ -248,7 +264,17 @@ def _acne_fulminans(text: str) -> bool:
     return has_local_concept_groups(
         text,
         (
-            ("mun", "acne"),
+            (
+                "mun cuc",
+                "mun nang",
+                "mun loet",
+                "mun trot loet",
+                "mun bung phat",
+                "ton thuong mun",
+                "ton thuong acne",
+                "acne dang cuc",
+                "acne dang nang",
+            ),
             ("loet", "trot loet", "mun cuc", "mun nang", "bung phat rat nhanh"),
             ("sot", "dau khop"),
         ),
