@@ -88,7 +88,10 @@ def test_manifest_describes_stage1_retrieval_contract() -> None:
     assert manifest["rrf_dense_weight"] == 1.0
     assert manifest["rrf_bm25_weight"] == 1.0
     assert manifest["max_retrieval_attempts"] == 2
-    assert manifest["retry_evidence_policy"] == "retain_deduplicate_rerank_repack"
+    assert (
+        manifest["retry_evidence_policy"]
+        == "retain_deduplicate_retry_query_rerank_repack"
+    )
     assert manifest["reranker"] == {
         "enabled": False,
         "model": None,
@@ -151,7 +154,7 @@ def test_retrieval_limits_partition_cache_identity() -> None:
 
 def test_retry_evidence_policy_partitions_cache_identity() -> None:
     current = build_pipeline_version_manifest({"CACHE_ANSWER_VERSION": "v10"})
-    previous = {**current, "retry_evidence_policy": "replace_prior_evidence"}
+    previous = {**current, "retry_evidence_policy": "retain_deduplicate_rerank_repack"}
 
     assert current["answer_cache_version"] == previous["answer_cache_version"] == "v10"
     assert compute_pipeline_fingerprint(current) != compute_pipeline_fingerprint(previous)

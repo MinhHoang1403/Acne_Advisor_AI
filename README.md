@@ -238,7 +238,7 @@ safety overrides, fallback, failed retrieval, or failed quality checks are not
 reused as ordinary cache entries.
 
 The effective answer-cache namespace is `v10`. The current pipeline fingerprint
-is `b0ea0dcc6077ed8cbc1ddbf1`, computed from a secret-free runtime manifest that
+is `e4c420923b79b37c992cf36d`, computed from a secret-free runtime manifest that
 includes the activated knowledge embedding and BM25 contracts. Provider calls, retrieval
 channels, the overall Agent request, and frontend requests use finite timeouts.
 Retries are bounded, and provider fallback requires both server configuration

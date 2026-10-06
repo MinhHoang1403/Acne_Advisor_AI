@@ -113,7 +113,7 @@ async def test_canonical_query_identity_matches_normal_and_retry_tool_inputs(
         "overall_rerank_query": _WorkflowTool.payloads[1]["rerank_query"],
     }
     assert second["query_identity"]["acquisition_query"] == "targeted missing evidence"
-    assert second["query_identity"]["overall_rerank_query"] == ("self-contained overall query")
+    assert second["query_identity"]["overall_rerank_query"] == "targeted missing evidence"
 
     attempt = second["retrieval_attempt_traces"][-1]
     assert attempt["request_id"] == "request-1"

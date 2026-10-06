@@ -94,7 +94,7 @@ def build_pipeline_version_manifest(
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "9"), 9),
         "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "7000"), 7000),
         "max_retrieval_attempts": 2,
-        "retry_evidence_policy": "retain_deduplicate_rerank_repack",
+        "retry_evidence_policy": "retain_deduplicate_retry_query_rerank_repack",
         "agent_decision_version": "direct_proposition_support_action_decision",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
