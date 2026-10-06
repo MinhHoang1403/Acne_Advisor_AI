@@ -19,6 +19,7 @@ from src.knowledge.versioning import (
     DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
     resolve_active_knowledge_build_id,
 )
+from src.retrieval.reranker import canonical_reranker_precision
 
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
 DEFAULT_ANSWER_FORMATTING_CONTRACT_VERSION = (
@@ -61,6 +62,7 @@ def build_pipeline_version_manifest(
 
     reranker_enabled = _env_bool(value("RERANKER_ENABLED", "false"), False)
     reranker_model = str(value("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3") or "").strip()
+    reranker_precision = canonical_reranker_precision(value("RERANKER_PRECISION", "bfloat16"))
     active_manifest_path = knowledge_manifest_path or DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
     active_build_id = resolve_active_knowledge_build_id(active_manifest_path)
     from src.ingestion.manifest import load_build_manifest
@@ -85,6 +87,7 @@ def build_pipeline_version_manifest(
         "reranker": {
             "enabled": reranker_enabled,
             "model": reranker_model if reranker_enabled else None,
+            "precision": reranker_precision,
         },
         "context_packer_version": "bounded_whole_chunk_admission",
         "retrieval_candidate_limit": _env_int(value("RETRIEVAL_CANDIDATE_LIMIT", "16"), 16),

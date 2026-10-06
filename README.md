@@ -178,10 +178,13 @@ probability or medical-confidence score. A bounded operational failure preserves
 the deterministic pre-reranker order. Packing then keeps complete chunk text and
 provenance while enforcing the 9-item and 7000-character limits.
 
-`RERANKER_DEVICE` accepts `cuda` or `cpu` and defaults to `cuda`. When CUDA is
-requested but unavailable, the reranker truthfully reports the reason and uses
-CPU; inference failures still preserve the deterministic pre-reranker order.
-The default batch size (`4`), precision, and timeout (`20` seconds) are unchanged.
+`RERANKER_DEVICE` accepts `cuda` or `cpu` and defaults to `cuda`.
+`RERANKER_PRECISION` accepts `float32` or `bfloat16` and defaults to the validated
+local production setting `bfloat16`. BF16 is used only when CUDA is available and
+the active GPU reports BF16 support. Otherwise the reranker reports both the
+requested and effective configuration and uses `float32`; inference failures
+still preserve the deterministic pre-reranker order. The default batch size (`4`)
+and timeout (`20` seconds) are unchanged.
 When reranking is enabled, FastAPI preloads the same process-wide model during
 startup so the first request does not spend its reranker timeout loading weights.
 
@@ -235,7 +238,7 @@ safety overrides, fallback, failed retrieval, or failed quality checks are not
 reused as ordinary cache entries.
 
 The effective answer-cache namespace is `v10`. The current pipeline fingerprint
-is `0a8d129a215c884f2d9654e9`, computed from a secret-free runtime manifest that
+is `b0ea0dcc6077ed8cbc1ddbf1`, computed from a secret-free runtime manifest that
 includes the activated knowledge embedding and BM25 contracts. Provider calls, retrieval
 channels, the overall Agent request, and frontend requests use finite timeouts.
 Retries are bounded, and provider fallback requires both server configuration
@@ -358,7 +361,8 @@ hardening.
 - Docker Desktop with Compose
 - a Gemini API key for live Gemini generation and Dense query embeddings
 - a local `BAAI/bge-reranker-v2-m3` artifact when reranking is enabled
-- an NVIDIA driver and CUDA-capable PyTorch build when `RERANKER_DEVICE=cuda`
+- an NVIDIA driver, CUDA-capable PyTorch build, and BF16-capable GPU for the
+  default `RERANKER_DEVICE=cuda` plus `RERANKER_PRECISION=bfloat16` configuration
 - Ollama with `qwen3:8b` when Ollama generation or fallback is enabled
 
 ### Installation
