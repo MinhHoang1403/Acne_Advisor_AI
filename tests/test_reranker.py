@@ -13,6 +13,7 @@ from src.retrieval import service as retrieval_service
 from src.retrieval.reranker import (
     CandidateReranker,
     DEFAULT_RERANKER_DEVICE,
+    DEFAULT_RERANKER_PRECISION,
     RerankerOperationalError,
     RerankerSettings,
     rerank_candidates,
@@ -168,6 +169,62 @@ def test_reranker_defaults_to_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.device == "cuda"
 
 
+def test_reranker_precision_defaults_to_bfloat16(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RERANKER_PRECISION", raising=False)
+
+    settings = RerankerSettings.from_env()
+
+    assert DEFAULT_RERANKER_PRECISION == "bfloat16"
+    assert settings.precision == "bfloat16"
+
+
+@pytest.mark.parametrize("precision", ["float32", "bfloat16"])
+def test_reranker_accepts_canonical_precision_values(
+    monkeypatch: pytest.MonkeyPatch,
+    precision: str,
+) -> None:
+    monkeypatch.setenv("RERANKER_PRECISION", precision)
+
+    assert RerankerSettings.from_env().precision == precision
+
+
+def test_unsupported_reranker_precision_uses_default(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("RERANKER_PRECISION", "half")
+
+    settings = RerankerSettings.from_env()
+
+    assert settings.precision == "bfloat16"
+    assert "Unsupported RERANKER_PRECISION" in caplog.text
+
+
+def test_precision_participates_in_process_reranker_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    constructions: list[RerankerSettings] = []
+
+    def fake_reranker(settings: RerankerSettings) -> object:
+        constructions.append(settings)
+        return object()
+
+    monkeypatch.setattr(retrieval_service, "_process_reranker", None)
+    monkeypatch.setattr(retrieval_service, "_process_reranker_settings", None)
+    monkeypatch.setattr(retrieval_service, "CandidateReranker", fake_reranker)
+
+    float32 = RerankerSettings(precision="float32")
+    bfloat16 = RerankerSettings(precision="bfloat16")
+    assert float32 != bfloat16
+
+    retrieval_service._get_process_reranker(float32)
+    retrieval_service._get_process_reranker(bfloat16)
+
+    assert constructions == [float32, bfloat16]
+
+
 def test_explicit_cpu_device_does_not_probe_cuda(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -183,6 +240,9 @@ def test_explicit_cpu_device_does_not_probe_cuda(
     assert reranker.requested_device == "cpu"
     assert reranker.device == "cpu"
     assert reranker.device_fallback_reason is None
+    assert reranker.requested_precision == "bfloat16"
+    assert reranker.precision == "float32"
+    assert reranker.precision_fallback_reason == "bfloat16_requires_cuda"
 
 
 def test_cuda_configuration_falls_back_truthfully_when_unavailable(
@@ -197,6 +257,116 @@ def test_cuda_configuration_falls_back_truthfully_when_unavailable(
     assert reranker.requested_device == "cuda"
     assert reranker.device == "cpu"
     assert reranker.device_fallback_reason == "cuda_unavailable"
+    assert reranker.precision == "float32"
+    assert reranker.precision_fallback_reason == "bfloat16_requires_cuda"
+
+
+class _CudaProbe:
+    def __add__(self, _other: object) -> _CudaProbe:
+        return self
+
+
+def _mock_available_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    bfloat16_supported: bool,
+) -> None:
+    import torch
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        torch.cuda,
+        "is_bf16_supported",
+        lambda: bfloat16_supported,
+    )
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda: None)
+    monkeypatch.setattr(torch, "ones", lambda *_args, **_kwargs: _CudaProbe())
+
+
+def test_bfloat16_is_effective_on_supported_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_available_cuda(monkeypatch, bfloat16_supported=True)
+
+    reranker = CandidateReranker(RerankerSettings(device="cuda", precision="bfloat16"))
+
+    assert reranker.device == "cuda"
+    assert reranker.precision == "bfloat16"
+    assert reranker.precision_fallback_reason is None
+
+
+def test_bfloat16_falls_back_to_float32_when_cuda_lacks_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _mock_available_cuda(monkeypatch, bfloat16_supported=False)
+
+    reranker = CandidateReranker(RerankerSettings(device="cuda", precision="bfloat16"))
+
+    assert reranker.device == "cuda"
+    assert reranker.precision == "float32"
+    assert reranker.precision_fallback_reason == "cuda_bfloat16_unsupported"
+
+
+def test_float32_does_not_probe_bfloat16_support(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import torch
+
+    _mock_available_cuda(monkeypatch, bfloat16_supported=True)
+    monkeypatch.setattr(
+        torch.cuda,
+        "is_bf16_supported",
+        lambda: (_ for _ in ()).throw(AssertionError("float32 must not probe BF16 support")),
+    )
+
+    reranker = CandidateReranker(RerankerSettings(device="cuda", precision="float32"))
+
+    assert reranker.device == "cuda"
+    assert reranker.precision == "float32"
+    assert reranker.precision_fallback_reason is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("effective_device", "effective_precision", "expected_dtype"),
+    [
+        ("cuda", "bfloat16", "bfloat16"),
+        ("cpu", "float32", "float32"),
+    ],
+)
+async def test_cross_encoder_receives_effective_torch_dtype(
+    monkeypatch: pytest.MonkeyPatch,
+    effective_device: str,
+    effective_precision: str,
+    expected_dtype: str,
+) -> None:
+    import sentence_transformers
+    import torch
+
+    captured: dict[str, object] = {}
+
+    class FakeCrossEncoder:
+        def __init__(self, _model_name: str, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+    monkeypatch.setattr(sentence_transformers, "CrossEncoder", FakeCrossEncoder)
+    monkeypatch.setattr(
+        reranker_module,
+        "_resolve_device",
+        lambda _requested: (effective_device, None),
+    )
+    monkeypatch.setattr(
+        reranker_module,
+        "_resolve_precision",
+        lambda _requested, _device: (effective_precision, None),
+    )
+    reranker = CandidateReranker(RerankerSettings(device="cuda", precision="bfloat16"))
+
+    await reranker.prepare()
+
+    assert captured["device"] == effective_device
+    assert captured["local_files_only"] is True
+    assert captured["model_kwargs"] == {"torch_dtype": getattr(torch, expected_dtype)}
 
 
 @pytest.mark.asyncio
@@ -580,6 +750,26 @@ async def test_service_reranks_rrf_union_before_packing() -> None:
     assert [item["id"] for item in result.vector_contexts] == ["bm25-only", "dense-only"]
     assert trace["reranker"]["status"] == "succeeded"
     assert trace["packer"]["selected_ids"] == ["bm25-only", "dense-only"]
+
+
+@pytest.mark.asyncio
+async def test_retrieval_trace_reports_effective_precision_truthfully() -> None:
+    scorer = FakeScorer([0.9])
+    scorer.requested_precision = "bfloat16"
+    scorer.precision = "float32"
+    scorer.precision_fallback_reason = "cuda_bfloat16_unsupported"
+    retriever = FakeChannelRetriever(
+        [_evidence("dense-only", "Dense evidence")],
+        [],
+        scorer,
+    )
+
+    result = await retriever.retrieve("direct query", top_k=1)
+    trace = result.metadata["retrieval_trace"]["reranker"]
+
+    assert trace["requested_precision"] == "bfloat16"
+    assert trace["precision"] == "float32"
+    assert trace["precision_fallback_reason"] == "cuda_bfloat16_unsupported"
 
 
 @pytest.mark.asyncio

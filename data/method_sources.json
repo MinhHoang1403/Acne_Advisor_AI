@@ -483,6 +483,21 @@
       "limitations": "The model card does not establish calibrated probabilities, Vietnamese acne-domain quality, or acceptable cold-start latency on this host."
     },
     {
+      "source_id": "sentence_transformers_cross_encoder_api_2026",
+      "title": "Sentence Transformers CrossEncoder API",
+      "authors_or_organization": "Sentence Transformers",
+      "publication_date": "current at 2026-10-06",
+      "venue_or_publisher": "Sentence Transformers documentation",
+      "doi": null,
+      "url": "https://sbert.net/docs/package_reference/cross_encoder/model.html",
+      "source_type": "official_provider_documentation",
+      "role": "reranker_precision_configuration_contract",
+      "claim_supported": "The CrossEncoder API accepts a target device, local-files-only loading, and model_kwargs with torch_dtype values including torch.bfloat16 and torch.float32.",
+      "project_method": "Load the local BGE cross-encoder with the resolved CUDA BF16 or fallback FP32 dtype through the public CrossEncoder constructor.",
+      "date_verified": "2026-10-06",
+      "limitations": "The API contract does not establish hardware support, speed, ranking quality, or medical-domain quality for this project's BF16 configuration. Those are project-specific empirical findings."
+    },
+    {
       "source_id": "ragchecker_2024",
       "title": "RAGChecker: A Fine-grained Framework for Diagnosing Retrieval-Augmented Generation",
       "authors_or_organization": "Ru et al.",

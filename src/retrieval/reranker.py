@@ -22,7 +22,9 @@ from src.retrieval.contracts import RetrievedCandidate
 
 DEFAULT_RERANKER_MODEL = "BAAI/bge-reranker-v2-m3"
 DEFAULT_RERANKER_DEVICE = "cuda"
+DEFAULT_RERANKER_PRECISION = "bfloat16"
 SUPPORTED_RERANKER_DEVICES = frozenset({"cpu", "cuda"})
+SUPPORTED_RERANKER_PRECISIONS = frozenset({"float32", "bfloat16"})
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,7 @@ class RerankerSettings:
     enabled: bool = False
     model_name: str = DEFAULT_RERANKER_MODEL
     device: str = DEFAULT_RERANKER_DEVICE
+    precision: str = DEFAULT_RERANKER_PRECISION
     batch_size: int = 4
     timeout_seconds: float = 20.0
 
@@ -114,6 +117,9 @@ class RerankerSettings:
             model_name=os.getenv("RERANKER_MODEL", DEFAULT_RERANKER_MODEL).strip()
             or DEFAULT_RERANKER_MODEL,
             device=_configured_device(),
+            precision=canonical_reranker_precision(
+                os.getenv("RERANKER_PRECISION", DEFAULT_RERANKER_PRECISION)
+            ),
             batch_size=_bounded_int_env("RERANKER_BATCH_SIZE", 4, 1, 64),
             timeout_seconds=_bounded_float_env(
                 "RERANKER_TIMEOUT_SECONDS", 20.0, 0.1, 120.0
@@ -142,8 +148,13 @@ class CandidateReranker:
         self.settings = settings or RerankerSettings.from_env()
         self.model_name = self.settings.model_name
         self.requested_device = self.settings.device
+        self.requested_precision = canonical_reranker_precision(self.settings.precision)
         self.device, self.device_fallback_reason = _resolve_device(
             self.requested_device
+        )
+        self.precision, self.precision_fallback_reason = _resolve_precision(
+            self.requested_precision,
+            self.device,
         )
         self.model_load_count = 0
         self._model: Any | None = None
@@ -155,6 +166,13 @@ class CandidateReranker:
                 self.requested_device,
                 self.device,
                 self.device_fallback_reason,
+            )
+        if self.precision_fallback_reason is not None:
+            logger.warning(
+                "Local reranker requested %s precision but will use %s: %s",
+                self.requested_precision,
+                self.precision,
+                self.precision_fallback_reason,
             )
 
     async def score(
@@ -250,11 +268,15 @@ class CandidateReranker:
             with self._model_init_lock:
                 if self._model is None:
                     from sentence_transformers import CrossEncoder
+                    import torch
+
+                    torch_dtype = torch.bfloat16 if self.precision == "bfloat16" else torch.float32
 
                     model = CrossEncoder(
                         self.settings.model_name,
                         device=self.device,
                         local_files_only=True,
+                        model_kwargs={"torch_dtype": torch_dtype},
                     )
                     self._model = model
                     self.model_load_count += 1
@@ -364,6 +386,20 @@ def _configured_device() -> str:
     return DEFAULT_RERANKER_DEVICE
 
 
+def canonical_reranker_precision(value: object) -> str:
+    """Return the supported configured precision used by runtime identity."""
+
+    configured = str(value or "").strip().casefold()
+    if configured in SUPPORTED_RERANKER_PRECISIONS:
+        return configured
+    logger.warning(
+        "Unsupported RERANKER_PRECISION=%r; using %s.",
+        configured,
+        DEFAULT_RERANKER_PRECISION,
+    )
+    return DEFAULT_RERANKER_PRECISION
+
+
 def _resolve_device(requested_device: str) -> tuple[str, str | None]:
     """Resolve the configured device without ever claiming unavailable CUDA."""
 
@@ -382,6 +418,26 @@ def _resolve_device(requested_device: str) -> tuple[str, str | None]:
     except (AssertionError, RuntimeError):
         return "cpu", "cuda_probe_failed"
     return "cuda", None
+
+
+def _resolve_precision(
+    requested_precision: str,
+    effective_device: str,
+) -> tuple[str, str | None]:
+    """Use BF16 only on CUDA hardware that reports explicit BF16 support."""
+
+    if requested_precision == "float32":
+        return "float32", None
+    if effective_device != "cuda":
+        return "float32", "bfloat16_requires_cuda"
+    try:
+        import torch
+
+        if torch.cuda.is_bf16_supported():
+            return "bfloat16", None
+    except (AttributeError, RuntimeError):
+        return "float32", "cuda_bfloat16_support_probe_failed"
+    return "float32", "cuda_bfloat16_unsupported"
 
 
 def _bounded_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
@@ -405,9 +461,11 @@ __all__ = [
     "CandidateScorer",
     "DEFAULT_RERANKER_DEVICE",
     "DEFAULT_RERANKER_MODEL",
+    "DEFAULT_RERANKER_PRECISION",
     "RerankerOperationalError",
     "RerankerSettings",
     "RerankOutcome",
+    "canonical_reranker_precision",
     "rerank_candidates",
     "shutdown_reranker_executor",
 ]

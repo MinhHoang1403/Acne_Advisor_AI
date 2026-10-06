@@ -85,6 +85,7 @@ def test_method_traceability_covers_methods_and_technical_standards() -> None:
         "aws_timeouts_retries_backoff_jitter_2019",
         "nist_fips_180_4_sha256",
         "ietf_rfc9562_uuidv5",
+        "sentence_transformers_cross_encoder_api_2026",
     }
 
     assert registry["verified_through"] == "2026-09-18"

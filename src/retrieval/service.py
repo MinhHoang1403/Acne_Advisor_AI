@@ -95,6 +95,7 @@ class EvidenceRetriever:
             enabled=enabled,
             model_name=settings.model_name,
             device=settings.device,
+            precision=settings.precision,
             batch_size=settings.batch_size,
             timeout_seconds=settings.timeout_seconds,
         )
@@ -274,6 +275,17 @@ class EvidenceRetriever:
                 "requested_device": self._reranker_settings.device,
                 "device": getattr(scorer, "device", None),
                 "device_fallback_reason": getattr(scorer, "device_fallback_reason", None),
+                "requested_precision": getattr(
+                    scorer,
+                    "requested_precision",
+                    self._reranker_settings.precision,
+                ),
+                "precision": getattr(scorer, "precision", None),
+                "precision_fallback_reason": getattr(
+                    scorer,
+                    "precision_fallback_reason",
+                    None,
+                ),
                 "model_load_count": getattr(scorer, "model_load_count", None),
                 "fallback_used": rerank_outcome.fallback_used,
                 "fallback_reason": rerank_outcome.fallback_reason,

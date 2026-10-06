@@ -21,7 +21,7 @@ nghĩa phương pháp đã tối ưu hoặc được xác nhận hiệu quả l�
 | Gemini Embedding 2 | `src/integrations/google_genai.py`, `src/ingestion/embedding.py` | `google_gemini_embedding2_2026` | `OFFICIAL_PROVIDER_CONTRACT` | 3072 chiều, cosine, không dùng `task_type`; document là `title: {title} \| text: {content}`, query là `task: question answering \| query: {content}`. Provider docs không chứng minh format này tối ưu. |
 | Native BM25 | `src/ingestion/bm25.py`, `src/database/vector_store.py` | `robertson_zaragoza_bm25_2009`, `qdrant_bm25_2026` | `IMPLEMENTED_RESEARCH_METHOD` + `OFFICIAL_PROVIDER_CONTRACT` | Qdrant thực thi; tokenizer `word`, lowercase, ASCII folding, language `none`, IDF collection-side. `k1=1.2`, `b=0.75`, `avg_len=256` không được tuyên bố tối ưu. |
 | Reciprocal Rank Fusion | `src/retrieval/rrf.py` | `cormack_clarke_buettcher_rrf_2009` | `IMPLEMENTED_RESEARCH_METHOD` | `k=60`, hai weight `1.0`; source không chứng minh các giá trị project là tối ưu hoặc mang nghĩa medical confidence. |
-| Local cross-encoder | `src/retrieval/reranker.py`, `src/retrieval/service.py` | `bge_reranker_v2_m3_model_card` | `OFFICIAL_PROVIDER_CONTRACT` + `ENGINEERING_POLICY` | `BAAI/bge-reranker-v2-m3`, local-files-only, timeout hữu hạn; lỗi giữ thứ tự deterministic trước rerank. Raw score không phải xác suất. |
+| Local cross-encoder | `src/retrieval/reranker.py`, `src/retrieval/service.py` | `bge_reranker_v2_m3_model_card`, `sentence_transformers_cross_encoder_api_2026` | `OFFICIAL_PROVIDER_CONTRACT` + `ENGINEERING_POLICY` + `EMPIRICAL_PROJECT_DECISION` | API chính thức hỗ trợ `device`, `local_files_only` và `model_kwargs.torch_dtype`. Project dùng BF16 chỉ trên CUDA có hỗ trợ, batch 4, full candidate union và fallback FP32 có telemetry trung thực. Model card/API không chứng minh chất lượng BF16 cho miền mụn. |
 | Whole-chunk packing | `src/retrieval/context_packer.py` | `lost_in_the_middle_2024` chỉ là related context | `EMPIRICAL_PROJECT_DECISION` | Giữ nguyên chunk và provenance, tối đa 9 item/7000 ký tự; không tuyên bố semantic sufficiency hoặc optimality. |
 | Bounded Agent actions | `src/agent/action_decision.py`, `src/agent/nodes/workflow.py` | `yao_react_2023`, `jiang_active_rag_2023`, `jeong_adaptive_rag_2024` | `ENGINEERING_POLICY` | Bốn action `retrieve/retry/generate/abstain`, tối đa hai lần retrieval. Project không tái hiện prompt, classifier hoặc strategy set của các paper. |
 | Purposeful evidence retry | `src/agent/action_decision.py`, `src/agent/nodes/workflow.py`, `src/retrieval/service.py` | `rewrite_retrieve_read_2023`, `conqrr_2022`, `itercqr_2024` là related literature | `ENGINEERING_POLICY` | Một retry khi không có evidence; giữ stable overall query cho rerank, dedupe/rerank/repack bounded. Không có dedicated query rewriter. |
@@ -47,6 +47,10 @@ nghĩa phương pháp đã tối ưu hoặc được xác nhận hiệu quả l�
   chunk; candidate thật pack đầy đủ 13/15 case source-grounded.
 - Query prompt B bị loại và revert vì completeness top-9 giảm từ 5/9 xuống 3/9,
   dù top-16 giữ 5/9. Không thêm dedicated rewriter.
+- CUDA BF16 với batch 4 và full candidate union được giữ sau benchmark nội bộ trên
+  RTX 3050 Laptop 6 GB: không kém FP32 trên benchmark project đã review. Đây là
+  kết quả thực nghiệm riêng của môi trường đã đo, không phải tuyên bố BF16 luôn tốt
+  hơn FP32. Bằng chứng được bảo toàn tại commit nghiên cứu `7e02625d942a9ae8d2f1d88d61b14bab01837dac`.
 
 Các số trên là development diagnostics của corpus này, không phải benchmark
 chính thức hoặc tuyên bố tối ưu phổ quát.

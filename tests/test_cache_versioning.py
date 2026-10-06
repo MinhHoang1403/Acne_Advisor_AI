@@ -89,7 +89,11 @@ def test_manifest_describes_stage1_retrieval_contract() -> None:
     assert manifest["rrf_bm25_weight"] == 1.0
     assert manifest["max_retrieval_attempts"] == 2
     assert manifest["retry_evidence_policy"] == "retain_deduplicate_rerank_repack"
-    assert manifest["reranker"] == {"enabled": False, "model": None}
+    assert manifest["reranker"] == {
+        "enabled": False,
+        "model": None,
+        "precision": "bfloat16",
+    }
     assert manifest["context_packer_version"] == "bounded_whole_chunk_admission"
     assert "candidate_policy" not in serialized
     assert "claim_shadow" not in serialized
@@ -108,6 +112,28 @@ def test_reranker_configuration_partitions_pipeline_fingerprint() -> None:
     assert enabled["reranker"]["model"] == "BAAI/bge-reranker-v2-m3"
     assert compute_pipeline_fingerprint(disabled) != compute_pipeline_fingerprint(enabled)
     assert compute_pipeline_fingerprint(enabled) != compute_pipeline_fingerprint(other_model)
+
+
+def test_reranker_precision_partitions_pipeline_fingerprint_without_cache_bump() -> None:
+    float32 = build_pipeline_version_manifest(
+        {
+            "RERANKER_ENABLED": "true",
+            "RERANKER_PRECISION": "float32",
+            "CACHE_ANSWER_VERSION": "v10",
+        }
+    )
+    bfloat16 = build_pipeline_version_manifest(
+        {
+            "RERANKER_ENABLED": "true",
+            "RERANKER_PRECISION": "bfloat16",
+            "CACHE_ANSWER_VERSION": "v10",
+        }
+    )
+
+    assert float32["reranker"]["precision"] == "float32"
+    assert bfloat16["reranker"]["precision"] == "bfloat16"
+    assert float32["answer_cache_version"] == bfloat16["answer_cache_version"] == "v10"
+    assert compute_pipeline_fingerprint(float32) != compute_pipeline_fingerprint(bfloat16)
 
 
 def test_retrieval_limits_partition_cache_identity() -> None:
