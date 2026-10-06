@@ -21,7 +21,11 @@ class NormalizedQuery(BaseModel):
 
 
 class CanonicalQueryIdentity(BaseModel):
-    """Executed query identities for one bounded retrieval attempt."""
+    """Executed query identities for one bounded retrieval attempt.
+
+    ``overall_rerank_query`` is a compatibility field name. Its value is the
+    effective attempt-scoped rerank query, including the targeted query on retry.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

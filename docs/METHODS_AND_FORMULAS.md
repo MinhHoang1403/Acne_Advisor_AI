@@ -118,8 +118,12 @@ selecting `retrieve` after the first execution.
 When the first attempt contains no evidence, the Agent may make one purposeful
 retry. Candidates from a prior attempt are retained only when acquisition
 itself fails, then deduplicated, reranked, and repacked. Provider errors do not
-cause an unbounded or semantically blind retry, and the stable overall user
-question remains the rerank context for a targeted retry.
+cause an unbounded or semantically blind retry. On the retry attempt, the same
+targeted evidence-gap query is used for acquisition and for reranking the full
+retained-plus-acquired candidate union. This is a project empirical decision:
+fixed-input study commit `b6e1fd6` improved packed reviewed evidence from 0/6 to
+1/6 without a per-case regression on the reviewed labels. It is not claimed as
+a universally optimal reranking method.
 
 ## Exact Cache Identity
 

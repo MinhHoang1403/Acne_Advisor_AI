@@ -184,7 +184,7 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
         or ""
     ).strip()
     retry_reason = str(decision.get("reason_code") or "needs_evidence")
-    rerank_query = _overall_information_need(state, question, attempt)
+    rerank_query = question
     intended_query_identity = CanonicalQueryIdentity(
         current_question=current_question,
         acquisition_query=question,
@@ -305,21 +305,6 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
                 attempt_trace,
             ],
         }
-
-
-def _overall_information_need(
-    state: ClinicalState,
-    acquisition_query: str,
-    retrieval_attempt: int,
-) -> str:
-    """Use the first self-contained retrieval query to rerank retry evidence."""
-
-    if retrieval_attempt > 1:
-        for entry in state.get("retry_history") or []:
-            query = str(entry.get("query") or "").strip()
-            if query:
-                return query
-    return acquisition_query
 
 
 def _retrieval_attempt_trace(

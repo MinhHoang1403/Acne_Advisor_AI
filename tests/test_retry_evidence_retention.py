@@ -69,6 +69,30 @@ class MappingScorer:
         return [self.scores[candidate.candidate_id] for candidate in candidates]
 
 
+class QueryAwareScorer:
+    model_name = "fake-query-aware-reranker"
+
+    def __init__(self, scores_by_query: dict[str, dict[str, float]]) -> None:
+        self.scores_by_query = scores_by_query
+        self.calls: list[dict[str, Any]] = []
+
+    async def score(
+        self,
+        query: str,
+        candidates: Sequence[RetrievedCandidate],
+    ) -> Sequence[float]:
+        self.calls.append(
+            {
+                "query": query,
+                "candidate_ids": [candidate.candidate_id for candidate in candidates],
+            }
+        )
+        return [
+            self.scores_by_query[query][candidate.candidate_id]
+            for candidate in candidates
+        ]
+
+
 class StaticStore:
     def __init__(self, bm25: list[dict[str, Any]]) -> None:
         self.bm25 = bm25
@@ -85,7 +109,7 @@ class StaticRetriever(EvidenceRetriever):
         self,
         dense: list[dict[str, Any]],
         bm25: list[dict[str, Any]],
-        scorer: MappingScorer,
+        scorer: MappingScorer | QueryAwareScorer,
     ) -> None:
         self.dense = dense
         super().__init__(StaticStore(bm25), reranker=scorer)
@@ -280,6 +304,66 @@ async def test_candidate_excluded_from_first_pack_remains_retry_eligible() -> No
         "first-unpacked",
         "retry-new",
     ]
+
+
+@pytest.mark.asyncio
+async def test_workflow_retry_query_recovers_retained_gap_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reproduce the measured loss when a broad query reranks a targeted retry union."""
+
+    monkeypatch.setenv("RETRIEVAL_CONTEXT_MAX_ITEMS", "1")
+    scorer = QueryAwareScorer(
+        {
+            "overall need": {"required": 0.1, "noise": 0.9},
+            "targeted missing relation": {"required": 0.9, "noise": 0.1},
+        }
+    )
+    first = await StaticRetriever(
+        [_evidence("required"), _evidence("noise")],
+        [],
+        scorer,
+    ).retrieve("overall need", top_k=1, retrieval_attempt=1)
+    assert [item["id"] for item in first.vector_contexts] == ["noise"]
+
+    retry_retriever = StaticRetriever([_evidence("required")], [], scorer)
+
+    class RetryTool:
+        @staticmethod
+        async def ainvoke(payload: dict[str, Any]) -> dict[str, Any]:
+            result = await retry_retriever.retrieve(**payload)
+            return {
+                "vector_contexts": result.vector_contexts,
+                "sources": result.sources,
+                "metadata": result.metadata,
+            }
+
+    monkeypatch.setattr(workflow, "retrieve_evidence", RetryTool())
+    second = await workflow.retrieve_node(
+        {
+            "normalized_question": "Overall need",
+            "agent_decision": {
+                "action": "retry",
+                "retrieval_query": "targeted missing relation",
+                "reason_code": "evidence_gap",
+            },
+            "retrieval_attempt": 1,
+            "retry_history": [{"attempt": 1, "query": "overall need"}],
+            "retained_retrieval_candidates": first.metadata[
+                "retained_retrieval_candidates"
+            ],
+        }
+    )
+
+    assert scorer.calls[-1] == {
+        "query": "targeted missing relation",
+        "candidate_ids": ["required", "noise"],
+    }
+    assert [item["id"] for item in second["vector_contexts"]] == ["required"]
+    assert second["vector_contexts"][0]["source_id"] == "source-required"
+    assert second["retrieval_attempt_traces"][-1]["overall_rerank_query"] == (
+        "targeted missing relation"
+    )
 
 
 @pytest.mark.asyncio
@@ -509,7 +593,7 @@ async def test_workflow_retains_candidates_and_isolates_independent_requests(
     )
 
     assert payloads[1]["query"] == "targeted missing evidence"
-    assert payloads[1]["rerank_query"] == "self-contained overall query"
+    assert payloads[1]["rerank_query"] == "targeted missing evidence"
     assert payloads[1]["retained_retrieval_candidates"] == [
         {"candidate_id": "candidate-1"}
     ]
