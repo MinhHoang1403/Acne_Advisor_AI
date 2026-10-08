@@ -55,37 +55,49 @@ sequenceDiagram
     User->>API: POST /chat
     API->>Agent: validated state and history
     Agent->>Agent: prepare and narrow safety check
-    Agent->>Cache: exact versioned cache lookup
-    alt eligible cache hit
-        Cache-->>Agent: grounded cached answer
-    else cache miss
-        Agent->>LLM: select initial typed action
-        LLM-->>Agent: retrieve or abstain
-        opt retrieve selected
-            Agent->>Tool: retrieve source evidence
-            Tool->>Qdrant: Dense and native BM25 queries
-            Qdrant-->>Tool: ranked source chunks
-            Tool->>Reranker: RRF candidate union and standalone retrieval query
-            Reranker-->>Tool: reranked candidates or deterministic RRF fallback
-            Tool-->>Agent: whole-chunk bounded provenance
-            Agent->>Agent: assess evidence
-            Agent->>LLM: select post-retrieval action
-            LLM-->>Agent: retry, generate, or abstain
+    Agent->>Agent: deterministic safety before cache
+    alt safety override
+        Agent->>Agent: finalize source-mapped system response
+    else no safety override
+        Agent->>Cache: exact versioned cache lookup
+        alt eligible cache hit
+            Cache-->>Agent: grounded cached answer
+        else cache miss
+            Agent->>LLM: select initial typed action
+            LLM-->>Agent: retrieve or abstain
+            opt retrieve selected
+                Agent->>Tool: retrieve source evidence with attempt-scoped query
+                Tool->>Qdrant: Dense and native BM25 queries
+                Qdrant-->>Tool: ranked source chunks
+                Tool->>Reranker: full candidate union and attempt-scoped query
+                Reranker-->>Tool: reranked candidates or deterministic RRF fallback
+                Tool-->>Agent: whole-chunk bounded provenance
+                Agent->>Agent: assess evidence
+                Agent->>LLM: select post-retrieval action
+                LLM-->>Agent: retry, generate, or abstain
+            end
+            opt generate selected with usable evidence
+                Agent->>LLM: system policy + user data + bounded source evidence
+                LLM-->>Agent: draft answer
+            end
+            Agent->>Agent: verify, format, finalize
+            Agent->>Cache: store only when eligible
         end
-        opt generate selected with usable evidence
-            Agent->>LLM: system policy + user data + bounded source evidence
-            LLM-->>Agent: draft answer
-        end
-        Agent->>Agent: verify, safety, format, finalize
-        Agent->>Cache: store only when eligible
     end
     Agent-->>API: answer, sources, sanitized metadata
     API-->>User: UTF-8 JSON
 ```
 
-The graph schema is `ClinicalState` in `src/agent/state.py` with 71 fields.
+The graph schema is `ClinicalState` in `src/agent/state.py` with 75 fields.
 `src/agent/nodes/workflow.py` owns all eight semantic node functions and routing
 decisions; support modules do not create hidden graph actions.
+
+On the first retrieval, the pre-decision acquisition query is also the rerank
+query. On a retry, the targeted evidence-gap query is used for both new
+acquisition and reranking the full retained-plus-acquired candidate union. The
+union is stable-deduplicated before reranking and packed again from the resulting
+order. Previously acquired candidates are therefore not discarded merely because
+the new acquisition succeeds.
 
 Normal medical meaning follows `retrieved evidence -> LLM synthesis -> narrow
 presentation/provenance processing`. Deterministic Python may replace content

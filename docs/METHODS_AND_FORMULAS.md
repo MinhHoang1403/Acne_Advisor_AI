@@ -115,12 +115,14 @@ evidence acquisition, `retry` means the later acquisition, and the retrieval
 tool can execute no more than two times. The model cannot bypass the budget by
 selecting `retrieve` after the first execution.
 
-When the first attempt contains no evidence, the Agent may make one purposeful
-retry. Candidates from a prior attempt are retained only when acquisition
-itself fails, then deduplicated, reranked, and repacked. Provider errors do not
-cause an unbounded or semantically blind retry. On the retry attempt, the same
-targeted evidence-gap query is used for acquisition and for reranking the full
-retained-plus-acquired candidate union. This is a project empirical decision:
+When the first attempt leaves a specific evidence gap, the Agent may make one
+purposeful retry. Candidates from the prior attempt are always retained, merged
+with any newly acquired candidates, stable-deduplicated, reranked, and repacked.
+If new acquisition fails, the retained candidates can still be reranked and
+repacked. Provider errors do not cause an unbounded or semantically blind retry.
+On the retry attempt, the same targeted evidence-gap query is used for acquisition
+and for reranking the full retained-plus-acquired candidate union. This is a
+project empirical decision:
 fixed-input study commit `b6e1fd6` improved packed reviewed evidence from 0/6 to
 1/6 without a per-case regression on the reviewed labels. It is not claimed as
 a universally optimal reranking method.
