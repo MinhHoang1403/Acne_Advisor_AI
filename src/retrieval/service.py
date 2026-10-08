@@ -407,11 +407,11 @@ async def warm_process_reranker() -> None:
     settings = RerankerSettings.from_env()
     if not settings.enabled:
         return
-    scorer = _get_process_reranker(settings)
-    prepare = getattr(scorer, "prepare", None)
-    if prepare is None:
-        return
     try:
+        scorer = _get_process_reranker(settings)
+        prepare = getattr(scorer, "prepare", None)
+        if prepare is None:
+            return
         await prepare()
     except (ImportError, ModuleNotFoundError, OSError, RuntimeError, ValueError) as exc:
         logger.warning(

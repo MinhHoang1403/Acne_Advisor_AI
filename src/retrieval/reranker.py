@@ -407,15 +407,19 @@ def _resolve_device(requested_device: str) -> tuple[str, str | None]:
         return "cpu", None
     try:
         import torch
-    except (ImportError, ModuleNotFoundError):
+    except (ImportError, ModuleNotFoundError, OSError, RuntimeError):
         return "cpu", "cuda_runtime_unavailable"
-    if not torch.cuda.is_available():
+    try:
+        cuda_available = torch.cuda.is_available()
+    except (OSError, RuntimeError):
+        return "cpu", "cuda_runtime_unavailable"
+    if not cuda_available:
         return "cpu", "cuda_unavailable"
     try:
         probe = torch.ones(1, device="cuda")
         _ = probe + 1
         torch.cuda.synchronize()
-    except (AssertionError, RuntimeError):
+    except (AssertionError, OSError, RuntimeError):
         return "cpu", "cuda_probe_failed"
     return "cuda", None
 
@@ -435,7 +439,7 @@ def _resolve_precision(
 
         if torch.cuda.is_bf16_supported():
             return "bfloat16", None
-    except (AttributeError, RuntimeError):
+    except (AttributeError, OSError, RuntimeError):
         return "float32", "cuda_bfloat16_support_probe_failed"
     return "float32", "cuda_bfloat16_unsupported"
 
