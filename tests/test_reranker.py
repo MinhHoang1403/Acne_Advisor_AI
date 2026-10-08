@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import threading
 import time
 from collections.abc import Sequence
@@ -261,6 +262,33 @@ def test_cuda_configuration_falls_back_truthfully_when_unavailable(
     assert reranker.precision_fallback_reason == "bfloat16_requires_cuda"
 
 
+def test_cuda_configuration_falls_back_when_torch_runtime_cannot_load(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_import = builtins.__import__
+
+    def blocked_torch_import(
+        name: str,
+        globals_: object = None,
+        locals_: object = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> object:
+        if name == "torch":
+            raise OSError("native runtime blocked")
+        return real_import(name, globals_, locals_, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", blocked_torch_import)
+
+    reranker = CandidateReranker(RerankerSettings(device="cuda"))
+
+    assert reranker.requested_device == "cuda"
+    assert reranker.device == "cpu"
+    assert reranker.device_fallback_reason == "cuda_runtime_unavailable"
+    assert reranker.precision == "float32"
+    assert reranker.precision_fallback_reason == "bfloat16_requires_cuda"
+
+
 class _CudaProbe:
     def __add__(self, _other: object) -> _CudaProbe:
         return self
@@ -416,6 +444,26 @@ async def test_startup_warm_uses_process_reranker_once(
     await retrieval_service.warm_process_reranker()
 
     assert prepare_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_startup_warm_contains_reranker_construction_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def unavailable_reranker(_settings: RerankerSettings) -> object:
+        raise OSError("native runtime blocked")
+
+    monkeypatch.setenv("RERANKER_ENABLED", "true")
+    monkeypatch.setattr(
+        retrieval_service,
+        "_get_process_reranker",
+        unavailable_reranker,
+    )
+
+    await retrieval_service.warm_process_reranker()
+
+    assert "request-time fallback remains active: OSError" in caplog.text
 
 
 def test_api_shutdown_registers_reranker_executor_cleanup() -> None:
