@@ -1,0 +1,73 @@
+{
+  "latency": {
+    "end_to_end": {
+      "count": 100,
+      "min_ms": 4873.3,
+      "median_ms": 6175.1,
+      "p95_ms": 25946.9,
+      "max_ms": 54023.9
+    },
+    "pre_decision": {
+      "count": 100,
+      "min_ms": 906.6,
+      "median_ms": 1209.4,
+      "p95_ms": 3644.1,
+      "max_ms": 49472.0
+    },
+    "retrieval": {
+      "count": 100,
+      "min_ms": 1243.7,
+      "median_ms": 1667.9,
+      "p95_ms": 2850.2,
+      "max_ms": 30088.5
+    },
+    "reranker": {
+      "count": 100,
+      "min_ms": 591.0,
+      "median_ms": 971.6,
+      "p95_ms": 1397.7,
+      "max_ms": 20021.0
+    },
+    "generation": {
+      "count": 100,
+      "min_ms": 986.7,
+      "median_ms": 1552.3,
+      "p95_ms": 4721.9,
+      "max_ms": 16778.0
+    },
+    "finalization": {
+      "count": 100,
+      "min_ms": 3.2,
+      "median_ms": 7.6,
+      "p95_ms": 17.8,
+      "max_ms": 76.9
+    },
+    "p95_method": "nearest-rank"
+  },
+  "retrieval_attempt_distribution": {
+    "1": 96,
+    "2": 4
+  },
+  "retry_rate": {
+    "count": 4,
+    "denominator": 100,
+    "percentage": 4.0
+  },
+  "provider_fallback_rate": {
+    "count": 18,
+    "denominator": 100,
+    "percentage": 18.0
+  },
+  "reranker_fallback_rate": {
+    "count": 2,
+    "denominator": 100,
+    "percentage": 2.0
+  },
+  "timeout_count": 0,
+  "error_count": 0,
+  "cache_hit_count": 0,
+  "generation_provider_model_distribution": {
+    "gemini::gemini-3.1-flash-lite": 18,
+    "gemini::gemini-3.5-flash-lite": 82
+  }
+}
