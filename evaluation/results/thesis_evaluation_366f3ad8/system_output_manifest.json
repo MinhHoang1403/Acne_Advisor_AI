@@ -1,0 +1,11 @@
+{
+  "schema": "thesis_system_output_manifest",
+  "run_id": "thesis_evaluation_366f3ad8",
+  "locked_at": "2026-10-09T14:29:55+00:00",
+  "protocol_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+  "record_count": 100,
+  "case_order_sha256": "f6320eacaa5725aa21ec5f913c77c0cd1e443c4c362f58043cac2c43bfee85aa",
+  "raw_results_canonical_sha256": "1f525efb44091c2444d298d45de4f31637b9be4d1d512f88db38ae9738125feb",
+  "raw_results_raw_sha256": "b078858d61ced4ed072339fd9cb576517a2ce585724e425c6fc0a2f772f57f16",
+  "system_answers_locked": true
+}
