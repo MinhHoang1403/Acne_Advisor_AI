@@ -350,7 +350,6 @@ hardening.
 | `docs/` | architecture, methods, safety, data, and operations documentation |
 | `tests/` | implementation and regression contracts |
 | `evaluation/` | benchmark, evaluator package, executed notebook, and official result |
-| `research_archive/` | preserved development evaluations and forensic history |
 
 ## Local Setup
 

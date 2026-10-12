@@ -35,6 +35,7 @@ medical use.
 
 The executed notebook is preserved at
 [`evaluation/formal_evaluation.ipynb`](../formal_evaluation.ipynb). Earlier and
-aborted development runs are retained separately under
-[`research_archive/development_evaluation`](../../research_archive/development_evaluation/)
-and must not be substituted for this official result.
+aborted development runs are intentionally absent from the active working tree
+and must not be substituted for this official result. Their original bytes,
+branches, checksums, and recovery reference remain in Git history and the
+verified external restore point created before cleanup.
