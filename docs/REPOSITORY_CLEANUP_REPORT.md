@@ -6,7 +6,8 @@
 - Repository: `MinhHoang1403/Acne_Advisor_AI`.
 - Baseline sản phẩm: `366f3ad836c36be36565caad4a94ad17a7a6278f`.
 - Nhánh thực hiện: `maintenance/deep-repo-cleanup`.
-- Final maintenance SHA: commit chứa tài liệu này (SHA PR head được ghi trong Git/GitHub; merge SHA được ghi ở báo cáo bàn giao sau CI).
+- Pull request: [#119 — chore: deep repository cleanup and audit](https://github.com/MinhHoang1403/Acne_Advisor_AI/pull/119).
+- Final maintenance SHA: PR #119 head (Git cannot self-embed the SHA của commit chứa chính tài liệu này); merge SHA được ghi trong final handoff sau CI.
 - Baseline: 271 file tracked, 45 thư mục tracked.
 - Sau cleanup: 246 file tracked, 37 thư mục tracked.
 - Thay đổi production: không.
@@ -262,8 +263,8 @@ này tránh Windows Application Control nhưng không thể ghi source, gọi pr
 | Ruff format check | vẫn fail đúng baseline: 88 file would be reformatted, 77 file formatted |
 
 Không có post-cleanup regression. Format debt tồn tại trước task và không được che bằng config
-hoặc một diff format hàng loạt. PR CI/final merge SHA được ghi trong final handoff sau khi GitHub
-chạy hai required jobs.
+hoặc một diff format hàng loạt. Required CI của PR #119 và final merge SHA được ghi trong final
+handoff sau khi GitHub chạy hai jobs trên final PR head.
 
 ## Behavioral invariants
 
@@ -325,10 +326,10 @@ Cleanup chỉ xóa artifact không được load, do đó:
 22. Dependency giảm: 0.
 23. Test trước/sau: baseline và post-cleanup được ghi đầy đủ ở mục Verification; container sạch
    đạt 1.076 test, frontend đạt 52 test.
-24. CI: baseline success; PR CI phải success trước merge.
+24. CI: baseline success; PR #119 chỉ được merge sau khi hai required jobs success trên final head.
 25. Backup: bundle verify pass, checksum ghi ở mục Restore point.
 26. Maintenance commits: xem Git log của branch/PR.
-27. PR URL: ghi trong final handoff sau khi push.
+27. PR URL: <https://github.com/MinhHoang1403/Acne_Advisor_AI/pull/119>.
 28. Final main SHA: ghi trong final handoff sau merge.
 29. Git status: phải sạch sau sync cuối.
 30. Technical debt: liệt kê trong mục Technical debt.
