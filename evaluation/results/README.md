@@ -37,5 +37,5 @@ The executed notebook is preserved at
 [`evaluation/formal_evaluation.ipynb`](../formal_evaluation.ipynb). Earlier and
 aborted development runs are intentionally absent from the active working tree
 and must not be substituted for this official result. Their original bytes,
-branches, checksums, and recovery reference remain in Git history and the
-verified external restore point created before cleanup.
+branches, checksums, and recovery reference are documented in the
+[repository cleanup report](../../docs/REPOSITORY_CLEANUP_REPORT.md).
