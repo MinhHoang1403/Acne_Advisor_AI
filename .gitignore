@@ -68,10 +68,9 @@ dmypy.json
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 
-# Ignore notebooks by default, but keep formal and archived research evidence
+# Ignore notebooks by default, but keep the active formal evaluation notebook
 *.ipynb
 !evaluation/formal_evaluation.ipynb
-!research_archive/**/*.ipynb
 
 # Local notebook recovery backups
 local_notebook_backups/
@@ -160,7 +159,7 @@ log/
 reports/
 
 # ---------------------------------------------------------------------------
-# Local thesis/report artifacts
+# Local reports and maintenance audit artifacts
 # ---------------------------------------------------------------------------
 /output/
 /FINAL_KL_Acne_Rag.docx

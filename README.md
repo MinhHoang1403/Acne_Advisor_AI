@@ -350,7 +350,6 @@ hardening.
 | `docs/` | architecture, methods, safety, data, and operations documentation |
 | `tests/` | implementation and regression contracts |
 | `evaluation/` | benchmark, evaluator package, executed notebook, and official result |
-| `research_archive/` | preserved development evaluations and forensic history |
 
 ## Local Setup
 
@@ -523,6 +522,7 @@ evidence-gap rows require researcher adjudication, documented in
 - [Methods and Formulas](docs/METHODS_AND_FORMULAS.md)
 - [Method Traceability](docs/METHOD_TRACEABILITY.md)
 - [Vietnamese Source Code Guide](docs/CODE_GUIDE_VI.md)
+- [Repository Cleanup Report](docs/REPOSITORY_CLEANUP_REPORT.md)
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
 - [AI Observability and Langfuse](docs/OBSERVABILITY.md)
