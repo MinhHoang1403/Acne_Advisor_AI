@@ -1,0 +1,15 @@
+{
+  "attempts": 104,
+  "database_writes": 0,
+  "deterministic_output": false,
+  "max_ms": 25176.6507,
+  "mean_ms": 7446.203988,
+  "p50_ms": 5404.0316,
+  "p95_ms": 18660.5992,
+  "provider_calls": 0,
+  "python_tracemalloc_peak_bytes": 19664072,
+  "reason_excluded_from_reproducibility_hashes": "Wall-clock timing is nondeterministic.",
+  "retrieval_calls": 0,
+  "schema": "budget_aware_selector_runtime_measurement_v1",
+  "selector": "RANK_WEIGHTED_BUDGET_AWARE_WHOLE_CHUNK_SELECTION_V1"
+}

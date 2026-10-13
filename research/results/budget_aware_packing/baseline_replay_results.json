@@ -1,0 +1,67 @@
+{
+  "attempts_with_complete_inputs": 104,
+  "baseline_implementation_identity": {
+    "all_match": true,
+    "current_head": "2d32317d6abd335aedd69b7b066fca53c13b0bb8",
+    "evaluated_production_sha": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+    "files": {
+      "src/retrieval/context_packer.py": {
+        "current_blob_oid": "6eaa457ff964d04066a339eee525f59d25575726",
+        "frozen_blob_oid": "6eaa457ff964d04066a339eee525f59d25575726",
+        "match": true
+      },
+      "src/retrieval/contracts.py": {
+        "current_blob_oid": "7b9f9485065739da292a1b3298a5407f23190f58",
+        "frozen_blob_oid": "7b9f9485065739da292a1b3298a5407f23190f58",
+        "match": true
+      },
+      "src/retrieval/reranker.py": {
+        "current_blob_oid": "34bf54d002bb1154c1b289ed433838085d5ea776",
+        "frozen_blob_oid": "34bf54d002bb1154c1b289ed433838085d5ea776",
+        "match": true
+      },
+      "src/retrieval/service.py": {
+        "current_blob_oid": "e6650103b1b9fdc3c877fba3fc7bfc4a700bd9bb",
+        "frozen_blob_oid": "e6650103b1b9fdc3c877fba3fc7bfc4a700bd9bb",
+        "match": true
+      }
+    }
+  },
+  "cases": 100,
+  "context_hash_matches": 100,
+  "context_hash_verifiable": 100,
+  "context_length_matches": 104,
+  "database_writes": 0,
+  "dropped_decision_matches": 104,
+  "execution_type": "deterministic_offline_packer_replay",
+  "gate_passed": true,
+  "metric_checks": {
+    "acquired_85": true,
+    "attempts_104": true,
+    "cases_100": true,
+    "character_losses_20": true,
+    "complete_cases_46": true,
+    "item_losses_7": true,
+    "packed_58": true,
+    "requirements_88": true
+  },
+  "metrics": {
+    "acquired": 85,
+    "character_losses": 20,
+    "complete_answerable_cases": 46,
+    "item_losses": 7,
+    "packed": 58,
+    "required_evidence": 88
+  },
+  "mismatch_count": 0,
+  "network_during_replay": false,
+  "not_examined_decision_matches": 104,
+  "provenance_matches": 104,
+  "provider_calls": 0,
+  "retrieval_attempts": 104,
+  "retrieval_search_calls": 0,
+  "schema": "budget_aware_baseline_replay_results_v1",
+  "selected_id_matches": 104,
+  "selected_order_matches": 104,
+  "status": "EXACT_BASELINE_REPLAY_CONFIRMED"
+}
