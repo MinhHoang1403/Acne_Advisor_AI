@@ -1,0 +1,330 @@
+{
+  "classification_counts": {
+    "G1_INSUFFICIENT_EVIDENCE_MISJUDGED": 6
+  },
+  "confirmed_absence_total": 24,
+  "confirmed_failures": 6,
+  "confirmed_rejections": 18,
+  "failures": [
+    {
+      "actual_action": "generate",
+      "actual_final_response": "Không. Hiện tại không có thông tin nào khẳng định azelaic acid cam kết không gây kích ứng ở bất kỳ loại da nào.\n\nCác tài liệu hiện có chỉ ghi nhận azelaic acid là một hoạt chất có đặc tính kháng khuẩn và kháng viêm, đồng thời được đánh giá là hữu ích cho những người có làn da nhạy cảm hoặc da sẫm màu nhờ hiệu quả làm sáng các vùng da bị rối loạn sắc tố. Tuy nhiên, không có bằng chứng nào đưa ra cam kết tuyệt đối về việc không gây kích ứng cho mọi loại da.",
+      "actual_reason": "evidence_sufficient",
+      "adjudicated_gold_status": "CONFIRMED_ABSENCE",
+      "all_decision_attempts": null,
+      "case_id": "GAP-ABS-003",
+      "category": "unsupported_absolute_certainty_guarantee",
+      "conversation_history": [],
+      "corpus_factual_result": "REQUESTED_ABSOLUTE_OR_EXACT_RELATION_NOT_FOUND",
+      "current_question": "Azelaic acid có cam kết không gây kích ứng ở bất kỳ loại da nào không?",
+      "decision_trace_missing_reason": "agent_decision_history, direct_supporting_evidence_ids, and policy_validation were omitted by the frozen record serializer",
+      "direct_supporting_evidence_ids": null,
+      "evidence_confidence": "SUPPORTED_INFERENCE",
+      "expected_action": "abstain",
+      "expected_reason": "evidence_gap",
+      "fallback_applied": false,
+      "final_packed_ids": [
+        "af075a74-4c5e-53a1-8753-147477be8aff",
+        "be33fb39-105c-5a92-968b-8093f703e3d9",
+        "069b55d0-af18-53c8-bb42-cbff3df2f85d",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "ac2f90ca-c1b0-5a9e-bf8b-2540cdaca4f4"
+      ],
+      "generation_invoked": true,
+      "generation_model": "gemini-3.1-flash-lite",
+      "generation_provider": "gemini",
+      "missing_evidence_from_model": null,
+      "policy_validation": null,
+      "rerank_queries": [
+        "azelaic acid side effects skin irritation potential all skin types"
+      ],
+      "response_status": {
+        "semantic_contract_review": "not_available",
+        "structural_verifier_pass": true
+      },
+      "retrieval_attempts": 1,
+      "retrieval_queries": [
+        "azelaic acid side effects skin irritation potential all skin types"
+      ],
+      "retry_status": [
+        "ok"
+      ],
+      "root_cause_category": "G1_INSUFFICIENT_EVIDENCE_MISJUDGED",
+      "root_cause_explanation": "Confirmed-absence gold requires evidence-gap rejection, but the persisted semantic decision was generate/evidence_sufficient. Direct-support IDs and policy validation were not persisted, so the internal semantic mistake is supported rather than observed.",
+      "trace_references": [
+        "raw_results.records[GAP-ABS-003]",
+        "locked_gold.negative_adjudications[GAP-ABS-003]"
+      ],
+      "unsupported_factual_requirement": "Cam kết hoặc kết luận tuyệt đối cần được nguồn hỗ trợ trực tiếp: cam kết, không gây kích ứng, bất kỳ."
+    },
+    {
+      "actual_action": "generate",
+      "actual_final_response": "Không. Isotretinoin là phương pháp điều trị hiệu quả nhất cho mụn nặng hoặc mụn có nguy cơ để lại sẹo, nhưng tài liệu không nêu rằng thuốc bảo đảm chắc chắn người bị mụn nặng sẽ không bị sẹo.\n\nTài liệu ghi nhận isotretinoin là lựa chọn được khuyến nghị cho bệnh nhân bị mụn nặng, mụn có gánh nặng tâm lý xã hội hoặc đã có sẹo, cũng như các trường hợp thất bại với liệu pháp uống hoặc bôi tiêu chuẩn. Tuy nhiên, các dữ liệu hiện có không đề cập đến việc thuốc có thể bảo đảm tuyệt đối ngăn ngừa hoàn toàn tình trạng để lại sẹo.",
+      "actual_reason": "evidence_sufficient",
+      "adjudicated_gold_status": "CONFIRMED_ABSENCE",
+      "all_decision_attempts": null,
+      "case_id": "GAP-ABS-004",
+      "category": "unsupported_absolute_certainty_guarantee",
+      "conversation_history": [],
+      "corpus_factual_result": "REQUESTED_ABSOLUTE_OR_EXACT_RELATION_NOT_FOUND",
+      "current_question": "Isotretinoin có bảo đảm người bị mụn nặng sẽ không để lại sẹo không?",
+      "decision_trace_missing_reason": "agent_decision_history, direct_supporting_evidence_ids, and policy_validation were omitted by the frozen record serializer",
+      "direct_supporting_evidence_ids": null,
+      "evidence_confidence": "SUPPORTED_INFERENCE",
+      "expected_action": "abstain",
+      "expected_reason": "evidence_gap",
+      "fallback_applied": false,
+      "final_packed_ids": [
+        "53fd9fb8-d7fa-5f13-a748-f813519e7e52",
+        "fab39994-704e-5185-b78d-5dfc8c7ae3d2",
+        "41a81bea-8def-5d49-b03e-6cc8a0d3db10",
+        "9a3422f5-a961-5b80-a064-68320a8b053d",
+        "ba1e646c-02de-5921-a36e-71f9a32f38a7"
+      ],
+      "generation_invoked": true,
+      "generation_model": "gemini-3.5-flash-lite",
+      "generation_provider": "gemini",
+      "missing_evidence_from_model": null,
+      "policy_validation": null,
+      "rerank_queries": [
+        "isotretinoin efficacy in preventing acne scarring for severe acne"
+      ],
+      "response_status": {
+        "semantic_contract_review": "not_available",
+        "structural_verifier_pass": true
+      },
+      "retrieval_attempts": 1,
+      "retrieval_queries": [
+        "isotretinoin efficacy in preventing acne scarring for severe acne"
+      ],
+      "retry_status": [
+        "ok"
+      ],
+      "root_cause_category": "G1_INSUFFICIENT_EVIDENCE_MISJUDGED",
+      "root_cause_explanation": "Confirmed-absence gold requires evidence-gap rejection, but the persisted semantic decision was generate/evidence_sufficient. Direct-support IDs and policy validation were not persisted, so the internal semantic mistake is supported rather than observed.",
+      "trace_references": [
+        "raw_results.records[GAP-ABS-004]",
+        "locked_gold.negative_adjudications[GAP-ABS-004]"
+      ],
+      "unsupported_factual_requirement": "Cam kết hoặc kết luận tuyệt đối cần được nguồn hỗ trợ trực tiếp: bảo đảm, không để lại sẹo."
+    },
+    {
+      "actual_action": "generate",
+      "actual_final_response": "Không có một con số chính xác tuyệt đối theo từng ngày để adapalene làm sạch hoàn toàn nhân mụn. Quá trình này cần có thời gian và mốc thời gian phụ thuộc vào từng giai đoạn đáp ứng của da:\n\n- Bạn có thể bắt đầu nhận thấy sự cải thiện hoặc kết quả ban đầu sau khoảng 4 đến 8 tuần sử dụng.\n- Việc làm sạch da hoàn toàn thường mất khoảng từ 2 đến 4 tháng.",
+      "actual_reason": "evidence_sufficient",
+      "adjudicated_gold_status": "CONFIRMED_ABSENCE",
+      "all_decision_attempts": null,
+      "case_id": "GAP-EXA-001",
+      "category": "unsupported_exact_quantity_time",
+      "conversation_history": [],
+      "corpus_factual_result": "REQUESTED_ABSOLUTE_OR_EXACT_RELATION_NOT_FOUND",
+      "current_question": "Chính xác bao nhiêu ngày adapalene sẽ làm hết toàn bộ nhân mụn?",
+      "decision_trace_missing_reason": "agent_decision_history, direct_supporting_evidence_ids, and policy_validation were omitted by the frozen record serializer",
+      "direct_supporting_evidence_ids": null,
+      "evidence_confidence": "SUPPORTED_INFERENCE",
+      "expected_action": "abstain",
+      "expected_reason": "evidence_gap",
+      "fallback_applied": false,
+      "final_packed_ids": [
+        "3d4374c8-2574-5647-a5fe-577f6ab40f2f",
+        "c527e2c8-eb10-576d-b36c-d79b08ef176f",
+        "d70589b7-7d99-540f-850a-f7870b0a810b"
+      ],
+      "generation_invoked": true,
+      "generation_model": "gemini-3.5-flash-lite",
+      "generation_provider": "gemini",
+      "missing_evidence_from_model": null,
+      "policy_validation": null,
+      "rerank_queries": [
+        "adapalene timeline clear acne lesions duration"
+      ],
+      "response_status": {
+        "semantic_contract_review": "not_available",
+        "structural_verifier_pass": true
+      },
+      "retrieval_attempts": 1,
+      "retrieval_queries": [
+        "adapalene timeline clear acne lesions duration"
+      ],
+      "retry_status": [
+        "ok"
+      ],
+      "root_cause_category": "G1_INSUFFICIENT_EVIDENCE_MISJUDGED",
+      "root_cause_explanation": "Confirmed-absence gold requires evidence-gap rejection, but the persisted semantic decision was generate/evidence_sufficient. Direct-support IDs and policy validation were not persisted, so the internal semantic mistake is supported rather than observed.",
+      "trace_references": [
+        "raw_results.records[GAP-EXA-001]",
+        "locked_gold.negative_adjudications[GAP-EXA-001]"
+      ],
+      "unsupported_factual_requirement": "Con số hoặc thời điểm chính xác cần được nguồn nêu trực tiếp: bao nhiêu ngày, hết toàn bộ, adapalene."
+    },
+    {
+      "actual_action": "generate",
+      "actual_final_response": "Các tài liệu hiện có không đưa ra quy định cụ thể về nhiệt độ nước (độ C) khi rửa mặt cho da mụn.\n\nThay vì tập trung vào nhiệt độ, các hướng dẫn chuyên môn khuyến nghị người bị mụn nên chú ý đến loại sản phẩm làm sạch:\n\n*   **Sử dụng sản phẩm phù hợp:** Nên dùng các loại sữa rửa mặt tổng hợp (syndet) có độ pH trung tính hoặc hơi axit (không chứa kiềm) để làm sạch da 2 lần mỗi ngày.\n*   **Đặc tính sản phẩm:** Các sản phẩm này giúp giảm số lượng tổn thương mụn viêm và không viêm, ít gây kích ứng hơn so với xà phòng truyền thống và không để lại lớp cặn trên da.\n*   **Tránh các sản phẩm gây hại:** Nên tránh các loại sữa rửa mặt có chứa hạt tẩy tế bào chết hoặc có kết cấu thô ráp vì chúng có thể gây kích ứng da và làm tình trạng mụn trở nên tồi tệ hơn.",
+      "actual_reason": "evidence_sufficient",
+      "adjudicated_gold_status": "CONFIRMED_ABSENCE",
+      "all_decision_attempts": null,
+      "case_id": "GAP-EXA-005",
+      "category": "unsupported_exact_quantity_time",
+      "conversation_history": [],
+      "corpus_factual_result": "REQUESTED_ABSOLUTE_OR_EXACT_RELATION_NOT_FOUND",
+      "current_question": "Nước rửa mặt cho da mụn phải đúng bao nhiêu độ C?",
+      "decision_trace_missing_reason": "agent_decision_history, direct_supporting_evidence_ids, and policy_validation were omitted by the frozen record serializer",
+      "direct_supporting_evidence_ids": null,
+      "evidence_confidence": "SUPPORTED_INFERENCE",
+      "expected_action": "abstain",
+      "expected_reason": "evidence_gap",
+      "fallback_applied": false,
+      "final_packed_ids": [
+        "65d797cf-c0ad-59ac-9f7e-0f0e219ba7e7",
+        "7213d9c3-66ee-5a7a-a0a4-52c94a288fdc",
+        "4a9b8aee-59c0-5724-a214-d93d0d110696",
+        "a5d5921e-d85b-5554-89c6-6b090b63cc9f",
+        "66597fe2-94da-5055-8f3f-455cb648838f",
+        "5ab273ba-95fb-5bf2-88f9-fe12c1ad7819",
+        "806ff2e0-c506-52df-8029-349796c99b87",
+        "420333b5-085f-516f-bc6d-a7a35fa47f71",
+        "9bbf9cbe-b0c7-511e-837b-1d521343903f"
+      ],
+      "generation_invoked": true,
+      "generation_model": "gemini-3.1-flash-lite",
+      "generation_provider": "gemini",
+      "missing_evidence_from_model": null,
+      "policy_validation": null,
+      "rerank_queries": [
+        "nước rửa mặt cho da mụn độ pH nhiệt độ bảo quản"
+      ],
+      "response_status": {
+        "semantic_contract_review": "not_available",
+        "structural_verifier_pass": true
+      },
+      "retrieval_attempts": 1,
+      "retrieval_queries": [
+        "nước rửa mặt cho da mụn độ pH nhiệt độ bảo quản"
+      ],
+      "retry_status": [
+        "ok"
+      ],
+      "root_cause_category": "G1_INSUFFICIENT_EVIDENCE_MISJUDGED",
+      "root_cause_explanation": "Confirmed-absence gold requires evidence-gap rejection, but the persisted semantic decision was generate/evidence_sufficient. Direct-support IDs and policy validation were not persisted, so the internal semantic mistake is supported rather than observed.",
+      "trace_references": [
+        "raw_results.records[GAP-EXA-005]",
+        "locked_gold.negative_adjudications[GAP-EXA-005]"
+      ],
+      "unsupported_factual_requirement": "Con số hoặc thời điểm chính xác cần được nguồn nêu trực tiếp: bao nhiêu độ C, nước rửa mặt."
+    },
+    {
+      "actual_action": "generate",
+      "actual_final_response": "Tài liệu hiện có không cung cấp con số phần trăm chính xác về sự chênh lệch hiệu quả giữa benzoyl peroxide 2,5% và 5%.\n\nCác tài liệu chuyên môn chỉ ghi nhận có những nghiên cứu so sánh hiệu quả của benzoyl peroxide ở các nồng độ 2,5%, 5% và 10% trên mụn viêm, nhưng không nêu cụ thể kết quả so sánh định lượng giữa các mức nồng độ này.",
+      "actual_reason": "evidence_sufficient",
+      "adjudicated_gold_status": "CONFIRMED_ABSENCE",
+      "all_decision_attempts": null,
+      "case_id": "GAP-REL-002",
+      "category": "unsupported_comparison_relationship_specificity",
+      "conversation_history": [],
+      "corpus_factual_result": "REQUESTED_ABSOLUTE_OR_EXACT_RELATION_NOT_FOUND",
+      "current_question": "Benzoyl peroxide 2,5% vượt 5% chính xác bao nhiêu phần trăm về hiệu quả?",
+      "decision_trace_missing_reason": "agent_decision_history, direct_supporting_evidence_ids, and policy_validation were omitted by the frozen record serializer",
+      "direct_supporting_evidence_ids": null,
+      "evidence_confidence": "SUPPORTED_INFERENCE",
+      "expected_action": "abstain",
+      "expected_reason": "evidence_gap",
+      "fallback_applied": false,
+      "final_packed_ids": [
+        "a89114e4-3e8b-5fb7-bafd-b0b5f33dec5b",
+        "9bf4a082-f386-5747-9de5-269283f3b327",
+        "17702949-57d1-5977-ad29-66dd1815ac8e",
+        "6c8057d5-0d97-5a3b-885f-f767381a754c"
+      ],
+      "generation_invoked": true,
+      "generation_model": "gemini-3.1-flash-lite",
+      "generation_provider": "gemini",
+      "missing_evidence_from_model": null,
+      "policy_validation": null,
+      "rerank_queries": [
+        "benzoyl peroxide 2.5% vs 5% efficacy comparison acne",
+        "benzoyl peroxide 2.5% versus 5% efficacy comparison acne vulgaris"
+      ],
+      "response_status": {
+        "semantic_contract_review": "not_available",
+        "structural_verifier_pass": true
+      },
+      "retrieval_attempts": 2,
+      "retrieval_queries": [
+        "benzoyl peroxide 2.5% vs 5% efficacy comparison acne",
+        "benzoyl peroxide 2.5% versus 5% efficacy comparison acne vulgaris"
+      ],
+      "retry_status": [
+        "ok",
+        "ok"
+      ],
+      "root_cause_category": "G1_INSUFFICIENT_EVIDENCE_MISJUDGED",
+      "root_cause_explanation": "Confirmed-absence gold requires evidence-gap rejection, but the persisted semantic decision was generate/evidence_sufficient. Direct-support IDs and policy validation were not persisted, so the internal semantic mistake is supported rather than observed.",
+      "trace_references": [
+        "raw_results.records[GAP-REL-002]",
+        "locked_gold.negative_adjudications[GAP-REL-002]"
+      ],
+      "unsupported_factual_requirement": "So sánh, quan hệ hoặc mức chênh lệch cụ thể cần được nguồn nêu trực tiếp: 2,5%, 5%, bao nhiêu phần trăm."
+    },
+    {
+      "actual_action": "generate",
+      "actual_final_response": "Không có loại chocolate hay định mức số gram nào chắc chắn làm xuất hiện mụn. Theo các chuyên gia, chocolate không gây ra mụn hay làm tình trạng mụn trở nên tồi tệ hơn.",
+      "actual_reason": "evidence_sufficient",
+      "adjudicated_gold_status": "CONFIRMED_ABSENCE",
+      "all_decision_attempts": null,
+      "case_id": "GAP-REL-010",
+      "category": "unsupported_comparison_relationship_specificity",
+      "conversation_history": [],
+      "corpus_factual_result": "REQUESTED_ABSOLUTE_OR_EXACT_RELATION_NOT_FOUND",
+      "current_question": "Loại chocolate và số gam mỗi ngày nào chắc chắn làm xuất hiện mụn?",
+      "decision_trace_missing_reason": "agent_decision_history, direct_supporting_evidence_ids, and policy_validation were omitted by the frozen record serializer",
+      "direct_supporting_evidence_ids": null,
+      "evidence_confidence": "SUPPORTED_INFERENCE",
+      "expected_action": "abstain",
+      "expected_reason": "evidence_gap",
+      "fallback_applied": false,
+      "final_packed_ids": [
+        "f18f5040-8246-5fd1-a618-2c26ccd18db4",
+        "bc8f3df2-5349-57ad-bc6a-6846ce491f09",
+        "9e54bed6-6a28-58bf-9029-629b32a7d4c5",
+        "4252a45c-1d48-5b3d-918d-e7c6bf36933a"
+      ],
+      "generation_invoked": true,
+      "generation_model": "gemini-3.5-flash-lite",
+      "generation_provider": "gemini",
+      "missing_evidence_from_model": null,
+      "policy_validation": null,
+      "rerank_queries": [
+        "chocolate consumption amount acne breakout causation"
+      ],
+      "response_status": {
+        "semantic_contract_review": "not_available",
+        "structural_verifier_pass": true
+      },
+      "retrieval_attempts": 1,
+      "retrieval_queries": [
+        "chocolate consumption amount acne breakout causation"
+      ],
+      "retry_status": [
+        "ok"
+      ],
+      "root_cause_category": "G1_INSUFFICIENT_EVIDENCE_MISJUDGED",
+      "root_cause_explanation": "Confirmed-absence gold requires evidence-gap rejection, but the persisted semantic decision was generate/evidence_sufficient. Direct-support IDs and policy validation were not persisted, so the internal semantic mistake is supported rather than observed.",
+      "trace_references": [
+        "raw_results.records[GAP-REL-010]",
+        "locked_gold.negative_adjudications[GAP-REL-010]"
+      ],
+      "unsupported_factual_requirement": "So sánh, quan hệ hoặc mức chênh lệch cụ thể cần được nguồn nêu trực tiếp: chocolate, số gam, chắc chắn."
+    }
+  ],
+  "important_interpretation": "These are action-contract failures. A generated answer may still state a limitation; generation_invoked alone is not a failure. No new semantic answer grading was performed.",
+  "policy_ambiguous_case_ids": [
+    "GAP-ABS-001",
+    "GAP-ABS-002",
+    "GAP-ABS-006",
+    "GAP-ABS-007",
+    "GAP-ABS-009",
+    "GAP-ABS-010"
+  ],
+  "policy_ambiguous_total": 6,
+  "schema": "rag_evidence_gap_failures_v1"
+}

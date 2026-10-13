@@ -1,0 +1,1288 @@
+{
+  "affected_case_count": 24,
+  "cases": [
+    {
+      "case_id": "ANS-ADV-002",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-ADV-002-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "requirement_id": "ANS-ADV-002::14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "rerank_ranks": [
+            10
+          ],
+          "rerank_scores": [
+            0.09814453125
+          ],
+          "rrf_ranks": [
+            19
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-ADV-002].retrieval_attempt_traces",
+            "raw_results.records[ANS-ADV-002].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-ADV-002-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-ADV-003",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-ADV-003-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "requirement_id": "ANS-ADV-003::14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "rerank_ranks": [
+            5
+          ],
+          "rerank_scores": [
+            0.94140625
+          ],
+          "rrf_ranks": [
+            5
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-ADV-003].retrieval_attempt_traces",
+            "raw_results.records[ANS-ADV-003].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-ADV-003-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-ADV-005",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-ADV-005-C02"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "41a81bea-8def-5d49-b03e-6cc8a0d3db10",
+          "requirement_id": "ANS-ADV-005::41a81bea-8def-5d49-b03e-6cc8a0d3db10",
+          "rerank_ranks": [
+            8
+          ],
+          "rerank_scores": [
+            0.27734375
+          ],
+          "rrf_ranks": [
+            13
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-ADV-005].retrieval_attempt_traces",
+            "raw_results.records[ANS-ADV-005].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-ADV-005-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-ADV-009",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-ADV-009-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ACQUISITION_MISS",
+          "primary_reason": "absent_from_saved_dense_and_bm25_candidate_limits",
+          "required_chunk_id": "4a9b8aee-59c0-5724-a214-d93d0d110696",
+          "requirement_id": "ANS-ADV-009::4a9b8aee-59c0-5724-a214-d93d0d110696",
+          "rerank_ranks": [
+            null
+          ],
+          "rerank_scores": [
+            null
+          ],
+          "rrf_ranks": [
+            null
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-ADV-009].retrieval_attempt_traces",
+            "raw_results.records[ANS-ADV-009].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-ADV-009-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ACQUISITION_MISS": 1
+      }
+    },
+    {
+      "case_id": "ANS-CMP-002",
+      "lost_requirement_count": 2,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 8,
+              "rrf_rank": 6
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-002-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+          "requirement_id": "ANS-CMP-002::42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+          "rerank_ranks": [
+            8
+          ],
+          "rerank_scores": [
+            0.69140625
+          ],
+          "rrf_ranks": [
+            6
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-002].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-002].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-002-C01]"
+          ]
+        },
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-002-C02"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "requirement_id": "ANS-CMP-002::9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "rerank_ranks": [
+            7
+          ],
+          "rerank_scores": [
+            0.73828125
+          ],
+          "rrf_ranks": [
+            7
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-002].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-002].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-002-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 2
+      }
+    },
+    {
+      "case_id": "ANS-CMP-003",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 15,
+              "rrf_rank": 7
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-003-C03"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "requirement_id": "ANS-CMP-003::e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "rerank_ranks": [
+            15
+          ],
+          "rerank_scores": [
+            0.8125
+          ],
+          "rrf_ranks": [
+            7
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-003].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-003].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-003-C03]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-CMP-004",
+      "lost_requirement_count": 2,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 21,
+              "rrf_rank": 11
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-004-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "624729be-fe2e-53e0-9738-134a08f481dc",
+          "requirement_id": "ANS-CMP-004::624729be-fe2e-53e0-9738-134a08f481dc",
+          "rerank_ranks": [
+            21
+          ],
+          "rerank_scores": [
+            0.29296875
+          ],
+          "rrf_ranks": [
+            11
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-004].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-004].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-004-C01]"
+          ]
+        },
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-004-C02",
+            "ANS-CMP-004-C03"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "requirement_id": "ANS-CMP-004::0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "rerank_ranks": [
+            13
+          ],
+          "rerank_scores": [
+            0.55859375
+          ],
+          "rrf_ranks": [
+            19
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-004].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-004].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-004-C02,ANS-CMP-004-C03]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 2
+      }
+    },
+    {
+      "case_id": "ANS-CMP-005",
+      "lost_requirement_count": 2,
+      "requirements": [
+        {
+          "contributing_factors": [],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-005-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ACQUISITION_MISS",
+          "primary_reason": "absent_from_saved_dense_and_bm25_candidate_limits",
+          "required_chunk_id": "3725e30a-9a79-5f53-87b9-8fb9165b9451",
+          "requirement_id": "ANS-CMP-005::3725e30a-9a79-5f53-87b9-8fb9165b9451",
+          "rerank_ranks": [
+            null
+          ],
+          "rerank_scores": [
+            null
+          ],
+          "rrf_ranks": [
+            null
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-005].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-005].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-005-C01]"
+          ]
+        },
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 20,
+              "rrf_rank": 6
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 20
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-005-C02"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "601b9c19-52c6-56cd-9965-0f3e0b1fa08e",
+          "requirement_id": "ANS-CMP-005::601b9c19-52c6-56cd-9965-0f3e0b1fa08e",
+          "rerank_ranks": [
+            20
+          ],
+          "rerank_scores": [
+            0.006683349609375
+          ],
+          "rrf_ranks": [
+            6
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-005].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-005].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-005-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ACQUISITION_MISS": 1,
+        "ITEM_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-CMP-008",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-008-C03"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "41a81bea-8def-5d49-b03e-6cc8a0d3db10",
+          "requirement_id": "ANS-CMP-008::41a81bea-8def-5d49-b03e-6cc8a0d3db10",
+          "rerank_ranks": [
+            7
+          ],
+          "rerank_scores": [
+            0.7890625
+          ],
+          "rrf_ranks": [
+            13
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-008].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-008].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-008-C03]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-CMP-010",
+      "lost_requirement_count": 2,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 18,
+              "rrf_rank": 13
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 18
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-010-C01"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "df9c7438-a085-5063-9824-a96830e2224a",
+          "requirement_id": "ANS-CMP-010::df9c7438-a085-5063-9824-a96830e2224a",
+          "rerank_ranks": [
+            18
+          ],
+          "rerank_scores": [
+            0.0021820068359375
+          ],
+          "rrf_ranks": [
+            13
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-010].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-010].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-010-C01]"
+          ]
+        },
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 19,
+              "rrf_rank": 9
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 19
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-CMP-010-C02"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "c5a99f3c-abf4-5ed3-be4a-6acdf0b82d3a",
+          "requirement_id": "ANS-CMP-010::c5a99f3c-abf4-5ed3-be4a-6acdf0b82d3a",
+          "rerank_ranks": [
+            19
+          ],
+          "rerank_scores": [
+            0.00159454345703125
+          ],
+          "rrf_ranks": [
+            9
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-CMP-010].retrieval_attempt_traces",
+            "raw_results.records[ANS-CMP-010].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-CMP-010-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ITEM_BUDGET_LOSS": 2
+      }
+    },
+    {
+      "case_id": "ANS-DEF-002",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-DEF-002-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ACQUISITION_MISS",
+          "primary_reason": "absent_from_saved_dense_and_bm25_candidate_limits",
+          "required_chunk_id": "904d057a-aa4d-5d6a-bcb7-7379c5137b60",
+          "requirement_id": "ANS-DEF-002::904d057a-aa4d-5d6a-bcb7-7379c5137b60",
+          "rerank_ranks": [
+            null
+          ],
+          "rerank_scores": [
+            null
+          ],
+          "rrf_ranks": [
+            null
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-DEF-002].retrieval_attempt_traces",
+            "raw_results.records[ANS-DEF-002].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-DEF-002-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ACQUISITION_MISS": 1
+      }
+    },
+    {
+      "case_id": "ANS-DEF-006",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 6,
+              "rrf_rank": 4
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-DEF-006-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "requirement_id": "ANS-DEF-006::9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "rerank_ranks": [
+            6
+          ],
+          "rerank_scores": [
+            0.8359375
+          ],
+          "rrf_ranks": [
+            4
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-DEF-006].retrieval_attempt_traces",
+            "raw_results.records[ANS-DEF-006].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-DEF-006-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-DEF-009",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 16,
+              "rrf_rank": 9
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 16
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-DEF-009-C01"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "c5a99f3c-abf4-5ed3-be4a-6acdf0b82d3a",
+          "requirement_id": "ANS-DEF-009::c5a99f3c-abf4-5ed3-be4a-6acdf0b82d3a",
+          "rerank_ranks": [
+            16
+          ],
+          "rerank_scores": [
+            0.000518798828125
+          ],
+          "rrf_ranks": [
+            9
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-DEF-009].retrieval_attempt_traces",
+            "raw_results.records[ANS-DEF-009].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-DEF-009-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ITEM_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-DEF-010",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 27,
+              "rrf_rank": 8
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 27
+            },
+            {
+              "confidence": "OBSERVED",
+              "factor": "RETRY_REPACK_OUTCOME_NOT_STATE_LOSS"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-DEF-010-C01"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "df9c7438-a085-5063-9824-a96830e2224a",
+          "requirement_id": "ANS-DEF-010::df9c7438-a085-5063-9824-a96830e2224a",
+          "rerank_ranks": [
+            21,
+            27
+          ],
+          "rerank_scores": [
+            0.000881195068359375,
+            0.00020313262939453125
+          ],
+          "rrf_ranks": [
+            8,
+            8
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-DEF-010].retrieval_attempt_traces",
+            "raw_results.records[ANS-DEF-010].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-DEF-010-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ITEM_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-MEC-008",
+      "lost_requirement_count": 2,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 14,
+              "rrf_rank": 5
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MEC-008-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "requirement_id": "ANS-MEC-008::e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "rerank_ranks": [
+            14
+          ],
+          "rerank_scores": [
+            0.69921875
+          ],
+          "rrf_ranks": [
+            5
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MEC-008].retrieval_attempt_traces",
+            "raw_results.records[ANS-MEC-008].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MEC-008-C01]"
+          ]
+        },
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MEC-008-C02"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "requirement_id": "ANS-MEC-008::0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "rerank_ranks": [
+            8
+          ],
+          "rerank_scores": [
+            0.8203125
+          ],
+          "rrf_ranks": [
+            10
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MEC-008].retrieval_attempt_traces",
+            "raw_results.records[ANS-MEC-008].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MEC-008-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 2
+      }
+    },
+    {
+      "case_id": "ANS-MUL-001",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 9,
+              "rrf_rank": 5
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MUL-001-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "8f7614fe-0375-5441-9822-3773a0cc4e07",
+          "requirement_id": "ANS-MUL-001::8f7614fe-0375-5441-9822-3773a0cc4e07",
+          "rerank_ranks": [
+            9
+          ],
+          "rerank_scores": [
+            0.10986328125
+          ],
+          "rrf_ranks": [
+            5
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MUL-001].retrieval_attempt_traces",
+            "raw_results.records[ANS-MUL-001].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MUL-001-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-MUL-003",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MUL-003-C02"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "ec49f82f-1b66-57ff-973a-caaea5959cf1",
+          "requirement_id": "ANS-MUL-003::ec49f82f-1b66-57ff-973a-caaea5959cf1",
+          "rerank_ranks": [
+            9
+          ],
+          "rerank_scores": [
+            0.388671875
+          ],
+          "rrf_ranks": [
+            29
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MUL-003].retrieval_attempt_traces",
+            "raw_results.records[ANS-MUL-003].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MUL-003-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-MUL-010",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MUL-010-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "ec49f82f-1b66-57ff-973a-caaea5959cf1",
+          "requirement_id": "ANS-MUL-010::ec49f82f-1b66-57ff-973a-caaea5959cf1",
+          "rerank_ranks": [
+            14
+          ],
+          "rerank_scores": [
+            0.04541015625
+          ],
+          "rrf_ranks": [
+            20
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MUL-010].retrieval_attempt_traces",
+            "raw_results.records[ANS-MUL-010].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MUL-010-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-MUL-011",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MUL-011-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "78e9df3c-560c-5c35-b149-385bdb884f11",
+          "requirement_id": "ANS-MUL-011::78e9df3c-560c-5c35-b149-385bdb884f11",
+          "rerank_ranks": [
+            7
+          ],
+          "rerank_scores": [
+            0.6640625
+          ],
+          "rrf_ranks": [
+            11
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MUL-011].retrieval_attempt_traces",
+            "raw_results.records[ANS-MUL-011].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MUL-011-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-MUL-012",
+      "lost_requirement_count": 2,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 11,
+              "rrf_rank": 1
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MUL-012-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "4a9b8aee-59c0-5724-a214-d93d0d110696",
+          "requirement_id": "ANS-MUL-012::4a9b8aee-59c0-5724-a214-d93d0d110696",
+          "rerank_ranks": [
+            11
+          ],
+          "rerank_scores": [
+            0.30078125
+          ],
+          "rrf_ranks": [
+            1
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MUL-012].retrieval_attempt_traces",
+            "raw_results.records[ANS-MUL-012].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MUL-012-C01]"
+          ]
+        },
+        {
+          "contributing_factors": [
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-MUL-012-C02"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "requirement_id": "ANS-MUL-012::14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "rerank_ranks": [
+            18
+          ],
+          "rerank_scores": [
+            0.1142578125
+          ],
+          "rrf_ranks": [
+            25
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-MUL-012].retrieval_attempt_traces",
+            "raw_results.records[ANS-MUL-012].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-MUL-012-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 2
+      }
+    },
+    {
+      "case_id": "ANS-TRT-001",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 27,
+              "rrf_rank": 9
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 27
+            },
+            {
+              "confidence": "OBSERVED",
+              "factor": "RETRY_REPACK_OUTCOME_NOT_STATE_LOSS"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-TRT-001-C01",
+            "ANS-TRT-001-C02"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "06a0e33d-b9f6-53c0-b5ed-a163ec1e0d5b",
+          "requirement_id": "ANS-TRT-001::06a0e33d-b9f6-53c0-b5ed-a163ec1e0d5b",
+          "rerank_ranks": [
+            23,
+            27
+          ],
+          "rerank_scores": [
+            1.6689300537109375e-05,
+            1.6689300537109375e-05
+          ],
+          "rrf_ranks": [
+            9,
+            9
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-TRT-001].retrieval_attempt_traces",
+            "raw_results.records[ANS-TRT-001].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-TRT-001-C01,ANS-TRT-001-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ITEM_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-TRT-003",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 21,
+              "rrf_rank": 18
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-TRT-003-C01"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "3725e30a-9a79-5f53-87b9-8fb9165b9451",
+          "requirement_id": "ANS-TRT-003::3725e30a-9a79-5f53-87b9-8fb9165b9451",
+          "rerank_ranks": [
+            21
+          ],
+          "rerank_scores": [
+            0.197265625
+          ],
+          "rrf_ranks": [
+            18
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-TRT-003].retrieval_attempt_traces",
+            "raw_results.records[ANS-TRT-003].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-TRT-003-C01]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-TRT-008",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 20,
+              "rrf_rank": 7
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "RERANK_ORDER_PLACED_REQUIREMENT_AFTER_PACKED_PREFIX",
+              "rerank_rank": 20
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-TRT-008-C02"
+          ],
+          "not_examined_reason": "item_limit_reached",
+          "packer_drop_reason": null,
+          "primary_loss_stage": "ITEM_BUDGET_LOSS",
+          "primary_reason": "candidate_not_examined_after_item_limit_was_reached",
+          "required_chunk_id": "43191f74-eff1-5540-bd20-b512c055fccd",
+          "requirement_id": "ANS-TRT-008::43191f74-eff1-5540-bd20-b512c055fccd",
+          "rerank_ranks": [
+            20
+          ],
+          "rerank_scores": [
+            0.00445556640625
+          ],
+          "rrf_ranks": [
+            7
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-TRT-008].retrieval_attempt_traces",
+            "raw_results.records[ANS-TRT-008].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-TRT-008-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "ITEM_BUDGET_LOSS": 1
+      }
+    },
+    {
+      "case_id": "ANS-TRT-009",
+      "lost_requirement_count": 1,
+      "requirements": [
+        {
+          "contributing_factors": [
+            {
+              "confidence": "OBSERVED",
+              "factor": "RERANK_DEMOTION_OBSERVED",
+              "rerank_rank": 5,
+              "rrf_rank": 3
+            },
+            {
+              "confidence": "DETERMINISTICALLY_REPRODUCED",
+              "factor": "WHOLE_CHUNK_ADMISSION_POLICY"
+            }
+          ],
+          "evidence_confidence": "OBSERVED",
+          "gold_claim_ids": [
+            "ANS-TRT-009-C01",
+            "ANS-TRT-009-C02"
+          ],
+          "not_examined_reason": null,
+          "packer_drop_reason": "character_limit",
+          "primary_loss_stage": "CHARACTER_BUDGET_LOSS",
+          "primary_reason": "whole_chunk_exceeded_remaining_character_budget",
+          "required_chunk_id": "6d6de22f-f537-5336-9812-1133ba9fbc7b",
+          "requirement_id": "ANS-TRT-009::6d6de22f-f537-5336-9812-1133ba9fbc7b",
+          "rerank_ranks": [
+            5
+          ],
+          "rerank_scores": [
+            0.2294921875
+          ],
+          "rrf_ranks": [
+            3
+          ],
+          "trace_references": [
+            "raw_results.records[ANS-TRT-009].retrieval_attempt_traces",
+            "raw_results.records[ANS-TRT-009].retrieval_trace",
+            "locked_gold.gold_claim_adjudications[ANS-TRT-009-C01,ANS-TRT-009-C02]"
+          ]
+        }
+      ],
+      "stage_counts": {
+        "CHARACTER_BUDGET_LOSS": 1
+      }
+    }
+  ],
+  "schema": "rag_evidence_loss_by_case_v1"
+}

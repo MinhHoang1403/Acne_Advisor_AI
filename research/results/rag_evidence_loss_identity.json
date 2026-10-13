@@ -1,0 +1,109 @@
+{
+  "artifact_source": {
+    "commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+    "files": {
+      "benchmark": {
+        "blob_oid": "d2aabf26e32fa16d031bfe69ff36555dec9cf36d",
+        "owner_commit": "bd3db1a87fc1e6491c11cab983dfa0b62112db00",
+        "path": "evaluation/benchmark_100.json"
+      },
+      "benchmark_manifest": {
+        "blob_oid": "181f3edcb3778ffead0638be2c8ea217945b2c0d",
+        "owner_commit": "88b28c7e74ce1f110339ccd75e526bf96046ffcc",
+        "path": "evaluation/benchmark_manifest.json"
+      },
+      "gold": {
+        "blob_oid": "e91dbe5ccfcf455c8e7f6c61436afd39b58194c9",
+        "owner_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+        "path": "evaluation/locked_gold/current_kb_adjudication.json"
+      },
+      "gold_manifest": {
+        "blob_oid": "08f2ac84773b097c8d516acc8ea9934ee5271436",
+        "owner_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+        "path": "evaluation/locked_gold/current_kb_adjudication_manifest.json"
+      },
+      "raw_results": {
+        "blob_oid": "04f75c350b5c2c8ba308f309b00dcc06c1905897",
+        "owner_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+        "path": "evaluation/results/thesis_evaluation_366f3ad8/raw_results.json"
+      },
+      "reference_metrics": {
+        "blob_oid": "c25df3cb89cf569f09d2bf470691e9ec1a7b021a",
+        "owner_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+        "path": "evaluation/results/thesis_evaluation_366f3ad8/deterministic_metrics.json"
+      },
+      "run_manifest": {
+        "blob_oid": "c2c92d419bf6dda0b3f29626043468bbdccadcd5",
+        "owner_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+        "path": "evaluation/results/thesis_evaluation_366f3ad8/run_manifest.json"
+      },
+      "system_output_manifest": {
+        "blob_oid": "f8998c91d3cb35988e14ca16aeceb8e4cd62a3e8",
+        "owner_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+        "path": "evaluation/results/thesis_evaluation_366f3ad8/system_output_manifest.json"
+      }
+    },
+    "ref": "evaluation/thesis-final-evaluation"
+  },
+  "benchmark": {
+    "canonical_sha256": "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b",
+    "case_count": 100,
+    "manifest_active_kb_build_id": "94d613bc9b33628de3ef"
+  },
+  "checks": {
+    "benchmark_hash_matches_manifest": true,
+    "benchmark_hash_matches_raw": true,
+    "benchmark_hash_matches_run": true,
+    "case_ids_unique": true,
+    "case_order_matches_benchmark": true,
+    "gold_canonical_matches_raw": true,
+    "gold_canonical_matches_run": true,
+    "gold_raw_matches_run": true,
+    "kb_build_matches_gold": true,
+    "kb_build_matches_gold_manifest": true,
+    "kb_build_matches_run": true,
+    "pipeline_fingerprint_matches": true,
+    "raw_bytes_match_output_manifest": true,
+    "raw_canonical_matches_output_manifest": true,
+    "raw_canonical_matches_reference_metrics": true,
+    "record_count_matches_benchmark": true,
+    "record_count_matches_output_manifest": true,
+    "record_pipeline_fingerprints_match": true,
+    "run_id_matches": true,
+    "system_sha_matches_expected": true,
+    "system_sha_matches_run_manifest": true
+  },
+  "evaluated_production_sha": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+  "gold": {
+    "annotation_status": {
+      "AUTO_CLEAR": 128,
+      "OWNER_REVIEW_REQUIRED": 6
+    },
+    "canonical_sha256": "e0597523954311d954266adae59f4bb86530e6bce9b5ca6b59b0148ef7d3801e",
+    "current_kb_build_id": "d4a1819fe7fb77fe1f40",
+    "old_benchmark_kb_build_id": "94d613bc9b33628de3ef",
+    "raw_sha256": "68e025affb608d220eebd5988e76d19a1baebc2f60d35a986a87b2d93db6a02e"
+  },
+  "historical_metadata_reconciliation": {
+    "benchmark_manifest_kb_is_old_build": true,
+    "current_kb_matches_run_and_gold": true,
+    "interpretation": "The benchmark manifest records the build where the benchmark was assembled. The locked-gold artifact explicitly maps that old build to the current KB used by the frozen run; content hashes and the current KB identity match.",
+    "old_kb_matches_locked_gold_lineage": true
+  },
+  "kb_build_id": "d4a1819fe7fb77fe1f40",
+  "pipeline_fingerprint": "e4c420923b79b37c992cf36d",
+  "raw_results": {
+    "canonical_sha256": "1f525efb44091c2444d298d45de4f31637b9be4d1d512f88db38ae9738125feb",
+    "case_count": 100,
+    "raw_sha256": "b078858d61ced4ed072339fd9cb576517a2ce585724e425c6fc0a2f772f57f16",
+    "system_answers_locked": true
+  },
+  "run_id": "thesis_evaluation_366f3ad8",
+  "run_status": {
+    "semantic_evaluator": "RAGCHECKER_EVALUATOR_BLOCKER",
+    "semantic_evaluator_note": "The semantic evaluator was blocked after outputs were frozen; this study uses only the complete deterministic traces.",
+    "system_outputs": "complete_and_locked"
+  },
+  "schema": "rag_evidence_loss_identity_v1",
+  "status": "VERIFIED"
+}

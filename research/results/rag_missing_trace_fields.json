@@ -1,0 +1,54 @@
+{
+  "cases_not_fully_traceable": [
+    "ANS-ADV-002",
+    "ANS-ADV-003",
+    "ANS-ADV-005",
+    "ANS-ADV-009",
+    "ANS-CMP-002",
+    "ANS-CMP-003",
+    "ANS-CMP-004",
+    "ANS-CMP-005",
+    "ANS-CMP-008",
+    "ANS-DEF-002",
+    "ANS-DEF-006",
+    "ANS-MEC-008",
+    "ANS-MUL-001",
+    "ANS-MUL-003",
+    "ANS-MUL-010",
+    "ANS-MUL-011",
+    "ANS-MUL-012",
+    "ANS-TRT-003",
+    "ANS-TRT-009"
+  ],
+  "fields": [
+    {
+      "affected_records": 100,
+      "field": "agent_decision_history/direct_supporting_evidence_ids/policy_validation",
+      "impact": "prevents OBSERVED attribution of the semantic decision internals",
+      "minimal_future_instrumentation": "persist the existing text-free agent_decision_history and agent_decision_evidence_traces fields",
+      "scope": "all frozen records; critical for six confirmed evidence-gap failures"
+    },
+    {
+      "affected_requirements": 27,
+      "field": "nonpacked candidate text and rendered block cost",
+      "impact": "prevents exact pure-function replay of whole-chunk packing",
+      "minimal_future_instrumentation": "persist text_sha256, text_length, rendered_cost, and used_chars_before",
+      "scope": "all nonpacked acquired requirements"
+    },
+    {
+      "affected_requirements": 20,
+      "field": "used and remaining characters at drop time",
+      "impact": "drop reason is observed, but exact arithmetic cannot be independently replayed",
+      "minimal_future_instrumentation": "add used_chars_before, rendered_cost, and remaining_chars to packer trace",
+      "scope": "character-budget losses"
+    },
+    {
+      "affected_requirements": 3,
+      "field": "candidates beyond saved channel top-k",
+      "impact": "cannot separate corpus/ranking miss from the configured channel limit",
+      "minimal_future_instrumentation": "record bounded rank-of-required only in offline labeled evaluation, never at runtime",
+      "scope": "acquisition misses"
+    }
+  ],
+  "schema": "rag_missing_trace_fields_v1"
+}
