@@ -155,10 +155,12 @@ stack as part of normal application startup.
 
 On this Windows machine, Application Control has blocked the Python `select`
 extension. Do not disable the security policy or delete the active environment to
-hide that failure. Use an approved Python installation or the existing
-`acne-thesis-evaluation:366f3ad8` image for bounded offline checks until the final
-Windows CI checks provide the corresponding clean-environment validation. The
-image is an evaluation/test tool, not a second application checkout.
+hide that failure. Use an approved Python installation and the required Windows
+CI checks for clean-environment validation. An existing evaluation image can be
+used for bounded offline checks during environment troubleshooting, but is not
+an application dependency or a second source checkout. The evaluator environment
+recipe is `evaluation/Dockerfile.thesis`; normal API/frontend startup uses the
+main checkout and the four backing services only.
 
 `.env`, provider secrets, caches, databases, snapshots and generated reports
 remain local-only. Never print secrets or use destructive global Docker cleanup.
