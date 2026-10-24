@@ -1,0 +1,173 @@
+{
+  "schema_version": "local_extraction_contract_protocol_v1",
+  "locked_before_new_inference": true,
+  "study_type": "research_only",
+  "production_changes_allowed": false,
+  "model": {
+    "name": "qwen3.5:9b-q4_K_M",
+    "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+    "quantization": "Q4_K_M",
+    "endpoint_policy": "local Ollama native API only",
+    "paid_or_remote_fallback": false
+  },
+  "runtime": {
+    "num_ctx": 16384,
+    "extraction_num_predict": 1000,
+    "checking_num_predict": 150,
+    "temperature": 0.0,
+    "seed": 42,
+    "think": false,
+    "timeout_seconds": 300.0,
+    "keep_alive": "30m",
+    "concurrency": 1,
+    "repetitions": 3,
+    "hybrid_gpu_ram_allowed": true
+  },
+  "software": {
+    "ollama": "0.40.2",
+    "ragchecker": "0.1.9",
+    "refchecker": "0.2.17",
+    "docker_image": "acne-thesis-evaluation:366f3ad8",
+    "source_hashes": {
+      "refchecker/extractor/extractor_base.py": "07f78556548a7ca1040ae50d4239c34254b5958c777b9ac8106896406e85423b",
+      "refchecker/extractor/llm_extractor.py": "48ae42a2be141ad279fb3e139aef6829a539c3e7dfd97a2be6b181b4a40591a8",
+      "ragchecker/computation.py": "18a92c5ef9e5a1d4a1e70d1203cbc281a3061908a247ab6c21411ea4ffa6d574",
+      "ragchecker/evaluator.py": "ffe74c4e8551bdeb52a505d85f2edc6571c84ec56c6ed5e2fd7108ae0c52a016",
+      "ragchecker/metrics.py": "e72cfc28a83268df6c32177fb3dac6f9f7fd52363a3e57031d5292a476c05171"
+    }
+  },
+  "development_set": {
+    "path": "evaluation/evaluator_calibration.json",
+    "canonical_sha256": "69b837a5571614b24c7705b362af1cb451b6111fddd60c9e471ffbd49fd04644",
+    "raw_file_sha256": "238f14148f6846e59240c558e14125a092afbd446c6c0e1519f3554b053c757c",
+    "counts": {
+      "extraction": 8,
+      "checking": 12
+    }
+  },
+  "holdout_draft": {
+    "path": "research/results/local_extraction_contract_holdout_draft.json",
+    "raw_sha256": "d85dc6467da8df2483c80a5e9a5ca4902c94e31bbfb2f1d71b2e2845c8f9d738",
+    "canonical_sha256": "2e35af7ed07718ba167c82f0510b1fd59fac0e3ddb5779f290778f787a592f2d",
+    "counts": {
+      "extraction": 30,
+      "checking": 18
+    },
+    "gold_status": "pending_independent_review",
+    "inference_allowed": false,
+    "overlap_report": "research/results/local_extraction_contract_holdout_overlap_report.json"
+  },
+  "candidates": {
+    "A": {
+      "name": "stock_ragchecker_baseline",
+      "prompt": "RAGChecker 0.1.9 LLM_TRIPLET_EXTRACTION_PROMPT_Q unchanged",
+      "parser": "RAGChecker 0.1.9 triplet parser unchanged",
+      "new_inference": false,
+      "reuse_artifact": "research/results/qwen35_9b_calibration.json",
+      "reuse_artifact_sha256": "6b620873c2ffe008afbb98ff5ba96129674ac580e0abdb9c503c0bba9e53df71",
+      "reuse_only_if_identity_matches": [
+        "model name and digest",
+        "runtime configuration",
+        "development-set canonical SHA-256",
+        "prompt inventory SHA-256",
+        "three completed repetitions"
+      ],
+      "prompt_inventory_sha256": "ad4a5e4db3d21d23f9c9c2bbc494caa1d18e9b25167a98451e4fd1fac25c1015"
+    },
+    "B": {
+      "name": "lossless_syntax_normalization",
+      "model_and_prompt": "identical to candidate A",
+      "new_inference": false,
+      "normalization_allowlist": [
+        "remove one exact leading ### KG: heading",
+        "remove an enclosing markdown code fence only when the entire payload is fenced",
+        "parse each tuple/list/JSON-array record containing exactly three strings",
+        "serialize the same three string values into one RAGChecker tuple per line"
+      ],
+      "forbidden": [
+        "trim, rewrite, translate, split, merge, reorder, add, or delete any field value",
+        "repair an empty field",
+        "infer subject, predicate, object, claim, qualifier, or label",
+        "change claim count or label count"
+      ],
+      "failure_policy": "reject the complete response when lossless equivalence cannot be proven"
+    },
+    "C": {
+      "name": "ollama_native_structured_extraction",
+      "new_evaluator_configuration": true,
+      "transport": "POST /api/chat with format set to json_schema",
+      "prompt_template": "You are performing the same claim-extraction task as RAGChecker 0.1.9. Given a question and a candidate answer, extract a knowledge graph from only the candidate answer, conditioned on the question. This is extraction, not fact checking: do not assess truth and do not use external knowledge. Represent every unique atomic assertion exactly once; do not emit inverse or redundant claims. Preserve explicit negation, uncertainty or modality, quantities, time, treatment route, entity scope, and drug/effect qualifiers. Do not generalize, infer, or add information. Every claim must have non-empty subject, predicate, and object strings. Choose field boundaries that preserve the complete assertion; do not omit content merely to satisfy the schema. Return only JSON matching the supplied schema, with no commentary.\n\nQuestion:\n{question}\n\nCandidate answer:\n{candidate_answer}",
+      "json_schema": {
+        "type": "object",
+        "properties": {
+          "claims": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "predicate": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "object": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "subject",
+                "predicate",
+                "object"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "additionalProperties": false
+      },
+      "conversion": "parse and validate JSON, preserve claim order and exact field strings, then JSON-quote each string into exact (subject, predicate, object) lines accepted by RAGChecker 0.1.9",
+      "checking_path": "stock RAGChecker checking prompt and strict three-way label adapter unchanged"
+    }
+  },
+  "development_gates": {
+    "parseable_rate": 1.0,
+    "empty_object_count": 0,
+    "confirmed_unsupported_claim_count": 0,
+    "must_preserve": [
+      "negation",
+      "important drug qualifiers",
+      "important effect qualifiers"
+    ],
+    "minimum_confirmed_extraction_passes": "7/8",
+    "checking_minimum": "no regression from candidate A baseline (12/12 per repetition)",
+    "timeout_oom_truncation_count": 0,
+    "local_only": true,
+    "review_required_policy": "not accepted without independent adjudication"
+  },
+  "selection_rule": {
+    "eligible": "all development gates pass in all three repetitions and no unresolved review-required case",
+    "tie_breaker": "least intervention in order A, B, C",
+    "holdout_required_before_final_selection": true,
+    "holdout_must_remain_unrun_until_independent_gold_is_approved": true
+  },
+  "holdout_gates": {
+    "extraction": "at least 27/30 confirmed passes",
+    "checking": "at least 17/18 exact three-way labels",
+    "severe_errors": 0,
+    "timeout_oom_truncation_count": 0,
+    "tuning_after_unblinding": false
+  },
+  "stop_rules": {
+    "missing_independent_gold": "INDEPENDENT_GOLD_REVIEW_REQUIRED",
+    "ragchecker_incompatibility": "LOCAL_EXTRACTION_RAGCHECKER_INCOMPATIBLE",
+    "resource_failure": "LOCAL_EXTRACTION_RESOURCE_BLOCKED"
+  }
+}

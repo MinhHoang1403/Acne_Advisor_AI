@@ -176,11 +176,12 @@ Retry and provider fallback consume the same remaining budget. AWS engineering
 guidance supports finite timeout, retry, exponential backoff, and jitter as a
 pattern; it does not prescribe this project's exact retry count or timing values.
 
-The Agent decision model sees at most the first 5 evidence items and the first
-1200 characters of each item. This bounded visibility is an engineering policy,
-not evidence sufficiency or a scientific optimum. The generation path can see
-more packed evidence through its separate limit of 9 items and 7000 characters;
-that asymmetry remains an evaluation question.
+In the normal runtime, the Agent decision model sees every item from the
+generator's bounded `PackedContext`, with full chunk text and evidence IDs.
+The shared packing limits default to 9 items and 7000 rendered characters.
+The compatibility path used when no packed context exists exposes at most the
+first 8 contexts; it does not apply a 1200-character excerpt limit. These are
+engineering visibility boundaries, not evidence-sufficiency guarantees.
 
 When Ollama reports truncated generation, the client performs at most one compact
 retry with an instruction capped at 160 words. This engineering policy can change
@@ -229,7 +230,7 @@ overlap as optimal.
 | retrieval candidates | default 16 | runtime resource policy |
 | context items/chars | defaults 9 / 7000 | runtime resource policy selected by bounded packing comparison |
 | retrieval attempts | maximum 2 | bounded safety/latency policy |
-| decision evidence visibility | first 5 items; 1200 chars/item | runtime engineering policy |
+| decision evidence visibility | all normally packed items; compatibility path at most 8 contexts | runtime engineering policy |
 | agent action schema | 4 semantic actions | implemented research method + engineering contract |
 | exact cache namespace | v10 | engineering invalidation policy |
 | cache question/TTL | 600 chars / 86400 seconds | engineering resource policy |

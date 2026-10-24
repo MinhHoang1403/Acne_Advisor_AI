@@ -1,0 +1,233 @@
+{
+  "baseline_implementation_identity": {
+    "all_match": true,
+    "current_head": "2d32317d6abd335aedd69b7b066fca53c13b0bb8",
+    "evaluated_production_sha": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+    "files": {
+      "src/retrieval/context_packer.py": {
+        "current_blob_oid": "6eaa457ff964d04066a339eee525f59d25575726",
+        "frozen_blob_oid": "6eaa457ff964d04066a339eee525f59d25575726",
+        "match": true
+      },
+      "src/retrieval/contracts.py": {
+        "current_blob_oid": "7b9f9485065739da292a1b3298a5407f23190f58",
+        "frozen_blob_oid": "7b9f9485065739da292a1b3298a5407f23190f58",
+        "match": true
+      },
+      "src/retrieval/reranker.py": {
+        "current_blob_oid": "34bf54d002bb1154c1b289ed433838085d5ea776",
+        "frozen_blob_oid": "34bf54d002bb1154c1b289ed433838085d5ea776",
+        "match": true
+      },
+      "src/retrieval/service.py": {
+        "current_blob_oid": "e6650103b1b9fdc3c877fba3fc7bfc4a700bd9bb",
+        "frozen_blob_oid": "e6650103b1b9fdc3c877fba3fc7bfc4a700bd9bb",
+        "match": true
+      }
+    }
+  },
+  "benchmark_canonical_sha256": "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b",
+  "candidate_data_source": {
+    "cache_canonical_sha256": "ed1a892876c2dce79225f051a76987b186c3f10c3e07429dcb46dc20d89d9056",
+    "collection_alias": "acne_knowledge",
+    "collection_target": "acne_knowledge__d4a1819fe7fb77fe1f40",
+    "database_writes": 0,
+    "embedding_calls": 0,
+    "kb_build_id": "d4a1819fe7fb77fe1f40",
+    "kind": "qdrant_exact_id_lookup",
+    "read_only": true,
+    "reranker_calls": 0,
+    "vector_search": false
+  },
+  "development": {
+    "case_count": 100,
+    "case_ids": [
+      "ANS-DEF-001",
+      "ANS-DEF-002",
+      "ANS-DEF-003",
+      "ANS-DEF-004",
+      "ANS-DEF-005",
+      "ANS-DEF-006",
+      "ANS-DEF-007",
+      "ANS-DEF-008",
+      "ANS-DEF-009",
+      "ANS-DEF-010",
+      "ANS-TRT-001",
+      "ANS-TRT-002",
+      "ANS-TRT-003",
+      "ANS-TRT-004",
+      "ANS-TRT-005",
+      "ANS-TRT-006",
+      "ANS-TRT-007",
+      "ANS-TRT-008",
+      "ANS-TRT-009",
+      "ANS-TRT-010",
+      "ANS-TRT-011",
+      "ANS-TRT-012",
+      "ANS-MEC-001",
+      "ANS-MEC-002",
+      "ANS-MEC-003",
+      "ANS-MEC-004",
+      "ANS-MEC-005",
+      "ANS-MEC-006",
+      "ANS-MEC-007",
+      "ANS-MEC-008",
+      "ANS-ADV-001",
+      "ANS-ADV-002",
+      "ANS-ADV-003",
+      "ANS-ADV-004",
+      "ANS-ADV-005",
+      "ANS-ADV-006",
+      "ANS-ADV-007",
+      "ANS-ADV-008",
+      "ANS-ADV-009",
+      "ANS-CMP-001",
+      "ANS-CMP-002",
+      "ANS-CMP-003",
+      "ANS-CMP-004",
+      "ANS-CMP-005",
+      "ANS-CMP-006",
+      "ANS-CMP-007",
+      "ANS-CMP-008",
+      "ANS-CMP-009",
+      "ANS-CMP-010",
+      "ANS-REF-001",
+      "ANS-REF-002",
+      "ANS-REF-003",
+      "ANS-REF-004",
+      "ANS-REF-005",
+      "ANS-REF-006",
+      "ANS-MUL-001",
+      "ANS-MUL-002",
+      "ANS-MUL-003",
+      "ANS-MUL-004",
+      "ANS-MUL-005",
+      "ANS-MUL-006",
+      "ANS-MUL-007",
+      "ANS-MUL-008",
+      "ANS-MUL-009",
+      "ANS-MUL-010",
+      "ANS-MUL-011",
+      "ANS-MUL-012",
+      "ANS-MUL-013",
+      "ANS-MUL-014",
+      "ANS-MUL-015",
+      "GAP-ABS-001",
+      "GAP-ABS-002",
+      "GAP-ABS-003",
+      "GAP-ABS-004",
+      "GAP-ABS-005",
+      "GAP-ABS-006",
+      "GAP-ABS-007",
+      "GAP-ABS-008",
+      "GAP-ABS-009",
+      "GAP-ABS-010",
+      "GAP-EXA-001",
+      "GAP-EXA-002",
+      "GAP-EXA-003",
+      "GAP-EXA-004",
+      "GAP-EXA-005",
+      "GAP-EXA-006",
+      "GAP-EXA-007",
+      "GAP-EXA-008",
+      "GAP-EXA-009",
+      "GAP-EXA-010",
+      "GAP-REL-001",
+      "GAP-REL-002",
+      "GAP-REL-003",
+      "GAP-REL-004",
+      "GAP-REL-005",
+      "GAP-REL-006",
+      "GAP-REL-007",
+      "GAP-REL-008",
+      "GAP-REL-009",
+      "GAP-REL-010"
+    ],
+    "case_ids_sha256": "93649ffbdc1b793420e069261456e18fee1e65a6f1f3ce497f53fb4e144094aa",
+    "historically_exposed": true
+  },
+  "expected_benchmark_canonical_sha256": "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b",
+  "experiment_protocol": {
+    "changed_after_development": false,
+    "path": "research/BUDGET_AWARE_PACKING_PROTOCOL.md",
+    "sha256": "bc73ccc69ccf5785ec46d6c65a34d39f5626f2b1f64d962f34a552e671fd9cd2"
+  },
+  "forensic_sha": "2d32317d6abd335aedd69b7b066fca53c13b0bb8",
+  "frozen_production_sha": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+  "frozen_run_id": "thesis_evaluation_366f3ad8",
+  "holdout": {
+    "case_ids": [],
+    "case_ids_sha256": null,
+    "status": "INDEPENDENT_HOLDOUT_UNAVAILABLE"
+  },
+  "kb_build_id": "d4a1819fe7fb77fe1f40",
+  "pipeline_fingerprint": "e4c420923b79b37c992cf36d",
+  "raw_results": {
+    "canonical_sha256": "1f525efb44091c2444d298d45de4f31637b9be4d1d512f88db38ae9738125feb",
+    "expected_canonical_sha256": "1f525efb44091c2444d298d45de4f31637b9be4d1d512f88db38ae9738125feb",
+    "expected_raw_byte_sha256": "b078858d61ced4ed072339fd9cb576517a2ce585724e425c6fc0a2f772f57f16",
+    "raw_byte_sha256": "b078858d61ced4ed072339fd9cb576517a2ce585724e425c6fc0a2f772f57f16"
+  },
+  "reconstruction_status": "EXACT_BASELINE_REPLAY_CONFIRMED",
+  "repository": "MinhHoang1403/Acne_Advisor_AI",
+  "research_base_sha": "2d32317d6abd335aedd69b7b066fca53c13b0bb8",
+  "research_branch": "research/budget-aware-packing-controlled",
+  "schema": "budget_aware_packing_experiment_identity_v1",
+  "selector": {
+    "gold_fields_in_input_contract": false,
+    "implementation_path": "research/budget_aware_packing/budget_aware_selector.py",
+    "implementation_sha256": "5ccce1edcff14a2c0ba8a13b50cdd5eee1bf151be532af4e19c5b588354c7efa",
+    "name": "RANK_WEIGHTED_BUDGET_AWARE_WHOLE_CHUNK_SELECTION_V1"
+  },
+  "source_artifact_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+  "source_artifact_ref": "evaluation/thesis-final-evaluation",
+  "source_artifacts": {
+    "benchmark": {
+      "blob_oid": "d2aabf26e32fa16d031bfe69ff36555dec9cf36d",
+      "owner_commit": "bd3db1a87fc1e6491c11cab983dfa0b62112db00",
+      "path": "evaluation/benchmark_100.json"
+    },
+    "benchmark_manifest": {
+      "blob_oid": "181f3edcb3778ffead0638be2c8ea217945b2c0d",
+      "owner_commit": "88b28c7e74ce1f110339ccd75e526bf96046ffcc",
+      "path": "evaluation/benchmark_manifest.json"
+    },
+    "gold": {
+      "blob_oid": "e91dbe5ccfcf455c8e7f6c61436afd39b58194c9",
+      "owner_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+      "path": "evaluation/locked_gold/current_kb_adjudication.json"
+    },
+    "gold_manifest": {
+      "blob_oid": "08f2ac84773b097c8d516acc8ea9934ee5271436",
+      "owner_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+      "path": "evaluation/locked_gold/current_kb_adjudication_manifest.json"
+    },
+    "raw_results": {
+      "blob_oid": "04f75c350b5c2c8ba308f309b00dcc06c1905897",
+      "owner_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+      "path": "evaluation/results/thesis_evaluation_366f3ad8/raw_results.json"
+    },
+    "reference_metrics": {
+      "blob_oid": "c25df3cb89cf569f09d2bf470691e9ec1a7b021a",
+      "owner_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+      "path": "evaluation/results/thesis_evaluation_366f3ad8/deterministic_metrics.json"
+    },
+    "run_manifest": {
+      "blob_oid": "c2c92d419bf6dda0b3f29626043468bbdccadcd5",
+      "owner_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+      "path": "evaluation/results/thesis_evaluation_366f3ad8/run_manifest.json"
+    },
+    "system_output_manifest": {
+      "blob_oid": "f8998c91d3cb35988e14ca16aeceb8e4cd62a3e8",
+      "owner_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+      "path": "evaluation/results/thesis_evaluation_366f3ad8/system_output_manifest.json"
+    }
+  },
+  "test_environment": {
+    "algorithm_network_calls": 0,
+    "database_writes": 0,
+    "platform": "win32",
+    "provider_calls": 0,
+    "python_version": "3.11.9"
+  }
+}

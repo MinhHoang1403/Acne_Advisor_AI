@@ -28,6 +28,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Frozen evaluation contracts verify original Git blobs and provenance commits.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6

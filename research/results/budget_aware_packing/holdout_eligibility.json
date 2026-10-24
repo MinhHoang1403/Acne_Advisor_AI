@@ -1,0 +1,32 @@
+{
+  "eligible": false,
+  "findings": [
+    "The frozen 100-case benchmark was fully exposed by forensic analysis.",
+    "No separate reviewer-approved evidence-requirement holdout with frozen replayable candidates exists.",
+    "Files named holdout on local-ragchecker-extraction-contract concern claim-extraction contract research, not this packing experiment.",
+    "A random split of the exposed 100 cases is not an independent holdout."
+  ],
+  "historically_exposed_frozen_cases": 100,
+  "holdout_case_ids": [],
+  "holdout_case_ids_sha256": null,
+  "prior_selector_development_case_ids": [
+    "bp_antibiotic",
+    "adapalene_class",
+    "clindamycin_monotherapy",
+    "adapalene_bp_comparison",
+    "retinoid_pregnancy",
+    "dermatologist_referral",
+    "historical_02",
+    "paraphrase_inflammatory_lesions"
+  ],
+  "prior_selector_regression_case_ids": [
+    "ANS-MUL-002",
+    "ANS-MUL-006",
+    "ANS-MUL-008",
+    "ANS-MUL-012",
+    "ANS-MUL-014"
+  ],
+  "repository_refs_audited": true,
+  "schema": "budget_aware_holdout_eligibility_v1",
+  "status": "INDEPENDENT_HOLDOUT_UNAVAILABLE"
+}

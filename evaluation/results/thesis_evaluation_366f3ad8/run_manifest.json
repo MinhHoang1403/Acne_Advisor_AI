@@ -1,0 +1,163 @@
+{
+  "schema": "thesis_evaluation_run_manifest",
+  "run_id": "thesis_evaluation_366f3ad8",
+  "prepared_at": "2026-10-09T14:10:41+00:00",
+  "system_under_test_sha": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+  "repository_head_at_preflight": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+  "system_under_test_is_ancestor": true,
+  "pipeline_fingerprint": "e4c420923b79b37c992cf36d",
+  "answer_cache_version": "v10",
+  "cache_mode": "isolated_cold_per_case",
+  "production_cache_enabled": true,
+  "kb_build_id": "d4a1819fe7fb77fe1f40",
+  "qdrant_collection": "acne_knowledge__d4a1819fe7fb77fe1f40",
+  "qdrant_points": 536,
+  "benchmark": {
+    "path": "evaluation/benchmark_100.json",
+    "canonical_sha256": "f61d6807c0ce39f902936844d810562c486f1bcadaa57a8a2da0e460ad7e534b",
+    "total": 100,
+    "answerable": 70,
+    "single_turn": 55,
+    "multi_turn": 15,
+    "evidence_gap": 30
+  },
+  "gold": {
+    "source_commit": "6da9b67634aa231a3d9cd51891af6d1685ab25cc",
+    "path": "evaluation/locked_gold/current_kb_adjudication.json",
+    "canonical_sha256": "e0597523954311d954266adae59f4bb86530e6bce9b5ca6b59b0148ef7d3801e",
+    "raw_sha256": "68e025affb608d220eebd5988e76d19a1baebc2f60d35a986a87b2d93db6a02e",
+    "reviewed_claims": 104,
+    "confirmed_absence": 24,
+    "policy_ambiguous": 6,
+    "required_evidence_ids": 39
+  },
+  "execution_policy": {
+    "case_order": "stored benchmark order",
+    "one_execution_per_case": true,
+    "successful_case_rerun": false,
+    "resume_only_after_external_infrastructure_failure": true,
+    "production_retry_and_fallback_enabled": true,
+    "qdrant_read_only": true,
+    "knowledge_base_read_only": true,
+    "production_redis_flushes": 0
+  },
+  "generation": {
+    "provider": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "provider_fallback_enabled": "true",
+    "fallback_models": "gemini-3.1-flash-lite"
+  },
+  "reranker": {
+    "enabled": "true",
+    "model": "BAAI/bge-reranker-v2-m3",
+    "device": "cuda",
+    "precision": "bfloat16"
+  },
+  "semantic_evaluator": {
+    "package": "ragchecker==0.1.9",
+    "model": "gpt-5.4-2026-03-05",
+    "api": "OpenAI Responses API",
+    "store": false,
+    "ragas_excluded": true
+  },
+  "environment": {
+    "python": "3.11.14",
+    "platform": "Linux-6.18.40.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+    "dependency_lock_sha256": "9fd14e89a2b0d80bfe81d5293bdd2e253d2e31ba4bac6b2620a1c6ae7a534f4b",
+    "torch": "2.13.0",
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "gpu": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+    "gpu_compute_capability": [
+      8,
+      6
+    ],
+    "gpu_bfloat16_supported": true,
+    "sentence_transformers": "5.5.1",
+    "transformers": "4.57.6",
+    "ragchecker": "0.1.9",
+    "openai": "2.38.0",
+    "spacy": "3.8.16"
+  },
+  "git": {
+    "branch": "evaluation/thesis-final-evaluation",
+    "dirty_at_preflight": true,
+    "production_sensitive_diff": []
+  },
+  "write_audit": {
+    "qdrant_writes": 0,
+    "knowledge_base_writes": 0,
+    "production_redis_flushes": 0
+  },
+  "cache_smoke": {
+    "status": "failed",
+    "passed": false,
+    "production_cache_behavior_verified": false,
+    "query": "Trong kiểm thử cache kỹ thuật, hãy định nghĩa ngắn gọn mụn trứng cá.",
+    "attempt_count": 2,
+    "attempts": [
+      {
+        "executed_at": "2026-10-09T14:31:51+00:00",
+        "isolated_cache_empty_before": true,
+        "first_cache_hit": false,
+        "second_cache_hit": false,
+        "first_answer_sha256": "eedf79af238a0d471e0071d09a5d99dc9d5e5fa2a0b25d8ca7b9352d84192e42",
+        "second_answer_sha256": "eedf79af238a0d471e0071d09a5d99dc9d5e5fa2a0b25d8ca7b9352d84192e42",
+        "answers_match": true,
+        "isolated_cache_empty_after": true
+      },
+      {
+        "executed_at": "2026-10-09T14:33:08+00:00",
+        "isolated_cache_empty_before": true,
+        "first_cache_hit": false,
+        "second_cache_hit": false,
+        "first_answer_sha256": "eedf79af238a0d471e0071d09a5d99dc9d5e5fa2a0b25d8ca7b9352d84192e42",
+        "second_answer_sha256": "eedf79af238a0d471e0071d09a5d99dc9d5e5fa2a0b25d8ca7b9352d84192e42",
+        "answers_match": true,
+        "isolated_cache_empty_after": true
+      }
+    ],
+    "interpretation": "Hai answer giống nhau nhưng lần hai vẫn miss; smoke query không chứng minh được lookup/store production. Không đổi query hoặc production sau khi thấy failure."
+  },
+  "calibration": {
+    "decision": "CALIBRATION_READY_FOR_FORMAL_RUN",
+    "method": "reused_exact_researcher_approved_adjudication",
+    "calibration_dataset_sha256": "69b837a5571614b24c7705b362af1cb451b6111fddd60c9e471ffbd49fd04644",
+    "ragchecker_version": "0.1.9",
+    "evaluator_model": "gpt-5.4-2026-03-05",
+    "adapter_contract_sha256": "314cdb9df981ab995ba010c0ee0cee0376829490eecd7c7383a14090fb6a343f",
+    "approved_run_sha": "2d5f0124dc532a4970a4b08dcd6cf846389a03ff",
+    "adjudication_raw_sha256": "ded7052769d3bf8b1df58f50526039ae051468986cd7c65666ebac3a8640268d",
+    "checks": {
+      "calibration_sha_matches_results": true,
+      "calibration_sha_matches_adjudication": true,
+      "evaluator_model_matches_results": true,
+      "evaluator_model_matches_adjudication": true,
+      "ragchecker_version_matches_approved_run": true,
+      "ragchecker_version_matches_runtime": true,
+      "adapter_contract_matches": true,
+      "researcher_approved": true,
+      "effective_decision_ready": true
+    }
+  },
+  "ragchecker": {
+    "status": "RAGCHECKER_EVALUATOR_BLOCKER",
+    "blocked_at": "2026-10-09T14:37:16+00:00",
+    "stage": "gt_answer_claim_extraction",
+    "observed_progress": "1/9 extraction batches completed before failure; partial in-memory output was not persisted by the package",
+    "package": "ragchecker==0.1.9",
+    "evaluator_model": "gpt-5.4-2026-03-05",
+    "api": "OpenAI Responses API",
+    "store": false,
+    "error_class": "openai.RateLimitError",
+    "http_status": 429,
+    "error_code": "credit_balance_exhausted",
+    "error_message": "OpenAI account has no credits remaining; add credits before resuming semantic evaluation.",
+    "frozen_system_outputs_preserved": true,
+    "system_answers_regenerated": false,
+    "resume_policy": "Resume evaluator scoring only from the same committed frozen raw output after credit is restored."
+  },
+  "protocol_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+  "system_output_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+  "final_results_commit": null
+}

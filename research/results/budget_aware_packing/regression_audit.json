@@ -1,0 +1,843 @@
+{
+  "changed_case_count": 15,
+  "changed_cases": [
+    {
+      "added_candidate_ids": [
+        "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+        "3add587d-fcc2-5434-aaa2-e99dd974e1c0"
+      ],
+      "baseline_context_chars": 6766,
+      "baseline_selected_ids": [
+        "729b2d33-bd1a-5e72-8d92-df7530e64f53",
+        "460222d6-c4ba-56f9-a26c-bf255b6afb39",
+        "12259038-373a-5ead-a76c-6e536aef00b9",
+        "a5d5921e-d85b-5554-89c6-6b090b63cc9f",
+        "9bbf9cbe-b0c7-511e-837b-1d521343903f",
+        "cd8a4e24-1dd5-5188-9623-acb480b189af",
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "ef863713-c20a-5475-8ccb-5247e62dfd86",
+        "967d791a-bb68-5529-b3a0-bd08156e4bee"
+      ],
+      "case_id": "ANS-ADV-002",
+      "frozen_candidate_pool_sha256": "eed6b7e6771cd7c7715b09776579b9bb3694b4e1b8b2e3ebab9d7a24bbe9d1ec",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 10,
+          "requirement_id": "ANS-ADV-002::14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-ADV-002::14857147-5eff-5e98-a6ce-c2256fdc0a05"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "967d791a-bb68-5529-b3a0-bd08156e4bee"
+      ],
+      "treatment_context_chars": 5795,
+      "treatment_selected_ids": [
+        "729b2d33-bd1a-5e72-8d92-df7530e64f53",
+        "460222d6-c4ba-56f9-a26c-bf255b6afb39",
+        "12259038-373a-5ead-a76c-6e536aef00b9",
+        "a5d5921e-d85b-5554-89c6-6b090b63cc9f",
+        "9bbf9cbe-b0c7-511e-837b-1d521343903f",
+        "cd8a4e24-1dd5-5188-9623-acb480b189af",
+        "ef863713-c20a-5475-8ccb-5247e62dfd86",
+        "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+        "3add587d-fcc2-5434-aaa2-e99dd974e1c0"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+        "4699afa5-1951-508f-8337-5d5ca1ed295b",
+        "d725e9ce-32bc-542e-a058-99cdceaa7776",
+        "942f3e42-86ff-5100-8860-326e623cf518",
+        "32abd77d-b689-58c2-826d-a08dbc95347a"
+      ],
+      "baseline_context_chars": 6884,
+      "baseline_selected_ids": [
+        "193a0908-65e2-5013-83c3-0c7c35432152",
+        "35d2089e-0763-562c-9552-e30ea18ac5b1",
+        "5e32098d-cf83-5445-8d71-55750cf96ab5",
+        "1abc7f34-ce29-5fd6-a4eb-758b09e4fdb8"
+      ],
+      "case_id": "ANS-ADV-003",
+      "frozen_candidate_pool_sha256": "a18ac466a2f46ca7faf777146674a8d0c3d44dca421aa6259b807b2afe5fa2a3",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 5,
+          "requirement_id": "ANS-ADV-003::14857147-5eff-5e98-a6ce-c2256fdc0a05",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-ADV-003::14857147-5eff-5e98-a6ce-c2256fdc0a05"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "35d2089e-0763-562c-9552-e30ea18ac5b1",
+        "5e32098d-cf83-5445-8d71-55750cf96ab5"
+      ],
+      "treatment_context_chars": 6961,
+      "treatment_selected_ids": [
+        "193a0908-65e2-5013-83c3-0c7c35432152",
+        "14857147-5eff-5e98-a6ce-c2256fdc0a05",
+        "4699afa5-1951-508f-8337-5d5ca1ed295b",
+        "1abc7f34-ce29-5fd6-a4eb-758b09e4fdb8",
+        "d725e9ce-32bc-542e-a058-99cdceaa7776",
+        "942f3e42-86ff-5100-8860-326e623cf518",
+        "32abd77d-b689-58c2-826d-a08dbc95347a"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "11c459d3-85d1-52b0-90a3-40c659c8bf4f",
+        "c1c379aa-164a-54e0-8de4-abbb125ed36a",
+        "1dc5c64e-2e3e-50b4-b31e-ff6ce55f7dcc",
+        "b5937863-0be2-55fb-badd-cc19d819bf66"
+      ],
+      "baseline_context_chars": 6589,
+      "baseline_selected_ids": [
+        "be636ba6-c7f8-5ff3-b96d-f5cb8da2d7ce",
+        "6041e31b-690b-5336-ba18-d6230e35423c",
+        "acd75b36-19cc-5a24-8630-caece16315d0",
+        "b343f2a5-d407-573d-88aa-f4ff91d601c3",
+        "4699afa5-1951-508f-8337-5d5ca1ed295b"
+      ],
+      "case_id": "ANS-ADV-006",
+      "frozen_candidate_pool_sha256": "4ee9f965688941ff5e27ac2c6ebdacb3291bd6824f7ccb28ac81fbe0d26d105e",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [],
+      "gained_requirement_ids": [],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [
+        {
+          "chunk_id": "acd75b36-19cc-5a24-8630-caece16315d0",
+          "original_rank": 3,
+          "requirement_id": "ANS-ADV-006::acd75b36-19cc-5a24-8630-caece16315d0",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "lost_requirement_ids": [
+        "ANS-ADV-006::acd75b36-19cc-5a24-8630-caece16315d0"
+      ],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "acd75b36-19cc-5a24-8630-caece16315d0"
+      ],
+      "treatment_context_chars": 6732,
+      "treatment_selected_ids": [
+        "be636ba6-c7f8-5ff3-b96d-f5cb8da2d7ce",
+        "6041e31b-690b-5336-ba18-d6230e35423c",
+        "b343f2a5-d407-573d-88aa-f4ff91d601c3",
+        "4699afa5-1951-508f-8337-5d5ca1ed295b",
+        "11c459d3-85d1-52b0-90a3-40c659c8bf4f",
+        "c1c379aa-164a-54e0-8de4-abbb125ed36a",
+        "1dc5c64e-2e3e-50b4-b31e-ff6ce55f7dcc",
+        "b5937863-0be2-55fb-badd-cc19d819bf66"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+        "42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+        "dff0316b-37fc-58bc-a4c0-e66b4443e1e6",
+        "986bf19e-a718-5dbc-87ec-8b2511b31d0d",
+        "721e7bbf-1862-52b3-9d47-e3989e092d2f",
+        "5b916891-4a7f-5f94-8293-87bc1371f743"
+      ],
+      "baseline_context_chars": 6781,
+      "baseline_selected_ids": [
+        "0573a68c-c960-5748-abb7-0b4f88cb4ec4",
+        "4cac5c71-db0d-538b-8a00-0e9ae0d21bd0",
+        "a5f10865-dec2-5b7a-b90a-49e1f9497237",
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "c13f4515-3e7b-5395-b591-775915db6768"
+      ],
+      "case_id": "ANS-CMP-002",
+      "frozen_candidate_pool_sha256": "38127f0a29c14941182e8a1c72d5b5396194929c6f7b4847c1dad0c2cfe6afda",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 8,
+          "requirement_id": "ANS-CMP-002::42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+          "source_id": "nice_ng198_2026_08"
+        },
+        {
+          "chunk_id": "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 7,
+          "requirement_id": "ANS-CMP-002::9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-CMP-002::42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+        "ANS-CMP-002::9d116ea2-912f-5c45-bb76-243f6bcf6bdb"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "c13f4515-3e7b-5395-b591-775915db6768"
+      ],
+      "treatment_context_chars": 6840,
+      "treatment_selected_ids": [
+        "0573a68c-c960-5748-abb7-0b4f88cb4ec4",
+        "4cac5c71-db0d-538b-8a00-0e9ae0d21bd0",
+        "a5f10865-dec2-5b7a-b90a-49e1f9497237",
+        "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+        "42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+        "dff0316b-37fc-58bc-a4c0-e66b4443e1e6",
+        "986bf19e-a718-5dbc-87ec-8b2511b31d0d",
+        "721e7bbf-1862-52b3-9d47-e3989e092d2f",
+        "5b916891-4a7f-5f94-8293-87bc1371f743"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "7f0209e8-4a60-5e8a-91ed-5edb055f08aa",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "d5b29855-d6f7-537e-9d3a-d6eed2a4dba5"
+      ],
+      "baseline_context_chars": 6924,
+      "baseline_selected_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "ef863713-c20a-5475-8ccb-5247e62dfd86",
+        "83ef481b-739b-509b-8794-4c760415ac01"
+      ],
+      "case_id": "ANS-CMP-003",
+      "frozen_candidate_pool_sha256": "827f0e1f1474d662a584c338e40a8df3edb149ab4d91f776243dd91448390f14",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 15,
+          "requirement_id": "ANS-CMP-003::e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "source_id": "aad_acne_guideline_2024"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-CMP-003::e4e54d11-c8bf-56eb-8e41-b7be9ecea11e"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "2719272a-82f7-5052-a06f-34efa505ac31"
+      ],
+      "treatment_context_chars": 6935,
+      "treatment_selected_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "7f0209e8-4a60-5e8a-91ed-5edb055f08aa",
+        "ef863713-c20a-5475-8ccb-5247e62dfd86",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "d5b29855-d6f7-537e-9d3a-d6eed2a4dba5",
+        "83ef481b-739b-509b-8794-4c760415ac01"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "06a0e33d-b9f6-53c0-b5ed-a163ec1e0d5b",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "d5b29855-d6f7-537e-9d3a-d6eed2a4dba5",
+        "12259038-373a-5ead-a76c-6e536aef00b9",
+        "83ef481b-739b-509b-8794-4c760415ac01"
+      ],
+      "baseline_context_chars": 6978,
+      "baseline_selected_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "ef863713-c20a-5475-8ccb-5247e62dfd86",
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "a7afe44d-6272-51b6-9cb7-5a2e4986f3a2"
+      ],
+      "case_id": "ANS-CMP-004",
+      "frozen_candidate_pool_sha256": "b78e363f063c6cc5994d6118249d22f2735b3885c729ff179b7c65bd5ad4089b",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 13,
+          "requirement_id": "ANS-CMP-004::0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "source_id": "aad_acne_guideline_2024"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-CMP-004::0a117c04-a7d2-5491-86af-f5d3e8f0b493"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "a7afe44d-6272-51b6-9cb7-5a2e4986f3a2"
+      ],
+      "treatment_context_chars": 6882,
+      "treatment_selected_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "ef863713-c20a-5475-8ccb-5247e62dfd86",
+        "06a0e33d-b9f6-53c0-b5ed-a163ec1e0d5b",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "d5b29855-d6f7-537e-9d3a-d6eed2a4dba5",
+        "12259038-373a-5ead-a76c-6e536aef00b9",
+        "83ef481b-739b-509b-8794-4c760415ac01"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "bec75e32-c8a9-5cff-ae97-e840712b6aef",
+        "806ff2e0-c506-52df-8029-349796c99b87"
+      ],
+      "baseline_context_chars": 6754,
+      "baseline_selected_ids": [
+        "1a5c4052-4796-5a98-b56a-331ed3d98d51",
+        "bee6aac0-ea7c-5f99-a789-3f78d9c64056",
+        "68362fd4-da94-5995-bfab-4cbeec495c9a",
+        "2f65dbb8-e8ba-519a-b481-bd3e5fedde9c",
+        "35c3c35a-4f3a-55d8-b6c3-d7ee51efea0b",
+        "ac93995d-741e-53f0-8b8c-72252cf81119",
+        "8d0c62bd-a475-5862-83a7-44a61fa98f17",
+        "38da2786-b72d-546e-a351-d6dff6dc0880"
+      ],
+      "case_id": "ANS-DEF-003",
+      "frozen_candidate_pool_sha256": "9cbfcb81ad00f5c960c307c1d2abe77b9021421662c7d6cc167f17198b3402ce",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [],
+      "gained_requirement_ids": [],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [
+        {
+          "chunk_id": "ac93995d-741e-53f0-8b8c-72252cf81119",
+          "original_rank": 6,
+          "requirement_id": "ANS-DEF-003::ac93995d-741e-53f0-8b8c-72252cf81119",
+          "source_id": "web_dermnetnz_cddf43ad3f7f941d"
+        }
+      ],
+      "lost_requirement_ids": [
+        "ANS-DEF-003::ac93995d-741e-53f0-8b8c-72252cf81119"
+      ],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "ac93995d-741e-53f0-8b8c-72252cf81119"
+      ],
+      "treatment_context_chars": 6545,
+      "treatment_selected_ids": [
+        "1a5c4052-4796-5a98-b56a-331ed3d98d51",
+        "bee6aac0-ea7c-5f99-a789-3f78d9c64056",
+        "68362fd4-da94-5995-bfab-4cbeec495c9a",
+        "2f65dbb8-e8ba-519a-b481-bd3e5fedde9c",
+        "35c3c35a-4f3a-55d8-b6c3-d7ee51efea0b",
+        "8d0c62bd-a475-5862-83a7-44a61fa98f17",
+        "38da2786-b72d-546e-a351-d6dff6dc0880",
+        "bec75e32-c8a9-5cff-ae97-e840712b6aef",
+        "806ff2e0-c506-52df-8029-349796c99b87"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+        "c13f4515-3e7b-5395-b591-775915db6768",
+        "42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+        "5b916891-4a7f-5f94-8293-87bc1371f743",
+        "5b0c049f-7138-5c84-a1d6-014ff9726681",
+        "78e9df3c-560c-5c35-b149-385bdb884f11",
+        "4b1afd96-a81a-5629-afda-de33d73042ab"
+      ],
+      "baseline_context_chars": 6902,
+      "baseline_selected_ids": [
+        "4cac5c71-db0d-538b-8a00-0e9ae0d21bd0",
+        "0573a68c-c960-5748-abb7-0b4f88cb4ec4",
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "82e73de2-57f7-5020-9b3c-281130d32b5f"
+      ],
+      "case_id": "ANS-DEF-006",
+      "frozen_candidate_pool_sha256": "9486f7f411e04d9d55a9e93f53db6596cde60602dcef735efe19e45a9501bdec",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 6,
+          "requirement_id": "ANS-DEF-006::9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-DEF-006::9d116ea2-912f-5c45-bb76-243f6bcf6bdb"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "82e73de2-57f7-5020-9b3c-281130d32b5f"
+      ],
+      "treatment_context_chars": 6949,
+      "treatment_selected_ids": [
+        "4cac5c71-db0d-538b-8a00-0e9ae0d21bd0",
+        "0573a68c-c960-5748-abb7-0b4f88cb4ec4",
+        "9d116ea2-912f-5c45-bb76-243f6bcf6bdb",
+        "c13f4515-3e7b-5395-b591-775915db6768",
+        "42d9c3a7-1569-54da-93a4-fd8c048d96a1",
+        "5b916891-4a7f-5f94-8293-87bc1371f743",
+        "5b0c049f-7138-5c84-a1d6-014ff9726681",
+        "78e9df3c-560c-5c35-b149-385bdb884f11",
+        "4b1afd96-a81a-5629-afda-de33d73042ab"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "06a0e33d-b9f6-53c0-b5ed-a163ec1e0d5b",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "b343f2a5-d407-573d-88aa-f4ff91d601c3",
+        "83ef481b-739b-509b-8794-4c760415ac01",
+        "d5b29855-d6f7-537e-9d3a-d6eed2a4dba5"
+      ],
+      "baseline_context_chars": 6741,
+      "baseline_selected_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "14cd27d8-c7e2-54ef-ae78-0d5a97a71aa1"
+      ],
+      "case_id": "ANS-MEC-008",
+      "frozen_candidate_pool_sha256": "7efbe4399c8eb2c7fc1293959307c70774d67399f67e5d164c701949caa8981b",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 14,
+          "requirement_id": "ANS-MEC-008::e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+          "source_id": "aad_acne_guideline_2024"
+        },
+        {
+          "chunk_id": "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 8,
+          "requirement_id": "ANS-MEC-008::0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+          "source_id": "aad_acne_guideline_2024"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-MEC-008::e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "ANS-MEC-008::0a117c04-a7d2-5491-86af-f5d3e8f0b493"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "14cd27d8-c7e2-54ef-ae78-0d5a97a71aa1"
+      ],
+      "treatment_context_chars": 6774,
+      "treatment_selected_ids": [
+        "fd9eb6fa-9f14-5147-ab66-cf67eb45fddd",
+        "06a0e33d-b9f6-53c0-b5ed-a163ec1e0d5b",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "b343f2a5-d407-573d-88aa-f4ff91d601c3",
+        "83ef481b-739b-509b-8794-4c760415ac01",
+        "d5b29855-d6f7-537e-9d3a-d6eed2a4dba5"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "8f7614fe-0375-5441-9822-3773a0cc4e07",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "5d09fe98-d705-56bd-ac67-a8eaf68a19ea",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "42a70333-82f8-5fd6-9ffe-e35b38dbd04d"
+      ],
+      "baseline_context_chars": 6950,
+      "baseline_selected_ids": [
+        "43c393b0-4772-5bef-8bd1-e162afbbc56d",
+        "6cbfbaf6-df76-5f67-be76-e33dd196e3b8",
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "92dc2111-e063-5eeb-9b13-d45835983243",
+        "4ff62088-2992-5d37-b775-6b3318a3878a"
+      ],
+      "case_id": "ANS-MUL-001",
+      "frozen_candidate_pool_sha256": "e81036e0bf8efd71aa103990fa1ff8aa7896ba14f918334f445b8e1a5a29353c",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "8f7614fe-0375-5441-9822-3773a0cc4e07",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 9,
+          "requirement_id": "ANS-MUL-001::8f7614fe-0375-5441-9822-3773a0cc4e07",
+          "source_id": "vn_moh_dermatology_4416_2023_acne"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-MUL-001::8f7614fe-0375-5441-9822-3773a0cc4e07"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "2719272a-82f7-5052-a06f-34efa505ac31",
+        "92dc2111-e063-5eeb-9b13-d45835983243"
+      ],
+      "treatment_context_chars": 6709,
+      "treatment_selected_ids": [
+        "43c393b0-4772-5bef-8bd1-e162afbbc56d",
+        "6cbfbaf6-df76-5f67-be76-e33dd196e3b8",
+        "e4e54d11-c8bf-56eb-8e41-b7be9ecea11e",
+        "8f7614fe-0375-5441-9822-3773a0cc4e07",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0",
+        "5d09fe98-d705-56bd-ac67-a8eaf68a19ea",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "42a70333-82f8-5fd6-9ffe-e35b38dbd04d",
+        "4ff62088-2992-5d37-b775-6b3318a3878a"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "1a284012-509b-5e63-b564-67d052c8a55f",
+        "480c020b-86ac-52ca-ba8b-b3477238e41d",
+        "75bf6076-97ec-5898-a000-3ff8316541b5"
+      ],
+      "baseline_context_chars": 6954,
+      "baseline_selected_ids": [
+        "9b2d94e2-660c-513a-8ce1-9301d064a383",
+        "89b4181a-5bba-5052-85bc-15ec2048b83a",
+        "b343f2a5-d407-573d-88aa-f4ff91d601c3",
+        "a4b5bd70-182a-5717-ae08-147d84dc1bf0",
+        "34b1df11-32b7-58b9-9958-8dfbf90758f1",
+        "601b9c19-52c6-56cd-9965-0f3e0b1fa08e",
+        "468cb25f-6043-5237-8eae-6e93f01732bc"
+      ],
+      "case_id": "ANS-MUL-007",
+      "frozen_candidate_pool_sha256": "0c1eda2afaf7ff67ccf315368ac57cce9ac3ee9d73a4b652c55556773bb6142b",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [],
+      "gained_requirement_ids": [],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [
+        {
+          "chunk_id": "601b9c19-52c6-56cd-9965-0f3e0b1fa08e",
+          "original_rank": 6,
+          "requirement_id": "ANS-MUL-007::601b9c19-52c6-56cd-9965-0f3e0b1fa08e",
+          "source_id": "aad_acne_guideline_2024"
+        }
+      ],
+      "lost_requirement_ids": [
+        "ANS-MUL-007::601b9c19-52c6-56cd-9965-0f3e0b1fa08e"
+      ],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "601b9c19-52c6-56cd-9965-0f3e0b1fa08e"
+      ],
+      "treatment_context_chars": 6952,
+      "treatment_selected_ids": [
+        "9b2d94e2-660c-513a-8ce1-9301d064a383",
+        "89b4181a-5bba-5052-85bc-15ec2048b83a",
+        "b343f2a5-d407-573d-88aa-f4ff91d601c3",
+        "a4b5bd70-182a-5717-ae08-147d84dc1bf0",
+        "34b1df11-32b7-58b9-9958-8dfbf90758f1",
+        "468cb25f-6043-5237-8eae-6e93f01732bc",
+        "1a284012-509b-5e63-b564-67d052c8a55f",
+        "480c020b-86ac-52ca-ba8b-b3477238e41d",
+        "75bf6076-97ec-5898-a000-3ff8316541b5"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "78e9df3c-560c-5c35-b149-385bdb884f11",
+        "258d0eb1-4dc3-572c-8d50-2a06091b92d3",
+        "f3ccb79e-857c-5994-9182-da2a04dcd220",
+        "00975091-68da-5fd1-b5b5-12cce147b8f1"
+      ],
+      "baseline_context_chars": 6797,
+      "baseline_selected_ids": [
+        "34a357f4-d12a-51ec-bfc7-d54e1ae8a041",
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "bbc49c68-e80d-5b58-910e-0a83e4da92a6",
+        "4c827d6c-2e89-5779-88a0-a898076b72be",
+        "f0fa00b3-8283-599b-84a6-a002fdc1d0f8"
+      ],
+      "case_id": "ANS-MUL-011",
+      "frozen_candidate_pool_sha256": "df0ec7c955397f0bb9dea4909ceeb80c4a9cdf733e9cfa4ded4936ebb738b742",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "78e9df3c-560c-5c35-b149-385bdb884f11",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 7,
+          "requirement_id": "ANS-MUL-011::78e9df3c-560c-5c35-b149-385bdb884f11",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-MUL-011::78e9df3c-560c-5c35-b149-385bdb884f11"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "4c827d6c-2e89-5779-88a0-a898076b72be"
+      ],
+      "treatment_context_chars": 6889,
+      "treatment_selected_ids": [
+        "34a357f4-d12a-51ec-bfc7-d54e1ae8a041",
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "bbc49c68-e80d-5b58-910e-0a83e4da92a6",
+        "f0fa00b3-8283-599b-84a6-a002fdc1d0f8",
+        "78e9df3c-560c-5c35-b149-385bdb884f11",
+        "258d0eb1-4dc3-572c-8d50-2a06091b92d3",
+        "f3ccb79e-857c-5994-9182-da2a04dcd220",
+        "00975091-68da-5fd1-b5b5-12cce147b8f1"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "4a9b8aee-59c0-5724-a214-d93d0d110696",
+        "5ab273ba-95fb-5bf2-88f9-fe12c1ad7819",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0"
+      ],
+      "baseline_context_chars": 6604,
+      "baseline_selected_ids": [
+        "31daf417-f490-51ac-a2fb-ff1248d8eb7e",
+        "9f52bfa8-5ff7-5e51-8afa-55347cac284c",
+        "17702949-57d1-5977-ad29-66dd1815ac8e"
+      ],
+      "case_id": "ANS-MUL-012",
+      "frozen_candidate_pool_sha256": "5c9dc96943e6a6cef7dea7f457caba9a89bb5a610b6c125db176fe2ed7862f41",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [
+        {
+          "chunk_id": "4a9b8aee-59c0-5724-a214-d93d0d110696",
+          "historical_stage": "CHARACTER_BUDGET_LOSS",
+          "original_rank": 11,
+          "requirement_id": "ANS-MUL-012::4a9b8aee-59c0-5724-a214-d93d0d110696",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "gained_requirement_ids": [
+        "ANS-MUL-012::4a9b8aee-59c0-5724-a214-d93d0d110696"
+      ],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [],
+      "lost_requirement_ids": [],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "9f52bfa8-5ff7-5e51-8afa-55347cac284c"
+      ],
+      "treatment_context_chars": 6619,
+      "treatment_selected_ids": [
+        "31daf417-f490-51ac-a2fb-ff1248d8eb7e",
+        "17702949-57d1-5977-ad29-66dd1815ac8e",
+        "4a9b8aee-59c0-5724-a214-d93d0d110696",
+        "5ab273ba-95fb-5bf2-88f9-fe12c1ad7819",
+        "0a117c04-a7d2-5491-86af-f5d3e8f0b493",
+        "36b8418b-6364-555e-bbaf-fb1bbe7406d0"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "f3ccb79e-857c-5994-9182-da2a04dcd220",
+        "78e9df3c-560c-5c35-b149-385bdb884f11",
+        "86cd1b85-7970-5b17-87d9-f596ccc95d3c",
+        "258d0eb1-4dc3-572c-8d50-2a06091b92d3",
+        "d31929fe-7ec8-5857-86c9-586efb8ecb65",
+        "00975091-68da-5fd1-b5b5-12cce147b8f1"
+      ],
+      "baseline_context_chars": 6730,
+      "baseline_selected_ids": [
+        "e7b84d56-86c5-5dde-a6c5-fd0a25f05ff6",
+        "a5f10865-dec2-5b7a-b90a-49e1f9497237",
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "36e5571c-4db0-50c7-b22e-be92ab490064",
+        "ce07a16c-2f4a-5e57-98e8-881413746889"
+      ],
+      "case_id": "ANS-REF-004",
+      "frozen_candidate_pool_sha256": "ad31340beabe7803e6a3709cd086c6bac59e632329bfea57dadfb23e775325a3",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [],
+      "gained_requirement_ids": [],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [
+        {
+          "chunk_id": "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+          "original_rank": 3,
+          "requirement_id": "ANS-REF-004::cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "lost_requirement_ids": [
+        "ANS-REF-004::cb9725c0-9c87-518f-a7e4-7ef767bfea4e"
+      ],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "ce07a16c-2f4a-5e57-98e8-881413746889"
+      ],
+      "treatment_context_chars": 6850,
+      "treatment_selected_ids": [
+        "e7b84d56-86c5-5dde-a6c5-fd0a25f05ff6",
+        "a5f10865-dec2-5b7a-b90a-49e1f9497237",
+        "36e5571c-4db0-50c7-b22e-be92ab490064",
+        "f3ccb79e-857c-5994-9182-da2a04dcd220",
+        "78e9df3c-560c-5c35-b149-385bdb884f11",
+        "86cd1b85-7970-5b17-87d9-f596ccc95d3c",
+        "258d0eb1-4dc3-572c-8d50-2a06091b92d3",
+        "d31929fe-7ec8-5857-86c9-586efb8ecb65",
+        "00975091-68da-5fd1-b5b5-12cce147b8f1"
+      ]
+    },
+    {
+      "added_candidate_ids": [
+        "4cce2952-bfae-568c-ab0e-6a4362908995",
+        "e2517fe5-0e49-5c3f-8fe1-ef81fd043a20",
+        "4542d9eb-33f5-50f2-910b-4484d11db9dd"
+      ],
+      "baseline_context_chars": 6700,
+      "baseline_selected_ids": [
+        "360c00e6-57c4-53ca-85cb-0a939842b9d8",
+        "689edbbb-ff7a-5c4a-9aa2-8b2705d548d1",
+        "88efaec2-06e5-5151-b162-b3eeeacc76de",
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+        "986bf19e-a718-5dbc-87ec-8b2511b31d0d",
+        "37f45304-4de3-5dfe-9b2d-98b47f4b1bd5"
+      ],
+      "case_id": "ANS-REF-006",
+      "frozen_candidate_pool_sha256": "061dacb7fe74a3e104f671b7e2ac60bab41fe54a4d6a99e152e0bec46ebd2a63",
+      "frozen_retrieval_attempts": 1,
+      "gained_evidence": [],
+      "gained_requirement_ids": [],
+      "known_limitations": [
+        "Gold labels do not enumerate every useful supporting chunk.",
+        "No generation or semantic answer-quality evaluation was run."
+      ],
+      "lost_evidence": [
+        {
+          "chunk_id": "cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+          "original_rank": 4,
+          "requirement_id": "ANS-REF-006::cb9725c0-9c87-518f-a7e4-7ef767bfea4e",
+          "source_id": "nice_ng198_2026_08"
+        }
+      ],
+      "lost_requirement_ids": [
+        "ANS-REF-006::cb9725c0-9c87-518f-a7e4-7ef767bfea4e"
+      ],
+      "potential_qualifier_displacement": true,
+      "qualifier_assessment": "UNASSESSED_UNLABELED_OR_QUALIFIER_RISK",
+      "removed_candidate_ids": [
+        "cb9725c0-9c87-518f-a7e4-7ef767bfea4e"
+      ],
+      "treatment_context_chars": 6870,
+      "treatment_selected_ids": [
+        "360c00e6-57c4-53ca-85cb-0a939842b9d8",
+        "689edbbb-ff7a-5c4a-9aa2-8b2705d548d1",
+        "88efaec2-06e5-5151-b162-b3eeeacc76de",
+        "986bf19e-a718-5dbc-87ec-8b2511b31d0d",
+        "4cce2952-bfae-568c-ab0e-6a4362908995",
+        "37f45304-4de3-5dfe-9b2d-98b47f4b1bd5",
+        "e2517fe5-0e49-5c3f-8fe1-ef81fd043a20",
+        "4542d9eb-33f5-50f2-910b-4484d11db9dd"
+      ]
+    }
+  ],
+  "gain_count": 12,
+  "hard_invariant_violation_count": 0,
+  "hard_invariant_violations": [],
+  "regression_count": 5,
+  "schema": "budget_aware_regression_audit_v1",
+  "status": "COMPLETE"
+}

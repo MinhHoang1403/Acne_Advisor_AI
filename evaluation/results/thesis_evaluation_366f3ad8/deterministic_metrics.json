@@ -1,0 +1,333 @@
+{
+  "schema": "thesis_deterministic_metrics",
+  "computed_at": "2026-10-09T14:34:46+00:00",
+  "source_raw_results_canonical_sha256": "1f525efb44091c2444d298d45de4f31637b9be4d1d512f88db38ae9738125feb",
+  "denominators": {
+    "all_cases": 100,
+    "answerable": 70,
+    "single_turn_answerable": 55,
+    "multi_turn_answerable": 15,
+    "reviewed_claims": 104,
+    "confirmed_absence": 24,
+    "policy_ambiguous": 6
+  },
+  "answerable_action_distribution": {
+    "abstain": 4,
+    "generate": 66
+  },
+  "answerable_completion_rate": {
+    "count": 66,
+    "denominator": 70,
+    "percentage": 94.3
+  },
+  "evidence": {
+    "acquisition_required_evidence_recall": {
+      "count": 85,
+      "denominator": 88,
+      "percentage": 96.6
+    },
+    "packed_required_evidence_recall": {
+      "count": 58,
+      "denominator": 88,
+      "percentage": 65.9
+    },
+    "complete_reviewed_claims": {
+      "count": 71,
+      "denominator": 104,
+      "percentage": 68.3
+    },
+    "complete_answerable_cases": {
+      "count": 46,
+      "denominator": 70,
+      "percentage": 65.7
+    },
+    "strict_reviewed_id_context_precision": {
+      "count": 58,
+      "denominator": 430,
+      "percentage": 13.5
+    }
+  },
+  "confirmed_evidence_gap_rejection": {
+    "count": 18,
+    "denominator": 24,
+    "percentage": 75.0
+  },
+  "confirmed_evidence_gap_cases": [
+    {
+      "case_id": "GAP-ABS-003",
+      "action": "generate",
+      "reason": "evidence_sufficient",
+      "passed": false
+    },
+    {
+      "case_id": "GAP-ABS-004",
+      "action": "generate",
+      "reason": "evidence_sufficient",
+      "passed": false
+    },
+    {
+      "case_id": "GAP-ABS-005",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-ABS-008",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-001",
+      "action": "generate",
+      "reason": "evidence_sufficient",
+      "passed": false
+    },
+    {
+      "case_id": "GAP-EXA-002",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-003",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-004",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-005",
+      "action": "generate",
+      "reason": "evidence_sufficient",
+      "passed": false
+    },
+    {
+      "case_id": "GAP-EXA-006",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-007",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-008",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-009",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-EXA-010",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-001",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-002",
+      "action": "generate",
+      "reason": "evidence_sufficient",
+      "passed": false
+    },
+    {
+      "case_id": "GAP-REL-003",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-004",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-005",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-006",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-007",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-008",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-009",
+      "action": "abstain",
+      "reason": "evidence_gap",
+      "passed": true
+    },
+    {
+      "case_id": "GAP-REL-010",
+      "action": "generate",
+      "reason": "evidence_sufficient",
+      "passed": false
+    }
+  ],
+  "policy_ambiguous_behavior": {
+    "denominator": 6,
+    "no_pass_fail_aggregate": true,
+    "distribution": {
+      "abstain": 2,
+      "generate": 4
+    },
+    "cases": [
+      {
+        "case_id": "GAP-ABS-001",
+        "action": "abstain",
+        "reason": "evidence_gap"
+      },
+      {
+        "case_id": "GAP-ABS-002",
+        "action": "abstain",
+        "reason": "evidence_gap"
+      },
+      {
+        "case_id": "GAP-ABS-006",
+        "action": "generate",
+        "reason": "evidence_sufficient"
+      },
+      {
+        "case_id": "GAP-ABS-007",
+        "action": "generate",
+        "reason": "evidence_sufficient"
+      },
+      {
+        "case_id": "GAP-ABS-009",
+        "action": "generate",
+        "reason": "evidence_sufficient"
+      },
+      {
+        "case_id": "GAP-ABS-010",
+        "action": "generate",
+        "reason": "evidence_sufficient"
+      }
+    ]
+  },
+  "structural_provenance": {
+    "citation_id_validity": {
+      "count": 267,
+      "denominator": 267,
+      "percentage": 100.0
+    },
+    "source_allowlist_validity": {
+      "count": 100,
+      "denominator": 100,
+      "percentage": 100.0
+    },
+    "provenance_validity": {
+      "count": 581,
+      "denominator": 581,
+      "percentage": 100.0
+    },
+    "structural_verifier_pass_rate": {
+      "count": 94,
+      "denominator": 100,
+      "percentage": 94.0
+    },
+    "scope": "technical identity and structure only; no semantic entailment claim"
+  },
+  "subgroups": {
+    "single_turn": {
+      "denominator": 55,
+      "evidence": {
+        "acquisition_required_evidence_recall": {
+          "count": 64,
+          "denominator": 67,
+          "percentage": 95.5
+        },
+        "packed_required_evidence_recall": {
+          "count": 43,
+          "denominator": 67,
+          "percentage": 64.2
+        },
+        "complete_reviewed_claims": {
+          "count": 54,
+          "denominator": 81,
+          "percentage": 66.7
+        },
+        "complete_answerable_cases": {
+          "count": 36,
+          "denominator": 55,
+          "percentage": 65.5
+        },
+        "strict_reviewed_id_context_precision": {
+          "count": 43,
+          "denominator": 348,
+          "percentage": 12.4
+        }
+      },
+      "action_distribution": {
+        "abstain": 4,
+        "generate": 51
+      }
+    },
+    "multi_turn": {
+      "denominator": 15,
+      "evidence": {
+        "acquisition_required_evidence_recall": {
+          "count": 21,
+          "denominator": 21,
+          "percentage": 100.0
+        },
+        "packed_required_evidence_recall": {
+          "count": 15,
+          "denominator": 21,
+          "percentage": 71.4
+        },
+        "complete_reviewed_claims": {
+          "count": 17,
+          "denominator": 23,
+          "percentage": 73.9
+        },
+        "complete_answerable_cases": {
+          "count": 10,
+          "denominator": 15,
+          "percentage": 66.7
+        },
+        "strict_reviewed_id_context_precision": {
+          "count": 15,
+          "denominator": 82,
+          "percentage": 18.3
+        }
+      },
+      "action_distribution": {
+        "generate": 15
+      }
+    }
+  }
+}

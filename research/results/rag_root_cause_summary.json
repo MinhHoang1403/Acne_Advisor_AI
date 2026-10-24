@@ -1,0 +1,141 @@
+{
+  "decision_and_generation": {
+    "code_supported_same_packed_context": true,
+    "observed_identity_comparison_available": false,
+    "reason": "The frozen serializer omitted agent_decision_evidence_traces. Frozen code uses the same PackedContext for decision and generation, but the direct runtime comparison cannot be marked OBSERVED."
+  },
+  "evidence_accounting": {
+    "acquired": 85,
+    "acquisition_misses": 3,
+    "all_loss_affected_cases": 24,
+    "all_not_packed": 30,
+    "packed": 58,
+    "packed_is_subset_of_acquisition": true,
+    "post_acquisition_affected_cases": 22,
+    "post_acquisition_losses": 27,
+    "primary_classification_conserved": true,
+    "requirements": 88,
+    "unknown_primary_classifications": 0
+  },
+  "evidence_gap": {
+    "confirmed_failures": 6,
+    "confirmed_rejections": 18,
+    "confirmed_total": 24,
+    "response_or_policy_contract_failure_confirmed": 0,
+    "retrieval_context_deficiency_confirmed": 0,
+    "semantic_decision_supported_inference": 6
+  },
+  "final_decision_status": [
+    "PARTIAL_ROOT_CAUSE_CONFIRMED",
+    "NO_CONFIRMED_IMPLEMENTATION_BUG"
+  ],
+  "implementation_assessment": {
+    "confirmed_bugs": 0,
+    "observed_design_limitations": [
+      "rank-ordered whole-chunk packing under a 7000-character budget",
+      "nine-item early stop after reranking",
+      "semantic action decision can label confirmed-absence queries evidence_sufficient"
+    ],
+    "status": "NO_CONFIRMED_IMPLEMENTATION_BUG",
+    "unresolved": [
+      "candidate-limit cause for the three acquisition misses",
+      "exact counterfactual contribution of reranking to character-budget losses",
+      "direct-support IDs and policy-validation state for the six action failures"
+    ]
+  },
+  "largest_confirmed_root_cause": {
+    "confidence": "OBSERVED",
+    "requirements": 20,
+    "share_of_post_acquisition_losses_percent": 74.1,
+    "stage": "CHARACTER_BUDGET_LOSS"
+  },
+  "metric_unit": "unique case_id + required_chunk_id; claim IDs attached but not double-counted",
+  "primary_stage_counts": {
+    "ACQUISITION_MISS": 3,
+    "CHARACTER_BUDGET_LOSS": 20,
+    "ITEM_BUDGET_LOSS": 7,
+    "PACKED": 58
+  },
+  "reconciliation": [
+    {
+      "affected_cases": 3,
+      "requirements": 3,
+      "stage": "ACQUISITION_MISS",
+      "sufficient_trace": 3,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 0,
+      "requirements": 0,
+      "stage": "FUSION_OR_IDENTITY_LOSS",
+      "sufficient_trace": 0,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 0,
+      "requirements": 0,
+      "stage": "RERANK_ORDER_LOSS",
+      "sufficient_trace": 0,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 16,
+      "requirements": 20,
+      "stage": "CHARACTER_BUDGET_LOSS",
+      "sufficient_trace": 20,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 6,
+      "requirements": 7,
+      "stage": "ITEM_BUDGET_LOSS",
+      "sufficient_trace": 7,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 0,
+      "requirements": 0,
+      "stage": "CONTRACT_OR_PROVENANCE_REJECTION",
+      "sufficient_trace": 0,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 0,
+      "requirements": 0,
+      "stage": "RETRY_STATE_LOSS",
+      "sufficient_trace": 0,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 0,
+      "requirements": 0,
+      "stage": "GOLD_OR_IDENTITY_MISMATCH",
+      "sufficient_trace": 0,
+      "unknown": 0
+    },
+    {
+      "affected_cases": 0,
+      "requirements": 0,
+      "stage": "TRACE_INSUFFICIENT",
+      "sufficient_trace": 0,
+      "unknown": 0
+    }
+  ],
+  "reference_metric_checks": {
+    "acquisition_85_of_88": true,
+    "confirmed_gap_18_of_24": true,
+    "packed_58_of_88": true
+  },
+  "reranking": {
+    "affected_cases": 6,
+    "interpretation": "The observed post-rerank order deterministically placed these requirements after the packed prefix. This does not prove that BGE misunderstood their semantics.",
+    "item_budget_losses_with_direct_rerank_order_link": 7
+  },
+  "retry": {
+    "answerable_requirements_in_retried_cases": 2,
+    "interpretation": "Retained requirements remained eligible. Their final omission was a rerank/pack outcome, not evidence disappearance from retry state.",
+    "retained_but_finally_not_packed": 2,
+    "retry_state_losses": 0
+  },
+  "schema": "rag_root_cause_summary_v1"
+}

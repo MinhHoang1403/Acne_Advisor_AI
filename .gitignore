@@ -213,3 +213,5 @@ evaluation/results/*
 !evaluation/results/README.md
 !evaluation/results/formal_run_2d5f0124/
 !evaluation/results/formal_run_2d5f0124/**
+!evaluation/results/thesis_evaluation_366f3ad8/
+!evaluation/results/thesis_evaluation_366f3ad8/**

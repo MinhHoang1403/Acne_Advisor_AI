@@ -1,0 +1,49 @@
+{
+  "schema_version": "local_extraction_contract_holdout_overlap_report_v1",
+  "holdout_raw_sha256": "d85dc6467da8df2483c80a5e9a5ca4902c94e31bbfb2f1d71b2e2845c8f9d738",
+  "holdout_canonical_sha256": "2e35af7ed07718ba167c82f0510b1fd59fac0e3ddb5779f290778f787a592f2d",
+  "counts": {
+    "extraction": 30,
+    "checking": 18,
+    "extraction_gold_null": 30,
+    "checking_gold_null": 18
+  },
+  "comparison_method": {
+    "normalization": "Unicode NFKC, casefold, retain word characters, collapse whitespace",
+    "scores": [
+      "token-set Jaccard",
+      "difflib SequenceMatcher ratio"
+    ],
+    "decision_score": "maximum of the two scores",
+    "near_duplicate_threshold": 0.85,
+    "holdout_components": "each extraction candidate answer; each checking reference and claim separately",
+    "formal_benchmark_components": "each query, gold answer, gold claim, evidence snippet, and provenance excerpt separately"
+  },
+  "comparisons": {
+    "development_calibration": {
+      "path": "evaluation/evaluator_calibration.json",
+      "maximum_score": 0.6941176470588235,
+      "maximum_pair": [
+        "HLD-CHK-13:reference",
+        "CAL-CHK-02:claim"
+      ],
+      "near_duplicate_pairs": []
+    },
+    "formal_benchmark": {
+      "path": "evaluation/benchmark_100.json",
+      "case_count": 100,
+      "maximum_score": 0.7950310559006211,
+      "maximum_pair": [
+        "HLD-CHK-10:reference",
+        "ANS-TRT-006:snippet"
+      ],
+      "near_duplicate_pairs": []
+    }
+  },
+  "result": "no cross-set near duplicate at preregistered threshold",
+  "limitations": [
+    "The check detects lexical near duplicates, not semantic paraphrases.",
+    "Checking cases deliberately reuse a reference for controlled Entailment/Neutral/Contradiction contrasts; this is within-holdout design and not cross-set contamination.",
+    "Independent gold review remains mandatory before any blind holdout inference."
+  ]
+}

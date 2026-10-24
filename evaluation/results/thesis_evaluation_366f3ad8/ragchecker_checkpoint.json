@@ -1,0 +1,30 @@
+{
+  "schema": "thesis_ragchecker_failure_checkpoint",
+  "status": "RAGCHECKER_EVALUATOR_BLOCKER",
+  "blocked_at": "2026-10-09T14:37:16+00:00",
+  "run_id": "thesis_evaluation_366f3ad8",
+  "system_under_test_sha": "366f3ad836c36be36565caad4a94ad17a7a6278f",
+  "protocol_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+  "system_output_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+  "raw_results_canonical_sha256": "1f525efb44091c2444d298d45de4f31637b9be4d1d512f88db38ae9738125feb",
+  "raw_results_raw_sha256": "b078858d61ced4ed072339fd9cb576517a2ce585724e425c6fc0a2f772f57f16",
+  "answerable_denominator": 70,
+  "ragchecker_version": "0.1.9",
+  "evaluator_model": "gpt-5.4-2026-03-05",
+  "adapter": {
+    "api": "OpenAI Responses API",
+    "store": false,
+    "adapter_contract_sha256": "314cdb9df981ab995ba010c0ee0cee0376829490eecd7c7383a14090fb6a343f"
+  },
+  "calibration_decision": "CALIBRATION_READY_FOR_FORMAL_RUN",
+  "stage": "gt_answer_claim_extraction",
+  "observed_progress": "1/9 extraction batches completed before failure; partial in-memory output was not persisted by the package",
+  "error": {
+    "class": "openai.RateLimitError",
+    "http_status": 429,
+    "code": "credit_balance_exhausted",
+    "message": "OpenAI account has no credits remaining; add credits before resuming semantic evaluation."
+  },
+  "system_answers_regenerated": false,
+  "resume_policy": "Resume evaluator scoring only from the same committed frozen raw output after credit is restored."
+}

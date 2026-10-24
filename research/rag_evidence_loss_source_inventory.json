@@ -1,0 +1,42 @@
+{
+  "benchmark": {
+    "path": "evaluation/benchmark_100.json",
+    "owner_commit": "bd3db1a87fc1e6491c11cab983dfa0b62112db00",
+    "blob_oid": "d2aabf26e32fa16d031bfe69ff36555dec9cf36d"
+  },
+  "benchmark_manifest": {
+    "path": "evaluation/benchmark_manifest.json",
+    "owner_commit": "88b28c7e74ce1f110339ccd75e526bf96046ffcc",
+    "blob_oid": "181f3edcb3778ffead0638be2c8ea217945b2c0d"
+  },
+  "gold": {
+    "path": "evaluation/locked_gold/current_kb_adjudication.json",
+    "owner_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+    "blob_oid": "e91dbe5ccfcf455c8e7f6c61436afd39b58194c9"
+  },
+  "gold_manifest": {
+    "path": "evaluation/locked_gold/current_kb_adjudication_manifest.json",
+    "owner_commit": "afc60883e9060c1dd041b2105c3e9a69a8313bf1",
+    "blob_oid": "08f2ac84773b097c8d516acc8ea9934ee5271436"
+  },
+  "raw_results": {
+    "path": "evaluation/results/thesis_evaluation_366f3ad8/raw_results.json",
+    "owner_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+    "blob_oid": "04f75c350b5c2c8ba308f309b00dcc06c1905897"
+  },
+  "reference_metrics": {
+    "path": "evaluation/results/thesis_evaluation_366f3ad8/deterministic_metrics.json",
+    "owner_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+    "blob_oid": "c25df3cb89cf569f09d2bf470691e9ec1a7b021a"
+  },
+  "run_manifest": {
+    "path": "evaluation/results/thesis_evaluation_366f3ad8/run_manifest.json",
+    "owner_commit": "5a19e3c079ef82006fbb42cba44e92560544b7da",
+    "blob_oid": "c2c92d419bf6dda0b3f29626043468bbdccadcd5"
+  },
+  "system_output_manifest": {
+    "path": "evaluation/results/thesis_evaluation_366f3ad8/system_output_manifest.json",
+    "owner_commit": "c679994efc4463e96f7154dfb80296378c32ff02",
+    "blob_oid": "f8998c91d3cb35988e14ca16aeceb8e4cd62a3e8"
+  }
+}

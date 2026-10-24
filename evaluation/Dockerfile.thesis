@@ -1,0 +1,22 @@
+FROM python:3.11.14-slim-bookworm
+
+ENV PYTHONUTF8=1 \
+    PYTHONIOENCODING=utf-8 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY requirements.txt requirements.lock.txt ./
+COPY evaluation/thesis_requirements.txt evaluation/thesis_requirements.txt
+# The production lock targets Windows CI; only its Windows API wheel is inapplicable here.
+RUN python -m pip install --upgrade pip==26.1.2 \
+    && grep --invert-match '^pywin32==' requirements.lock.txt > /tmp/linux-requirements.lock.txt \
+    && python -m pip install --requirement /tmp/linux-requirements.lock.txt \
+    && python -m pip install --requirement evaluation/thesis_requirements.txt \
+    && python -m pip check
+
+CMD ["python", "-m", "evaluation.thesis_evaluation_support", "preflight"]

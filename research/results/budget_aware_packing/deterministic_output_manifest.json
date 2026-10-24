@@ -1,0 +1,45 @@
+{
+  "deterministic_files": {
+    "baseline_replay_mismatches.json": {
+      "bytes": 124,
+      "sha256": "383572d2c92e1d1e36dfa52830d644100e1709d84d2c5a4fca1c8000baab2299"
+    },
+    "baseline_replay_results.json": {
+      "bytes": 2165,
+      "sha256": "47cb07eaa83a1c4ba9f28dadc30a7c5448fb3d7826082b2694c49a2a6d02b38e"
+    },
+    "development_comparison.json": {
+      "bytes": 5143,
+      "sha256": "00cb5a9b1926c3b8418b9a3e66e4e310d2cf65debacbbc489969f2339aca2a77"
+    },
+    "experiment_identity.json": {
+      "bytes": 7837,
+      "sha256": "00429626b46ca9d0408e71f77a0ca13daa3e543e04ab703f0acbd800ad4092d6"
+    },
+    "holdout_comparison.json": {
+      "bytes": 183,
+      "sha256": "bc17b90c494e046b09fddd1f7d9400d4f5744cd1bab1e8828deb2aaf21adc69c"
+    },
+    "holdout_eligibility.json": {
+      "bytes": 1095,
+      "sha256": "ec4e26ded034acee92fb0bcb8f9ee39bcd3d6c5c8276968d36d39271210f810f"
+    },
+    "per_case_comparison.csv": {
+      "bytes": 84333,
+      "sha256": "dd0099e1257921870e6768685f1d9e62dc0e724bf4ca7add76208f3611f17f6d"
+    },
+    "reconstruction_manifest.json": {
+      "bytes": 2155423,
+      "sha256": "8195d3e5779cd74be1a4f60112c005aab020bd8f1d0622abba69cffdb559a8f4"
+    },
+    "regression_audit.json": {
+      "bytes": 33245,
+      "sha256": "013726de44be4181af61909cb025cd1a09d55558702cfaa44f367edc9765fb81"
+    }
+  },
+  "excluded_nondeterministic_files": [
+    "selector_runtime_measurements.json"
+  ],
+  "schema": "budget_aware_deterministic_output_manifest_v1",
+  "status": "HASHES_RECORDED"
+}

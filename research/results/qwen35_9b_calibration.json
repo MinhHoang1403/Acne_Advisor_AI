@@ -1,0 +1,2263 @@
+{
+  "schema_version": "local_ragchecker_calibration_v1",
+  "started_at": "2026-10-12T04:35:15+00:00",
+  "calibration_dataset_sha256": "69b837a5571614b24c7705b362af1cb451b6111fddd60c9e471ffbd49fd04644",
+  "execution_mode": "per_prompt_diagnostic_fail_closed",
+  "resource_policy": {
+    "require_full_gpu": false
+  },
+  "preflight": {
+    "ollama_version": "0.40.2",
+    "model": {
+      "name": "qwen3.5:9b-q4_K_M",
+      "model": "qwen3.5:9b-q4_K_M",
+      "modified_at": "2026-10-12T11:31:09.1895698+07:00",
+      "size": 6550825550,
+      "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "details": {
+        "parent_model": "model.gguf",
+        "format": "gguf",
+        "family": "qwen35",
+        "families": [
+          "qwen35"
+        ],
+        "parameter_size": "9.0B",
+        "quantization_level": "Q4_K_M",
+        "context_length": 262144,
+        "embedding_length": 4096,
+        "runner": "llamacpp"
+      },
+      "capabilities": [
+        "completion",
+        "vision",
+        "tools",
+        "thinking"
+      ]
+    },
+    "details": {
+      "parent_model": "model.gguf",
+      "format": "gguf",
+      "family": "qwen35",
+      "families": [
+        "qwen35"
+      ],
+      "parameter_size": "9.0B",
+      "quantization_level": "Q4_K_M",
+      "runner": "llamacpp"
+    },
+    "capabilities": [
+      "completion",
+      "vision",
+      "tools",
+      "thinking"
+    ],
+    "config": {
+      "base_url": "http://host.docker.internal:11434",
+      "model": "qwen3.5:9b-q4_K_M",
+      "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+      "quantization": "Q4_K_M",
+      "num_ctx": 16384,
+      "extraction_num_predict": 1000,
+      "checking_num_predict": 150,
+      "temperature": 0.0,
+      "seed": 42,
+      "think": false,
+      "timeout_seconds": 300.0,
+      "keep_alive": "30m"
+    }
+  },
+  "runs": [
+    {
+      "run": 1,
+      "ok": true,
+      "result": {
+        "extraction": [
+          {
+            "item_id": "CAL-EXT-01",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Mụn trứng cá', 'là', 'bệnh viêm mạn tính']",
+              "['Mụn trứng cá', 'của', 'đơn vị nang lông - tuyến bã']"
+            ],
+            "raw_output": "(\"Mụn trứng cá\", \"là\", \"bệnh viêm mạn tính\")\n(\"Mụn trứng cá\", \"của\", \"đơn vị nang lông - tuyến bã\")"
+          },
+          {
+            "item_id": "CAL-EXT-02",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R02"
+            ],
+            "claims": [
+              "['Benzoyl peroxide', 'is', 'antibacterial active ingredient']",
+              "['Benzoyl peroxide', 'used for', 'topical application']",
+              "['Benzoyl peroxide', 'has effect on', 'mild acne reduction']"
+            ],
+            "raw_output": "(\"Benzoyl peroxide\", \"is\", \"antibacterial active ingredient\")\n(\"Benzoyl peroxide\", \"used for\", \"topical application\")\n(\"Benzoyl peroxide\", \"has effect on\", \"mild acne reduction\")"
+          },
+          {
+            "item_id": "CAL-EXT-03",
+            "status": "invalid",
+            "acceptable": false,
+            "review_required": false,
+            "reasons": [
+              "OLLAMA_EXTRACTION_FORMAT_INVALID"
+            ],
+            "claims": [],
+            "raw_output": "(\"Chế độ ăn tải đường huyết thấp\", \"có bằng chứng mâu thuẫn\", \"\")\n(\"Chế độ ăn tải đường huyết thấp\", \"gợi ý khả năng\", \"giảm mụn\")"
+          },
+          {
+            "item_id": "CAL-EXT-04",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R01"
+            ],
+            "claims": [
+              "['Điều trị duy trì', 'cần thiết', 'không phải lúc nào']",
+              "['Điều trị duy trì', 'có thể cân nhắc', 'khi thường xuyên tái phát']"
+            ],
+            "raw_output": "(\"Điều trị duy trì\", \"cần thiết\", \"không phải lúc nào\")\n(\"Điều trị duy trì\", \"có thể cân nhắc\", \"khi thường xuyên tái phát\")"
+          },
+          {
+            "item_id": "CAL-EXT-05",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R01",
+              "missing_reference:R02"
+            ],
+            "claims": [
+              "['Treatment', 'should not use', 'monotherapy with antibiotics']",
+              "['Combination of treatment', 'includes', 'benzoyl peroxide']",
+              "['Combination of treatment', 'can reduce', 'antibiotic resistance']"
+            ],
+            "raw_output": "(\"Treatment\", \"should not use\", \"monotherapy with antibiotics\")\n(\"Combination of treatment\", \"includes\", \"benzoyl peroxide\")\n(\"Combination of treatment\", \"can reduce\", \"antibiotic resistance\")"
+          },
+          {
+            "item_id": "CAL-EXT-06",
+            "status": "invalid",
+            "acceptable": false,
+            "review_required": false,
+            "reasons": [
+              "OLLAMA_EXTRACTION_FORMAT_INVALID"
+            ],
+            "claims": [],
+            "raw_output": "(\"Isotretinoin\", \"reduces\", \"sebaceous gland activity\")\n(\"Isotretinoin\", \"regulates\", \"keratinization\")\n(\"Isotretinoin\", \"has anti-inflammatory effect\", \"\")"
+          },
+          {
+            "item_id": "CAL-EXT-07",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Open comedone', 'is', 'mụn đầu đen']",
+              "['Closed comedone', 'is', 'mụn đầu trắng']"
+            ],
+            "raw_output": "(\"Open comedone\", \"is\", \"mụn đầu đen\")\n(\"Closed comedone\", \"is\", \"mụn đầu trắng\")"
+          },
+          {
+            "item_id": "CAL-EXT-08",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Benzoyl peroxide', 'is', 'antimicrobial']",
+              "['Benzoyl peroxide', 'is not', 'topical antibiotic']",
+              "['Clindamycin', 'is', 'topical antibiotic']"
+            ],
+            "raw_output": "(\"Benzoyl peroxide\", \"is\", \"antimicrobial\")\n(\"Benzoyl peroxide\", \"is not\", \"topical antibiotic\")\n(\"Clindamycin\", \"is\", \"topical antibiotic\")"
+          }
+        ],
+        "checking": [
+          {
+            "item_id": "CAL-CHK-01",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "entity_distinction"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-02",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "qualifier_modality"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-03",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "negation"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-04",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_number"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-05",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "negation",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-06",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "qualifier_modality",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-07",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-08",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "entity_distinction",
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment",
+              "Entailment"
+            ],
+            "raw_output": "Entailment\nEntailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-09",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_time",
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-10",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "unsupported_comparison",
+              "entity_distinction"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-11",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_time",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-12",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_number",
+              "unsupported_comparison"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          }
+        ]
+      }
+    },
+    {
+      "run": 2,
+      "ok": true,
+      "result": {
+        "extraction": [
+          {
+            "item_id": "CAL-EXT-01",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Mụn trứng cá', 'là', 'bệnh viêm mạn tính']",
+              "['Mụn trứng cá', 'của', 'đơn vị nang lông - tuyến bã']"
+            ],
+            "raw_output": "(\"Mụn trứng cá\", \"là\", \"bệnh viêm mạn tính\")\n(\"Mụn trứng cá\", \"của\", \"đơn vị nang lông - tuyến bã\")"
+          },
+          {
+            "item_id": "CAL-EXT-02",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R02"
+            ],
+            "claims": [
+              "['Benzoyl peroxide', 'is', 'antibacterial active ingredient']",
+              "['Benzoyl peroxide', 'used for', 'topical application']",
+              "['Benzoyl peroxide', 'has effect on', 'mild acne reduction']"
+            ],
+            "raw_output": "(\"Benzoyl peroxide\", \"is\", \"antibacterial active ingredient\")\n(\"Benzoyl peroxide\", \"used for\", \"topical application\")\n(\"Benzoyl peroxide\", \"has effect on\", \"mild acne reduction\")"
+          },
+          {
+            "item_id": "CAL-EXT-03",
+            "status": "invalid",
+            "acceptable": false,
+            "review_required": false,
+            "reasons": [
+              "OLLAMA_EXTRACTION_FORMAT_INVALID"
+            ],
+            "claims": [],
+            "raw_output": "(\"Chế độ ăn tải đường huyết thấp\", \"có bằng chứng mâu thuẫn\", \"\")\n(\"Chế độ ăn tải đường huyết thấp\", \"gợi ý khả năng\", \"giảm mụn\")"
+          },
+          {
+            "item_id": "CAL-EXT-04",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R01"
+            ],
+            "claims": [
+              "['Điều trị duy trì', 'cần thiết', 'không phải lúc nào']",
+              "['Điều trị duy trì', 'có thể cân nhắc', 'khi thường xuyên tái phát']"
+            ],
+            "raw_output": "(\"Điều trị duy trì\", \"cần thiết\", \"không phải lúc nào\")\n(\"Điều trị duy trì\", \"có thể cân nhắc\", \"khi thường xuyên tái phát\")"
+          },
+          {
+            "item_id": "CAL-EXT-05",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R01",
+              "missing_reference:R02"
+            ],
+            "claims": [
+              "['Treatment', 'should not use', 'monotherapy with antibiotics']",
+              "['Combination of treatment', 'includes', 'benzoyl peroxide']",
+              "['Combination of treatment', 'can reduce', 'antibiotic resistance']"
+            ],
+            "raw_output": "(\"Treatment\", \"should not use\", \"monotherapy with antibiotics\")\n(\"Combination of treatment\", \"includes\", \"benzoyl peroxide\")\n(\"Combination of treatment\", \"can reduce\", \"antibiotic resistance\")"
+          },
+          {
+            "item_id": "CAL-EXT-06",
+            "status": "invalid",
+            "acceptable": false,
+            "review_required": false,
+            "reasons": [
+              "OLLAMA_EXTRACTION_FORMAT_INVALID"
+            ],
+            "claims": [],
+            "raw_output": "(\"Isotretinoin\", \"reduces\", \"sebaceous gland activity\")\n(\"Isotretinoin\", \"regulates\", \"keratinization\")\n(\"Isotretinoin\", \"has anti-inflammatory effect\", \"\")"
+          },
+          {
+            "item_id": "CAL-EXT-07",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Open comedone', 'is', 'mụn đầu đen']",
+              "['Closed comedone', 'is', 'mụn đầu trắng']"
+            ],
+            "raw_output": "(\"Open comedone\", \"is\", \"mụn đầu đen\")\n(\"Closed comedone\", \"is\", \"mụn đầu trắng\")"
+          },
+          {
+            "item_id": "CAL-EXT-08",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Benzoyl peroxide', 'is', 'antimicrobial']",
+              "['Benzoyl peroxide', 'is not', 'topical antibiotic']",
+              "['Clindamycin', 'is', 'topical antibiotic']"
+            ],
+            "raw_output": "(\"Benzoyl peroxide\", \"is\", \"antimicrobial\")\n(\"Benzoyl peroxide\", \"is not\", \"topical antibiotic\")\n(\"Clindamycin\", \"is\", \"topical antibiotic\")"
+          }
+        ],
+        "checking": [
+          {
+            "item_id": "CAL-CHK-01",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "entity_distinction"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-02",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "qualifier_modality"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-03",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "negation"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-04",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_number"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-05",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "negation",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-06",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "qualifier_modality",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-07",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-08",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "entity_distinction",
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment",
+              "Entailment"
+            ],
+            "raw_output": "Entailment\nEntailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-09",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_time",
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-10",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "unsupported_comparison",
+              "entity_distinction"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-11",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_time",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-12",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_number",
+              "unsupported_comparison"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          }
+        ]
+      }
+    },
+    {
+      "run": 3,
+      "ok": true,
+      "result": {
+        "extraction": [
+          {
+            "item_id": "CAL-EXT-01",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Mụn trứng cá', 'là', 'bệnh viêm mạn tính']",
+              "['Mụn trứng cá', 'của', 'đơn vị nang lông - tuyến bã']"
+            ],
+            "raw_output": "(\"Mụn trứng cá\", \"là\", \"bệnh viêm mạn tính\")\n(\"Mụn trứng cá\", \"của\", \"đơn vị nang lông - tuyến bã\")"
+          },
+          {
+            "item_id": "CAL-EXT-02",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R02"
+            ],
+            "claims": [
+              "['Benzoyl peroxide', 'is', 'antibacterial active ingredient']",
+              "['Benzoyl peroxide', 'used for', 'topical application']",
+              "['Benzoyl peroxide', 'has effect on', 'mild acne reduction']"
+            ],
+            "raw_output": "(\"Benzoyl peroxide\", \"is\", \"antibacterial active ingredient\")\n(\"Benzoyl peroxide\", \"used for\", \"topical application\")\n(\"Benzoyl peroxide\", \"has effect on\", \"mild acne reduction\")"
+          },
+          {
+            "item_id": "CAL-EXT-03",
+            "status": "invalid",
+            "acceptable": false,
+            "review_required": false,
+            "reasons": [
+              "OLLAMA_EXTRACTION_FORMAT_INVALID"
+            ],
+            "claims": [],
+            "raw_output": "(\"Chế độ ăn tải đường huyết thấp\", \"có bằng chứng mâu thuẫn\", \"\")\n(\"Chế độ ăn tải đường huyết thấp\", \"gợi ý khả năng\", \"giảm mụn\")"
+          },
+          {
+            "item_id": "CAL-EXT-04",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R01"
+            ],
+            "claims": [
+              "['Điều trị duy trì', 'cần thiết', 'không phải lúc nào']",
+              "['Điều trị duy trì', 'có thể cân nhắc', 'khi thường xuyên tái phát']"
+            ],
+            "raw_output": "(\"Điều trị duy trì\", \"cần thiết\", \"không phải lúc nào\")\n(\"Điều trị duy trì\", \"có thể cân nhắc\", \"khi thường xuyên tái phát\")"
+          },
+          {
+            "item_id": "CAL-EXT-05",
+            "status": "review_required",
+            "acceptable": false,
+            "review_required": true,
+            "reasons": [
+              "missing_reference:R01",
+              "missing_reference:R02"
+            ],
+            "claims": [
+              "['Treatment', 'should not use', 'monotherapy with antibiotics']",
+              "['Combination of treatment', 'includes', 'benzoyl peroxide']",
+              "['Combination of treatment', 'can reduce', 'antibiotic resistance']"
+            ],
+            "raw_output": "(\"Treatment\", \"should not use\", \"monotherapy with antibiotics\")\n(\"Combination of treatment\", \"includes\", \"benzoyl peroxide\")\n(\"Combination of treatment\", \"can reduce\", \"antibiotic resistance\")"
+          },
+          {
+            "item_id": "CAL-EXT-06",
+            "status": "invalid",
+            "acceptable": false,
+            "review_required": false,
+            "reasons": [
+              "OLLAMA_EXTRACTION_FORMAT_INVALID"
+            ],
+            "claims": [],
+            "raw_output": "(\"Isotretinoin\", \"reduces\", \"sebaceous gland activity\")\n(\"Isotretinoin\", \"regulates\", \"keratinization\")\n(\"Isotretinoin\", \"has anti-inflammatory effect\", \"\")"
+          },
+          {
+            "item_id": "CAL-EXT-07",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Open comedone', 'is', 'mụn đầu đen']",
+              "['Closed comedone', 'is', 'mụn đầu trắng']"
+            ],
+            "raw_output": "(\"Open comedone\", \"is\", \"mụn đầu đen\")\n(\"Closed comedone\", \"is\", \"mụn đầu trắng\")"
+          },
+          {
+            "item_id": "CAL-EXT-08",
+            "status": "accepted",
+            "acceptable": true,
+            "review_required": false,
+            "reasons": [],
+            "claims": [
+              "['Benzoyl peroxide', 'is', 'antimicrobial']",
+              "['Benzoyl peroxide', 'is not', 'topical antibiotic']",
+              "['Clindamycin', 'is', 'topical antibiotic']"
+            ],
+            "raw_output": "(\"Benzoyl peroxide\", \"is\", \"antimicrobial\")\n(\"Benzoyl peroxide\", \"is not\", \"topical antibiotic\")\n(\"Clindamycin\", \"is\", \"topical antibiotic\")"
+          }
+        ],
+        "checking": [
+          {
+            "item_id": "CAL-CHK-01",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "entity_distinction"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-02",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "qualifier_modality"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-03",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "negation"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-04",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_number"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-05",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "negation",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-06",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "qualifier_modality",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-07",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-08",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "entity_distinction",
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment",
+              "Entailment"
+            ],
+            "raw_output": "Entailment\nEntailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-09",
+            "expected": "SUPPORTED",
+            "actual": "SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_time",
+              "cross_language_entailment"
+            ],
+            "raw": [
+              "Entailment"
+            ],
+            "raw_output": "Entailment",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-10",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "unsupported_comparison",
+              "entity_distinction"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-11",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_time",
+              "absolute_claim"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          },
+          {
+            "item_id": "CAL-CHK-12",
+            "expected": "NOT_SUPPORTED",
+            "actual": "NOT_SUPPORTED",
+            "agreement": true,
+            "critical_dimensions": [
+              "exact_number",
+              "unsupported_comparison"
+            ],
+            "raw": [
+              "Contradiction"
+            ],
+            "raw_output": "Contradiction",
+            "error": null
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    [
+      {
+        "request_index": 0,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "e0899053959d5e5f0a29b801ab282ee1849c8a70bfe77793d074ea7144e21378",
+        "prompt_chars": 2284,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 7128280276,
+        "done_reason": "stop",
+        "content": "(\"Mụn trứng cá\", \"là\", \"bệnh viêm mạn tính\")\n(\"Mụn trứng cá\", \"của\", \"đơn vị nang lông - tuyến bã\")",
+        "content_chars": 99,
+        "total_duration": 7119539800,
+        "load_duration": 23793100,
+        "prompt_eval_count": 551,
+        "prompt_eval_duration": 1635880000,
+        "eval_count": 37,
+        "eval_duration": 4931874000,
+        "generation_tokens_per_second": 7.5022192375555425
+      },
+      {
+        "request_index": 1,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "1c0e45a810979a4540d8aa39287f8ba894530307df7d86c28c2c10cdd15dfbbc",
+        "prompt_chars": 2296,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 8531742270,
+        "done_reason": "stop",
+        "content": "(\"Benzoyl peroxide\", \"is\", \"antibacterial active ingredient\")\n(\"Benzoyl peroxide\", \"used for\", \"topical application\")\n(\"Benzoyl peroxide\", \"has effect on\", \"mild acne reduction\")",
+        "content_chars": 178,
+        "total_duration": 8521748200,
+        "load_duration": 18252000,
+        "prompt_eval_count": 553,
+        "prompt_eval_duration": 1091547000,
+        "eval_count": 54,
+        "eval_duration": 7401968000,
+        "generation_tokens_per_second": 7.295357126645238
+      },
+      {
+        "request_index": 2,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "8762717eaeeccb335d1faab4ac87e284ac95c6e37124e580a57d5546136e467f",
+        "prompt_chars": 2307,
+        "num_predict": 1000,
+        "ok": false,
+        "wall_duration": 6783247922,
+        "done_reason": "stop",
+        "content": "(\"Chế độ ăn tải đường huyết thấp\", \"có bằng chứng mâu thuẫn\", \"\")\n(\"Chế độ ăn tải đường huyết thấp\", \"gợi ý khả năng\", \"giảm mụn\")",
+        "content_chars": 130,
+        "total_duration": 6775278600,
+        "load_duration": 17640100,
+        "prompt_eval_count": 556,
+        "prompt_eval_duration": 1143450000,
+        "eval_count": 42,
+        "eval_duration": 5603186000,
+        "generation_tokens_per_second": 7.495735461931837,
+        "error": "OLLAMA_EXTRACTION_FORMAT_INVALID"
+      },
+      {
+        "request_index": 3,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "78645081d417115ef55acdac057ec3fc8b3fb406f742d0947c3ac62ddbdbffe1",
+        "prompt_chars": 2307,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 6490937010,
+        "done_reason": "stop",
+        "content": "(\"Điều trị duy trì\", \"cần thiết\", \"không phải lúc nào\")\n(\"Điều trị duy trì\", \"có thể cân nhắc\", \"khi thường xuyên tái phát\")",
+        "content_chars": 124,
+        "total_duration": 6478589600,
+        "load_duration": 21643500,
+        "prompt_eval_count": 554,
+        "prompt_eval_duration": 1187951000,
+        "eval_count": 39,
+        "eval_duration": 5260794000,
+        "generation_tokens_per_second": 7.413329622866815
+      },
+      {
+        "request_index": 4,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "225bad7540a82a501ae18c7f476572acc19fa8e15c5a542ac019bcbd3f9f39a4",
+        "prompt_chars": 2315,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 9104650019,
+        "done_reason": "stop",
+        "content": "(\"Treatment\", \"should not use\", \"monotherapy with antibiotics\")\n(\"Combination of treatment\", \"includes\", \"benzoyl peroxide\")\n(\"Combination of treatment\", \"can reduce\", \"antibiotic resistance\")",
+        "content_chars": 192,
+        "total_duration": 9096709000,
+        "load_duration": 19846000,
+        "prompt_eval_count": 557,
+        "prompt_eval_duration": 1207896000,
+        "eval_count": 50,
+        "eval_duration": 7859996000,
+        "generation_tokens_per_second": 6.361326392532516
+      },
+      {
+        "request_index": 5,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "d34dde75e3927cc551b6042f38b389ec3dbfb60dfa4b6fe69b962892f119f255",
+        "prompt_chars": 2295,
+        "num_predict": 1000,
+        "ok": false,
+        "wall_duration": 8218007881,
+        "done_reason": "stop",
+        "content": "(\"Isotretinoin\", \"reduces\", \"sebaceous gland activity\")\n(\"Isotretinoin\", \"regulates\", \"keratinization\")\n(\"Isotretinoin\", \"has anti-inflammatory effect\", \"\")",
+        "content_chars": 156,
+        "total_duration": 8207332800,
+        "load_duration": 21246800,
+        "prompt_eval_count": 555,
+        "prompt_eval_duration": 1124955000,
+        "eval_count": 51,
+        "eval_duration": 7051329000,
+        "generation_tokens_per_second": 7.232679116234684,
+        "error": "OLLAMA_EXTRACTION_FORMAT_INVALID"
+      },
+      {
+        "request_index": 6,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "c26a83bd393278c09c7626f238d8d2237c262caca49ef54133fc08b56acbd6e3",
+        "prompt_chars": 2284,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 6701257789,
+        "done_reason": "stop",
+        "content": "(\"Open comedone\", \"is\", \"mụn đầu đen\")\n(\"Closed comedone\", \"is\", \"mụn đầu trắng\")",
+        "content_chars": 81,
+        "total_duration": 6693098900,
+        "load_duration": 19972500,
+        "prompt_eval_count": 550,
+        "prompt_eval_duration": 1181821000,
+        "eval_count": 30,
+        "eval_duration": 5482965000,
+        "generation_tokens_per_second": 5.471492157983865
+      },
+      {
+        "request_index": 7,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "d8c621112df6f6c09ce26f1358c77cde619f36cda7afe3f2375c4bb5563295d9",
+        "prompt_chars": 2320,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 10704836199,
+        "done_reason": "stop",
+        "content": "(\"Benzoyl peroxide\", \"is\", \"antimicrobial\")\n(\"Benzoyl peroxide\", \"is not\", \"topical antibiotic\")\n(\"Clindamycin\", \"is\", \"topical antibiotic\")",
+        "content_chars": 140,
+        "total_duration": 10693975700,
+        "load_duration": 24597900,
+        "prompt_eval_count": 557,
+        "prompt_eval_duration": 1230962000,
+        "eval_count": 48,
+        "eval_duration": 9427816000,
+        "generation_tokens_per_second": 5.091317013399498
+      },
+      {
+        "request_index": 8,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "91c21692ef971d21548eb80a54a2d1b0367d5ade3503eee754b50e2639088339",
+        "prompt_chars": 1490,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 4817680273,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 4795251500,
+        "load_duration": 26240000,
+        "prompt_eval_count": 355,
+        "prompt_eval_duration": 1765415000,
+        "eval_count": 4,
+        "eval_duration": 573374000,
+        "generation_tokens_per_second": 6.976249359057089
+      },
+      {
+        "request_index": 9,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "04339d2d90fcbcb49c1540dd4d25ede4cafff17b4fe45f92b0584bb3449e7381",
+        "prompt_chars": 1959,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1943186907,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1923882700,
+        "load_duration": 58312600,
+        "prompt_eval_count": 519,
+        "prompt_eval_duration": 1230336000,
+        "eval_count": 4,
+        "eval_duration": 604655000,
+        "generation_tokens_per_second": 6.615342633402518
+      },
+      {
+        "request_index": 10,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "816ca9b30ff97dd7502420391e59d82d313d53d1318e4c47f557c329a1b6999b",
+        "prompt_chars": 1693,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 2984891950,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 2952495400,
+        "load_duration": 48202400,
+        "prompt_eval_count": 423,
+        "prompt_eval_duration": 1506126000,
+        "eval_count": 4,
+        "eval_duration": 676012000,
+        "generation_tokens_per_second": 5.917054726839169
+      },
+      {
+        "request_index": 11,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "963ddf02aa4189e30a8f1da9f2c42a1b19b32a025050c6ecee7bc6f5590e0f72",
+        "prompt_chars": 1904,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 2209567710,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 2159373200,
+        "load_duration": 54785500,
+        "prompt_eval_count": 507,
+        "prompt_eval_duration": 1306728000,
+        "eval_count": 4,
+        "eval_duration": 530554999,
+        "generation_tokens_per_second": 7.5392749244456745
+      },
+      {
+        "request_index": 12,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "1339df118c4a48db7564c35076eb1554695a2e399e9e0eb53bceb3e36589028c",
+        "prompt_chars": 1654,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1585439265,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1574802400,
+        "load_duration": 25753000,
+        "prompt_eval_count": 424,
+        "prompt_eval_duration": 1041608999,
+        "eval_count": 4,
+        "eval_duration": 434470000,
+        "generation_tokens_per_second": 9.206619559463254
+      },
+      {
+        "request_index": 13,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "41fbf86b6d5a2bdfe7f28888d4489ca37f0e3347eb9c5d78db3ecc083526a2f6",
+        "prompt_chars": 1504,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1584275541,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1575102600,
+        "load_duration": 20592500,
+        "prompt_eval_count": 362,
+        "prompt_eval_duration": 987182000,
+        "eval_count": 4,
+        "eval_duration": 492466000,
+        "generation_tokens_per_second": 8.122388144562263
+      },
+      {
+        "request_index": 14,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "ca15a2ca1d51ae4823309831d5e5d14fb2edd06c5adb93c2b88683cd3892f5e1",
+        "prompt_chars": 1528,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1550655744,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1542133200,
+        "load_duration": 23234900,
+        "prompt_eval_count": 361,
+        "prompt_eval_duration": 987215000,
+        "eval_count": 4,
+        "eval_duration": 507831000,
+        "generation_tokens_per_second": 7.876636125010092
+      },
+      {
+        "request_index": 15,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "d82c7fc60f72093160606495cb91daf71479c1f6e17394fc2e2849074d211fad",
+        "prompt_chars": 1750,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 2194532111,
+        "done_reason": "stop",
+        "content": "Entailment\nEntailment",
+        "content_chars": 21,
+        "total_duration": 2182838200,
+        "load_duration": 28688500,
+        "prompt_eval_count": 416,
+        "prompt_eval_duration": 1111630000,
+        "eval_count": 8,
+        "eval_duration": 1018391000,
+        "generation_tokens_per_second": 7.855528966772094
+      },
+      {
+        "request_index": 16,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "11dabdb1d6083dd8d97a8c1087a0c00a9d02894ebb9d3c2bccec5d82b29d7852",
+        "prompt_chars": 1962,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1281675113,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1273883700,
+        "load_duration": 21807000,
+        "prompt_eval_count": 472,
+        "prompt_eval_duration": 409962000,
+        "eval_count": 4,
+        "eval_duration": 459456000,
+        "generation_tokens_per_second": 8.705947903607745
+      },
+      {
+        "request_index": 17,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "6ae0a16cc83792c48fff5044c73f12478f57edbf34517e06f016c769606c8170",
+        "prompt_chars": 1808,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1377432403,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1366664600,
+        "load_duration": 24494900,
+        "prompt_eval_count": 430,
+        "prompt_eval_duration": 430061000,
+        "eval_count": 4,
+        "eval_duration": 466464000,
+        "generation_tokens_per_second": 8.575152637716952
+      },
+      {
+        "request_index": 18,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "dbb338bd4fbda528238eaf459cf2f265835462bc379112b161d6cd8c2fb18fd8",
+        "prompt_chars": 1971,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1535523965,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1526813300,
+        "load_duration": 20277900,
+        "prompt_eval_count": 448,
+        "prompt_eval_duration": 499588000,
+        "eval_count": 4,
+        "eval_duration": 590885000,
+        "generation_tokens_per_second": 6.769506756813931
+      },
+      {
+        "request_index": 19,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "bdb3e085c8638004d0f10d6ccaef6b1ac7c1ff5875ef2c7b9cd8ea33392e2497",
+        "prompt_chars": 1502,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1148833388,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1140328300,
+        "load_duration": 19970900,
+        "prompt_eval_count": 378,
+        "prompt_eval_duration": 385499000,
+        "eval_count": 4,
+        "eval_duration": 504872000,
+        "generation_tokens_per_second": 7.922800234514887
+      }
+    ],
+    [
+      {
+        "request_index": 20,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "e0899053959d5e5f0a29b801ab282ee1849c8a70bfe77793d074ea7144e21378",
+        "prompt_chars": 2284,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 6267969867,
+        "done_reason": "stop",
+        "content": "(\"Mụn trứng cá\", \"là\", \"bệnh viêm mạn tính\")\n(\"Mụn trứng cá\", \"của\", \"đơn vị nang lông - tuyến bã\")",
+        "content_chars": 99,
+        "total_duration": 6258023300,
+        "load_duration": 22294700,
+        "prompt_eval_count": 551,
+        "prompt_eval_duration": 1159820000,
+        "eval_count": 37,
+        "eval_duration": 4939917000,
+        "generation_tokens_per_second": 7.490004386713379
+      },
+      {
+        "request_index": 21,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "1c0e45a810979a4540d8aa39287f8ba894530307df7d86c28c2c10cdd15dfbbc",
+        "prompt_chars": 2296,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 8720314079,
+        "done_reason": "stop",
+        "content": "(\"Benzoyl peroxide\", \"is\", \"antibacterial active ingredient\")\n(\"Benzoyl peroxide\", \"used for\", \"topical application\")\n(\"Benzoyl peroxide\", \"has effect on\", \"mild acne reduction\")",
+        "content_chars": 178,
+        "total_duration": 8711220400,
+        "load_duration": 17800700,
+        "prompt_eval_count": 553,
+        "prompt_eval_duration": 1131512000,
+        "eval_count": 54,
+        "eval_duration": 7553543000,
+        "generation_tokens_per_second": 7.148963076002877
+      },
+      {
+        "request_index": 22,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "8762717eaeeccb335d1faab4ac87e284ac95c6e37124e580a57d5546136e467f",
+        "prompt_chars": 2307,
+        "num_predict": 1000,
+        "ok": false,
+        "wall_duration": 7091206169,
+        "done_reason": "stop",
+        "content": "(\"Chế độ ăn tải đường huyết thấp\", \"có bằng chứng mâu thuẫn\", \"\")\n(\"Chế độ ăn tải đường huyết thấp\", \"gợi ý khả năng\", \"giảm mụn\")",
+        "content_chars": 130,
+        "total_duration": 7081566200,
+        "load_duration": 21072400,
+        "prompt_eval_count": 556,
+        "prompt_eval_duration": 1278850000,
+        "eval_count": 42,
+        "eval_duration": 5772904000,
+        "generation_tokens_per_second": 7.275367821810306,
+        "error": "OLLAMA_EXTRACTION_FORMAT_INVALID"
+      },
+      {
+        "request_index": 23,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "78645081d417115ef55acdac057ec3fc8b3fb406f742d0947c3ac62ddbdbffe1",
+        "prompt_chars": 2307,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 6638382185,
+        "done_reason": "stop",
+        "content": "(\"Điều trị duy trì\", \"cần thiết\", \"không phải lúc nào\")\n(\"Điều trị duy trì\", \"có thể cân nhắc\", \"khi thường xuyên tái phát\")",
+        "content_chars": 124,
+        "total_duration": 6628104800,
+        "load_duration": 18973600,
+        "prompt_eval_count": 554,
+        "prompt_eval_duration": 1120719000,
+        "eval_count": 39,
+        "eval_duration": 5477285000,
+        "generation_tokens_per_second": 7.120315995972457
+      },
+      {
+        "request_index": 24,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "225bad7540a82a501ae18c7f476572acc19fa8e15c5a542ac019bcbd3f9f39a4",
+        "prompt_chars": 2315,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 8435442692,
+        "done_reason": "stop",
+        "content": "(\"Treatment\", \"should not use\", \"monotherapy with antibiotics\")\n(\"Combination of treatment\", \"includes\", \"benzoyl peroxide\")\n(\"Combination of treatment\", \"can reduce\", \"antibiotic resistance\")",
+        "content_chars": 192,
+        "total_duration": 8425227700,
+        "load_duration": 20471300,
+        "prompt_eval_count": 557,
+        "prompt_eval_duration": 1171033000,
+        "eval_count": 50,
+        "eval_duration": 7223502000,
+        "generation_tokens_per_second": 6.921850371191148
+      },
+      {
+        "request_index": 25,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "d34dde75e3927cc551b6042f38b389ec3dbfb60dfa4b6fe69b962892f119f255",
+        "prompt_chars": 2295,
+        "num_predict": 1000,
+        "ok": false,
+        "wall_duration": 8166230125,
+        "done_reason": "stop",
+        "content": "(\"Isotretinoin\", \"reduces\", \"sebaceous gland activity\")\n(\"Isotretinoin\", \"regulates\", \"keratinization\")\n(\"Isotretinoin\", \"has anti-inflammatory effect\", \"\")",
+        "content_chars": 156,
+        "total_duration": 8157769500,
+        "load_duration": 17307400,
+        "prompt_eval_count": 555,
+        "prompt_eval_duration": 1161180000,
+        "eval_count": 51,
+        "eval_duration": 6971264000,
+        "generation_tokens_per_second": 7.315746470080605,
+        "error": "OLLAMA_EXTRACTION_FORMAT_INVALID"
+      },
+      {
+        "request_index": 26,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "c26a83bd393278c09c7626f238d8d2237c262caca49ef54133fc08b56acbd6e3",
+        "prompt_chars": 2284,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 5387432940,
+        "done_reason": "stop",
+        "content": "(\"Open comedone\", \"is\", \"mụn đầu đen\")\n(\"Closed comedone\", \"is\", \"mụn đầu trắng\")",
+        "content_chars": 81,
+        "total_duration": 5376211700,
+        "load_duration": 21075700,
+        "prompt_eval_count": 550,
+        "prompt_eval_duration": 1178657000,
+        "eval_count": 30,
+        "eval_duration": 4167892000,
+        "generation_tokens_per_second": 7.197883246494871
+      },
+      {
+        "request_index": 27,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "d8c621112df6f6c09ce26f1358c77cde619f36cda7afe3f2375c4bb5563295d9",
+        "prompt_chars": 2320,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 7672401459,
+        "done_reason": "stop",
+        "content": "(\"Benzoyl peroxide\", \"is\", \"antimicrobial\")\n(\"Benzoyl peroxide\", \"is not\", \"topical antibiotic\")\n(\"Clindamycin\", \"is\", \"topical antibiotic\")",
+        "content_chars": 140,
+        "total_duration": 7662667700,
+        "load_duration": 19800700,
+        "prompt_eval_count": 557,
+        "prompt_eval_duration": 1159898000,
+        "eval_count": 48,
+        "eval_duration": 6473270000,
+        "generation_tokens_per_second": 7.415108592720526
+      },
+      {
+        "request_index": 28,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "91c21692ef971d21548eb80a54a2d1b0367d5ade3503eee754b50e2639088339",
+        "prompt_chars": 1490,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1632525452,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1623911800,
+        "load_duration": 18777000,
+        "prompt_eval_count": 355,
+        "prompt_eval_duration": 1012343000,
+        "eval_count": 4,
+        "eval_duration": 442923000,
+        "generation_tokens_per_second": 9.030915080047773
+      },
+      {
+        "request_index": 29,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "04339d2d90fcbcb49c1540dd4d25ede4cafff17b4fe45f92b0584bb3449e7381",
+        "prompt_chars": 1959,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1530816964,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1522152700,
+        "load_duration": 29912800,
+        "prompt_eval_count": 519,
+        "prompt_eval_duration": 1065073000,
+        "eval_count": 4,
+        "eval_duration": 417862000,
+        "generation_tokens_per_second": 9.57253830211888
+      },
+      {
+        "request_index": 30,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "816ca9b30ff97dd7502420391e59d82d313d53d1318e4c47f557c329a1b6999b",
+        "prompt_chars": 1693,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1458802055,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1452568100,
+        "load_duration": 23888100,
+        "prompt_eval_count": 423,
+        "prompt_eval_duration": 987578000,
+        "eval_count": 4,
+        "eval_duration": 409300000,
+        "generation_tokens_per_second": 9.772782799902272
+      },
+      {
+        "request_index": 31,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "963ddf02aa4189e30a8f1da9f2c42a1b19b32a025050c6ecee7bc6f5590e0f72",
+        "prompt_chars": 1904,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1869685686,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1862874300,
+        "load_duration": 16540900,
+        "prompt_eval_count": 507,
+        "prompt_eval_duration": 1349232000,
+        "eval_count": 4,
+        "eval_duration": 434326000,
+        "generation_tokens_per_second": 9.209671997531808
+      },
+      {
+        "request_index": 32,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "1339df118c4a48db7564c35076eb1554695a2e399e9e0eb53bceb3e36589028c",
+        "prompt_chars": 1654,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1610258250,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1600461200,
+        "load_duration": 24097400,
+        "prompt_eval_count": 424,
+        "prompt_eval_duration": 1077320000,
+        "eval_count": 4,
+        "eval_duration": 441093000,
+        "generation_tokens_per_second": 9.068382404617621
+      },
+      {
+        "request_index": 33,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "41fbf86b6d5a2bdfe7f28888d4489ca37f0e3347eb9c5d78db3ecc083526a2f6",
+        "prompt_chars": 1504,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1468040730,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1460466100,
+        "load_duration": 19787100,
+        "prompt_eval_count": 362,
+        "prompt_eval_duration": 948715000,
+        "eval_count": 4,
+        "eval_duration": 445542000,
+        "generation_tokens_per_second": 8.977829250665481
+      },
+      {
+        "request_index": 34,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "ca15a2ca1d51ae4823309831d5e5d14fb2edd06c5adb93c2b88683cd3892f5e1",
+        "prompt_chars": 1528,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1508169360,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1499814000,
+        "load_duration": 18123700,
+        "prompt_eval_count": 361,
+        "prompt_eval_duration": 1021550000,
+        "eval_count": 4,
+        "eval_duration": 453760000,
+        "generation_tokens_per_second": 8.815232722143865
+      },
+      {
+        "request_index": 35,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "d82c7fc60f72093160606495cb91daf71479c1f6e17394fc2e2849074d211fad",
+        "prompt_chars": 1750,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 2246947416,
+        "done_reason": "stop",
+        "content": "Entailment\nEntailment",
+        "content_chars": 21,
+        "total_duration": 2238680400,
+        "load_duration": 24088800,
+        "prompt_eval_count": 416,
+        "prompt_eval_duration": 1108256000,
+        "eval_count": 8,
+        "eval_duration": 1098595000,
+        "generation_tokens_per_second": 7.282028409013331
+      },
+      {
+        "request_index": 36,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "11dabdb1d6083dd8d97a8c1087a0c00a9d02894ebb9d3c2bccec5d82b29d7852",
+        "prompt_chars": 1962,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 817562527,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 807225000,
+        "load_duration": 25174600,
+        "prompt_eval_count": 472,
+        "prompt_eval_duration": 312312000,
+        "eval_count": 4,
+        "eval_duration": 434076000,
+        "generation_tokens_per_second": 9.214976179286577
+      },
+      {
+        "request_index": 37,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "6ae0a16cc83792c48fff5044c73f12478f57edbf34517e06f016c769606c8170",
+        "prompt_chars": 1808,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 847623197,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 838898500,
+        "load_duration": 20032400,
+        "prompt_eval_count": 430,
+        "prompt_eval_duration": 295382000,
+        "eval_count": 4,
+        "eval_duration": 438760000,
+        "generation_tokens_per_second": 9.116601331023794
+      },
+      {
+        "request_index": 38,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "dbb338bd4fbda528238eaf459cf2f265835462bc379112b161d6cd8c2fb18fd8",
+        "prompt_chars": 1971,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 867941016,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 860344200,
+        "load_duration": 24625900,
+        "prompt_eval_count": 448,
+        "prompt_eval_duration": 299887000,
+        "eval_count": 4,
+        "eval_duration": 450519000,
+        "generation_tokens_per_second": 8.87864884721843
+      },
+      {
+        "request_index": 39,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "bdb3e085c8638004d0f10d6ccaef6b1ac7c1ff5875ef2c7b9cd8ea33392e2497",
+        "prompt_chars": 1502,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 860786753,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 853512900,
+        "load_duration": 21721700,
+        "prompt_eval_count": 378,
+        "prompt_eval_duration": 316179000,
+        "eval_count": 4,
+        "eval_duration": 430699000,
+        "generation_tokens_per_second": 9.287228435636024
+      }
+    ],
+    [
+      {
+        "request_index": 40,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "e0899053959d5e5f0a29b801ab282ee1849c8a70bfe77793d074ea7144e21378",
+        "prompt_chars": 2284,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 6172268214,
+        "done_reason": "stop",
+        "content": "(\"Mụn trứng cá\", \"là\", \"bệnh viêm mạn tính\")\n(\"Mụn trứng cá\", \"của\", \"đơn vị nang lông - tuyến bã\")",
+        "content_chars": 99,
+        "total_duration": 6165116000,
+        "load_duration": 18904900,
+        "prompt_eval_count": 551,
+        "prompt_eval_duration": 1122718000,
+        "eval_count": 37,
+        "eval_duration": 4927582000,
+        "generation_tokens_per_second": 7.508753786339831
+      },
+      {
+        "request_index": 41,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "1c0e45a810979a4540d8aa39287f8ba894530307df7d86c28c2c10cdd15dfbbc",
+        "prompt_chars": 2296,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 9023886502,
+        "done_reason": "stop",
+        "content": "(\"Benzoyl peroxide\", \"is\", \"antibacterial active ingredient\")\n(\"Benzoyl peroxide\", \"used for\", \"topical application\")\n(\"Benzoyl peroxide\", \"has effect on\", \"mild acne reduction\")",
+        "content_chars": 178,
+        "total_duration": 9015144700,
+        "load_duration": 16734500,
+        "prompt_eval_count": 553,
+        "prompt_eval_duration": 1170953000,
+        "eval_count": 54,
+        "eval_duration": 7818427000,
+        "generation_tokens_per_second": 6.906760144975454
+      },
+      {
+        "request_index": 42,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "8762717eaeeccb335d1faab4ac87e284ac95c6e37124e580a57d5546136e467f",
+        "prompt_chars": 2307,
+        "num_predict": 1000,
+        "ok": false,
+        "wall_duration": 6799465125,
+        "done_reason": "stop",
+        "content": "(\"Chế độ ăn tải đường huyết thấp\", \"có bằng chứng mâu thuẫn\", \"\")\n(\"Chế độ ăn tải đường huyết thấp\", \"gợi ý khả năng\", \"giảm mụn\")",
+        "content_chars": 130,
+        "total_duration": 6791062800,
+        "load_duration": 20720400,
+        "prompt_eval_count": 556,
+        "prompt_eval_duration": 1129600000,
+        "eval_count": 42,
+        "eval_duration": 5630169000,
+        "generation_tokens_per_second": 7.4598115971296775,
+        "error": "OLLAMA_EXTRACTION_FORMAT_INVALID"
+      },
+      {
+        "request_index": 43,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "78645081d417115ef55acdac057ec3fc8b3fb406f742d0947c3ac62ddbdbffe1",
+        "prompt_chars": 2307,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 6779110789,
+        "done_reason": "stop",
+        "content": "(\"Điều trị duy trì\", \"cần thiết\", \"không phải lúc nào\")\n(\"Điều trị duy trì\", \"có thể cân nhắc\", \"khi thường xuyên tái phát\")",
+        "content_chars": 124,
+        "total_duration": 6769437900,
+        "load_duration": 21730800,
+        "prompt_eval_count": 554,
+        "prompt_eval_duration": 1281999000,
+        "eval_count": 39,
+        "eval_duration": 5455365000,
+        "generation_tokens_per_second": 7.148925873887449
+      },
+      {
+        "request_index": 44,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "225bad7540a82a501ae18c7f476572acc19fa8e15c5a542ac019bcbd3f9f39a4",
+        "prompt_chars": 2315,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 8422951843,
+        "done_reason": "stop",
+        "content": "(\"Treatment\", \"should not use\", \"monotherapy with antibiotics\")\n(\"Combination of treatment\", \"includes\", \"benzoyl peroxide\")\n(\"Combination of treatment\", \"can reduce\", \"antibiotic resistance\")",
+        "content_chars": 192,
+        "total_duration": 8413930800,
+        "load_duration": 18944900,
+        "prompt_eval_count": 557,
+        "prompt_eval_duration": 1131011000,
+        "eval_count": 50,
+        "eval_duration": 7256423000,
+        "generation_tokens_per_second": 6.890447263066114
+      },
+      {
+        "request_index": 45,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "d34dde75e3927cc551b6042f38b389ec3dbfb60dfa4b6fe69b962892f119f255",
+        "prompt_chars": 2295,
+        "num_predict": 1000,
+        "ok": false,
+        "wall_duration": 8486653754,
+        "done_reason": "stop",
+        "content": "(\"Isotretinoin\", \"reduces\", \"sebaceous gland activity\")\n(\"Isotretinoin\", \"regulates\", \"keratinization\")\n(\"Isotretinoin\", \"has anti-inflammatory effect\", \"\")",
+        "content_chars": 156,
+        "total_duration": 8475820500,
+        "load_duration": 18564100,
+        "prompt_eval_count": 555,
+        "prompt_eval_duration": 1167857000,
+        "eval_count": 51,
+        "eval_duration": 7281562000,
+        "generation_tokens_per_second": 7.003991725951107,
+        "error": "OLLAMA_EXTRACTION_FORMAT_INVALID"
+      },
+      {
+        "request_index": 46,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "c26a83bd393278c09c7626f238d8d2237c262caca49ef54133fc08b56acbd6e3",
+        "prompt_chars": 2284,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 5092405540,
+        "done_reason": "stop",
+        "content": "(\"Open comedone\", \"is\", \"mụn đầu đen\")\n(\"Closed comedone\", \"is\", \"mụn đầu trắng\")",
+        "content_chars": 81,
+        "total_duration": 5083355500,
+        "load_duration": 23688800,
+        "prompt_eval_count": 550,
+        "prompt_eval_duration": 1173152000,
+        "eval_count": 30,
+        "eval_duration": 3877670000,
+        "generation_tokens_per_second": 7.736604713655365
+      },
+      {
+        "request_index": 47,
+        "role": "extraction",
+        "measurement_only": false,
+        "prompt_sha256": "d8c621112df6f6c09ce26f1358c77cde619f36cda7afe3f2375c4bb5563295d9",
+        "prompt_chars": 2320,
+        "num_predict": 1000,
+        "ok": true,
+        "wall_duration": 7617097184,
+        "done_reason": "stop",
+        "content": "(\"Benzoyl peroxide\", \"is\", \"antimicrobial\")\n(\"Benzoyl peroxide\", \"is not\", \"topical antibiotic\")\n(\"Clindamycin\", \"is\", \"topical antibiotic\")",
+        "content_chars": 140,
+        "total_duration": 7609478300,
+        "load_duration": 18890900,
+        "prompt_eval_count": 557,
+        "prompt_eval_duration": 1081656000,
+        "eval_count": 48,
+        "eval_duration": 6501777000,
+        "generation_tokens_per_second": 7.382597096147715
+      },
+      {
+        "request_index": 48,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "91c21692ef971d21548eb80a54a2d1b0367d5ade3503eee754b50e2639088339",
+        "prompt_chars": 1490,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1560604166,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1552585600,
+        "load_duration": 18727300,
+        "prompt_eval_count": 355,
+        "prompt_eval_duration": 952384000,
+        "eval_count": 4,
+        "eval_duration": 435804000,
+        "generation_tokens_per_second": 9.178438013418877
+      },
+      {
+        "request_index": 49,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "04339d2d90fcbcb49c1540dd4d25ede4cafff17b4fe45f92b0584bb3449e7381",
+        "prompt_chars": 1959,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1529568468,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1521359900,
+        "load_duration": 20388300,
+        "prompt_eval_count": 519,
+        "prompt_eval_duration": 1066506000,
+        "eval_count": 4,
+        "eval_duration": 422155000,
+        "generation_tokens_per_second": 9.47519276095273
+      },
+      {
+        "request_index": 50,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "816ca9b30ff97dd7502420391e59d82d313d53d1318e4c47f557c329a1b6999b",
+        "prompt_chars": 1693,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 692543448,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 685296800,
+        "load_duration": 19645000,
+        "prompt_eval_count": 423,
+        "prompt_eval_duration": 239165000,
+        "eval_count": 4,
+        "eval_duration": 397652000,
+        "generation_tokens_per_second": 10.059046603562914
+      },
+      {
+        "request_index": 51,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "963ddf02aa4189e30a8f1da9f2c42a1b19b32a025050c6ecee7bc6f5590e0f72",
+        "prompt_chars": 1904,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 749823187,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 743307400,
+        "load_duration": 20460300,
+        "prompt_eval_count": 507,
+        "prompt_eval_duration": 244088000,
+        "eval_count": 4,
+        "eval_duration": 410797000,
+        "generation_tokens_per_second": 9.737169453525707
+      },
+      {
+        "request_index": 52,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "1339df118c4a48db7564c35076eb1554695a2e399e9e0eb53bceb3e36589028c",
+        "prompt_chars": 1654,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 753508449,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 747049300,
+        "load_duration": 16636000,
+        "prompt_eval_count": 424,
+        "prompt_eval_duration": 261027000,
+        "eval_count": 4,
+        "eval_duration": 400665000,
+        "generation_tokens_per_second": 9.983402593188824
+      },
+      {
+        "request_index": 53,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "41fbf86b6d5a2bdfe7f28888d4489ca37f0e3347eb9c5d78db3ecc083526a2f6",
+        "prompt_chars": 1504,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1384345336,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 1377932500,
+        "load_duration": 15856400,
+        "prompt_eval_count": 362,
+        "prompt_eval_duration": 927270000,
+        "eval_count": 4,
+        "eval_duration": 388819000,
+        "generation_tokens_per_second": 10.28756310776994
+      },
+      {
+        "request_index": 54,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "ca15a2ca1d51ae4823309831d5e5d14fb2edd06c5adb93c2b88683cd3892f5e1",
+        "prompt_chars": 1528,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1418734009,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 1411450400,
+        "load_duration": 19952300,
+        "prompt_eval_count": 361,
+        "prompt_eval_duration": 938584000,
+        "eval_count": 4,
+        "eval_duration": 443918000,
+        "generation_tokens_per_second": 9.0106731423371
+      },
+      {
+        "request_index": 55,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "d82c7fc60f72093160606495cb91daf71479c1f6e17394fc2e2849074d211fad",
+        "prompt_chars": 1750,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 1999970728,
+        "done_reason": "stop",
+        "content": "Entailment\nEntailment",
+        "content_chars": 21,
+        "total_duration": 1991697200,
+        "load_duration": 21704200,
+        "prompt_eval_count": 416,
+        "prompt_eval_duration": 1029837000,
+        "eval_count": 8,
+        "eval_duration": 932477000,
+        "generation_tokens_per_second": 8.579300079251285
+      },
+      {
+        "request_index": 56,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "11dabdb1d6083dd8d97a8c1087a0c00a9d02894ebb9d3c2bccec5d82b29d7852",
+        "prompt_chars": 1962,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 769044171,
+        "done_reason": "stop",
+        "content": "Entailment",
+        "content_chars": 10,
+        "total_duration": 762823000,
+        "load_duration": 18735100,
+        "prompt_eval_count": 472,
+        "prompt_eval_duration": 228871000,
+        "eval_count": 4,
+        "eval_duration": 420136000,
+        "generation_tokens_per_second": 9.52072662185578
+      },
+      {
+        "request_index": 57,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "6ae0a16cc83792c48fff5044c73f12478f57edbf34517e06f016c769606c8170",
+        "prompt_chars": 1808,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 934123541,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 925028100,
+        "load_duration": 21112100,
+        "prompt_eval_count": 430,
+        "prompt_eval_duration": 303443000,
+        "eval_count": 4,
+        "eval_duration": 494536000,
+        "generation_tokens_per_second": 8.08838992510151
+      },
+      {
+        "request_index": 58,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "dbb338bd4fbda528238eaf459cf2f265835462bc379112b161d6cd8c2fb18fd8",
+        "prompt_chars": 1971,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 935441996,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 926903100,
+        "load_duration": 20174600,
+        "prompt_eval_count": 448,
+        "prompt_eval_duration": 315703000,
+        "eval_count": 4,
+        "eval_duration": 497501000,
+        "generation_tokens_per_second": 8.04018484384956
+      },
+      {
+        "request_index": 59,
+        "role": "checking",
+        "measurement_only": false,
+        "prompt_sha256": "bdb3e085c8638004d0f10d6ccaef6b1ac7c1ff5875ef2c7b9cd8ea33392e2497",
+        "prompt_chars": 1502,
+        "num_predict": 150,
+        "ok": true,
+        "wall_duration": 992795644,
+        "done_reason": "stop",
+        "content": "Contradiction",
+        "content_chars": 13,
+        "total_duration": 984824900,
+        "load_duration": 22850600,
+        "prompt_eval_count": 378,
+        "prompt_eval_duration": 363819000,
+        "eval_count": 4,
+        "eval_duration": 502813000,
+        "generation_tokens_per_second": 7.955243798390257
+      }
+    ]
+  ],
+  "finished_at": "2026-10-12T04:39:11+00:00",
+  "decision": {
+    "passed": false,
+    "completed_runs": 3,
+    "extraction_accepted": 9,
+    "extraction_total": 24,
+    "checking_agreement": 36,
+    "checking_total": 36,
+    "critical_semantic_failures": [],
+    "review_required": [
+      {
+        "run": 1,
+        "item_id": "CAL-EXT-02",
+        "reasons": [
+          "missing_reference:R02"
+        ]
+      },
+      {
+        "run": 1,
+        "item_id": "CAL-EXT-04",
+        "reasons": [
+          "missing_reference:R01"
+        ]
+      },
+      {
+        "run": 1,
+        "item_id": "CAL-EXT-05",
+        "reasons": [
+          "missing_reference:R01",
+          "missing_reference:R02"
+        ]
+      },
+      {
+        "run": 2,
+        "item_id": "CAL-EXT-02",
+        "reasons": [
+          "missing_reference:R02"
+        ]
+      },
+      {
+        "run": 2,
+        "item_id": "CAL-EXT-04",
+        "reasons": [
+          "missing_reference:R01"
+        ]
+      },
+      {
+        "run": 2,
+        "item_id": "CAL-EXT-05",
+        "reasons": [
+          "missing_reference:R01",
+          "missing_reference:R02"
+        ]
+      },
+      {
+        "run": 3,
+        "item_id": "CAL-EXT-02",
+        "reasons": [
+          "missing_reference:R02"
+        ]
+      },
+      {
+        "run": 3,
+        "item_id": "CAL-EXT-04",
+        "reasons": [
+          "missing_reference:R01"
+        ]
+      },
+      {
+        "run": 3,
+        "item_id": "CAL-EXT-05",
+        "reasons": [
+          "missing_reference:R01",
+          "missing_reference:R02"
+        ]
+      }
+    ],
+    "exact_output_agreement": 20,
+    "exact_output_total": 20,
+    "parsed_claim_agreement": 8,
+    "parsed_claim_total": 8,
+    "claim_label_agreement": 12,
+    "claim_label_total": 12,
+    "invalid_output_count": 6,
+    "truncation_count": 0,
+    "inference_error_count": 6,
+    "per_item_differences": []
+  },
+  "runtime_residency": {
+    "name": "qwen3.5:9b-q4_K_M",
+    "model": "qwen3.5:9b-q4_K_M",
+    "size": 6687398293,
+    "digest": "56671c2ab9385f9cfcb404638e32cd62d88e3501d44822208363c010179a3c90",
+    "details": {
+      "parent_model": "",
+      "format": "gguf",
+      "family": "qwen35",
+      "families": [
+        "qwen35"
+      ],
+      "parameter_size": "9.0B",
+      "quantization_level": "Q4_K_M"
+    },
+    "expires_at": "2026-10-12T12:09:11.7997102+07:00",
+    "size_vram": 3520279345,
+    "context_length": 16384,
+    "runner": "llamacpp"
+  }
+}

@@ -36,6 +36,29 @@ medical use.
 The executed notebook is preserved at
 [`evaluation/formal_evaluation.ipynb`](../formal_evaluation.ipynb). Earlier and
 aborted development runs are intentionally absent from the active working tree
-and must not be substituted for this official result. Their original bytes,
-branches, checksums, and recovery reference are documented in the
-[repository cleanup report](../../docs/REPOSITORY_CLEANUP_REPORT.md).
+and must not be substituted for this official result.
+
+## Frozen current-build thesis outputs: semantic scoring incomplete
+
+[`thesis_evaluation_366f3ad8`](thesis_evaluation_366f3ad8/) contains 100 frozen
+outputs from production `366f3ad836c36be36565caad4a94ad17a7a6278f`, knowledge build
+`d4a1819fe7fb77fe1f40`, fingerprint `e4c420923b79b37c992cf36d`.
+The [locked gold](../locked_gold/current_kb_adjudication.json) has 104 reviewed
+claims, 24 confirmed-absence cases and 6 policy-ambiguous cases. Keep these
+identities distinct from the completed historical result above.
+
+The run manifest records `RAGCHECKER_EVALUATOR_BLOCKER`, HTTP 429
+`credit_balance_exhausted`; `final_results_commit` is null. Deterministic metrics
+are available, but there is no completed current-build semantic score. The
+separate cache smoke also failed to demonstrate a second-request cache hit.
+
+After evaluator credits are available, resume scoring from the same committed
+raw outputs with `python -m evaluation.thesis_evaluation_support ragchecker`; do not
+rerun successful system cases or change the evaluator to bypass calibration.
+Read the [protocol](../THESIS_EVALUATION_PROTOCOL.md) and the module's `--help`
+before running any command. Semantic scoring incurs evaluator API usage.
+
+The original provenance commits remain in main's history. CI fetches full
+history because evaluation/replay contracts verify those immutable Git blobs.
+Closed experiment conclusions and pending review packets are indexed in the
+[research guide](../../research/README.md); they are not runtime alternatives.

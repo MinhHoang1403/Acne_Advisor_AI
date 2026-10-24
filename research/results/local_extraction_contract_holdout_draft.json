@@ -1,0 +1,395 @@
+{
+  "schema_version": "local_extraction_contract_holdout_draft_v1",
+  "status": "pending_independent_review",
+  "blind_execution_allowed": false,
+  "provenance": {
+    "construction_rule": "source-document excerpts only; no formal-run output was used",
+    "sources": [
+      {
+        "source_id": "nice_ng198_2026_08",
+        "local_file": "data/cache/markdown/acne-vulgaris-management-pdf-66142088866501.64ba4da5ae379770b0d591b8.md",
+        "sha256": "e6f3f388d22edc627de57de738251a91f84baa2ba7a89db5f3cd6e892a3c9471"
+      },
+      {
+        "source_id": "aad_acne_guideline_2024",
+        "local_file": "data/cache/markdown/PIIS0190962223033893.8694ad635ebe040a885d5fdf.md",
+        "sha256": "cf981227cf908408e327a17fd3b9702a8e70ad247a4f7589a5f7ba8c95bdb0e4"
+      },
+      {
+        "source_id": "vn_moh_dermatology_4416_2023_acne",
+        "local_file": "data/cache/markdown/qd_4416_cut.2214f9f4c30e0af42468664a.md",
+        "sha256": "68139af87b71f0e3126295732aa5dfbd9b5584da52919ecac2c120bd93624df9"
+      }
+    ]
+  },
+  "review_contract": {
+    "reviewer_must_be_independent_of_adapter_and_prompt_author": true,
+    "extraction_gold": "complete non-redundant atomic triplets preserving negation, modality, quantities, route, scope, and qualifiers",
+    "checking_gold": "exactly one of Entailment, Neutral, Contradiction",
+    "model_output_may_not_be_used_as_gold": true,
+    "required_signoff_fields": [
+      "reviewer_id",
+      "reviewed_at",
+      "adjudication_notes",
+      "gold"
+    ]
+  },
+  "extraction": [
+    {
+      "item_id": "HLD-EXT-01",
+      "question": "Which acne grading scale is commonly used in the United States?",
+      "candidate_answer": "There is no universally accepted acne grading system in clinical settings, but the Investigator Global Assessment is most commonly used in the United States and shows good agreement between clinician and patient ratings.",
+      "source": "aad_acne_guideline_2024:163",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-02",
+      "question": "Which skin-care preparations should people with acne avoid?",
+      "candidate_answer": "People with acne who use skin care products and sunscreens should avoid oil-based and comedogenic preparations.",
+      "source": "nice_ng198_2026_08:149",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-03",
+      "question": "What make-up advice is given to people with acne?",
+      "candidate_answer": "Avoid oil-based and comedogenic make-up products, and remove make-up at the end of the day.",
+      "source": "nice_ng198_2026_08:151",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-04",
+      "question": "Is routine microbiological testing indicated for acne?",
+      "candidate_answer": "Routine microbiological or antibiotic susceptibility testing is not indicated for acne because it does not affect management, although some C. acnes strains have developed antibiotic resistance.",
+      "source": "aad_acne_guideline_2024:271",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-05",
+      "question": "Does the guideline support a specific diet for treating acne?",
+      "candidate_answer": "There is not enough evidence to support specific diets for treating acne.",
+      "source": "nice_ng198_2026_08:170",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-06",
+      "question": "How urgently should acne fulminans be referred?",
+      "candidate_answer": "People with acne fulminans should be referred to the on-call hospital dermatology team on the same day and assessed within 24 hours.",
+      "source": "nice_ng198_2026_08:181",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-07",
+      "question": "Which first-line options are listed for moderate-to-severe acne?",
+      "candidate_answer": "For moderate-to-severe acne, options include topical adapalene with topical benzoyl peroxide plus oral lymecycline or doxycycline, or topical azelaic acid plus oral lymecycline or doxycycline.",
+      "source": "nice_ng198_2026_08:241-247",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-08",
+      "question": "When may benzoyl peroxide monotherapy be considered?",
+      "candidate_answer": "Consider topical benzoyl peroxide monotherapy if the table treatments are contraindicated or the person wishes to avoid a topical retinoid or an antibiotic.",
+      "source": "nice_ng198_2026_08:297-300",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-09",
+      "question": "What alternatives are considered when oral lymecycline and doxycycline cannot be used?",
+      "candidate_answer": "For moderate-to-severe acne with intolerance or contraindications to oral lymecycline or doxycycline, consider trimethoprim or an oral macrolide such as erythromycin in their place.",
+      "source": "nice_ng198_2026_08:302-303",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-10",
+      "question": "What consultation factors and treatment timing should be discussed?",
+      "candidate_answer": "Acne of any severity can cause psychological distress and mental health disorders. Positive treatment effects can take 6 to 8 weeks to become noticeable.",
+      "source": "nice_ng198_2026_08:322-326",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-11",
+      "question": "How should oral antibiotics be handled at review?",
+      "candidate_answer": "If acne has completely cleared, consider stopping the oral antibiotic while continuing topical treatment. If it has improved but not completely cleared, consider continuing the oral antibiotic with topical treatment for up to 12 more weeks.",
+      "source": "nice_ng198_2026_08:400-402",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-12",
+      "question": "When may an antibiotic-containing acne treatment continue beyond six months?",
+      "candidate_answer": "Continue a topical or oral antibiotic treatment for more than 6 months only in exceptional circumstances, review at 3-monthly intervals, and stop the antibiotic as soon as possible.",
+      "source": "nice_ng198_2026_08:404-405",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-13",
+      "question": "What happens after inadequate response to a first-line 12-week course?",
+      "candidate_answer": "For mild-to-moderate acne, offer another table option. For moderate-to-severe acne without an oral antibiotic, offer an option containing one. If an oral antibiotic was already included, consider specialist referral.",
+      "source": "nice_ng198_2026_08:413-418",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-14",
+      "question": "When is referral considered after treatment failure in mild-to-moderate acne?",
+      "candidate_answer": "Consider referral if mild-to-moderate acne fails to respond adequately to 2 different 12-week courses of treatment.",
+      "source": "nice_ng198_2026_08:430",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-15",
+      "question": "Who should be considered for oral isotretinoin?",
+      "candidate_answer": "Consider oral isotretinoin for people older than 12 with severe acne resistant to adequate systemic-antibiotic and topical therapy, including nodulo-cystic acne, acne conglobata, acne fulminans, or acne at risk of permanent scarring.",
+      "source": "nice_ng198_2026_08:442-449",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-16",
+      "question": "What safeguards apply when starting isotretinoin in people under 18?",
+      "candidate_answer": "Starting isotretinoin in someone under 18 requires agreement by 2 independent healthcare professionals that no other appropriate effective treatment exists, plus counselling and monitoring for mental-health and sexual-function effects.",
+      "source": "nice_ng198_2026_08:457-464",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-17",
+      "question": "What pregnancy warning accompanies oral isotretinoin?",
+      "candidate_answer": "Isotretinoin can cause serious harm to a developing baby if taken during pregnancy, and people who can become pregnant must follow the MHRA pregnancy prevention programme.",
+      "source": "nice_ng198_2026_08:487-491",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-18",
+      "question": "What dose and stopping criteria are described for isotretinoin?",
+      "candidate_answer": "The standard daily dose is 0.5 to 1 mg/kg; a dose below 0.5 mg/kg may be considered for people at increased risk of adverse effects. Continue to a cumulative 120 to 150 mg/kg, but consider stopping sooner after adequate response and 4 to 8 weeks with no new lesions.",
+      "source": "nice_ng198_2026_08:493-503",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-19",
+      "question": "How is relapse after isotretinoin managed?",
+      "candidate_answer": "After isotretinoin, mild-to-moderate relapse should receive an appropriate treatment option. Moderate-to-severe relapse should receive a 12-week appropriate treatment or re-referral if the person is no longer under specialist care.",
+      "source": "nice_ng198_2026_08:584-593",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-20",
+      "question": "When is specialist scarring treatment considered?",
+      "candidate_answer": "If severe acne-related scarring persists one year after acne clears, refer to a dermatologist-led team; in that setting consider CO2 laser treatment or glycolic acid peel.",
+      "source": "nice_ng198_2026_08:633-648",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-21",
+      "question": "Mụn mủ và sẩn mủ được mô tả như thế nào?",
+      "candidate_answer": "Mụn mủ có đường kính dưới 5 mm, chứa đầu mủ trắng hoặc vàng ở trung tâm nền đỏ. Sẩn mủ tương đối nông ở bề mặt và cũng có đường kính dưới 5 mm.",
+      "source": "vn_moh_dermatology_4416_2023_acne:24-25",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-22",
+      "question": "Thuốc điều trị trứng cá tác động vào những yếu tố nào?",
+      "candidate_answer": "Thuốc có thể tác động vào sừng hóa cổ nang lông, sản xuất bã nhờn, vi khuẩn C. acnes hoặc yếu tố viêm; cần điều trị sớm để tránh biến chứng và điều trị theo mức độ bệnh.",
+      "source": "vn_moh_dermatology_4416_2023_acne:130-135",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-23",
+      "question": "Có thể điều chỉnh liệu pháp retinoid bôi như thế nào khi đáp ứng kém?",
+      "candidate_answer": "Có thể tăng nồng độ retinoid hoặc đổi sang retinoid khác, hoặc thêm clindamycin hay dapson bôi tại chỗ.",
+      "source": "vn_moh_dermatology_4416_2023_acne:163-164",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-24",
+      "question": "Retinoid bôi được dùng vào thời điểm và tần suất nào?",
+      "candidate_answer": "Bôi retinoid một lớp mỏng một lần mỗi ngày vào buổi tối; trong vài tuần đầu có thể giảm xuống cách ngày hoặc bôi sau dưỡng ẩm để hạn chế kích ứng.",
+      "source": "vn_moh_dermatology_4416_2023_acne:232",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-25",
+      "question": "Những lưu ý nào được nêu cho retinoid bôi?",
+      "candidate_answer": "Khô, kích ứng, bong da và tăng nhạy cảm ánh sáng thường gặp trong 2 tuần đầu. Tretinoin không dùng cùng lúc với benzoyl peroxide, còn tazarotene không chỉ định cho phụ nữ mang thai.",
+      "source": "vn_moh_dermatology_4416_2023_acne:234-238",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-26",
+      "question": "Benzoyl peroxide bôi có dạng, cách dùng và giới hạn bằng chứng nào?",
+      "candidate_answer": "Benzoyl peroxide có dạng gel, kem hoặc xà phòng rửa ở nồng độ 2,5–10%, bôi một lần vào buổi tối; an toàn và hiệu quả chưa được chứng minh ở trẻ dưới 12 tuổi.",
+      "source": "vn_moh_dermatology_4416_2023_acne:261-267",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-27",
+      "question": "Acid azelaic được dùng như thế nào và phù hợp với ai?",
+      "candidate_answer": "Acid azelaic 20% dạng kem hoặc gel được bôi hai lần mỗi ngày; thuốc phù hợp với da nhạy cảm hoặc type da tối màu có tăng sắc tố sau viêm và có thể dùng cho phụ nữ mang thai.",
+      "source": "vn_moh_dermatology_4416_2023_acne:269-274",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-28",
+      "question": "Các giới hạn sử dụng kháng sinh toàn thân trong điều trị trứng cá là gì?",
+      "candidate_answer": "Không dùng quá 3–4 tháng, không dùng để duy trì hay làm điều trị đơn độc, không phối hợp với kháng sinh tại chỗ; nên phối hợp với retinoid và/hoặc benzoyl peroxide bôi.",
+      "source": "vn_moh_dermatology_4416_2023_acne:318-320",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-29",
+      "question": "Isotretinoin uống có liều và thời gian điều trị nào?",
+      "candidate_answer": "Isotretinoin dùng cho trứng cá mức độ trung bình và nặng với liều 0,5–1 mg/kg/ngày trong 4–6 tháng; có thể kéo dài nếu chưa đáp ứng hoặc đạt tổng liều 120–150 mg/kg để hạn chế tái phát.",
+      "source": "vn_moh_dermatology_4416_2023_acne:324-328",
+      "gold": null
+    },
+    {
+      "item_id": "HLD-EXT-30",
+      "question": "What monitoring and pregnancy safeguards are stated for isotretinoin?",
+      "candidate_answer": "Monitoring of liver function tests and lipids should be considered, but CBC monitoring is not needed in healthy patients. For people of childbearing potential, pregnancy prevention is mandatory.",
+      "source": "aad_acne_guideline_2024:340-345",
+      "gold": null
+    }
+  ],
+  "checking": [
+    {
+      "item_id": "HLD-CHK-01",
+      "question": "What cleansing routine is advised?",
+      "reference": "Use a non-alkaline syndet cleansing product twice daily on acne-prone skin.",
+      "claim": ["People with acne", "should cleanse acne-prone skin with", "a non-alkaline syndet twice daily"],
+      "source": "nice_ng198_2026_08:147",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-02",
+      "question": "What cleansing routine is advised?",
+      "reference": "Use a non-alkaline syndet cleansing product twice daily on acne-prone skin.",
+      "claim": ["People with acne", "should use", "an alkaline soap once daily"],
+      "source": "nice_ng198_2026_08:147",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-03",
+      "question": "What cleansing routine is advised?",
+      "reference": "Use a non-alkaline syndet cleansing product twice daily on acne-prone skin.",
+      "claim": ["Syndet cleansers", "prevent", "all acne scars"],
+      "source": "nice_ng198_2026_08:147",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-04",
+      "question": "What is known about diet for acne?",
+      "reference": "There is not enough evidence to support specific diets for treating acne.",
+      "claim": ["Evidence", "is insufficient to support", "specific acne-treatment diets"],
+      "source": "nice_ng198_2026_08:170",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-05",
+      "question": "What is known about diet for acne?",
+      "reference": "There is not enough evidence to support specific diets for treating acne.",
+      "claim": ["A specific diet", "is proven to cure", "acne"],
+      "source": "nice_ng198_2026_08:170",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-06",
+      "question": "What is known about diet for acne?",
+      "reference": "There is not enough evidence to support specific diets for treating acne.",
+      "claim": ["Balanced diets", "lower", "sebum by 20 percent"],
+      "source": "nice_ng198_2026_08:170",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-07",
+      "question": "How urgent is referral for acne fulminans?",
+      "reference": "Urgently refer people with acne fulminans on the same day for assessment within 24 hours.",
+      "claim": ["Acne fulminans", "requires assessment within", "24 hours"],
+      "source": "nice_ng198_2026_08:181",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-08",
+      "question": "How urgent is referral for acne fulminans?",
+      "reference": "Urgently refer people with acne fulminans on the same day for assessment within 24 hours.",
+      "claim": ["Acne fulminans", "can routinely wait", "one month for assessment"],
+      "source": "nice_ng198_2026_08:181",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-09",
+      "question": "How urgent is referral for acne fulminans?",
+      "reference": "Urgently refer people with acne fulminans on the same day for assessment within 24 hours.",
+      "claim": ["Acne fulminans", "is caused by", "benzoyl peroxide"],
+      "source": "nice_ng198_2026_08:181",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-10",
+      "question": "When is isotretinoin considered?",
+      "reference": "Consider oral isotretinoin for people older than 12 with severe acne resistant to adequate systemic antibiotic and topical therapy.",
+      "claim": ["Oral isotretinoin", "may be considered for", "treatment-resistant severe acne in people older than 12"],
+      "source": "nice_ng198_2026_08:442-449",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-11",
+      "question": "When is isotretinoin considered?",
+      "reference": "Consider oral isotretinoin for people older than 12 with severe acne resistant to adequate systemic antibiotic and topical therapy.",
+      "claim": ["Oral isotretinoin", "is first-line for", "every child younger than 12 with mild acne"],
+      "source": "nice_ng198_2026_08:442-449",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-12",
+      "question": "When is isotretinoin considered?",
+      "reference": "Consider oral isotretinoin for people older than 12 with severe acne resistant to adequate systemic antibiotic and topical therapy.",
+      "claim": ["Oral isotretinoin", "must be taken", "with milk"],
+      "source": "nice_ng198_2026_08:442-449",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-13",
+      "question": "Retinoid bôi được dùng thế nào?",
+      "reference": "Bôi thuốc mỏng 1 lần/ngày vào buổi tối; có thể giảm tần suất trong vài tuần đầu để hạn chế kích ứng.",
+      "claim": ["Retinoid bôi", "được bôi", "một lần mỗi ngày vào buổi tối"],
+      "source": "vn_moh_dermatology_4416_2023_acne:232",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-14",
+      "question": "Retinoid bôi được dùng thế nào?",
+      "reference": "Bôi thuốc mỏng 1 lần/ngày vào buổi tối; có thể giảm tần suất trong vài tuần đầu để hạn chế kích ứng.",
+      "claim": ["Retinoid bôi", "bắt buộc bôi", "ba lần mỗi ngày"],
+      "source": "vn_moh_dermatology_4416_2023_acne:232",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-15",
+      "question": "Retinoid bôi được dùng thế nào?",
+      "reference": "Bôi thuốc mỏng 1 lần/ngày vào buổi tối; có thể giảm tần suất trong vài tuần đầu để hạn chế kích ứng.",
+      "claim": ["Retinoid bôi", "có giá", "100 nghìn đồng"],
+      "source": "vn_moh_dermatology_4416_2023_acne:232",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-16",
+      "question": "What monitoring is recommended with isotretinoin?",
+      "reference": "Monitoring of liver function tests and lipids should be considered, but CBC monitoring is not needed in healthy patients.",
+      "claim": ["Healthy isotretinoin patients", "do not need", "routine CBC monitoring"],
+      "source": "aad_acne_guideline_2024:343-345",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-17",
+      "question": "What monitoring is recommended with isotretinoin?",
+      "reference": "Monitoring of liver function tests and lipids should be considered, but CBC monitoring is not needed in healthy patients.",
+      "claim": ["Healthy isotretinoin patients", "must receive", "daily CBC monitoring"],
+      "source": "aad_acne_guideline_2024:343-345",
+      "gold_label": null
+    },
+    {
+      "item_id": "HLD-CHK-18",
+      "question": "What monitoring is recommended with isotretinoin?",
+      "reference": "Monitoring of liver function tests and lipids should be considered, but CBC monitoring is not needed in healthy patients.",
+      "claim": ["Isotretinoin", "improves", "visual acuity"],
+      "source": "aad_acne_guideline_2024:343-345",
+      "gold_label": null
+    }
+  ]
+}

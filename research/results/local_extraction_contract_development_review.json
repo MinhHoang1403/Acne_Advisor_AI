@@ -1,0 +1,133 @@
+{
+  "schema_version": "local_extraction_contract_development_review_v1",
+  "status": "developer_confirmation_required",
+  "candidate": "C",
+  "result_artifact": "research/results/local_extraction_contract_c_results.json",
+  "result_artifact_sha256": "76d25bd34438bdc884e33fa2eacb5bfab7fb8be5f455ec6c9e3f861db42a1894",
+  "repeatability": {
+    "repetitions": 3,
+    "structured_raw_output_identical_per_item": "8/8",
+    "converted_output_identical_per_item": "8/8",
+    "checking_labels_identical_per_item": "12/12"
+  },
+  "automatic_result": {
+    "parseable": "24/24",
+    "empty_string_field": 0,
+    "accepted": "15/24 (5/8 per repetition)",
+    "review_required": "9/24 (the same 3/8 per repetition)",
+    "checking_agreement": "36/36",
+    "timeout_oom_truncation": 0,
+    "development_gate_passed": false
+  },
+  "review_instructions": {
+    "reviewer_requirement": "A developer/researcher must adjudicate independently of Qwen output; the model output is evidence under review, not gold.",
+    "allowed_verdicts": [
+      "confirmed_pass",
+      "confirmed_fail"
+    ],
+    "required_error_categories_if_failed": [
+      "FORMAT_ONLY",
+      "STRUCTURE_WITH_INFORMATION_LOSS",
+      "SEMANTIC_OMISSION",
+      "SEMANTIC_DISTORTION",
+      "UNSUPPORTED_ADDITION"
+    ],
+    "pass_rule": "The complete claim set must preserve all assertions, negation, modality, entity scope, route, drug/effect qualifiers, and must contain no unsupported addition. Each emitted triplet must be meaningful for independent RAGChecker checking.",
+    "do_not_do": "Do not treat schema validity, repeated output, or Qwen self-consistency as semantic correctness."
+  },
+  "items": [
+    {
+      "item_id": "CAL-EXT-01",
+      "input_text": "Mụn trứng cá là bệnh viêm mạn tính của đơn vị nang lông - tuyến bã.",
+      "reference_claims": [
+        "Mụn trứng cá là bệnh viêm mạn tính của đơn vị nang lông - tuyến bã."
+      ],
+      "candidate_triplets": [
+        [
+          "mụn trứng cá",
+          "là",
+          "bệnh viêm mạn tính"
+        ],
+        [
+          "bệnh viêm mạn tính",
+          "của",
+          "đơn vị nang lông - tuyến bã"
+        ]
+      ],
+      "automatic_reason": "missing_reference:R01",
+      "review_question": "Hai triplet tạo thành một chuỗi có bảo toàn đúng claim rằng acne là bệnh của đơn vị nang lông–tuyến bã, hay triplet thứ hai đã đổi subject/scope khiến từng claim RAGChecker không còn tương đương?",
+      "preliminary_risk_not_a_verdict": "Possible structure split with scope distortion.",
+      "verdict": null,
+      "error_categories": null,
+      "reviewer_id": null,
+      "reviewed_at": null,
+      "adjudication_notes": null
+    },
+    {
+      "item_id": "CAL-EXT-03",
+      "input_text": "Bằng chứng về chế độ ăn tải đường huyết thấp còn mâu thuẫn và chỉ gợi ý khả năng giảm mụn.",
+      "reference_claims": [
+        "Bằng chứng về chế độ ăn tải đường huyết thấp còn mâu thuẫn.",
+        "Bằng chứng chỉ gợi ý chế độ ăn tải đường huyết thấp có thể giảm mụn."
+      ],
+      "candidate_triplets": [
+        [
+          "bằng chứng",
+          "về",
+          "chế độ ăn tải đường huyết thấp"
+        ],
+        [
+          "bằng chứng",
+          "còn mâu thuẫn",
+          "null"
+        ],
+        [
+          "bằng chứng",
+          "chỉ gợi ý",
+          "khả năng giảm mụn"
+        ]
+      ],
+      "automatic_reason": "missing_reference:R01, missing_reference:R02",
+      "review_question": "String literal 'null' có phải unsupported placeholder/severe semantic defect không, và các triplet còn lại có giữ liên kết của low-glycemic diet với cả tính mâu thuẫn lẫn khả năng giảm mụn không?",
+      "preliminary_risk_not_a_verdict": "High risk of semantic omission/distortion and unsupported placeholder despite schema validity.",
+      "verdict": null,
+      "error_categories": null,
+      "reviewer_id": null,
+      "reviewed_at": null,
+      "adjudication_notes": null
+    },
+    {
+      "item_id": "CAL-EXT-04",
+      "input_text": "Điều trị duy trì không phải lúc nào cũng cần và có thể cân nhắc khi thường xuyên tái phát.",
+      "reference_claims": [
+        "Điều trị duy trì không phải lúc nào cũng cần.",
+        "Có thể cân nhắc điều trị duy trì khi thường xuyên tái phát."
+      ],
+      "candidate_triplets": [
+        [
+          "điều trị duy trì",
+          "cần",
+          "không phải lúc nào"
+        ],
+        [
+          "điều trị duy trì",
+          "có thể cân nhắc",
+          "khi thường xuyên tái phát"
+        ]
+      ],
+      "automatic_reason": "missing_reference:R01",
+      "review_question": "Cách đặt 'cần' ở predicate và 'không phải lúc nào' ở object có bảo toàn phủ định 'không phải lúc nào cũng cần' khi từng triplet được checker đánh giá độc lập không?",
+      "preliminary_risk_not_a_verdict": "Possible negation/scope distortion caused by field boundaries.",
+      "verdict": null,
+      "error_categories": null,
+      "reviewer_id": null,
+      "reviewed_at": null,
+      "adjudication_notes": null
+    }
+  ],
+  "next_step_after_review": {
+    "if_any_severe_or_gate_breaking_failure": "Record LOCAL_EXTRACTION_CONTRACT_FAILED; do not run holdout.",
+    "if_all_development_gates_are_confirmed": "Obtain independent approval of all 48 holdout gold fields, commit the adjudicated packet, then run the selected candidate once on the blind holdout without tuning.",
+    "current_holdout_action": "prohibited"
+  }
+}
