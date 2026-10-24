@@ -72,9 +72,9 @@ messages. Query text is represented only by a redacted length summary and the
 pre-existing short hash. Export, serialization, and sink failures fail open and
 must not change the business response.
 
-The current effective environment computes fingerprint
-`0a8d129a215c884f2d9654e9` for active knowledge build
-`d4a1819fe7fb77fe1f40`. The immutable historical formal evaluation artifact
+Compute the effective fingerprint with `scripts/inspect_cache_versions.py`; it
+depends on the active knowledge build and runtime configuration. Do not copy a
+digest from an older report into configuration. The immutable historical formal evaluation artifact
 records fingerprint `f93ad3e8dfb2c39f403b0794` and build
 `94d613bc9b33628de3ef`; it must not be presented as the current system. Never
 hard-code either digest or remove manifest fields to force equality.
@@ -131,17 +131,34 @@ disconnects.
 `--mode live` performs bounded provider smoke calls; it does not run ingestion,
 embedding, model download or database rebuild.
 
-## Shutdown and Rollback
+## Shutdown and Knowledge Maintenance
 
 Use `docker compose stop` for normal shutdown. Do not use global prune commands,
 `docker compose down -v`, Qdrant collection deletion, Neo4j destructive deletes,
 or Redis `FLUSHALL` as a startup/shutdown strategy.
 
-For runtime rollback, check out the previous integration commit, preserve the
-existing bind-mounted data, start pinned services with `--pull never --no-build`,
-then rerun readiness and knowledge-build status checks. A knowledge datastore rollback
-must use its verified snapshots and cold backup; it is a separate controlled
-migration operation.
+Develop and operate from the canonical `main` checkout. Preserve the existing
+bind-mounted data and reuse the activated build. Historical local backup folders,
+old Qdrant collections and research Docker stacks are not runtime dependencies.
+The manifest's `activation.rollback_root` records the backup used at the historical
+cutover; it does not promise that this local folder is still retained. Its value
+must not be rewritten to imply a new backup or a different build identity.
+
+A future knowledge migration remains a separate operation: activation still
+requires verified rollback artifacts supplied explicitly to that operation.
+Deleting historical backups does not bypass or disable this guard.
+
+The optional Langfuse sink is disabled in the normal local configuration; JSONL
+telemetry remains available. Its Compose recipe is retained for integration
+contracts, not as a backing-service requirement. Do not start an observability
+stack as part of normal application startup.
+
+On this Windows machine, Application Control has blocked the Python `select`
+extension. Do not disable the security policy or delete the active environment to
+hide that failure. Use an approved Python installation or the existing
+`acne-thesis-evaluation:366f3ad8` image for bounded offline checks until the final
+Windows CI checks provide the corresponding clean-environment validation. The
+image is an evaluation/test tool, not a second application checkout.
 
 `.env`, provider secrets, caches, databases, snapshots and generated reports
 remain local-only. Never print secrets or use destructive global Docker cleanup.

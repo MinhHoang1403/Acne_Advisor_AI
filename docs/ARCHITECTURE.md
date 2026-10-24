@@ -189,7 +189,7 @@ fingerprint, and cache version; it performs no semantic lookup.
 prompt assembly, and provider dispatch remain internal Python calls; there is
 no separate project-internal context service.
 
-The React client starts at `src/frontend/src/main.jsx`. `App.jsx::handleSubmit`
+The React client starts at `src/frontend/src/main.jsx`. `App.jsx::sendQuestion`
 calls `chatApi.js::sendChatMessage`, then updates session state from
 `ChatResponse`. `ChatWindow.jsx` and `ChatMessage.jsx` render answers and source
 labels. Provider credentials remain backend-only.
@@ -205,8 +205,8 @@ answer table, and the verifier does not judge ordinary medical truth.
   environment; truthful FP32/RRF fallbacks remain required.
 - The validated retry improvement is narrow: one of six reviewed evidence items
   became packed on the fixed retry study. It is not a universal quality claim.
-- The decision model sees fewer bounded evidence excerpts than generation; this
-  is an evaluation question, not an unbounded prompt path.
+- The decision model sees the full bounded packed evidence in the normal runtime;
+  the compatibility path without `PackedContext` has a separate item limit.
 - Context budgets are versioned engineering policies, not proven optimal values.
 - Neo4j is not an online evidence source, and its unavailability does not remove
   already activated Qdrant evidence.

@@ -487,9 +487,12 @@ case-level metrics, checkpoint, calibration evidence, hashes, and interpretation
 boundary are listed in [Official Evaluation Results](evaluation/results/README.md).
 These benchmark results are research evidence, not clinical validation.
 They do not describe the current `d4a1819fe7fb77fe1f40` knowledge build or its
-current pipeline fingerprint. A new formal result has not been declared: six
-evidence-gap rows require researcher adjudication, documented in
-[`evaluation/benchmark_adjudication.md`](evaluation/benchmark_adjudication.md).
+current pipeline fingerprint. The current-build run has 100 frozen system outputs
+on `main`, but RAGChecker scoring stopped because evaluator credits were exhausted.
+Its locked gold separates 24 confirmed-absence and 6 policy-ambiguous cases. See
+[Evaluation Results](evaluation/results/README.md) for identities and scoring resume.
+The historical [adjudication queue](evaluation/benchmark_adjudication.md) remains
+separate and must not be silently relabeled.
 
 ## Limitations
 
@@ -510,8 +513,8 @@ evidence-gap rows require researcher adjudication, documented in
   current asymmetric text representation was selected by a bounded development
   comparison; it is not a formal or clinical quality result.
 - The current build has development retrieval regression evidence, but no new
-  immutable formal RAGChecker result while benchmark adjudication remains
-  pending researcher review.
+  immutable formal RAGChecker result; semantic scoring is incomplete and policy
+  adjudication remains distinct from confirmed-absence evaluation.
 - Deployment assumptions target trusted, local, single-user use.
 
 ## References and Technical Documentation
@@ -522,10 +525,10 @@ evidence-gap rows require researcher adjudication, documented in
 - [Methods and Formulas](docs/METHODS_AND_FORMULAS.md)
 - [Method Traceability](docs/METHOD_TRACEABILITY.md)
 - [Vietnamese Source Code Guide](docs/CODE_GUIDE_VI.md)
-- [Repository Cleanup Report](docs/REPOSITORY_CLEANUP_REPORT.md)
 - [Safety](docs/SAFETY.md)
 - [Operations](docs/OPERATIONS.md)
 - [AI Observability and Langfuse](docs/OBSERVABILITY.md)
+- [Research conclusions and pending reviews](research/README.md)
 - [References](docs/REFERENCES.md)
 - [Method and source registry](data/method_sources.json)
 - [Source manifest](data/sources/manifest.yaml)
