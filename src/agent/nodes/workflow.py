@@ -445,31 +445,8 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
 
     retrieval_error = state.get("retrieval_error")
     decision_reason = str((state.get("agent_decision") or {}).get("reason_code") or "")
-    evidence_usable = bool((state.get("evidence_assessment") or {}).get("usable"))
-    if decision_reason == "evidence_gap" and evidence_usable and not retrieval_error:
-        generated = await generate_answer_node(
-            {**state, "response_contract": "evidence_gap_with_related_context"}
-        )
-        generation_metadata = {
-            "generation_invoked": True,
-            "generation_provider": generated.get("actual_provider"),
-            "generation_model": generated.get("actual_model"),
-        }
-        fallback_decision = await generation_fallback_decision_node({**state, **generated})
-        if not fallback_decision.get("fallback_applied"):
-            return {
-                **generated,
-                **fallback_decision,
-                **generation_metadata,
-                "fallback_cache_eligible": False,
-            }
-        return {
-            **generated,
-            **fallback_decision,
-            **(await safe_fallback_node({**state, **generated, **fallback_decision})),
-            **generation_metadata,
-        }
-
+    # Related context is not sufficient support for the requested proposition.
+    # The decision owner's abstention must remain a non-generation transition.
     reason_code = state.get("fallback_reason_code") or (
         "retrieval_unavailable"
         if retrieval_error
@@ -495,7 +472,12 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
         "fallback_reason_code": reason_code,
         "fallback_cache_eligible": False,
     }
-    return await safe_fallback_node(fallback_state)
+    return {
+        **(await safe_fallback_node(fallback_state)),
+        "generation_invoked": False,
+        "generation_provider": None,
+        "generation_model": None,
+    }
 
 
 async def finalize_node(state: ClinicalState) -> dict[str, Any]:

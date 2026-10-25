@@ -6,7 +6,10 @@ module owner phía dưới; file này không tự chấm evidence hay sinh answe
 """
 
 import asyncio
+import hashlib
+import json
 import logging
+import math
 import os
 import time
 import uuid
@@ -14,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -82,6 +85,7 @@ RELEASE_READINESS_TEST_MODES = {"http_double", "deterministic"}
 
 # Lock chỉ có phạm vi một process; API_WORKERS phải được cân nhắc nếu cần khóa phân tán.
 active_requests = set()
+active_request_ids: set[str] = set()
 
 
 def _http_status_for_resilience_error(exc: RuntimeResilienceError) -> int:
@@ -205,8 +209,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+async def shutdown_runtime_connections():
+    from src.cache.redis_cache import close_redis
+    from src.database.connection import engine
+    from src.database.vector_store import QdrantVectorStore
+
+    try:
+        await close_redis()
+    finally:
+        try:
+            await QdrantVectorStore.close_shared_client()
+        finally:
+            await engine.dispose()
+
+
 app.router.add_event_handler("shutdown", shutdown_langfuse)
 app.router.add_event_handler("shutdown", shutdown_reranker_executor)
+app.router.add_event_handler("shutdown", shutdown_runtime_connections)
 app.router.add_event_handler("startup", warm_process_reranker)
 
 
@@ -251,6 +270,7 @@ class ChatCacheMetadata(BaseModel):
 
 class ChatMetadata(BaseModel):
     request_id: str
+    replayed: bool = False
     provider: str
     model: Optional[str] = None
     requested_provider: Optional[str] = None
@@ -480,8 +500,19 @@ async def _get_db_session():
         return None
 
 
+def _chat_db_timeout() -> float:
+    """Optional SQL work has its own small budget outside the 210s Agent stage."""
+    try:
+        value = float(os.getenv("CHAT_DB_TIMEOUT_SECONDS", "2"))
+    except ValueError:
+        return 2.0
+    return min(10.0, max(0.01, value)) if math.isfinite(value) else 2.0
+
+
 async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
     """Nạp history gần nhất khi client không gửi history của session."""
+    if MAX_CONVERSATION_HISTORY_MESSAGES <= 0:
+        return []
     from src.database.repositories import chat_history as repo
 
     db_session = await _get_db_session()
@@ -489,7 +520,7 @@ async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
         return []
 
     try:
-        async with db_session.begin():
+        async with asyncio.timeout(_chat_db_timeout()), db_session.begin():
             messages = await repo.get_recent_messages(
                 session=db_session,
                 session_id=session_id,
@@ -512,6 +543,58 @@ async def _load_recent_history_from_db(session_id: str) -> list[dict[str, str]]:
         return []
     finally:
         await db_session.close()
+
+
+def _request_payload_hash(request: ChatRequest) -> str:
+    # Session is checked separately so a retry without a session can recover it.
+    payload = request.model_dump(mode="json", exclude={"request_id", "session_id"})
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+async def _load_completed_request(request: ChatRequest) -> ChatResponse | None:
+    """Replay a persisted logical turn; never generate a different answer for its ID."""
+    if request.request_id is None or _release_readiness_test_mode_enabled():
+        return None
+    from src.database.repositories import chat_history as repo
+
+    session = await _get_db_session()
+    if session is None:
+        return None
+    try:
+        async with asyncio.timeout(_chat_db_timeout()), session.begin():
+            messages = await repo.get_request_messages(session, str(request.request_id))
+    except Exception as exc:
+        logger.warning("Request replay lookup unavailable: error_type=%s", exc.__class__.__name__)
+        return None
+    finally:
+        await session.close()
+    if not messages:
+        return None
+    by_role = {row["role"]: row for row in messages}
+    user = by_role.get("user") or {}
+    assistant = by_role.get("assistant") or {}
+    metadata = assistant.get("metadata") or {}
+    if isinstance(metadata, str):
+        try:
+            metadata = json.loads(metadata)
+        except ValueError:
+            metadata = {}
+    if (
+        not isinstance(metadata, dict)
+        or metadata.get("request_payload_hash") != _request_payload_hash(request)
+        or user.get("session_id") != assistant.get("session_id")
+        or (request.session_id and request.session_id != assistant.get("session_id"))
+        or user.get("content") != request.message
+    ):
+        raise HTTPException(409, detail={"code": "request_id_conflict", "message": "Mã yêu cầu đã được sử dụng cho một lượt chat khác."})
+    sources = assistant.get("sources") or []
+    if isinstance(sources, str):
+        sources = json.loads(sources)
+    return ChatResponse(
+        answer=assistant["content"], session_id=assistant["session_id"], sources=sources,
+        source_metadata=metadata.get("source_metadata") or [],
+        metadata=ChatMetadata.model_validate({**metadata, "replayed": True}),
+    )
 
 
 async def _delete_app_redis_cache_keys() -> tuple[int, list[str]]:
@@ -540,6 +623,20 @@ async def _delete_app_redis_cache_keys() -> tuple[int, list[str]]:
 
 
 # --- Endpoints ---
+
+@app.get("/live")
+async def liveness():
+    """Process liveness, with no dependency probes or provider calls."""
+    return {"status": "ok", "service": "acne-advisor-api"}
+
+
+@app.get("/ready", response_model=HealthResponse)
+async def readiness(response: Response):
+    """Core dependency/config readiness; external paid providers are not probed."""
+    health = await health_check()
+    if health.status != "ok":
+        response.status_code = 503
+    return health
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -732,26 +829,30 @@ async def chat_endpoint(request: ChatRequest):
     
     # Cap conversation history. If client did not send it, load recent DB history
     # so same-session follow-ups work through API clients as well as the frontend.
-    history = []
-    if request.conversation_history:
-        history = [
-            {"role": msg.role, "content": msg.content[:MAX_HISTORY_MESSAGE_CHARS]}
-            for msg in request.conversation_history[-MAX_CONVERSATION_HISTORY_MESSAGES:]
-        ]
-    elif request.session_id:
-        history = await _load_recent_history_from_db(session_id)
-    
     # Request locking to prevent concurrent processing for the same session
-    if session_id in active_requests:
+    if session_id in active_requests or request_id in active_request_ids:
         raise HTTPException(
             status_code=409,
             detail={"code": "request_in_progress", "message": "Câu hỏi trước đang được xử lý. Vui lòng chờ hoàn tất rồi gửi câu tiếp theo."}
         )
         
     active_requests.add(session_id)
+    active_request_ids.add(request_id)
     langfuse_handle = begin_langfuse_request(request_id)
     
     try:
+        replay = await _load_completed_request(request)
+        if replay is not None:
+            return replay
+        history = []
+        if MAX_CONVERSATION_HISTORY_MESSAGES > 0:
+            if request.conversation_history:
+                history = [
+                    {"role": msg.role, "content": msg.content[:MAX_HISTORY_MESSAGE_CHARS]}
+                    for msg in request.conversation_history[-MAX_CONVERSATION_HISTORY_MESSAGES:]
+                ]
+            elif request.session_id:
+                history = await _load_recent_history_from_db(session_id)
         logger.info(
             "Received chat request for session=%s, user_id_present=%s, message_chars=%d",
             session_id,
@@ -788,12 +889,15 @@ async def chat_endpoint(request: ChatRequest):
         used_retrieval = _used_retrieval(result, is_in_domain)
         
         answer_text = repair_mojibake(result.get("answer", ""))
-        raw_sources_list = result.get("sources", [])
+        # Retrieved context remains diagnostic evidence, not an attribution for
+        # a deterministic fallback that did not synthesize an answer from it.
+        raw_sources_list = [] if result.get("fallback_applied") else result.get("sources", [])
+        source_contexts = [] if result.get("fallback_applied") else result.get("vector_contexts", [])
         source_metadata = build_source_metadata(
             raw_sources_list,
-            result.get("vector_contexts", []),
+            source_contexts,
         )
-        sources_list = display_names_for_sources(raw_sources_list, result.get("vector_contexts", []))
+        sources_list = display_names_for_sources(raw_sources_list, source_contexts)
         answer_quality_report = result.get("answer_quality_report") or {}
         performance_timings = dict(result.get("performance_timings") or {})
         pipeline_fingerprint = result.get("pipeline_fingerprint")
@@ -836,6 +940,7 @@ async def chat_endpoint(request: ChatRequest):
         # Build safe metadata dict for DB storage (no API keys, no raw exceptions)
         safe_db_metadata = {
             "request_id": request_id,
+            "request_payload_hash": _request_payload_hash(request),
             "provider": response_provider,
             "model": response_model,
             "requested_provider": result.get("requested_provider") or request.llm_provider or "gemini",
@@ -1022,6 +1127,8 @@ async def chat_endpoint(request: ChatRequest):
         
     except asyncio.CancelledError:
         raise
+    except HTTPException:
+        raise
     except RuntimeResilienceError as e:
         result["performance_timings"] = {
             **(result.get("performance_timings") or {}),
@@ -1061,6 +1168,7 @@ async def chat_endpoint(request: ChatRequest):
         # Return generic 500 error without leaking sensitive info
         raise HTTPException(status_code=500, detail="Internal server error processing the request.")
     finally:
+        active_request_ids.discard(request_id)
         if langfuse_handle is not None:
             langfuse_handle.close()
         active_requests.discard(session_id)
@@ -1089,7 +1197,7 @@ async def _persist_chat_to_db(
         return
     
     try:
-        async with db_session.begin():
+        async with asyncio.timeout(_chat_db_timeout()), db_session.begin():
             # Create title from first 40 chars of user message
             title = user_message[:40] + ("..." if len(user_message) > 40 else "")
             
@@ -1186,6 +1294,8 @@ async def delete_all_chat_sessions():
     - Does not touch Qdrant, Neo4j, ingestion data, or indexed knowledge stores.
     - Deletes Redis keys only under the app answer-cache prefix.
     """
+    if active_requests:
+        raise HTTPException(409, detail={"code": "request_in_progress", "message": "Vui lòng chờ lượt chat đang xử lý hoàn tất trước khi xóa lịch sử."})
     from src.database.repositories import chat_history as repo
 
     db_session = await _get_db_session()
@@ -1213,7 +1323,11 @@ async def delete_all_chat_sessions():
 
 
 @app.get("/chat/sessions/{session_id}/messages", response_model=list[MessageResponse])
-async def get_chat_messages(session_id: str, limit: int = 50):
+async def get_chat_messages(
+    session_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
     """Get messages for a specific chat session."""
     from src.database.repositories import chat_history as repo
     
@@ -1227,6 +1341,7 @@ async def get_chat_messages(session_id: str, limit: int = 50):
                 session=db_session,
                 session_id=session_id,
                 limit=limit,
+                offset=offset,
             )
         
         return [

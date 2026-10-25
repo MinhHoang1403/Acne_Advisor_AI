@@ -41,10 +41,14 @@ def reciprocal_rank_fusion(
         (dense_results, dense_weight, "dense_rank", "dense_score"),
         (sparse_results, sparse_weight, "sparse_rank", "sparse_score"),
     ):
-        for rank, document in enumerate(channel, start=1):
+        seen_ids: set[str] = set()
+        rank = 0
+        for document in channel:
             document_id = str(document.get("id", ""))
-            if not document_id:
+            if not document_id or document_id in seen_ids:
                 continue
+            seen_ids.add(document_id)
+            rank += 1
             scores[document_id] = scores.get(document_id, 0.0) + weight / (k + rank)
             documents.setdefault(document_id, dict(document))
             documents[document_id][rank_key] = rank

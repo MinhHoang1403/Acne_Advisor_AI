@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-import { checkBackendHealth, fetchModels, parseApiError, sendChatMessage } from './chatApi.js';
+import { checkBackendHealth, fetchModels, fetchMessages, parseApiError, sendChatMessage } from './chatApi.js';
 
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
@@ -71,6 +71,62 @@ test('sendChatMessage aborts after its finite client timeout', async (t) => {
       return true;
     },
   );
+});
+
+test('chat timeout covers a stalled response body after headers arrive', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let stop;
+  globalThis.fetch = async (_url, init) => new Response(new ReadableStream({
+    start(controller) {
+      stop = () => controller.error(new DOMException('Aborted', 'AbortError'));
+      init.signal.addEventListener('abort', stop, { once: true });
+    },
+  }), { status: 200 });
+  const outcome = await Promise.race([
+    sendChatMessage({ message: 'x', timeoutMs: 5 }).then(() => 'success', (e) => e.isTimeout ? 'timeout' : 'other'),
+    new Promise((resolve) => setTimeout(() => resolve('hung_body'), 50)),
+  ]);
+  stop();
+  assert.equal(outcome, 'timeout');
+});
+
+test('completed health requests remove the parent abort listener', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let listeners = 0;
+  const signal = { aborted: false, addEventListener() { listeners++; }, removeEventListener() { listeners--; } };
+  globalThis.fetch = async () => jsonResponse(200, { status: 'ok' });
+  await checkBackendHealth({ signal });
+  assert.equal(listeners, 0);
+});
+
+test('invalid JSON proves the backend is reachable and preserves the supplied request id', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const requestId = globalThis.crypto.randomUUID();
+  globalThis.fetch = async (_url, init) => {
+    assert.equal(JSON.parse(init.body).request_id, requestId);
+    return new Response('invalid json', { status: 200 });
+  };
+  await assert.rejects(() => sendChatMessage({ message: 'x', requestId }), (error) => {
+    assert.equal(error.status, 502);
+    assert.equal(error.code, 'invalid_response');
+    return true;
+  });
+});
+
+test('history reload reads messages beyond the first server page in order', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const messages = Array.from({ length: 215 }, (_, id) => ({ id: String(id), role: id % 2 ? 'assistant' : 'user' }));
+  globalThis.fetch = async (raw) => {
+    const url = new URL(raw);
+    const offset = Number(url.searchParams.get('offset') || 0);
+    const limit = Number(url.searchParams.get('limit') || 50);
+    return jsonResponse(200, messages.slice(offset, offset + limit));
+  };
+  assert.deepEqual(await fetchMessages('long-session'), messages);
 });
 
 test('checkBackendHealth returns degraded for reachable degraded backend', async (t) => {

@@ -96,6 +96,7 @@ def build_pipeline_version_manifest(
         "max_retrieval_attempts": 2,
         "retry_evidence_policy": "retain_deduplicate_retry_query_rerank_repack",
         "agent_decision_version": "direct_proposition_support_action_decision",
+        "abstention_policy_version": "deterministic_no_answer_generation_v1",
         "evidence_contract_version": "provenance_complete_evidence_presence_v2",
         "evidence_grounding_version": _effective_contract_version(
             value("EVIDENCE_GROUNDING_VERSION", DEFAULT_EVIDENCE_GROUNDING_VERSION),

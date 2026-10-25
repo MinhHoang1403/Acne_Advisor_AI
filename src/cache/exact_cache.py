@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 from typing import Any
 
 from src.agent.text_encoding import repair_mojibake
@@ -32,7 +33,7 @@ CACHE_SCHEMA_VERSION = os.getenv("CACHE_SCHEMA_VERSION", "v3")
 def normalize_question(text: str) -> str:
     """Chuẩn hóa case, dấu câu và whitespace để exact matching ổn định."""
 
-    normalized = re.sub(r"[?!.,:;]+", " ", str(text or "").casefold())
+    normalized = re.sub(r"[?!.,:;]+", " ", unicodedata.normalize("NFC", str(text or "")).casefold())
     return " ".join(normalized.split())
 
 
@@ -90,8 +91,15 @@ async def get_exact_cache(
         parsed = json.loads(value)
         if not isinstance(parsed, dict):
             return None
-        if isinstance(parsed.get("answer"), str):
-            parsed["answer"] = repair_mojibake(parsed["answer"])
+        if (
+            not isinstance(parsed.get("answer"), str)
+            or not parsed["answer"].strip()
+            or not isinstance(parsed.get("metadata"), dict)
+            or not isinstance(parsed.get("sources"), list)
+            or any(not isinstance(source, str) for source in parsed["sources"])
+        ):
+            return None
+        parsed["answer"] = repair_mojibake(parsed["answer"])
         return parsed
     except Exception as exc:
         logger.debug("Exact cache read skipped: %s", sanitize_fallback_reason(exc))

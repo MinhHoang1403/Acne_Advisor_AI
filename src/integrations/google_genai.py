@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import logging
 import os
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -24,6 +25,16 @@ from src.resilience.exceptions import (
 )
 
 GOOGLE_GENAI_SDK_VERSION = "google_genai_sdk_v1"
+logger = logging.getLogger(__name__)
+
+
+def _log_token_usage(response: Any, model_name: str) -> None:
+    """Operational counters only; never record prompts, answers or credentials."""
+    usage = _get_field(response, "usage_metadata")
+    prompt = _get_field(usage, "prompt_token_count")
+    total = _get_field(usage, "total_token_count")
+    if isinstance(prompt, int) and isinstance(total, int) and total >= prompt >= 0:
+        logger.info("Google token usage: model=%s input_tokens=%d output_tokens_including_thinking=%d", model_name, prompt, total - prompt)
 
 
 def get_google_api_key(api_key: str | None = None) -> str:
@@ -84,16 +95,20 @@ async def generate_text_async(
 
     async def _call() -> Any:
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
-        return await active_client.aio.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=_generation_config(
-                model_name=model_name,
-                temperature=temperature,
-                system_prompt=system_prompt,
-                response_schema=response_schema,
-            ),
-        )
+        try:
+            return await active_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=_generation_config(
+                    model_name=model_name,
+                    temperature=temperature,
+                    system_prompt=system_prompt,
+                    response_schema=response_schema,
+                ),
+            )
+        finally:
+            if client is None:
+                await active_client.aio.aclose()
 
     try:
         if request_timeout and request_timeout > 0:
@@ -101,6 +116,7 @@ async def generate_text_async(
                 response = await _call()
         else:
             response = await _call()
+        _log_token_usage(response, model_name)
         return extract_response_text(response)
     except asyncio.CancelledError:
         raise
@@ -120,6 +136,7 @@ def generate_text_sync(
 ) -> str | None:
     """Sinh text qua synchronous Google GenAI client và chuẩn hóa lỗi provider."""
 
+    active_client = None
     try:
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
         response = active_client.models.generate_content(
@@ -132,11 +149,15 @@ def generate_text_sync(
                 response_schema=response_schema,
             ),
         )
+        _log_token_usage(response, model_name)
         return extract_response_text(response)
     except asyncio.CancelledError:
         raise
     except Exception as exc:
         raise normalize_google_genai_exception(exc) from exc
+    finally:
+        if client is None and active_client is not None:
+            active_client.close()
 
 
 def extract_response_text(response: Any) -> str | None:
@@ -169,6 +190,7 @@ def embed_texts_sync(
 
     if not texts:
         return []
+    active_client = None
     try:
         active_client = client or build_google_genai_client(api_key=api_key)
         config_kwargs: dict[str, Any] = {}
@@ -193,6 +215,9 @@ def embed_texts_sync(
         if normalized is exc:
             raise
         raise normalized from exc
+    finally:
+        if client is None and active_client is not None:
+            active_client.close()
 
 
 def extract_embedding_vectors(response: Any, *, expected_count: int) -> list[list[float]]:

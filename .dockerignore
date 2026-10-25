@@ -1,0 +1,23 @@
+# Allowlist: never send credentials, datastore files, source corpus or model caches.
+**
+!requirements.lock.txt
+!requirements.runtime.in
+!requirements.runtime.lock.txt
+!src/
+!src/**
+src/frontend/**
+src/**/__pycache__/**
+src/**/*.pyc
+!data/
+data/**
+!data/knowledge_build_manifest.json
+!data/method_sources.json
+!data/sources/
+data/sources/**
+!data/sources/*.yaml
+!data/taxonomy/
+data/taxonomy/**
+!data/taxonomy/*.yaml
+!docker/
+docker/**
+!docker/backend.Dockerfile

@@ -1,0 +1,18 @@
+# API image only. Existing development/ingestion versions remain authoritative.
+-c requirements.lock.txt
+python-dotenv
+pydantic
+PyYAML
+fastapi
+uvicorn
+httpx
+langchain-core
+langgraph
+langfuse
+google-genai
+sentence-transformers
+sqlalchemy[asyncio]
+asyncpg
+redis[hiredis]
+qdrant-client
+neo4j

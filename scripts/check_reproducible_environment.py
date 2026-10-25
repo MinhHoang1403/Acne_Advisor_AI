@@ -194,17 +194,51 @@ def inspect_compose_images(path: Path) -> dict[str, Any]:
         return {"passed": False, "images": {}, "error": "docker-compose.yml missing"}
 
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    images: dict[str, str] = {
-        service: str(config.get("image", ""))
-        for service, config in (data.get("services") or {}).items()
-        if isinstance(config, dict)
-    }
+    images: dict[str, str] = {}
+    built_images: dict[str, Any] = {}
+    invalid_builds: dict[str, str] = {}
+    for service, config in (data.get("services") or {}).items():
+        if not isinstance(config, dict):
+            continue
+        if "build" not in config:
+            images[service] = str(config.get("image", ""))
+            continue
+        build = config["build"]
+        context = build if isinstance(build, str) else build.get("context", ".")
+        dockerfile = "Dockerfile" if isinstance(build, str) else build.get("dockerfile", "Dockerfile")
+        source = (path.parent / context / dockerfile).resolve()
+        if not source.is_relative_to(path.parent.resolve()) or not source.is_file():
+            invalid_builds[service] = "Missing or external Dockerfile"
+            continue
+        stages: set[str] = set()
+        bases = []
+        for line in source.read_text(encoding="utf-8").splitlines():
+            words = line.split()
+            if not words or words[0].upper() != "FROM":
+                continue
+            base = words[1] if len(words) > 1 else ""
+            if base.lower() not in stages:
+                bases.append(base)
+            if len(words) == 4 and words[2].upper() == "AS":
+                stages.add(words[3].lower())
+        built_images[service] = {"image": str(config.get("image", "")), "bases": bases}
+        if not bases or any(
+            not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", base) or ":latest" in base
+            for base in bases
+        ) or ":latest" in str(config.get("image", "")):
+            invalid_builds[service] = "Build requires digest-pinned external FROM images"
     invalid = {
         service: image
         for service, image in images.items()
         if "@sha256:" not in image or ":latest" in image
     }
-    return {"passed": bool(images) and not invalid, "images": images, "invalid": invalid}
+    return {
+        "passed": bool(images or built_images) and not invalid and not invalid_builds,
+        "images": images,
+        "built_images": built_images,
+        "invalid": invalid,
+        "invalid_builds": invalid_builds,
+    }
 
 
 def inspect_env_example(path: Path) -> dict[str, Any]:

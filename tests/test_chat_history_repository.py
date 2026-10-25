@@ -9,6 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from src.database.repositories.chat_history import get_messages, get_recent_messages, save_message
 
 
+def test_metadata_sanitizer_removes_nested_secrets_without_mutating_input():
+    from src.database.repositories.chat_history import _sanitize_metadata
+    original = {"provider": "test", "details": {"api_key": "private", "items": [{"authorization": "private", "status": "ok"}]}}
+    assert _sanitize_metadata(original) == {"provider": "test", "details": {"items": [{"status": "ok"}]}}
+    assert original["details"]["api_key"] == "private"
+
+
 async def _session_with_messages(count: int) -> tuple[AsyncSession, object]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as connection:
@@ -94,6 +101,17 @@ async def test_complete_history_reader_keeps_earliest_first_semantics() -> None:
         await engine.dispose()
 
     assert [row["id"] for row in rows] == [f"message-{index:02d}" for index in range(5)]
+
+
+@pytest.mark.asyncio
+async def test_history_reader_can_continue_after_the_first_page():
+    session, engine = await _session_with_messages(7)
+    try:
+        rows = await get_messages(session, "session-a", limit=3, offset=3)
+    finally:
+        await session.close()
+        await engine.dispose()
+    assert [row["id"] for row in rows] == [f"message-{index:02d}" for index in range(3, 6)]
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import json
+import unicodedata
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +10,29 @@ import pytest
 from src.cache import exact_cache, redis_cache
 from src.database.vector_store import QdrantVectorStore
 from src.retrieval.service import EvidenceRetriever
+
+
+def test_cache_question_unicode_forms_preserve_negation():
+    question = "Tôi không dùng thuốc này"
+    assert exact_cache.normalize_question(question) == exact_cache.normalize_question(unicodedata.normalize("NFD", question))
+    assert exact_cache.normalize_question(question) != exact_cache.normalize_question("Tôi dùng thuốc này")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [
+    {"answer": "Text", "metadata": ["invalid"], "sources": ["source"]},
+    {"answer": 4, "metadata": {}, "sources": ["source"]},
+    {"answer": "Text", "metadata": {}, "sources": "source"},
+])
+async def test_malformed_exact_cache_payload_is_a_miss(monkeypatch, payload):
+    async def get(_key):
+        return json.dumps(payload)
+
+    async def client():
+        return SimpleNamespace(get=get)
+
+    monkeypatch.setattr(exact_cache, "get_redis", client)
+    assert await exact_cache.get_exact_cache("question", provider="gemini", model="test", pipeline_fingerprint="test") is None
 
 
 @pytest.mark.asyncio
