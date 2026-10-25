@@ -12,6 +12,15 @@ optional history/cache/structural services retain degraded behavior. External
 Gemini and optional host Ollama are provider connections, not extra Compose
 workers. No ingestion, activation or schema creation runs on application startup.
 
+The API owns client request identity and replay. React persists a pending UUID and
+the original pre-submit history for an uncertain retry; PostgreSQL stores the two
+UUID5 message identities plus an input hash. The API reads a completed turn before
+calling the Agent again, rejects conflicting identity reuse, and locks in-flight
+session/request IDs within one process. Replay and optional history/persistence
+each have a bounded SQL deadline. This is best-effort when PostgreSQL is down and
+does not provide distributed exactly-once execution. Source/citation and medical
+decision responsibilities stay in their existing owners.
+
 1. **Knowledge preparation and indexing** owns parsing, normalization, chunking,
    provenance, Dense embeddings, native BM25 documents, EntityCards, and the
    Neo4j taxonomy graph.

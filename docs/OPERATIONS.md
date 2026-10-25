@@ -106,6 +106,77 @@ use the same GPU override as the original start. Check the active identity throu
 `/api/health` -> `checks.qdrant.knowledge_build_id`, and verify counts 536/32 through
 Qdrant's API. No new database mounts or named data volumes are needed.
 
+### Runtime audit and operational limits
+
+The 25 October 2026 audit reproduced resource leaks on provider cancellation and
+Redis initialization, invalid NullPool options, a zero-history slicing error,
+response-body timeouts, request replay divergence, incomplete history pagination,
+malformed cache payloads and duplicate-channel RRF inflation. Regression tests live
+under `tests/test_runtime_resource_lifecycle.py`, `tests/test_api_idempotency.py`,
+`tests/test_storage_safety.py`, `tests/test_retrieval_invariants.py` and frontend
+HTTP/turn contract tests. These are engineering correctness checks; they do not
+certify clinical safety or semantic answer faithfulness.
+
+Frontend logical retries now keep a UUID `request_id`, the original input and
+pre-submit history. PostgreSQL retains deterministic UUID5 user/assistant message
+IDs. A successfully persisted turn replays its original answer with
+`metadata.replayed=true`; reusing its request ID for different input or session
+returns 409. Missing/corrupt historical replay metadata also fails closed with 409.
+The API locks both session and request IDs within its single process. Persistence
+remains best-effort: when PostgreSQL is unavailable, replay cannot promise
+exactly-once generation. No distributed idempotency claim is made. Requests without
+client IDs preserve the existing behavior. History has bounded pages (1–200,
+nonnegative offset); the UI loads subsequent pages in order. Avoid editing a
+session concurrently from several independent clients.
+
+Optional chat SQL work uses `CHAT_DB_TIMEOUT_SECONDS=2` per replay/history/save
+operation. A stalled transaction is cancelled and rolled back before the Agent
+answer is returned; this preserves time for the proxy/browser response after the
+210-second Agent budget. Pool acquisition's former 30-second default could exceed
+that remaining envelope. Provider and Redis clients now close on failure/shutdown;
+caller-supplied Google clients remain owned by their caller. Cache normalization
+uses NFC without stripping Vietnamese diacritics or negation; invalid cache JSON
+shapes are misses. Cache remains exact and keeps its namespace and eligibility rules.
+
+Package auditing found vulnerable versions in ten runtime packages. The two lock
+files now select the minimum identified fixes: AnyIO 4.14.2, certifi 2026.10.19,
+cryptography 50.0.0, filelock 4.2.1, h2 4.4.1, langgraph-sdk 0.4.4,
+opentelemetry-api 1.45.1 (with matching SDK/exporter closure),
+sentence-transformers 5.6.0, setuptools 84.1.0 and urllib3 2.8.0.
+The Nginx runtime uses 1.30.6, selected against its upstream security advisory.
+Affected-version presence alone does not prove exploitability in this application:
+several issues require custom model code, process pools, custom SDK auth or local
+filesystem attackers. BGE artifacts remain local/read-only and no custom model
+Python code is provisioned. Primary records include
+[AnyIO](https://github.com/agronholm/anyio/security/advisories/GHSA-82r6-8w77-94w6),
+[certifi](https://github.com/certifi/python-certifi/security/advisories/GHSA-6q48-6c7w-9gw2),
+[sentence-transformers](https://github.com/huggingface/sentence-transformers/pull/3807),
+[urllib3](https://github.com/urllib3/urllib3/security/advisories/GHSA-vxq7-64xx-v4gw)
+and [Nginx](https://nginx.org/en/security_advisories.html). Vulnerability databases
+change; a clean version scan is not a guarantee against all vulnerabilities.
+
+On this host, Docker Desktop 4.89.0 / Engine 29.7.2 / Compose 5.5.0 uses WSL 2
+with 12 logical CPUs and 7.42 GiB Linux memory, sharing a 15.31 GiB Windows machine.
+RTX 3050 Laptop has 6 GiB VRAM, driver 617.42; Torch 2.13.0 CUDA 13.0 and BF16
+were verified. Initial API warmup took about 150 seconds under concurrent host
+work; a separate warm-cache model load took about 70 seconds. An unhealthy startup
+probe does not restart the container. GPU model inference with 16 synthetic pairs
+measured 177 ms warm at concurrency 1, 300 ms maximum at concurrency 2 and 591 ms
+maximum at concurrency 4, using one serialized model executor. These tiny probes
+are not representative p95/SLO measurements. CUDA-hidden CPU/FP32 fallback produced
+finite scores but took about 61 seconds for two pairs while the host was under
+load; a 20-second runtime reranker timeout can therefore preserve RRF order.
+Normal GPU backend residency was approximately 2 GiB RAM / 1.16 GiB VRAM;
+an additional diagnostic CPU model raised cgroup peak memory to about 4.26 GiB.
+No global Docker Desktop settings or arbitrary hard memory limits were imposed on
+the shared daemon. Keep one API worker, monitor `docker stats`, and avoid parallel
+CPU model diagnostics on this 16 GiB laptop.
+
+Browser E2E was blocked by the Windows Computer Use tool's unsupported browser URL
+policy enforcement. HTTP/proxy tests do not substitute for real UI interaction.
+Existing frozen research/evaluation artifacts remain immutable. Semantic evaluator
+credit/calibration, independent holdout and clinical review remain separate gates.
+
 ## Knowledge Build
 
 ```powershell

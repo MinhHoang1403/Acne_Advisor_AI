@@ -160,30 +160,30 @@ export async function checkBackendHealth({ timeoutMs = 4000, signal } = {}) {
       method: 'GET',
       signal,
     }, timeoutMs, async (response) => {
-    const health = await response.json().catch((error) => {
-      if (error?.name === 'AbortError') throw error;
-      return null;
-    });
+      const health = await response.json().catch((error) => {
+        if (error?.name === 'AbortError') throw error;
+        return null;
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        return {
+          state: 'degraded',
+          reachable: true,
+          health,
+          reason: `health_http_${response.status}`,
+        };
+      }
+
+      if (health?.status === 'ok') {
+        return { state: 'connected', reachable: true, health, reason: null };
+      }
+
       return {
         state: 'degraded',
         reachable: true,
         health,
-        reason: `health_http_${response.status}`,
+        reason: health?.status || 'health_degraded',
       };
-    }
-
-    if (health?.status === 'ok') {
-      return { state: 'connected', reachable: true, health, reason: null };
-    }
-
-    return {
-      state: 'degraded',
-      reachable: true,
-      health,
-      reason: health?.status || 'health_degraded',
-    };
     });
   } catch (err) {
     const timedOut = err?.name === 'AbortError' || err?.name === 'TimeoutError';

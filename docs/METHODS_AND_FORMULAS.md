@@ -190,6 +190,14 @@ claimed optimal.
 
 ## Safety and Verification
 
+The runtime audit additionally checks channel-duplicate invariance of RRF: a point
+contributes once per channel at its first distinct-document rank. Duplicating a
+point inside one channel must not manufacture another vote or shift later distinct
+document ranks. Current Qdrant normally returns unique IDs; this hardening keeps
+the normal unique-result formula and ordering unchanged. Seeded generated packing
+cases check whole-text preservation, budget bounds, unique IDs and stable source
+identity. These software invariants do not establish better evidence recall.
+
 `src/agent/safety_policy.py` owns nine narrow deterministic overrides mapped to
 clinical/public-health sources or an explicit no-prescription engineering
 policy. It is not a general medical reasoner. Ordinary answer meaning remains

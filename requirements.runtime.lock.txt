@@ -9,7 +9,7 @@ annotated-types==0.7.0
     # via
     #   -c requirements.lock.txt
     #   pydantic
-anyio==4.14.1
+anyio==4.14.2
     # via
     #   -c requirements.lock.txt
     #   google-genai
@@ -26,7 +26,7 @@ backoff==2.2.1
     # via
     #   -c requirements.lock.txt
     #   langfuse
-certifi==2026.6.17
+certifi==2026.10.19
     # via
     #   -c requirements.lock.txt
     #   httpcore
@@ -45,7 +45,7 @@ click==8.4.2
     #   -c requirements.lock.txt
     #   huggingface-hub
     #   uvicorn
-cryptography==49.0.0
+cryptography==50.0.0
     # via
     #   -c requirements.lock.txt
     #   google-auth
@@ -64,7 +64,7 @@ fastapi==0.139.0
     # via
     #   -c requirements.lock.txt
     #   -r requirements.runtime.in
-filelock==3.32.3
+filelock==4.2.1
     # via
     #   -c requirements.lock.txt
     #   huggingface-hub
@@ -99,7 +99,7 @@ h11==0.16.0
     #   -c requirements.lock.txt
     #   httpcore
     #   uvicorn
-h2==4.3.0
+h2==4.4.1
     # via
     #   -c requirements.lock.txt
     #   httpx
@@ -191,7 +191,7 @@ langgraph-prebuilt==1.1.0
     # via
     #   -c requirements.lock.txt
     #   langgraph
-langgraph-sdk==0.4.2
+langgraph-sdk==0.4.4
     # via
     #   -c requirements.lock.txt
     #   langgraph
@@ -276,32 +276,42 @@ nvidia-nvshmem-cu13==3.4.5
     # via torch
 nvidia-nvtx==13.0.85
     # via cuda-toolkit
-opentelemetry-api==1.44.0
+opentelemetry-api==1.45.1
     # via
     #   -c requirements.lock.txt
     #   langfuse
+    #   opentelemetry-exporter-http-transport
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-exporter-otlp-proto-common==1.44.0
+opentelemetry-exporter-http-transport==0.66b1
     # via
     #   -c requirements.lock.txt
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-exporter-otlp-proto-http==1.44.0
+opentelemetry-exporter-otlp-common==0.66b1
+    # via
+    #   -c requirements.lock.txt
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-common==1.45.1
+    # via
+    #   -c requirements.lock.txt
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-http==1.45.1
     # via
     #   -c requirements.lock.txt
     #   langfuse
-opentelemetry-proto==1.44.0
+opentelemetry-proto==1.45.1
     # via
     #   -c requirements.lock.txt
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk==1.44.0
+opentelemetry-sdk==1.45.1
     # via
     #   -c requirements.lock.txt
     #   langfuse
+    #   opentelemetry-exporter-otlp-common
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-semantic-conventions==0.65b0
+opentelemetry-semantic-conventions==0.66b1
     # via
     #   -c requirements.lock.txt
     #   opentelemetry-sdk
@@ -396,6 +406,7 @@ requests==2.34.2
     #   google-auth
     #   google-genai
     #   langsmith
+    #   opentelemetry-exporter-http-transport
     #   opentelemetry-exporter-otlp-proto-http
     #   requests-toolbelt
 requests-toolbelt==1.0.0
@@ -419,11 +430,11 @@ scipy==1.17.1
     #   -c requirements.lock.txt
     #   scikit-learn
     #   sentence-transformers
-sentence-transformers==5.5.1
+sentence-transformers==5.6.0
     # via
     #   -c requirements.lock.txt
     #   -r requirements.runtime.in
-setuptools==84.0.0
+setuptools==84.1.0
     # via
     #   -c requirements.lock.txt
     #   torch
@@ -509,7 +520,7 @@ typing-inspection==0.4.2
     #   -c requirements.lock.txt
     #   fastapi
     #   pydantic
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   -c requirements.lock.txt
     #   qdrant-client
