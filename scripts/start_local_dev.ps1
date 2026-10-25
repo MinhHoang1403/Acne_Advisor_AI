@@ -84,11 +84,11 @@ if (-not (Test-Path $frontendDir)) {
 
 Write-Step "Checking Docker services."
 if ($DryRun) {
-    Write-Step "DryRun: would run 'docker compose up -d'."
+    Write-Step "DryRun: would run 'docker compose up -d postgres redis qdrant neo4j'."
 } else {
     Push-Location $repoRoot
     try {
-        docker compose up -d
+        docker compose up -d postgres redis qdrant neo4j
     } finally {
         Pop-Location
     }

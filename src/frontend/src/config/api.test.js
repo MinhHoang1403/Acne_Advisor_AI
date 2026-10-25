@@ -21,3 +21,10 @@ test('API base URL rejects unsafe schemes', () => {
   assert.throws(() => resolveApiBaseUrl('javascript:alert(1)'), /Invalid VITE_API_URL protocol/);
   assert.throws(() => resolveApiBaseUrl('file:///tmp/api'), /Invalid VITE_API_URL protocol/);
 });
+
+test('same-origin API prefix works without browser globals', () => {
+  assert.equal(resolveApiBaseUrl('/api/'), '/api');
+  assert.equal(buildApiUrl('/chat', '/api'), '/api/chat');
+  assert.equal(buildApiUrl('/chat/sessions?include_hidden=true', '/api'), '/api/chat/sessions?include_hidden=true');
+  assert.throws(() => resolveApiBaseUrl('//external.example/api'), /Invalid VITE_API_URL/);
+});

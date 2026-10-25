@@ -32,6 +32,20 @@ def test_compose_images_are_digest_pinned_without_latest() -> None:
     assert report["invalid"] == {}
     assert all("@sha256:" in image for image in report["images"].values())
     assert all(":latest" not in image for image in report["images"].values())
+    assert set(report["built_images"]) == {"backend", "frontend"}
+    assert report["invalid_builds"] == {}
+
+
+def test_source_build_rejects_unpinned_bases_and_missing_dockerfile(tmp_path):
+    compose = tmp_path / "docker-compose.yml"
+    compose.write_text("services:\n  api:\n    build: .\n", encoding="utf-8")
+    assert not checker.inspect_compose_images(compose)["passed"]
+    dockerfile = tmp_path / "Dockerfile"
+    for base in ("python:3.11", "python:latest", "${UNVERIFIED_BASE}"):
+        dockerfile.write_text(f"FROM {base}\n", encoding="utf-8")
+        assert not checker.inspect_compose_images(compose)["passed"]
+    dockerfile.write_text(f"FROM python:3.11@sha256:{'a' * 64} AS base\nFROM base\n", encoding="utf-8")
+    assert checker.inspect_compose_images(compose)["passed"]
 
 
 def test_observability_compose_images_are_digest_pinned_without_latest() -> None:

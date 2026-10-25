@@ -16,6 +16,12 @@ export function resolveApiBaseUrl(rawValue = readViteApiUrl()) {
     return DEFAULT_API_BASE_URL;
   }
 
+  // A root-relative API prefix works both in the browser and in Node contracts.
+  // Reject protocol-relative URLs, which could silently switch to another host.
+  if (withoutTrailingSlash.startsWith('/') && !withoutTrailingSlash.startsWith('//')) {
+    return withoutTrailingSlash;
+  }
+
   let parsed;
   try {
     parsed = new URL(withoutTrailingSlash, globalThis.location?.origin);

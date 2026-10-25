@@ -14,6 +14,28 @@ from src.api.app import app, parse_cors_origins
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status,expected_http", [("ok", 200), ("degraded", 503)])
+async def test_readiness_status_and_dependency_free_liveness(monkeypatch, status, expected_http):
+    calls = []
+
+    async def preflight():
+        calls.append(True)
+        return {"status": status, "checks": {
+            name: {"status": "ok"} for name in ("postgres", "qdrant", "neo4j", "redis", "ollama")
+        }}
+
+    monkeypatch.setattr("src.api.preflight.run_runtime_preflight", preflight)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        live = await client.get("/live")
+        assert live.status_code == 200
+        assert calls == []
+        ready = await client.get("/ready")
+        assert ready.status_code == expected_http
+        assert ready.json()["status"] == status
+        assert len(calls) == 1
+
+
+@pytest.mark.asyncio
 async def test_health_returns_ok(monkeypatch):
     async def fake_preflight():
         return {

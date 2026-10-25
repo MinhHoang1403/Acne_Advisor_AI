@@ -353,6 +353,30 @@ hardening.
 
 ## Local Setup
 
+For the existing provisioned knowledge/database environment, the full application
+can run entirely in Docker (no host Python or Node runtime required):
+
+```powershell
+docker compose build backend frontend
+# NVIDIA GPU on Windows/WSL 2:
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+# CPU-only alternative: docker compose up -d
+docker compose ps
+docker compose logs --tail 100 backend frontend
+docker compose stop
+```
+
+Open **http://127.0.0.1:8088**. The static frontend proxies same-origin `/api/`
+to FastAPI; API inspection remains at http://127.0.0.1:8000/docs. The existing
+datastore mounts and pinned images are preserved. Provide an ignored `.env` and
+the existing BGE cache; no model download, migration, ingestion or index rebuild
+runs at startup. `/api/live` is liveness, `/api/ready` checks core readiness, and
+`/api/health` includes optional dependency details without paid API probes.
+See [Operations](docs/OPERATIONS.md#docker-full-stack) for ports, CPU fallback,
+GPU verification, credentials, troubleshooting and restart behavior.
+
+The following host setup remains available for source development.
+
 ### Prerequisites
 
 - Python 3.11 (`3.11.9` in CI) and pip `26.1.2`
@@ -391,17 +415,22 @@ Fill only the secrets required by the selected providers, and keep `.env` out
 of version control. Local Docker Qdrant works with an empty `QDRANT_API_KEY`;
 secured Qdrant passes a configured key through runtime and preflight clients.
 
-Start the backing services and initialize application schemas:
+Start only the backing services for host development:
 
 ```powershell
-docker compose pull
-docker compose up -d --pull never --no-build
+docker compose pull postgres redis qdrant neo4j
+docker compose up -d --pull never --no-build postgres redis qdrant neo4j
 docker compose ps
+```
+
+Only for an empty, new PostgreSQL installation, initialize schemas explicitly:
+
+```powershell
 .\.venv\Scripts\python.exe scripts\init_schema.py
 .\.venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
 
-These commands initialize application infrastructure but do not create the
+These schema commands initialize application infrastructure but do not create the
 indexed medical knowledge. An existing development environment can verify its
 current build with `scripts/knowledge_build.py status`. A new environment must provision
 the validated indexes through the controlled knowledge-build procedure in

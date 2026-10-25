@@ -2,6 +2,16 @@
 
 Acne Advisor AI separates knowledge preparation from online answer generation.
 
+The local Compose stack contains `frontend`, `backend`, `postgres`, `redis`,
+`qdrant` and `neo4j`. Nginx serves the production Vite build and proxies browser
+`/api/...` requests to `backend:8000`. FastAPI runs one worker with one local BGE
+model and a read-only existing Hugging Face cache. Optional CUDA passthrough is
+in `docker-compose.gpu.yml`; CPU-only hosts use the base Compose file. Datastore
+bind mounts and digests remain unchanged. Only Qdrant readiness gates API startup;
+optional history/cache/structural services retain degraded behavior. External
+Gemini and optional host Ollama are provider connections, not extra Compose
+workers. No ingestion, activation or schema creation runs on application startup.
+
 1. **Knowledge preparation and indexing** owns parsing, normalization, chunking,
    provenance, Dense embeddings, native BM25 documents, EntityCards, and the
    Neo4j taxonomy graph.

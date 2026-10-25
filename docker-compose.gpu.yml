@@ -1,0 +1,11 @@
+# Optional CUDA passthrough. Omit this file for CPU-only Docker hosts.
+# docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  backend:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

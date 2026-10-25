@@ -10,14 +10,101 @@ python -m pip install -r requirements.lock.txt
 Copy-Item .env.example .env
 ```
 
-Keep secrets only in `.env`. Start pinned local services and initialize SQL:
+Keep secrets only in `.env`. For host development, start just the pinned datastores:
 
 ```powershell
-docker compose up -d --pull never --no-build
+docker compose up -d --pull never --no-build postgres redis qdrant neo4j
 docker compose ps
+```
+
+Only on a genuinely new, empty PostgreSQL installation, initialize SQL explicitly:
+
+```powershell
 .\.venv\Scripts\python.exe scripts\init_schema.py
 .\.venv\Scripts\python.exe scripts\init_chat_schema.py
 ```
+
+## Docker Full Stack
+
+The canonical Compose project remains `acne-agent-system`. It manages six services
+without changing any existing database image digest or bind mount. The backend
+image contains the API and immutable knowledge metadata, never the corpus,
+datastores, credentials, model weights or Git history. `requirements.runtime.lock.txt`
+is the Linux API dependency closure constrained by the existing development lock;
+it excludes ingestion/evaluator/test tools. Torch's pinned Linux wheels supply CUDA
+13.0 libraries. Regenerate this lock only deliberately with the command in its header.
+
+The existing complete BGE Hugging Face hub cache is mounted read-only at
+`/models/hub`. Set `HF_MODEL_CACHE_PATH` to an existing absolute directory on a
+different machine; missing paths fail rather than creating an empty cache. No
+startup model download, schema migration, parsing, embedding or activation runs.
+
+```powershell
+docker compose config --quiet
+docker compose build backend frontend
+# This NVIDIA/WSL 2 machine: one API worker, one BGE model, CUDA/BF16 when supported.
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+docker compose ps
+docker compose logs --tail 100 backend frontend
+docker stats --no-stream
+Invoke-RestMethod http://127.0.0.1:8088/api/health
+Invoke-RestMethod http://127.0.0.1:8088/api/ready
+# Graceful stop, preserving all bind-mounted database data:
+docker compose stop
+```
+
+CPU-only hosts use `docker compose up -d` without the GPU override. The configured
+CUDA scorer reports its CPU/FP32 fallback when CUDA is unavailable; explicitly set
+`RERANKER_DEVICE=cpu` if CPU operation is intended. Do not raise API worker count:
+each additional process would duplicate model memory and bypass process-local locks.
+
+| Service | Host loopback port | Internal address |
+|---|---|---|
+| UI / Nginx | 8088 (`FRONTEND_PORT`) | frontend:8080 |
+| FastAPI | 8000 (`BACKEND_PORT`) | backend:8000 |
+| PostgreSQL | existing 5433 | postgres:5432 |
+| Redis | existing 6379 | redis:6379 |
+| Qdrant | existing 6333 / 6334 | qdrant:6333 |
+| Neo4j | existing 7474 / 7687 | neo4j:7687 |
+
+The browser calls relative `/api/...`; Nginx strips `/api` and resolves `backend`
+through Docker DNS, including after backend recreation. Proxy read timeout is
+220 seconds between the 210-second Agent budget and 225-second browser deadline.
+It forwards error statuses and never automatically retries POSTs. Host Vite/API
+development retains `VITE_API_URL=http://127.0.0.1:8000` and
+`scripts/start_local_dev.ps1` starts datastores only. Stop Docker FE/BE first when
+using the same host API port, or choose distinct ports.
+
+`/live` proves only API process liveness. `/health` reports detailed dependency and
+configuration state; `/ready` returns 503 when required core checks fail. No health
+probe calls paid providers. A configured Gemini key does not prove live generation.
+Redis, PostgreSQL and Neo4j retain their optional runtime role. Only healthy Qdrant
+gates backend startup. Qdrant uses the pinned image's bash HTTP `/readyz` probe;
+neither curl nor wget is assumed. Nginx `/healthz` proves static serving only; use
+`/api/ready` to inspect the application behind it. Unhealthy status alone does not
+make Compose restart a container, and provider faults must not trigger restart loops.
+
+Gemini credentials are injected from ignored `.env` at container creation. Parser
+and evaluator keys are blanked in the API environment. Local optional Langfuse is
+disabled in this stack; bounded JSONL diagnostics use ephemeral `/tmp/acne-traces`
+when enabled. `docker compose logs` captures application stdout/stderr with rotation.
+API access logs are disabled to avoid recording session paths. Docker access itself
+is privileged access to runtime environment secrets; do not print resolved config.
+
+Ollama is not started or downloaded by Compose. Use
+`DOCKER_OLLAMA_BASE_URL=http://host.docker.internal:11434` for an existing host
+service. Its absence does not veto primary Gemini readiness. To explicitly require
+that fallback, set `DOCKER_LLM_PROVIDER_FALLBACK_ENABLED=true`; then its unavailability
+is correctly reported as degraded. `DOCKER_DATABASE_URL` accepts a fully encoded
+internal PostgreSQL URL when credentials need URL escaping.
+
+When startup fails, inspect `docker compose ps`, `/health` and service logs. Check
+the cache mount and `docker compose exec backend python -c "import torch; print(torch.__version__, torch.cuda.is_available())"`.
+Never delete data or rebuild the knowledge index to fix DNS, GPU or credential
+errors. Retry just FE/BE with `docker compose ... up -d --no-deps backend frontend`;
+use the same GPU override as the original start. Check the active identity through
+`/api/health` -> `checks.qdrant.knowledge_build_id`, and verify counts 536/32 through
+Qdrant's API. No new database mounts or named data volumes are needed.
 
 ## Knowledge Build
 
@@ -153,14 +240,13 @@ telemetry remains available. Its Compose recipe is retained for integration
 contracts, not as a backing-service requirement. Do not start an observability
 stack as part of normal application startup.
 
-On this Windows machine, Application Control has blocked the Python `select`
-extension. Do not disable the security policy or delete the active environment to
-hide that failure. Use an approved Python installation and the required Windows
-CI checks for clean-environment validation. An existing evaluation image can be
-used for bounded offline checks during environment troubleshooting, but is not
-an application dependency or a second source checkout. The evaluator environment
-recipe is `evaluation/Dockerfile.thesis`; normal API/frontend startup uses the
-main checkout and the four backing services only.
+Windows Application Control previously blocked the Python `select` extension.
+On 25 October 2026 the existing environment could import `select` and Torch CUDA
+again; no security policy or system DLL was changed by this task. Keep checking
+this separately from the Linux API image and GitHub Windows CI. Docker operation
+does not repair or prove the underlying Windows security policy. The isolated
+thesis evaluator recipe remains `evaluation/Dockerfile.thesis` and is not needed
+to start the application.
 
 `.env`, provider secrets, caches, databases, snapshots and generated reports
 remain local-only. Never print secrets or use destructive global Docker cleanup.

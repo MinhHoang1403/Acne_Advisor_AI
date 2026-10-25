@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -540,6 +540,20 @@ async def _delete_app_redis_cache_keys() -> tuple[int, list[str]]:
 
 
 # --- Endpoints ---
+
+@app.get("/live")
+async def liveness():
+    """Process liveness, with no dependency probes or provider calls."""
+    return {"status": "ok", "service": "acne-advisor-api"}
+
+
+@app.get("/ready", response_model=HealthResponse)
+async def readiness(response: Response):
+    """Core dependency/config readiness; external paid providers are not probed."""
+    health = await health_check()
+    if health.status != "ok":
+        response.status_code = 503
+    return health
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
