@@ -212,11 +212,15 @@ app.add_middleware(
 async def shutdown_runtime_connections():
     from src.cache.redis_cache import close_redis
     from src.database.connection import engine
+    from src.database.vector_store import QdrantVectorStore
 
     try:
         await close_redis()
     finally:
-        await engine.dispose()
+        try:
+            await QdrantVectorStore.close_shared_client()
+        finally:
+            await engine.dispose()
 
 
 app.router.add_event_handler("shutdown", shutdown_langfuse)
