@@ -104,7 +104,7 @@ async def test_concurrent_redis_initialization_publishes_only_a_ready_singleton(
 @pytest.mark.asyncio
 async def test_api_shutdown_closes_all_shared_connections_even_if_one_fails(monkeypatch):
     from src.api.app import shutdown_runtime_connections
-    from src.database.connection import engine
+    from src.database import connection
     from src.database.vector_store import QdrantVectorStore
     closed = []
 
@@ -120,7 +120,7 @@ async def test_api_shutdown_closes_all_shared_connections_even_if_one_fails(monk
 
     monkeypatch.setattr(redis_cache, "close_redis", broken_redis)
     monkeypatch.setattr(QdrantVectorStore, "close_shared_client", qdrant)
-    monkeypatch.setattr(engine, "dispose", postgres)
+    monkeypatch.setattr(connection, "engine", SimpleNamespace(dispose=postgres))
     with pytest.raises(RuntimeError):
         await shutdown_runtime_connections()
     assert closed == ["redis", "qdrant", "postgres"]
