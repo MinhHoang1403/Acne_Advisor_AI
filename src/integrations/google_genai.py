@@ -84,16 +84,20 @@ async def generate_text_async(
 
     async def _call() -> Any:
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
-        return await active_client.aio.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=_generation_config(
-                model_name=model_name,
-                temperature=temperature,
-                system_prompt=system_prompt,
-                response_schema=response_schema,
-            ),
-        )
+        try:
+            return await active_client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=_generation_config(
+                    model_name=model_name,
+                    temperature=temperature,
+                    system_prompt=system_prompt,
+                    response_schema=response_schema,
+                ),
+            )
+        finally:
+            if client is None:
+                await active_client.aio.aclose()
 
     try:
         if request_timeout and request_timeout > 0:
@@ -120,6 +124,7 @@ def generate_text_sync(
 ) -> str | None:
     """Sinh text qua synchronous Google GenAI client và chuẩn hóa lỗi provider."""
 
+    active_client = None
     try:
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
         response = active_client.models.generate_content(
@@ -137,6 +142,9 @@ def generate_text_sync(
         raise
     except Exception as exc:
         raise normalize_google_genai_exception(exc) from exc
+    finally:
+        if client is None and active_client is not None:
+            active_client.close()
 
 
 def extract_response_text(response: Any) -> str | None:
@@ -169,6 +177,7 @@ def embed_texts_sync(
 
     if not texts:
         return []
+    active_client = None
     try:
         active_client = client or build_google_genai_client(api_key=api_key)
         config_kwargs: dict[str, Any] = {}
@@ -193,6 +202,9 @@ def embed_texts_sync(
         if normalized is exc:
             raise
         raise normalized from exc
+    finally:
+        if client is None and active_client is not None:
+            active_client.close()
 
 
 def extract_embedding_vectors(response: Any, *, expected_count: int) -> list[list[float]]:

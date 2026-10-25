@@ -30,13 +30,19 @@ DATABASE_URL: str = os.environ.get(
 # ---------------------------------------------------------------------------
 _use_null_pool = os.getenv("DB_USE_NULL_POOL", "false").lower() == "true"
 
+_pool_options = (
+    {"poolclass": NullPool}
+    if _use_null_pool
+    else {
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "10")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "20")),
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+    }
+)
 engine = create_async_engine(
     DATABASE_URL,
     echo=os.getenv("LOG_LEVEL", "INFO").upper() == "DEBUG",
-    pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
-    max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
-    pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
-    poolclass=NullPool if _use_null_pool else None,
+    **_pool_options,
 )
 
 # ---------------------------------------------------------------------------

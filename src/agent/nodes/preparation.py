@@ -15,7 +15,8 @@ async def prepare_request_node(state: ClinicalState) -> dict[str, object]:
     max_messages = _bounded_int("MAX_CONVERSATION_HISTORY_MESSAGES", 10, 0, 20)
     max_chars = _bounded_int("MAX_HISTORY_MESSAGE_CHARS", 1000, 1, 4000)
     history: list[dict[str, str]] = []
-    for item in list(state.get("conversation_history") or [])[-max_messages:]:
+    bounded_history = list(state.get("conversation_history") or [])[-max_messages:] if max_messages else []
+    for item in bounded_history:
         if not isinstance(item, dict):
             continue
         role = str(item.get("role") or "user")

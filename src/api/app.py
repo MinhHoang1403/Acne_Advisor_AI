@@ -205,8 +205,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+async def shutdown_runtime_connections():
+    from src.cache.redis_cache import close_redis
+    from src.database.connection import engine
+
+    try:
+        await close_redis()
+    finally:
+        await engine.dispose()
+
+
 app.router.add_event_handler("shutdown", shutdown_langfuse)
 app.router.add_event_handler("shutdown", shutdown_reranker_executor)
+app.router.add_event_handler("shutdown", shutdown_runtime_connections)
 app.router.add_event_handler("startup", warm_process_reranker)
 
 
