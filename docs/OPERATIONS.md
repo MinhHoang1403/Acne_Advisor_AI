@@ -183,6 +183,68 @@ policy enforcement. HTTP/proxy tests do not substitute for real UI interaction.
 Existing frozen research/evaluation artifacts remain immutable. Semantic evaluator
 credit/calibration, independent holdout and clinical review remain separate gates.
 
+### Bounded live verification on 25 October 2026
+
+Five HTTP chat scenarios plus one idempotent replay were exercised through
+`http://127.0.0.1:8088/api/chat`, within the approved five-question / USD 1 limit.
+No further paid probe is needed to start this stack.
+
+| Scenario | Observed result |
+|---|---|
+| Benzoyl peroxide classification, initial implementation | HTTP 200, 18.15 s, two retrievals; exposed answer generation after `abstain/evidence_gap` |
+| Identical request-id replay | Same answer, about 22 ms, no additional generation or history rows |
+| Benzoyl peroxide treatment information | HTTP 200, 5.99 s, one retrieval and source-backed generation |
+| Same treatment question in a fresh session | Exact-cache hit, 0.232 s, no retrieval or generation calls |
+| Classification after non-generating abstention fix | HTTP 200, 8.61 s; semantic model selected sufficient evidence at the first retrieval |
+| Synthetic unsupported genotype / exact-effect claim | HTTP 200, 4.48 s; `abstain/evidence_gap`, `generation_invoked=false`, non-cacheable deterministic fallback |
+
+The five scenarios created five clearly named `docker-audit-20261025-*` sessions
+and ten messages; replay created none. The original 15 sessions / 98 messages
+retained their pre-audit row checksums after excluding those new diagnostic rows.
+These rows are retained for review. The unsupported-claim probe additionally
+exposed retrieved source labels on a non-generated fallback. API attribution and
+source-request presentation now suppress those labels while preserving retrieval
+diagnostics. Regression tests and a provider-free ASGI check in the final Linux
+image verify this final correction; no sixth paid scenario was run. Historical
+stored answers/metadata are not rewritten retroactively.
+
+Twelve Gemini 3.5 Flash-Lite calls across these scenarios consumed 26,729 input
+and 1,075 output tokens (including thinking): estimated USD 0.0107062 at the
+[published pricing](https://ai.google.dev/gemini-api/docs/pricing), excluding the
+small query-embedding charge. This is a token-based estimate, not a billing
+invoice. Corpus embeddings were never regenerated. The cache-hit measurement was
+before the abstention policy's deliberate fingerprint change; it is not a claim
+that old cache entries remain eligible in the new partition.
+
+One repeated question followed different retrieval/decision paths in the two
+live executions. This is evidence of semantic/provider variability, not proof
+that sufficiency improved. The bounded probes do not establish clinical safety,
+faithfulness, independent-holdout scores, sustained throughput or a latency SLO.
+The NICE source's represented revision date still warrants provenance review;
+the frozen source snapshot and active build were preserved rather than silently
+relabelled or reingested. Optional Ollama generation was not verified live.
+
+### Generated files and shared Docker storage
+
+The current `.venv` (about 3.48 GB), frontend `node_modules` (78 MB), read-only
+Hugging Face model cache and four datastore directories are active dependencies
+or data. Keep them for continued local development. Frontend `dist` (263 kB),
+`.pytest_cache`, `.ruff_cache`, Python `__pycache__`/`.pyc` and editable-install
+`acne_advisor_ai.egg-info` are regenerable outputs; the latter is useful for the
+current installed development package. Local logs may be retained for diagnosis.
+All remain ignored and outside production build contexts as appropriate.
+
+Only the two current tagged application images were found with this Compose
+project's ownership label; no dangling image was listed. The daemon-wide storage
+snapshot showed 68.69 GB of images and 70.95 GB of build-cache logical usage,
+including other projects and shared layers. These figures overlap and must not
+be added or treated as Acne-only disk consumption. The current backend's CUDA
+dependency build layer is approximately 8.59 GB; its compressed image is about
+3.02 GB and the frontend about 25.7 MB. Build cache can accelerate later rebuilds.
+No global prune, volume deletion, model deletion or cleanup of another project's
+resources was performed. Classify ownership and container references before any
+future deletion; a daemon-wide reclaimable total is insufficient authorization.
+
 ## Knowledge Build
 
 ```powershell

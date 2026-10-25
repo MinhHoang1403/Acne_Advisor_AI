@@ -117,6 +117,13 @@ direct-support evidence IDs, a targeted retry gap, or abstention. Generation see
 the exact bounded packed context through delimited user data and receives its
 behavioral policy as a system instruction.
 
+An `abstain` decision always uses the deterministic owned fallback, even when
+related provenance-complete evidence exists. Evidence presence does not establish
+support for the requested proposition. No answer-model call, retrieved citation
+presentation or answer-cache write is permitted on this transition. The
+`abstention_policy_version` partitions the pipeline fingerprint from the former
+related-context generation behavior. The semantic ActionDecision is unchanged.
+
 Final verification is deliberately structural. It checks requested output shape,
 requested-entity scope, citation identifiers, source allowlisting, and provenance.
 It does not prove semantic entailment, clinical truth, or general evidence
@@ -181,8 +188,9 @@ without merging repeated text or leaking state across a new chat/session switch.
 
 ## Lifecycle and Evaluation Boundary
 
-FastAPI startup preloads the process-wide reranker. Shutdown closes its executor
-and the optional Langfuse sink. Qdrant, embedding, and the configured generation
+FastAPI startup preloads the process-wide reranker. Shutdown closes its executor,
+shared Qdrant/Redis clients, SQL engine and the optional Langfuse sink.
+Qdrant, embedding, and the configured generation
 provider are core preflight dependencies. PostgreSQL, Redis, and Neo4j are
 reported separately and are optional for the online grounding core; Ollama is
 required only when configured as primary or required fallback.

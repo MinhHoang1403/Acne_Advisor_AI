@@ -47,6 +47,30 @@ async def persisted_api(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_abstention_does_not_present_related_retrieval_sources(persisted_api, monkeypatch):
+    client, _, sessions = persisted_api
+
+    async def abstain(**kwargs):
+        return {
+            "answer": "Insufficient evidence.", "actual_provider": "system",
+            "sources": [], "is_in_domain": True, "fallback_applied": True,
+            "fallback_reason_code": "insufficient_evidence", "generation_invoked": False,
+            "vector_contexts": [{"source_id": "synthetic-related", "text": "Related only."}],
+        }
+
+    monkeypatch.setattr(api, "run_clinical_agent", abstain)
+    response = await client.post("/chat", json={"session_id": "gap", "message": "A question"})
+    assert response.status_code == 200
+    assert response.json()["sources"] == []
+    assert response.json()["source_metadata"] == []
+    async with sessions() as session:
+        stored = (await session.execute(text(
+            "SELECT sources FROM chat_messages WHERE session_id='gap' AND role='assistant'"
+        ))).scalar_one()
+    assert stored is None
+
+
+@pytest.mark.asyncio
 async def test_completed_request_replays_the_original_turn_without_generation(persisted_api):
     client, calls, sessions = persisted_api
     payload = {"request_id": str(uuid.uuid4()), "session_id": "one", "message": "A question"}

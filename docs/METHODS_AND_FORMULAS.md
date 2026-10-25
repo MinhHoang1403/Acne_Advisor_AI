@@ -190,6 +190,14 @@ claimed optimal.
 
 ## Safety and Verification
 
+The abstention transition is non-generating: related evidence cannot authorize an
+answer after the semantic owner selected `abstain/evidence_gap`. The runtime uses
+the existing deterministic fallback and records `generation_invoked=false`.
+This restores an explicit execution contract; it does not recalibrate semantic
+sufficiency, change its prompt or establish clinical quality. Synthetic tests
+cover both usable and unusable related evidence. A separate pipeline manifest
+field prevents cache identity from silently spanning this behavior change.
+
 The runtime audit additionally checks channel-duplicate invariance of RRF: a point
 contributes once per channel at its first distinct-document rank. Duplicating a
 point inside one channel must not manufacture another vote or shift later distinct

@@ -48,6 +48,13 @@ def test_pipeline_fingerprint_is_deterministic_and_sensitive() -> None:
     assert len(compute_pipeline_fingerprint(manifest)) == 24
 
 
+def test_non_generating_abstention_has_a_distinct_cache_identity() -> None:
+    manifest = build_pipeline_version_manifest()
+    previous = dict(manifest)
+    assert previous.pop("abstention_policy_version") == "deterministic_no_answer_generation_v1"
+    assert compute_pipeline_fingerprint(previous) != compute_pipeline_fingerprint(manifest)
+
+
 def test_activated_build_change_partitions_fingerprint_and_cache_namespace(
     tmp_path: Path,
 ) -> None:

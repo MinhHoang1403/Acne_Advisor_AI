@@ -39,15 +39,18 @@ async def finalize_response_node(state: ClinicalState) -> dict:
         fallback_type=fallback_type if state.get("fallback_applied") else None,
         request_shape=state.get("request_shape"),
     )
-    allowlist = state.get("source_allowlist") or build_source_allowlist(
-        state.get("sources", []),
-        state.get("vector_contexts", []),
+    allowlist = [] if state.get("fallback_applied") else (
+        state.get("source_allowlist") or build_source_allowlist(
+            state.get("sources", []),
+            state.get("vector_contexts", []),
+        )
     )
 
     def present_and_validate(draft: str, *, add_disclaimer: bool | None = None) -> tuple[str, dict]:
         started = time.perf_counter()
         source_request_answer = (
-            build_grounded_source_answer(query, allowlist) if is_source_request(query) else draft
+            build_grounded_source_answer(query, allowlist)
+            if is_source_request(query) and not state.get("fallback_applied") else draft
         )
         presented = finalize_answer_presentation(
             source_request_answer,

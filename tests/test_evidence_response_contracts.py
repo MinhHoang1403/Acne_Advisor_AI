@@ -229,25 +229,18 @@ async def test_supported_proposition_accepts_multiple_visible_evidence_ids(
 
 
 @pytest.mark.asyncio
-async def test_evidence_gap_can_keep_grounded_context_without_changing_action(
+@pytest.mark.parametrize("usable", [True, False])
+async def test_evidence_gap_abstains_without_answer_generation(
     monkeypatch: pytest.MonkeyPatch,
+    usable: bool,
 ) -> None:
-    captured: dict = {}
-
     async def fake_generate(state: dict) -> dict:
-        captured.update(state)
-        return {
-            "draft_answer": (
-                "Bằng chứng hiện có không xác lập kết luận được hỏi. "
-                "Nguồn vẫn cho biết liệu pháp A có thể hỗ trợ tổn thương viêm."
-            ),
-            "actual_provider": "test",
-            "actual_model": "answer-model",
-        }
+        pytest.fail("An abstention must never invoke answer generation")
 
     monkeypatch.setattr(workflow, "generate_answer_node", fake_generate)
     state = {
         **_evidence_state("Liệu pháp A có đem lại kết quả giống nhau cho tất cả?"),
+        "evidence_assessment": {"usable": usable},
         "agent_decision": {
             "action": "abstain",
             "reason_code": "evidence_gap",
@@ -256,12 +249,28 @@ async def test_evidence_gap_can_keep_grounded_context_without_changing_action(
 
     result = await workflow.abstain_node(state)
 
-    assert captured["response_contract"] == "evidence_gap_with_related_context"
-    assert result["fallback_applied"] is False
+    assert result["fallback_applied"] is True
+    assert result["fallback_reason_code"] == "insufficient_evidence"
     assert result["fallback_cache_eligible"] is False
-    assert result["generation_invoked"] is True
-    assert "liệu pháp A" in result["draft_answer"]
+    assert result["generation_invoked"] is False
+    assert result["actual_provider"] == "system"
+    assert result["actual_model"] is None
+    assert result["sources"] == []
+    assert result["draft_answer"]
     assert state["agent_decision"]["action"] == "abstain"
+
+
+@pytest.mark.asyncio
+async def test_abstention_source_request_keeps_the_fallback_after_finalization() -> None:
+    state = {
+        **_evidence_state("Cho tôi nguồn của kết luận synthetic này?"),
+        "agent_decision": {"action": "abstain", "reason_code": "evidence_gap"},
+        "source_allowlist": [{"source_id": "synthetic-guideline", "display_name": "Synthetic"}],
+    }
+    abstained = await workflow.abstain_node(state)
+    finalized = await workflow.finalize_node({**state, **abstained})
+    assert finalized["final_answer"] == abstained["draft_answer"]
+    assert finalized["source_validation"]["allowlist_source_ids"] == []
 
 
 def test_evidence_gap_generation_instruction_preserves_epistemic_boundary() -> None:

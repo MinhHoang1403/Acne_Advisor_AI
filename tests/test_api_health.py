@@ -386,7 +386,9 @@ async def test_chat_metadata_preserves_non_generation_reason_without_fake_model(
     assert metadata.get("generation_model") is None
     assert metadata["provider"] == "system"
     assert metadata.get("model") is None
-    assert response.json()["sources"] == ["Fixture Acne Guide"]
+    assert response.json()["sources"] == []
+    assert response.json()["source_metadata"] == []
+    assert metadata["used_retrieval"] is True
     assert persisted_metadata[0]["fallback_reason_code"] == "insufficient_evidence"
     assert persisted_metadata[0]["agent_decision"]["reason_code"] == "evidence_gap"
 

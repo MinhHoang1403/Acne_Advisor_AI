@@ -889,12 +889,15 @@ async def chat_endpoint(request: ChatRequest):
         used_retrieval = _used_retrieval(result, is_in_domain)
         
         answer_text = repair_mojibake(result.get("answer", ""))
-        raw_sources_list = result.get("sources", [])
+        # Retrieved context remains diagnostic evidence, not an attribution for
+        # a deterministic fallback that did not synthesize an answer from it.
+        raw_sources_list = [] if result.get("fallback_applied") else result.get("sources", [])
+        source_contexts = [] if result.get("fallback_applied") else result.get("vector_contexts", [])
         source_metadata = build_source_metadata(
             raw_sources_list,
-            result.get("vector_contexts", []),
+            source_contexts,
         )
-        sources_list = display_names_for_sources(raw_sources_list, result.get("vector_contexts", []))
+        sources_list = display_names_for_sources(raw_sources_list, source_contexts)
         answer_quality_report = result.get("answer_quality_report") or {}
         performance_timings = dict(result.get("performance_timings") or {})
         pipeline_fingerprint = result.get("pipeline_fingerprint")
