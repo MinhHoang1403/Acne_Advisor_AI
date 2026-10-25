@@ -62,5 +62,5 @@ export function nextHealthDelayMs(connectionState, attempt, documentVisibility =
 }
 
 export function shouldTreatChatErrorAsDisconnected(error) {
-  return !error?.status;
+  return !error?.status && !error?.isCanceled;
 }

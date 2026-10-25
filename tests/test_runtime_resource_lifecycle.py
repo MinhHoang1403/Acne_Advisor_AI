@@ -72,6 +72,35 @@ async def test_google_owned_async_client_closed_on_cancellation(monkeypatch):
     assert closed == [True]
 
 
+@pytest.mark.asyncio
+async def test_concurrent_redis_initialization_publishes_only_a_ready_singleton(monkeypatch):
+    ready, release = asyncio.Event(), asyncio.Event()
+    clients = []
+
+    async def ping():
+        ready.set()
+        await release.wait()
+        return True
+
+    def create(*args, **kwargs):
+        client = SimpleNamespace(ping=ping)
+        clients.append(client)
+        return client
+
+    monkeypatch.setenv("CACHE_ENABLED", "true")
+    monkeypatch.setattr(redis_cache, "_redis_client", None)
+    monkeypatch.setattr(redis_cache, "_redis_lock", asyncio.Lock())
+    monkeypatch.setattr(redis_cache.redis, "from_url", create)
+    first = asyncio.create_task(redis_cache.get_redis())
+    await ready.wait()
+    second = asyncio.create_task(redis_cache.get_redis())
+    await asyncio.sleep(0)
+    assert not second.done()
+    release.set()
+    assert await first is await second
+    assert len(clients) == 1
+
+
 @pytest.mark.parametrize("operation", ["generation", "embedding"])
 def test_google_owned_sync_client_closed_on_failure(monkeypatch, operation):
     closed = []

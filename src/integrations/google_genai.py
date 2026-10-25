@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import logging
 import os
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -24,6 +25,16 @@ from src.resilience.exceptions import (
 )
 
 GOOGLE_GENAI_SDK_VERSION = "google_genai_sdk_v1"
+logger = logging.getLogger(__name__)
+
+
+def _log_token_usage(response: Any, model_name: str) -> None:
+    """Operational counters only; never record prompts, answers or credentials."""
+    usage = _get_field(response, "usage_metadata")
+    prompt = _get_field(usage, "prompt_token_count")
+    total = _get_field(usage, "total_token_count")
+    if isinstance(prompt, int) and isinstance(total, int) and total >= prompt >= 0:
+        logger.info("Google token usage: model=%s input_tokens=%d output_tokens_including_thinking=%d", model_name, prompt, total - prompt)
 
 
 def get_google_api_key(api_key: str | None = None) -> str:
@@ -105,6 +116,7 @@ async def generate_text_async(
                 response = await _call()
         else:
             response = await _call()
+        _log_token_usage(response, model_name)
         return extract_response_text(response)
     except asyncio.CancelledError:
         raise
@@ -137,6 +149,7 @@ def generate_text_sync(
                 response_schema=response_schema,
             ),
         )
+        _log_token_usage(response, model_name)
         return extract_response_text(response)
     except asyncio.CancelledError:
         raise

@@ -134,6 +134,7 @@ async def get_messages(
     session: AsyncSession,
     session_id: str,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[dict]:
     """Đọc messages của một session theo ``created_at`` tăng dần."""
     result = await session.execute(
@@ -141,10 +142,23 @@ async def get_messages(
             SELECT id, session_id, role, content, sources, metadata, created_at
             FROM chat_messages
             WHERE session_id = :session_id
-            ORDER BY created_at ASC
+            ORDER BY created_at ASC, id ASC
             LIMIT :limit
+            OFFSET :offset
         """),
-        {"session_id": session_id, "limit": limit},
+        {"session_id": session_id, "limit": limit, "offset": offset},
+    )
+    return [dict(row) for row in result.mappings().fetchall()]
+
+
+async def get_request_messages(session: AsyncSession, request_id: str) -> list[dict]:
+    """Read the two immutable message identities for one logical request."""
+    identity = uuid.UUID(request_id)
+    result = await session.execute(
+        text("SELECT id, session_id, role, content, sources, metadata FROM chat_messages "
+             "WHERE id IN (:user_message_id, :assistant_message_id)"),
+        {"user_message_id": str(uuid.uuid5(identity, "user")),
+         "assistant_message_id": str(uuid.uuid5(identity, "assistant"))},
     )
     return [dict(row) for row in result.mappings().fetchall()]
 
@@ -293,7 +307,11 @@ def _sanitize_metadata(meta: dict) -> dict:
     """Loại field nhạy cảm khỏi metadata trước khi lưu."""
     if not isinstance(meta, dict):
         return {}
-    return {
-        k: v for k, v in meta.items()
-        if k.lower() not in _SENSITIVE_KEYS
-    }
+    def sanitize(value):
+        if isinstance(value, dict):
+            return {k: sanitize(v) for k, v in value.items() if str(k).lower() not in _SENSITIVE_KEYS}
+        if isinstance(value, (list, tuple)):
+            return [sanitize(item) for item in value]
+        return value
+
+    return sanitize(meta)

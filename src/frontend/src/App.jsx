@@ -33,6 +33,7 @@ import {
   shouldGenerateSessionTitle,
 } from './utils/chatTitle.js';
 import { mergeSessionMessages, mergeSessionSummaries } from './utils/sessionMerge.js';
+import { prepareChatTurn } from './utils/chatRequest.js';
 
 // App sở hữu session state, request lifecycle và đồng bộ localStorage/backend.
 // Component con chỉ nhận dữ liệu/handler để render; HTTP contract thuộc chatApi.
@@ -53,6 +54,10 @@ export default function App() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [historyHiddenAt, setHistoryHiddenAt] = useState(() => loadHistoryHiddenAt());
   const requestInFlight = useRef(false);
+  const selectionSequence = useRef(0);
+  const chatAbortRef = useRef(null);
+
+  useEffect(() => () => chatAbortRef.current?.abort(), []);
 
   const backendSessionsLoaded = useRef(false);
   const healthTimerRef = useRef(null);
@@ -223,6 +228,7 @@ export default function App() {
 
   // Event handlers cập nhật local state trước, rồi đồng bộ backend nếu có thể.
   const handleNewChat = useCallback(() => {
+    selectionSequence.current++;
     setActiveSessionId(null);
     setError(null);
     setMessage('');
@@ -230,6 +236,7 @@ export default function App() {
 
   const handleSelectSession = useCallback(
     (id) => {
+      selectionSequence.current++;
       setActiveSessionId(id);
       setError(null);
       if (window.innerWidth < 768) {
@@ -292,6 +299,7 @@ export default function App() {
   );
 
   const handleClearLocalHistory = useCallback(() => {
+    selectionSequence.current++;
     clearLocalChatCache();
     setSessions([]);
     setActiveSessionId(null);
@@ -299,6 +307,7 @@ export default function App() {
   }, []);
 
   const handleHideAllSessions = useCallback(() => {
+    selectionSequence.current++;
     setHistoryHiddenAt(Date.now());
     setActiveSessionId(null);
     setError(null);
@@ -350,6 +359,9 @@ export default function App() {
       setError(null);
       setIsLoading(true);
       requestInFlight.current = true;
+      const selectionAtSubmit = selectionSequence.current;
+      const controller = new AbortController();
+      chatAbortRef.current = controller;
 
       let currentSessionId = activeSessionId;
       let generatedSessionTitle = null;
@@ -376,7 +388,12 @@ export default function App() {
       }
 
       // Append user message bằng functional update để không mutate React state.
-      const userMsgObj = { role: 'user', content: trimmedMessage };
+      const currentSessionObj = sessions.find((s) => s.id === currentSessionId) || { messages: [] };
+      const turn = prepareChatTurn({
+        sessionId: currentSessionId, message: trimmedMessage, modelConfig,
+        messages: currentSessionObj.messages,
+      });
+      const userMsgObj = { role: 'user', content: trimmedMessage, pendingRequest: turn };
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id === currentSessionId) {
@@ -384,6 +401,7 @@ export default function App() {
               generatedSessionTitle && shouldGenerateSessionTitle(s.title, s.messages)
                 ? generatedSessionTitle
                 : s.title;
+            if (turn.isRetry) return { ...s, title, updatedAt: Date.now() };
             return { ...s, title, messages: [...s.messages, userMsgObj], updatedAt: Date.now() };
           }
           return s;
@@ -391,18 +409,15 @@ export default function App() {
       );
 
       // Chỉ gửi sáu message gần nhất và hai field role/content để giới hạn payload.
-      const currentSessionObj = sessions.find((s) => s.id === currentSessionId) || {
-        messages: [],
-      };
-      const history = currentSessionObj.messages
-        .slice(-6)
-        .map((m) => ({ role: m.role, content: m.content }));
+      const history = turn.history;
 
       try {
         const data = await sendChatMessage({
           message: trimmedMessage,
           sessionId: currentSessionId,
           conversationHistory: history,
+          requestId: turn.requestId,
+          signal: controller.signal,
           llmProvider: modelConfig?.llmProvider,
           llmModel: modelConfig?.llmModel,
           allowModelFallback: modelConfig?.allowModelFallback,
@@ -419,7 +434,7 @@ export default function App() {
               return s;
             })
           );
-          setActiveSessionId(responseSessionId);
+          if (selectionAtSubmit === selectionSequence.current) setActiveSessionId(responseSessionId);
         }
 
         if (backendOnline && generatedSessionTitle) {
@@ -435,13 +450,20 @@ export default function App() {
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId || s.id === responseSessionId) {
-              return { ...s, messages: [...s.messages, assistantMsgObj] };
+              const completed = s.messages.map((m) => {
+                if (m.pendingRequest?.requestId !== turn.requestId) return m;
+                const message = { ...m };
+                delete message.pendingRequest;
+                return message;
+              });
+              return { ...s, messages: [...completed, assistantMsgObj] };
             }
             return s;
           })
         );
         return true;
       } catch (err) {
+        if (err?.isCanceled || selectionAtSubmit !== selectionSequence.current) return false;
         setError(err?.message || 'Backend không thể xử lý yêu cầu. Vui lòng thử lại.');
 
         if (shouldTreatChatErrorAsDisconnected(err)) {
@@ -462,6 +484,7 @@ export default function App() {
         }
         return false;
       } finally {
+        if (chatAbortRef.current === controller) chatAbortRef.current = null;
         setIsLoading(false);
         requestInFlight.current = false;
       }
@@ -470,8 +493,9 @@ export default function App() {
   );
 
   const handleSubmit = useCallback(async (text, modelConfig) => {
+    const selectionAtSubmit = selectionSequence.current;
     const success = await sendQuestion(text, modelConfig);
-    if (success) {
+    if (success && selectionAtSubmit === selectionSequence.current) {
       setMessage('');
     }
   }, [sendQuestion]);
