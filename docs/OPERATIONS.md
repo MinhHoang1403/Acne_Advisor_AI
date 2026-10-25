@@ -154,6 +154,12 @@ Python code is provisioned. Primary records include
 [urllib3](https://github.com/urllib3/urllib3/security/advisories/GHSA-vxq7-64xx-v4gw)
 and [Nginx](https://nginx.org/en/security_advisories.html). Vulnerability databases
 change; a clean version scan is not a guarantee against all vulnerabilities.
+The separate development/ingestion lock also received verified fixes in aiohttp
+3.14.4, banks 2.5.1, multidict 6.9.1, NLTK 3.10.4, Pillow 13.0.0 and tinytag 2.3.0
+(plus the required yarl 1.25.1). These packages are absent from the API image's
+minimal dependency closure. OSV returned no affected packages for the resulting
+148-package development lock and 123-package runtime lock on this audit date.
+No source parsing or model/corpus download was used to test these changes.
 
 On this host, Docker Desktop 4.89.0 / Engine 29.7.2 / Compose 5.5.0 uses WSL 2
 with 12 logical CPUs and 7.42 GiB Linux memory, sharing a 15.31 GiB Windows machine.
