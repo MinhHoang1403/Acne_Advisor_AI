@@ -1,568 +1,559 @@
+<!-- markdownlint-configure-file
+{"MD013":{"tables":false,"code_blocks":false}}
+-->
+
 # Acne Advisor AI
 
-Acne Advisor AI is a Vietnamese, evidence-grounded acne information assistant
-built with bounded Agentic RAG. It retrieves medical evidence, lets a language
-model decide whether to retrieve again, generate, or abstain, and applies
-deterministic boundaries for a small set of safety-critical situations.
+**Trợ lý tra cứu thông tin về mụn và chăm sóc da liên quan bằng tiếng Việt, dựa
+trên kho tài liệu có nguồn gốc rõ ràng.**
 
-The system is not a diagnostic model, an autonomous physician, a prescription
-service, an image-analysis system, or a clinically validated medical product.
+Người dùng đặt câu hỏi trên giao diện chat. Hệ thống tìm các đoạn tài liệu liên
+quan, xem xét khả năng đáp ứng câu hỏi, rồi dùng mô hình ngôn ngữ tổng hợp câu
+trả lời kèm nguồn. Nếu chưa tìm được bằng chứng phù hợp, Agent có thể tìm thêm
+một lần hoặc thông báo giới hạn thông tin.
 
-## Overview
+Dự án sử dụng **Agentic RAG có giới hạn**. RAG là cách truy xuất tài liệu trước
+khi tạo câu trả lời; Agentic nghĩa là mô hình được chọn bước tiếp theo trong quy
+trình. Python kiểm tra quyết định và giới hạn số lần tìm kiếm, thời gian xử lý,
+nguồn trích dẫn và điều kiện lưu cache.
 
-The repository contains two cooperating parts:
+Đây là hệ thống hỗ trợ tìm hiểu thông tin, phục vụ nghiên cứu và phát triển cục
+bộ. Hệ thống chưa được kiểm định lâm sàng; không thực hiện chẩn đoán, kê đơn cá
+nhân hoặc phân tích ảnh da.
 
-1. **Knowledge preparation and indexing** converts curated medical source
-   snapshots into versioned, provenance-preserving Qdrant indexes and structural
-   knowledge assets.
-2. **The Agentic RAG runtime** accepts questions through FastAPI, uses LangGraph
-   to select bounded actions, retrieves evidence with Dense and BM25 search,
-   reranks fused candidates with a local BGE cross-encoder, generates or
-   abstains, and returns an answer to the React interface.
+## Mục lục
 
-Responsibilities are intentionally separate:
+- [1. Chức năng](#1-chức-năng)
+- [2. Kiến trúc và luồng xử lý](#2-kiến-trúc-và-luồng-xử-lý)
+- [3. Kho tri thức và dữ liệu](#3-kho-tri-thức-và-dữ-liệu)
+- [4. Cài đặt và chạy bằng Docker](#4-cài-đặt-và-chạy-bằng-docker)
+- [5. Phát triển trên Antigravity](#5-phát-triển-trên-antigravity)
+- [6. Cấu hình](#6-cấu-hình)
+- [7. API](#7-api)
+- [8. Kiểm thử và notebook đánh giá](#8-kiểm-thử-và-notebook-đánh-giá)
+- [9. Cấu trúc mã nguồn](#9-cấu-trúc-mã-nguồn)
+- [10. Xử lý lỗi](#10-xử-lý-lỗi)
+- [11. Giới hạn và tài liệu chi tiết](#11-giới-hạn-và-tài-liệu-chi-tiết)
 
-- retrieval supplies bounded source evidence;
-- the language model selects semantic actions and synthesizes normal answers;
-- Python validates transitions and enforces safety, provenance, finite budgets,
-  cache eligibility, and fail-safe behavior;
-- FastAPI transports the result and React presents it.
+## 1. Chức năng
 
-## Architecture
+- Hỏi về mụn, chăm sóc da liên quan, vai trò hoạt chất và những lưu ý được tài
+  liệu hỗ trợ.
+- Đặt câu hỏi tiếp nối; hệ thống dùng lịch sử hội thoại có giới hạn để hiểu câu
+  hỏi hiện tại.
+- Xem nguồn tài liệu được dùng và mô hình thực sự đã tạo câu trả lời.
+- Chọn Gemini hoặc Ollama khi model khả dụng; tùy chọn fallback nằm trong phần
+  nâng cao.
+- Tạo, đổi tên, ẩn và xem lại cuộc trò chuyện. PostgreSQL lưu lịch sử phía máy
+  chủ; trình duyệt giữ trạng thái cục bộ và đồng bộ theo ID tin nhắn.
 
-```text
-KNOWLEDGE PREPARATION
+Ví dụ để khám phá: “Mụn hình thành như thế nào?”, “Adapalene và benzoyl peroxide
+khác nhau ở điểm nào?”, “Khi nào tình trạng mụn cần đi khám?”. Khả năng trả lời
+phụ thuộc bằng chứng trong kho tri thức và trạng thái dịch vụ.
 
-curated source snapshots
-  -> deterministic parsing and normalization
-  -> structure-aware chunking and provenance identities
-  -> Gemini Embedding 2 + Qdrant-native BM25 documents
-  -> versioned Qdrant knowledge/entity indexes
-  -> EntityCards and a deterministic Neo4j structural graph
+## 2. Kiến trúc và luồng xử lý
 
-AGENTIC RAG RUNTIME
+Hệ thống có hai quy trình riêng: **chuẩn bị kho tri thức** và **trả lời câu hỏi
+trực tuyến**. Một lượt chat đọc chỉ mục đã kích hoạt; không tự crawl website,
+xây lại dữ liệu hoặc ghi thêm kiến thức vào Qdrant.
 
-React -> FastAPI -> START -> prepare -> guard -> decide
-                                             +-- retrieve/retry
-                                             |      -> Dense + BM25 -> RRF
-                                             |      -> local BGE reranking
-                                             |      -> whole-chunk packing
-                                             |      -> assess -> decide
-                                             +-- generate -> generate -> finalize -> END
-                                             +-- abstain  -> abstain  -> finalize -> END
-                                             `-- cache/safety -> finalize -> END
+### Các thành phần
+
+| Thành phần           | Công nghệ                   | Vai trò                                              |
+| -------------------- | --------------------------- | ---------------------------------------------------- |
+| Giao diện            | React 19, Vite              | Chat, lịch sử, chọn model, hiển thị nguồn            |
+| API                  | FastAPI                     | Kiểm tra đầu vào, gọi Agent, quản lý HTTP và lịch sử |
+| Điều phối            | LangGraph                   | Thực thi các bước và vòng truy xuất hữu hạn          |
+| Tạo văn bản          | Gemini / Ollama             | Chọn hành động và tổng hợp câu trả lời               |
+| Truy xuất            | Qdrant + Gemini Embedding 2 | Tìm theo ngữ nghĩa và từ khóa BM25                   |
+| Xếp hạng lại         | BGE cross-encoder cục bộ    | Sắp xếp ứng viên sau khi hợp nhất                    |
+| Lịch sử              | PostgreSQL                  | Lưu phiên chat và tin nhắn                           |
+| Cache                | Redis                       | Tái sử dụng câu trả lời đủ điều kiện                 |
+| Tri thức có cấu trúc | Neo4j, EntityCards          | Kiểm tra và nghiên cứu cấu trúc tri thức             |
+
+Neo4j và chỉ mục EntityCards không tham gia truy xuất bằng chứng cho câu trả lời
+thông thường. Bằng chứng trực tuyến đến từ các knowledge chunk trong Qdrant.
+
+### Luồng A — Chuẩn bị kho tri thức
+
+```mermaid
+flowchart LR
+    S["Tài liệu nguồn + manifest"] --> P["Parse và chuẩn hóa"]
+    P --> C["Chia đoạn theo cấu trúc"]
+    C --> V["Lọc, loại trùng, gắn định danh nguồn"]
+    V --> E["Gemini embedding + BM25"]
+    E --> Q["Chỉ mục Qdrant theo phiên bản"]
+    T["Taxonomy có nguồn"] --> A["EntityCards + đồ thị Neo4j"]
+    Q --> K["Kiểm tra và kích hoạt build"]
+    A --> K
 ```
 
-The eight LangGraph nodes are `prepare`, `guard`, `decide`, `retrieve`,
-`assess`, `generate`, `abstain`, and `finalize`. `retry` is an Agent action that
-routes through the existing `retrieve` node, not a separate graph node.
+Mỗi đoạn giữ định danh tài liệu, nguồn, vị trí và hash nội dung để truy vết. Bộ
+chia đoạn giữ cấu trúc tiêu đề, danh sách, bảng; giới hạn 2.400 ký tự Unicode,
+không chồng lặp. Parse và embedding được tái sử dụng khi nội dung và hợp đồng xử
+lý không đổi.
 
-Normal runtime requests read the existing indexed medical knowledge. They do
-not rebuild, re-embed, reindex, activate, or write to the knowledge indexes.
+Build mới tạo collection ứng viên theo phiên bản. Kích hoạt build là thao tác
+bảo trì có kiểm tra và yêu cầu bản sao lưu phục hồi; không chạy tự động khi mở
+ứng dụng.
 
-## Knowledge Preparation and Indexing
+### Luồng B — Từ câu hỏi đến câu trả lời
 
-The current validated build is `d4a1819fe7fb77fe1f40`:
+```mermaid
+flowchart TD
+    U["Người dùng gửi câu hỏi"] --> API["React → FastAPI"]
+    API --> P["prepare: chuẩn hóa đầu vào, giới hạn lịch sử"]
+    P --> G["guard: kiểm tra an toàn trước, sau đó tra exact cache"]
+    G --> D["decide: chọn bước tiếp theo"]
+    D -->|"retrieve / retry"| R["retrieve: Dense + BM25 → RRF → BGE → đóng gói"]
+    R --> A["assess: kiểm tra nội dung và định danh nguồn"]
+    A --> D
+    D -->|"generate"| L["generate: tổng hợp từ bằng chứng đã đóng gói"]
+    D -->|"abstain"| N["abstain: thông báo giới hạn, không gọi model sinh câu trả lời"]
+    D -->|"phản hồi an toàn / cache hit"| F["finalize: định dạng, kiểm tra cấu trúc và nguồn, xét cache"]
+    L --> F
+    N --> F
+    F --> O["API lưu lịch sử nếu khả dụng → giao diện"]
+```
 
-| Artifact | Count or contract |
-|---|---|
-| Curated source snapshots | 4 |
-| Knowledge chunks | 536 |
-| EntityCards | 32 |
-| Neo4j graph | 32 nodes / 27 relationships |
-| Qdrant knowledge index | 536 points |
-| Qdrant entity index | 32 points |
-| Dense vectors | `models/gemini-embedding-2`, asymmetric question-answering text representation, 3072 dimensions, cosine distance |
-| Sparse vectors | Qdrant-native BM25, tokenizer `word`, lowercase and ASCII folding enabled |
+LangGraph có đúng **8 node**: `prepare`, `guard`, `decide`, `retrieve`,
+`assess`, `generate`, `abstain`, `finalize`. `retry` là hành động quay lại node
+`retrieve`.
 
-Source, document, record, and chunk identities are content-bound. The pipeline
-uses structure-aware blocks, list lead-ins, and table rows capped at 2400 Unicode
-characters with zero overlap, proof-based artifact filtering, exact
-deduplication, and complete provenance. Dense documents are represented as
-`title: {title} | text: {content}` and queries as
-`task: question answering | query: {content}`.
-The deterministic graph is built from source-backed taxonomy data; no LLM graph
-extraction runs in the current pipeline.
+Một lượt xử lý thông thường:
 
-The supported operator interface is
-[`scripts/knowledge_build.py`](scripts/knowledge_build.py):
+1. **Chuẩn bị:** giới hạn độ dài câu hỏi và lịch sử, giữ ngữ cảnh cần thiết cho
+   câu hỏi hiện tại.
+2. **An toàn và cache:** áp dụng các quy tắc an toàn hẹp đã định nghĩa; nếu
+   không khớp mới tra cache. Phản hồi an toàn/cache hit bỏ qua các lời gọi model
+   và truy xuất.
+3. **Chọn hành động:** mô hình trả JSON đề xuất `retrieve`, `retry`, `generate`
+   hoặc `abstain`. Python kiểm tra tính hợp lệ trước khi thực thi.
+4. **Tìm bằng chứng:** Dense tìm theo ngữ nghĩa bằng vector Gemini; BM25 tìm
+   theo từ khóa. Hai nhánh chạy song song trong Qdrant, sau đó hợp nhất thứ hạng
+   bằng RRF.
+5. **Xếp hạng và đóng gói:** BGE đọc cặp câu hỏi–đoạn văn để xếp lại ứng viên.
+   Packer giữ nguyên đoạn, loại trùng và giữ thông tin nguồn trong giới hạn
+   context.
+6. **Quyết định lại:** `assess` chỉ xác nhận có văn bản và định danh nguồn; mô
+   hình quyết định bằng chứng có đáp ứng câu hỏi hay cần tìm thêm/từ chối.
+7. **Kết thúc:** nếu được phép, mô hình tổng hợp từ context đã đóng gói. Hệ
+   thống xử lý trình bày, kiểm tra cấu trúc/nguồn, xét cache và trả kết quả.
+
+### Các giới hạn mặc định
+
+| Tham số                    |                     Giá trị | Ý nghĩa                               |
+| -------------------------- | --------------------------: | ------------------------------------- |
+| Thực thi truy xuất         |                Tối đa 2 lần | Lần đầu và tối đa một lần tìm bổ sung |
+| Ứng viên mỗi kênh          |                          16 | Giới hạn đầu vào cho hợp nhất         |
+| Context đưa vào model      | Tối đa 9 đoạn / 7.000 ký tự | Giữ nguyên đoạn cùng thông tin nguồn  |
+| RRF                        |  `k=60`, hai trọng số `1.0` | Hợp nhất theo thứ hạng                |
+| Timeout mỗi kênh truy xuất |                     20 giây | Hai kênh có timeout riêng             |
+| Tổng ngân sách Agent       |                    210 giây | Các bước dùng chung deadline          |
+
+Khi tìm bổ sung, hệ thống hợp ứng viên cũ và mới, loại trùng rồi xếp hạng lại
+toàn bộ. Nếu một kênh tìm kiếm lỗi, bằng chứng từ kênh còn lại được giữ. Lỗi BGE
+giữ thứ tự dự phòng có tính xác định. Các giới hạn và điểm số này là chính sách
+kỹ thuật, không phải độ tin cậy y khoa.
+
+Redis dùng **exact cache**, so khớp câu hỏi sau chuẩn hóa cùng provider, model,
+phiên bản và fingerprint pipeline. Câu trả lời phụ thuộc lịch sử, phản hồi an
+toàn, fallback hoặc không đạt điều kiện kiểm tra không được lưu như câu trả lời
+thông thường. Fallback model cần cả cấu hình máy chủ và sự cho phép trong
+request.
+
+## 3. Kho tri thức và dữ liệu
+
+Build đã kích hoạt được ghi trong
+[`data/knowledge_build_manifest.json`](data/knowledge_build_manifest.json):
+**`d4a1819fe7fb77fe1f40`**.
+
+| Tài sản          | Quy mô / cấu hình                                 |
+| ---------------- | ------------------------------------------------- |
+| Bộ nguồn         | 4 snapshot/nhóm nguồn được quản lý trong manifest |
+| Knowledge chunks | 536 đoạn                                          |
+| EntityCards      | 32 thẻ                                            |
+| Neo4j            | 32 node, 27 quan hệ                               |
+| Dense vectors    | `models/gemini-embedding-2`, 3.072 chiều, cosine  |
+| Sparse vectors   | BM25 gốc của Qdrant                               |
+| Alias logic      | `acne_knowledge`, `acne_entities`                 |
+
+Nguồn gồm snapshot NICE NG198, hướng dẫn AAD/JAAD, trích đoạn hướng dẫn da liễu
+Bộ Y tế Việt Nam và tập trang giáo dục cộng đồng từ nhiều nhà xuất bản. Danh
+tính, hash và giới hạn nguồn nằm trong
+[manifest nguồn](data/sources/manifest.yaml). “4 nguồn” không có nghĩa chỉ có 4
+trang web.
+
+**Git lưu mã nguồn, manifest và các kết quả nghiên cứu được chọn.** File nguồn
+trong `sample_data/`, dữ liệu database trong `data/`, API key, môi trường
+Python, `node_modules` và model weights không đi kèm bản clone. Máy mới cần được
+cấp kho dữ liệu hợp lệ hoặc chuẩn bị tri thức theo
+[quy trình dữ liệu](docs/DATA_PIPELINE.md) và
+[vận hành](docs/OPERATIONS.md#knowledge-build) trước khi chat RAG hoạt động.
+
+Với môi trường đã có dữ liệu, kiểm tra bằng:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\knowledge_build.py status
 .\.venv\Scripts\python.exe scripts\knowledge_build.py validate
 ```
 
-Normal application development uses the existing indexed build. A controlled
-rebuild is needed only when source data, indexing configuration, provider
-compatibility, or the stored indexes materially change. Build and activation
-procedures are documented in [Data Pipeline](docs/DATA_PIPELINE.md) and
-[Operations](docs/OPERATIONS.md).
+Không dùng rebuild/re-embed như cách sửa lỗi kết nối hoặc lỗi IDE. Ứng dụng
+thông thường tái sử dụng build đang hoạt động.
 
-EntityCards, the entity Qdrant index, and the Neo4j graph are maintained as
-structural knowledge assets for validation, inspection, and research. They are
-not queried when generating normal medical answers.
+## 4. Cài đặt và chạy bằng Docker
 
-## Agentic RAG Runtime
+Các lệnh dưới đây dành cho **Windows PowerShell**, chạy từ thư mục gốc trừ khi
+có chỉ dẫn khác.
 
-The language model selects one of four typed actions:
-
-| Action | Meaning |
-|---|---|
-| `retrieve` | acquire evidence for the first time |
-| `retry` | make a later evidence request after a previous retrieval |
-| `generate` | answer from provenance-complete evidence |
-| `abstain` | stop without making an unsupported medical claim |
-
-Python validates whether each selected action is legal. Invalid model output,
-impossible transitions, repeated non-recoverable queries, and exhausted limits
-become abstention. The retrieval tool can execute at most twice.
-
-The normal request lifecycle is:
-
-```text
-ChatInput -> App -> POST /chat -> run_clinical_agent
-  -> prepare -> guard -> decide -> retrieve -> assess -> decide
-  -> generate / retry / abstain -> finalize -> ChatResponse
-  -> ChatWindow -> ChatMessage and citations
-```
-
-Cache hits and narrow safety overrides take a deterministic path to `finalize`.
-For normal generation, the model receives the current question, bounded
-conversation context when applicable, the exact packed evidence, and a source
-allowlist. Retrieval, context packing, prompt assembly, and provider dispatch
-are internal Python calls rather than separate HTTP services.
-
-The answer path includes one local cross-encoder reranker after RRF. It does not
-contain a Candidate Policy, metadata score boost, separate evidence selector,
-EntityCard retrieval, graph retrieval, medical proposition engine, semantic
-cache, or deterministic normal-answer engine.
-
-## Retrieval
-
-[`src/retrieval/service.py`](src/retrieval/service.py) owns runtime evidence
-retrieval:
-
-```text
-query
-  +-> Gemini query embedding -> Qdrant "dense"
-  +-> query text             -> Qdrant "bm25"
-                                  |
-                                  v
-                    Reciprocal Rank Fusion (RRF)
-                                  |
-                                  v
-                    local BGE cross-encoder
-                                  |
-                                  v
-                    whole-chunk context packing
-```
-
-| Default | Value |
-|---|---:|
-| Candidate limit per channel | 16 |
-| Selected context items | 9 |
-| Packed context characters | 7000 |
-| Timeout per channel | 20 seconds |
-| RRF `k` | 60 |
-| Dense / BM25 weights | 1.0 / 1.0 |
-
-Dense and BM25 execute concurrently with independent timeouts. If Dense fails
-but BM25 returns evidence, the result is preserved as `degraded_dense`. If BM25
-fails but Dense succeeds, it is preserved as `degraded_bm25`. If neither
-channel yields usable evidence, the Agent can request one legal retry and then
-abstains when the retrieval budget is exhausted.
-
-The reranker uses `BAAI/bge-reranker-v2-m3` from an already available local
-model artifact. Its raw score is used only to order candidates; it is not a
-probability or medical-confidence score. A bounded operational failure preserves
-the deterministic pre-reranker order. Packing then keeps complete chunk text and
-provenance while enforcing the 9-item and 7000-character limits.
-
-`RERANKER_DEVICE` accepts `cuda` or `cpu` and defaults to `cuda`.
-`RERANKER_PRECISION` accepts `float32` or `bfloat16` and defaults to the validated
-local production setting `bfloat16`. BF16 is used only when CUDA is available and
-the active GPU reports BF16 support. Otherwise the reranker reports both the
-requested and effective configuration and uses `float32`; inference failures
-still preserve the deterministic pre-reranker order. The default batch size (`4`)
-and timeout (`20` seconds) are unchanged.
-When reranking is enabled, FastAPI preloads the same process-wide model during
-startup so the first request does not spend its reranker timeout loading weights.
-
-The formulas, provider contracts, and parameter classifications are documented
-in [Methods and Formulas](docs/METHODS_AND_FORMULAS.md).
-
-## Evidence and Citations
-
-The deterministic `assess` node confirms only that packed evidence contains
-text and a source identifier. It does not determine medical relevance,
-completeness, truth, or semantic sufficiency. The model's `decide` action makes
-the semantic sufficiency decision.
-
-Source allowlisting prevents an answer from displaying a source outside the
-request's retrieved evidence. This validates source identity, but it does not
-prove that every sentence or medical claim is entailed by its cited chunk.
-
-[`src/quality/answer_verifier.py`](src/quality/answer_verifier.py) checks
-presentation, structural contracts, and provenance identity. Claim-level
-groundedness and medical correctness are evaluated separately; they are not
-deterministically established by the current verifier.
-
-## Safety
-
-[`src/agent/safety_policy.py`](src/agent/safety_policy.py) defines nine narrow,
-source-mapped deterministic boundaries:
-
-- anaphylaxis-like breathing difficulty with swelling or hives;
-- active breathing difficulty after medication use;
-- significant bleeding after acne manipulation;
-- chest pain or tightness with breathlessness;
-- explicit personal and current self-harm or suicide intent;
-- acne fulminans-like severe lesions with fever or joint pain;
-- isotretinoin during pregnancy or pregnancy planning;
-- isotretinoin with severe headache plus visual or gastrointestinal symptoms;
-- explicit requests to prescribe, select a drug, or select a dose.
-
-These rules are action-oriented safeguards, not a general medical classifier.
-The self-harm detector is intentionally narrow and is not a validated
-suicide-risk classifier. Ordinary medical questions continue through retrieved
-evidence and model synthesis. See [Safety](docs/SAFETY.md) for the exact trigger
-boundaries and sources.
-
-## Cache and Reliability
-
-Redis stores exact normalized answers, not semantic-similarity matches. Cache
-identity includes the schema and answer versions, pipeline fingerprint,
-normalized question, provider, and model. Stored metadata retains selected
-evidence identifiers and the source allowlist. Answers involving history,
-safety overrides, fallback, failed retrieval, or failed quality checks are not
-reused as ordinary cache entries.
-
-The effective answer-cache namespace is `v10`. The current pipeline fingerprint
-is `e4c420923b79b37c992cf36d`, computed from a secret-free runtime manifest that
-includes the activated knowledge embedding and BM25 contracts. Provider calls, retrieval
-channels, the overall Agent request, and frontend requests use finite timeouts.
-Retries are bounded, and provider fallback requires both server configuration
-and request-level opt-in.
-
-The evaluated generation chain is `gemini-3.5-flash-lite`, then
-`gemini-3.1-flash-lite`, then local `qwen3:8b` when fallback is enabled and the
-request opts in. This fallback order does not change retrieval or evidence
-requirements.
-
-Health output distinguishes configured/tag-visible model availability from a
-generation probe. `generation_probed=false` means readiness did not execute a
-paid or local generation request; it is not a claim that generation succeeded.
-
-## Data Stores and Providers
-
-| Component | Responsibility | Runtime role |
-|---|---|---|
-| Qdrant knowledge index | Dense and BM25 medical evidence | required for normal RAG |
-| Google embedding API | 3072-dimensional Dense query embeddings | required by current preflight; BM25 can preserve evidence during an individual Dense-channel failure |
-| Local BGE reranker | Cross-encoder ordering after RRF | enabled in the evaluated runtime; failure preserves deterministic candidate order |
-| Gemini or Ollama | action selection and answer generation | one configured generation path is required |
-| PostgreSQL | chat/session persistence and history endpoints | optional for a single chat response; history features depend on it |
-| Redis | exact answer cache | optional; cache failure becomes a miss |
-| Neo4j | structural graph and integrity inspection | not used for runtime medical grounding |
-| Qdrant entity index | EntityCard lookup asset | not used by the normal answer path |
-
-Ollama can run answer generation locally, but Dense retrieval still uses Gemini
-Embedding 2 under the current embedding configuration. Selecting Ollama does
-not make the complete RAG pipeline fully local or offline.
-
-## API
-
-The FastAPI entrypoint is `src.api.app:app`.
-
-| Method | Route | Purpose |
-|---|---|---|
-| `GET` | `/health` | bounded dependency and provider readiness |
-| `GET` | `/retrieve?q=...` | trusted-operator retrieval diagnostics, disabled by default |
-| `GET` | `/models` | available generation models |
-| `POST` | `/chat` | guarded Agentic RAG request |
-| `GET` | `/chat/sessions` | list persisted sessions |
-| `DELETE` | `/chat/sessions` | delete application chat history and answer-cache keys |
-| `GET` | `/chat/sessions/{session_id}/messages` | list session messages |
-| `PATCH` | `/chat/sessions/{session_id}/rename` | rename a session |
-| `PATCH` | `/chat/sessions/{session_id}/hide` | hide a session |
-| `POST` | `/chat/sessions/sync` | import compatible history records |
-
-`/retrieve` returns 404 unless a trusted local operator enables
-`ENABLE_DIAGNOSTIC_RETRIEVE`. It uses the same retrieval service as the Agent
-and is not a separate production answer API.
-
-`ChatResponse` includes friendly citations and structured source/runtime
-metadata for local research, debugging, and provenance inspection. The current
-API is not hardened as an untrusted multi-tenant public interface. Local OpenAPI
-documentation is available at `http://127.0.0.1:8000/docs`.
-
-`ChatRequest.request_id` is an optional UUID idempotency key. Replaying the same
-canonical request produces one logical user/assistant pair, while different
-request IDs remain distinct even when their text is identical. Persistence is
-best effort: a database failure does not discard the current answer.
-
-## Frontend
-
-The React request and render path is:
-
-```text
-ChatInput -> App.sendQuestion -> chatApi.sendChatMessage -> FastAPI
-  -> ChatResponse -> session state -> ChatWindow -> ChatMessage/citations
-```
-
-Source metadata is converted to friendly labels for display while the backend
-retains raw source identity. `VITE_API_URL` is the only browser configuration.
-All `VITE_*` values are visible to browser users, so provider keys and database
-credentials belong only in backend configuration.
-
-Session reconciliation is ID-based. It preserves an unsynchronized local tail,
-does not merge repeated text with different message IDs, and isolates new chats
-and session switches.
-
-## Deployment Boundary
-
-The current deployment configuration targets trusted, local, single-user
-research and development. Docker Compose binds project services to
-`127.0.0.1`. Chat/session routes do not provide end-user authentication,
-tenant-level authorization, multi-tenant isolation, production rate limiting,
-or distributed session locking.
-
-Public deployment requires authentication, authorization, TLS, restrictive
-CORS, rate limiting, tenant isolation, secret management, and operational
-hardening.
-
-## Repository Structure
-
-| Location | Responsibility |
-|---|---|
-| `scripts/knowledge_build.py` | knowledge build, validation, and status interface |
-| `src/ingestion/` | parsing, chunking, provenance, validation, and indexing |
-| `src/knowledge/` | taxonomy, EntityCards, and deterministic graph assets |
-| `src/retrieval/` | Dense + native BM25 + RRF, local reranking, and whole-chunk packing |
-| `src/agent/` | LangGraph state, decisions, generation, safety, and presentation |
-| `src/quality/` | structural/provenance verification and safe fallback contracts |
-| `src/cache/` | exact Redis answer cache |
-| `src/resilience/` | deadlines, retries, and provider-failure contracts |
-| `src/api/` | FastAPI routes and dependency preflight |
-| `src/database/` | Qdrant adapter and PostgreSQL persistence |
-| `src/integrations/` | external provider SDK adapters |
-| `src/frontend/` | React/Vite interface |
-| `docs/` | architecture, methods, safety, data, and operations documentation |
-| `tests/` | implementation and regression contracts |
-| `evaluation/` | benchmark, evaluator package, executed notebook, and official result |
-
-## Local Setup
-
-For the existing provisioned knowledge/database environment, the full application
-can run entirely in Docker (no host Python or Node runtime required):
-
-```powershell
-docker compose build backend frontend
-# NVIDIA GPU on Windows/WSL 2:
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
-# CPU-only alternative: docker compose up -d
-docker compose ps
-docker compose logs --tail 100 backend frontend
-docker compose stop
-```
-
-Open **http://127.0.0.1:8088**. The static frontend proxies same-origin `/api/`
-to FastAPI; API inspection remains at http://127.0.0.1:8000/docs. The existing
-datastore mounts and pinned images are preserved. Provide an ignored `.env` and
-the existing BGE cache; no model download, migration, ingestion or index rebuild
-runs at startup. `/api/live` is liveness, `/api/ready` checks core readiness, and
-`/api/health` includes optional dependency details without paid API probes.
-See [Operations](docs/OPERATIONS.md#docker-full-stack) for ports, CPU fallback,
-GPU verification, credentials, troubleshooting and restart behavior.
-
-The following host setup remains available for source development.
-
-### Prerequisites
-
-- Python 3.11 (`3.11.9` in CI) and pip `26.1.2`
-- Node.js 24 and npm
-- Docker Desktop with Compose
-- a Gemini API key for live Gemini generation and Dense query embeddings
-- a local `BAAI/bge-reranker-v2-m3` artifact when reranking is enabled
-- an NVIDIA driver, CUDA-capable PyTorch build, and BF16-capable GPU for the
-  default `RERANKER_DEVICE=cuda` plus `RERANKER_PRECISION=bfloat16` configuration
-- Ollama with `qwen3:8b` when Ollama generation or fallback is enabled
-
-### Installation
+### Chuẩn bị chung
 
 ```powershell
 git clone https://github.com/MinhHoang1403/Acne_Advisor_AI.git
 Set-Location Acne_Advisor_AI
-
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip==26.1.2
-python -m pip install -r requirements.lock.txt
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-The lock file fixes `torch`, `sentence-transformers`, and `transformers`; no
-separate CUDA Toolkit or cuDNN installation is required by this repository.
-Before enabling GPU reranking, verify the active environment directly:
+Điền `GOOGLE_API_KEY` thật trong `.env` để dùng Gemini và Dense embedding. Giữ
+nguyên embedding model/dimension nếu dùng chỉ mục hiện có. Chuẩn bị Docker
+Desktop với Linux containers/WSL 2, kho Qdrant đã kích hoạt và cache model
+`BAAI/bge-reranker-v2-m3`.
+
+Nếu chưa có model, dùng môi trường Python ở
+[phần phát triển](#5-phát-triển-trên-antigravity) để tải một lần:
 
 ```powershell
-nvidia-smi
-python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'cpu')"
-python -m pip check
+.\.venv\Scripts\python.exe -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-reranker-v2-m3')"
 ```
 
-Fill only the secrets required by the selected providers, and keep `.env` out
-of version control. Local Docker Qdrant works with an empty `QDRANT_API_KEY`;
-secured Qdrant passes a configured key through runtime and preflight clients.
+Model tương đối lớn. Backend đọc model cục bộ khi khởi động, không tự tải model
+hoặc khởi tạo chỉ mục. Compose mặc định gắn cache từ
+`${USERPROFILE}/.cache/huggingface/hub`; đặt `HF_MODEL_CACHE_PATH` trong `.env`
+nếu dùng thư mục khác.
 
-Start only the backing services for host development:
+### Khởi động toàn bộ ứng dụng
+
+Khi dữ liệu và cache đã sẵn sàng, cách này không cần Python/Node trên máy host
+để chạy ứng dụng:
 
 ```powershell
-docker compose pull postgres redis qdrant neo4j
-docker compose up -d --pull never --no-build postgres redis qdrant neo4j
+docker compose config --quiet
+docker compose build backend frontend
+docker compose up -d
 docker compose ps
 ```
 
-Only for an empty, new PostgreSQL installation, initialize schemas explicitly:
+Máy NVIDIA đã hỗ trợ GPU trong Docker dùng lệnh sau **thay cho** lệnh `up` ở
+trên:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\init_schema.py
-.\.venv\Scripts\python.exe scripts\init_chat_schema.py
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
-These schema commands initialize application infrastructure but do not create the
-indexed medical knowledge. An existing development environment can verify its
-current build with `scripts/knowledge_build.py status`. A new environment must provision
-the validated indexes through the controlled knowledge-build procedure in
-[Operations](docs/OPERATIONS.md).
+| Địa chỉ                            | Mục đích                    |
+| ---------------------------------- | --------------------------- |
+| <http://127.0.0.1:8088>            | Giao diện chat              |
+| <http://127.0.0.1:8000/docs>       | Swagger / OpenAPI           |
+| <http://127.0.0.1:8088/api/live>   | API đang chạy               |
+| <http://127.0.0.1:8088/api/ready>  | Phụ thuộc cốt lõi sẵn sàng  |
+| <http://127.0.0.1:8088/api/health> | Chi tiết trạng thái dịch vụ |
 
-Start the application with the bounded local launcher:
+Nginx phục vụ frontend và chuyển `/api/...` tới backend. Backend dùng một worker
+và một model BGE trong process. Mặc định yêu cầu CUDA/BF16; khi phần cứng không
+hỗ trợ, reranker báo cấu hình thực tế và dùng CPU/FP32 phù hợp.
 
 ```powershell
+docker compose logs --tail 80 backend frontend
+docker compose stop
+```
+
+Dữ liệu PostgreSQL, Redis, Qdrant và Neo4j nằm ở các bind mount dưới `data/`.
+`stop` giữ dữ liệu; tránh xóa thư mục dữ liệu hoặc dọn Docker toàn cục để xử lý
+lỗi khởi động.
+
+## 5. Phát triển trên Antigravity
+
+### Tạo môi trường phát triển
+
+Cần **Python 3.11** (`3.11.9` dùng trong CI), **Node.js 24**, npm và Docker
+Desktop. Từ thư mục gốc:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip==26.1.2
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+Push-Location src\frontend
+npm.cmd ci
+Pop-Location
+```
+
+Luôn dùng interpreter của `.venv` để tránh chạy nhầm Python toàn cục. Không cần
+kích hoạt venv nếu gọi đường dẫn đầy đủ. Kiểm tra GPU trước khi kỳ vọng CUDA
+hoạt động:
+
+```powershell
+nvidia-smi
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
+.\.venv\Scripts\python.exe -m pip check
+```
+
+Nếu CUDA chưa khả dụng, kiểm tra driver và bản PyTorch phù hợp; có thể đặt
+`RERANKER_DEVICE=cpu` cho môi trường CPU. Dự án không yêu cầu cài CUDA
+Toolkit/cuDNN riêng để dùng các thư viện runtime do wheel PyTorch cung cấp.
+
+### Mở đúng workspace
+
+Trong Antigravity chọn **File → Open Workspace from File…** và mở
+[`acne-advisor.code-workspace`](acne-advisor.code-workspace).
+
+Workspace đặt interpreter `.venv\Scripts\python.exe`, terminal PowerShell riêng
+và UTF-8 cho dự án. Cấu hình không chứa đường dẫn tài khoản cá nhân hoặc API
+key. Các extension đề xuất gồm Python, Python Debugger, Jupyter và Ruff.
+
+Mở một file `.py` và kiểm tra thanh trạng thái: Python phải là **3.11.x
+(`.venv`)**. Nếu IDE còn nhớ interpreter cũ, dùng **Python: Select Interpreter**
+để chọn lại `.venv\Scripts\python.exe`. Mở terminal mới sau khi đổi
+workspace/interpreter.
+
+### Chạy mã nguồn trên host
+
+Nếu Docker đang chạy cả frontend/backend, dừng hai lớp ứng dụng để dùng cổng mặc
+định cho chế độ phát triển:
+
+```powershell
+docker compose stop backend frontend
+docker compose pull postgres redis qdrant neo4j
 .\scripts\start_local_dev.ps1
 ```
 
-Or start each layer manually:
+Launcher khởi động bốn datastore, FastAPI tại **8000** và Vite tại **5173**. Nó
+kiểm tra Python, dependency frontend và lỗi Docker; log nằm ở `logs/local-dev/`.
+API reload chỉ trong `src/`. Vite nhận địa chỉ backend từ launcher, kể cả khi
+đổi cổng:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
-
-Set-Location src\frontend
-npm ci
-npm run dev -- --host 127.0.0.1 --port 5173
+.\scripts\start_local_dev.ps1 -DryRun
+.\scripts\start_local_dev.ps1 -ApiPort 8001
 ```
 
-Environment settings are grouped in [`.env.example`](.env.example) by provider,
-embedding, retrieval, datastore, reliability, versioning, and observability.
+Dùng cổng **8001** cho phép kiểm tra backend mã nguồn song song với backend
+Docker đang dùng **8000**. Launcher tái sử dụng dịch vụ phù hợp, báo lỗi nếu
+cổng bị chiếm không tương thích và không tự chuyển Vite sang cổng khác. Khi đổi
+cổng frontend, bổ sung origin vào `CORS_ALLOW_ORIGINS`.
 
-## Testing
+Nếu muốn tự quản lý process trong hai terminal, dùng:
 
-Backend and runtime contracts:
+```powershell
+# Terminal 1, tại thư mục gốc
+.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --reload-dir src --host 127.0.0.1 --port 8000
+```
+
+```powershell
+# Terminal 2
+Set-Location src\frontend
+npm.cmd run dev -- --host 127.0.0.1 --port 5173 --strictPort
+```
+
+Frontend host mặc định gọi `http://127.0.0.1:8000`. Nếu chạy thủ công với API
+khác cổng, đặt `$env:VITE_API_URL` trước khi mở Vite. Các lệnh thủ công dừng
+bằng `Ctrl+C` trong terminal tương ứng.
+
+Chỉ với PostgreSQL mới, chưa có schema, khởi tạo bằng `scripts/init_schema.py`
+và `scripts/init_chat_schema.py`. Các script này không tạo kho bằng chứng
+Qdrant. Lần đầu nạp model có thể cần vài phút; launcher chờ tối đa 240 giây và
+lưu lỗi vào log.
+
+## 6. Cấu hình
+
+[`.env.example`](.env.example) là mẫu đầy đủ. `.env` thật chỉ lưu trên máy chạy.
+Mọi biến `VITE_*` có thể xuất hiện trong trình duyệt nên không dùng để chứa bí
+mật.
+
+| Nhóm       | Biến chính                                                 | Ghi chú                                                                               |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Gemini     | `GOOGLE_API_KEY`, `GOOGLE_MODEL`, `GOOGLE_FALLBACK_MODELS` | Mặc định `gemini-3.5-flash-lite`; fallback Gemini cấu hình là `gemini-3.1-flash-lite` |
+| Embedding  | `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`                  | Phải khớp chỉ mục: Gemini Embedding 2 / 3072                                          |
+| Ollama     | `OLLAMA_BASE_URL`, `OLLAMA_MODEL`                          | Mặc định `qwen3:8b`; cần cài Ollama và có model nếu sử dụng                           |
+| Reranker   | `RERANKER_MODEL`, `RERANKER_DEVICE`, `RERANKER_PRECISION`  | BGE cục bộ; mặc định `cuda` / `bfloat16`                                              |
+| Database   | `DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`, `NEO4J_URI`     | Host/container dùng địa chỉ khác nhau; Compose đặt địa chỉ nội bộ                     |
+| Frontend   | `VITE_API_URL`, `CORS_ALLOW_ORIGINS`                       | Host mặc định API 8000; Docker dùng `/api` cùng origin                                |
+| Theo dõi   | `OBSERVABILITY_ENABLED`, `LANGFUSE_ENABLED`                | Tùy chọn, mặc định tắt; JSONL/Langfuse phục vụ chẩn đoán                              |
+| Nghiên cứu | `LLAMA_CLOUD_API_KEY`, `OPENAI_API_KEY`                    | Parse PDF/đánh giá tương ứng; không bắt buộc cho chat đã có chỉ mục                   |
+
+Chọn Ollama chỉ thay đường tạo văn bản; Dense embedding hiện vẫn dùng API Google
+nên toàn bộ pipeline chưa offline. Health kiểm tra cấu hình/key hiện diện và
+model Ollama có trong danh sách; không chứng minh một lần sinh câu trả lời thực
+tế đã thành công.
+
+## 7. API
+
+Entrypoint: `src.api.app:app`. Đường dẫn dưới đây là đường trực tiếp của
+FastAPI; qua frontend Docker, thêm tiền tố `/api`.
+
+| Method   | Đường dẫn                                                                | Chức năng                                                    |
+| -------- | ------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `GET`    | `/live`, `/ready`, `/health`                                             | Sống, sẵn sàng cốt lõi, trạng thái chi tiết                  |
+| `GET`    | `/models`                                                                | Danh sách model và khả dụng                                  |
+| `POST`   | `/chat`                                                                  | Gửi câu hỏi và lịch sử có giới hạn                           |
+| `GET`    | `/chat/sessions`                                                         | Liệt kê phiên chat                                           |
+| `GET`    | `/chat/sessions/{session_id}/messages`                                   | Đọc tin nhắn                                                 |
+| `PATCH`  | `/chat/sessions/{session_id}/rename`, `/chat/sessions/{session_id}/hide` | Đổi tên hoặc ẩn phiên                                        |
+| `POST`   | `/chat/sessions/sync`                                                    | Đồng bộ lịch sử tương thích                                  |
+| `DELETE` | `/chat/sessions`                                                         | Xóa lịch sử chat và key answer-cache của ứng dụng            |
+| `GET`    | `/retrieve?q=...`                                                        | Chẩn đoán truy xuất; mặc định tắt, dành cho operator tin cậy |
+
+Body tối thiểu của `POST /chat`:
+
+```json
+{
+  "message": "Mụn hình thành như thế nào?",
+  "conversation_history": [],
+  "allow_model_fallback": false
+}
+```
+
+Response gồm `answer`, `session_id`, `sources`, `source_metadata`, `metadata`.
+Có thể gửi UUID `request_id` nhận diện lượt; gửi lại cùng ID/nội dung giúp tránh
+tạo trùng khi persistence hoạt động. Đây là cơ chế best effort trong một
+process, không phải bảo đảm thực thi đúng một lần trên hệ phân tán.
+
+## 8. Kiểm thử và notebook đánh giá
+
+### Kiểm tra phần mềm
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip check
-.\.venv\Scripts\python.exe -m compileall -q src scripts tests
 .\.venv\Scripts\python.exe -m ruff check src scripts tests
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe scripts\check_runtime_contracts.py
-.\.venv\Scripts\python.exe scripts\pre_ui_runtime_check.py
 .\.venv\Scripts\python.exe scripts\check_reproducible_environment.py
 .\.venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
+.\.venv\Scripts\python.exe scripts\inspect_runtime_readiness.py
 ```
 
-Knowledge build validation:
+`--mode offline` kiểm tra hợp đồng không gọi model thật;
+`inspect_runtime_readiness.py` đọc manifest và datastore đang chạy. `/ready` trả
+503 nếu phụ thuộc cốt lõi chưa sẵn sàng.
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\knowledge_build.py status
-.\.venv\Scripts\python.exe scripts\knowledge_build.py validate
+Push-Location src\frontend
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build
+Pop-Location
 ```
 
-Frontend:
+GitHub Actions chạy Python trên Windows/Python 3.11.9 và frontend trên Node 24.
+Test xác nhận hợp đồng phần mềm, không thay thế đánh giá ngữ nghĩa hoặc kiểm
+định y khoa.
 
-```powershell
-Set-Location src\frontend
-npm ci
-npm test
-npm run lint
-npm run build
-npm audit
+### Môi trường notebook riêng
+
+Ứng dụng khóa `sentence-transformers==5.6.0` / `transformers==5.15.1`;
+RAGChecker 0.1.9 cần Transformers 4 qua `refchecker`. Dùng **`evaluation/.venv`
+riêng**, theo [hướng dẫn notebook](evaluation/README.md).
+
+Chọn kernel **Acne Advisor AI (evaluation)** cho
+[notebook kiểm tra môi trường](evaluation/environment_check.ipynb). Notebook
+kiểm tra thư viện, spaCy và việc đọc benchmark/kết quả đã lưu, không gọi API
+đánh giá. Kernel **Acne Advisor AI (runtime)** dùng `.venv` ở gốc cho
+Agent/reranker. Không cài gộp hai bộ dependency.
+
+### Phân biệt kết quả lịch sử và build hiện tại
+
+| Bộ kết quả                                                                   | Hệ thống / KB                                | Trạng thái                                                                  |
+| ---------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------- |
+| [formal_run_2d5f0124](evaluation/results/formal_run_2d5f0124/)               | Commit `2d5f0124`, KB `94d613bc9b33628de3ef` | Hoàn tất 100 ca, không có lỗi hạ tầng                                       |
+| [thesis_evaluation_366f3ad8](evaluation/results/thesis_evaluation_366f3ad8/) | Commit `366f3ad8`, KB `d4a1819fe7fb77fe1f40` | 100 output đã khóa; chấm RAGChecker chưa hoàn tất vì hết tín dụng evaluator |
+
+Kết quả lịch sử: Claim Recall **72,3%**, Context Precision **38,9%**,
+Faithfulness **87,7%**, Claim F1 **33,8%** trên 70 ca answerable; Negative
+Rejection Rate **80,0% (24/30)**. Không gán các số này cho mã nguồn/build mới
+hơn.
+
+Gold của build hiện tại tách **24 ca xác nhận thiếu bằng chứng** và **6 ca mơ hồ
+chính sách**. Notebook nghiên cứu cũ kiểm tra commit, fingerprint, KB lịch sử;
+khôi phục môi trường không bỏ qua các điều kiện đó. Đọc
+[kết quả](evaluation/results/README.md),
+[giao thức luận văn](evaluation/THESIS_EVALUATION_PROTOCOL.md) và
+[chỉ mục nghiên cứu](research/README.md) trước khi tiếp tục chấm API.
+
+## 9. Cấu trúc mã nguồn
+
+```text
+acne-agent-system/
+├── src/
+│   ├── frontend/       # React/Vite, HTTP client, hội thoại
+│   ├── api/            # FastAPI, request/response, health
+│   ├── agent/          # LangGraph, quyết định, prompt, an toàn, trình bày
+│   ├── retrieval/      # Dense/BM25, RRF, BGE, đóng gói context
+│   ├── ingestion/      # Parse, chia đoạn, provenance, indexing, activation
+│   ├── knowledge/      # Taxonomy, EntityCards, đồ thị, phiên bản KB
+│   ├── integrations/   # Adapter SDK dịch vụ bên ngoài
+│   ├── database/       # Qdrant adapter, SQL, lịch sử
+│   ├── cache/          # Exact cache Redis
+│   ├── quality/        # Kiểm tra cấu trúc, nguồn, safe fallback
+│   ├── resilience/     # Deadline, timeout, retry hữu hạn
+│   └── observability/  # Trace, fingerprint, Langfuse tùy chọn
+├── scripts/            # Lệnh vận hành và kiểm tra
+├── tests/              # Kiểm thử và fixture
+├── data/               # Manifest được quản lý; dữ liệu runtime bỏ qua Git
+├── evaluation/         # Benchmark, kernel riêng, kết quả đánh giá
+├── research/           # Experiment đã lưu, không phải backend khác
+├── docs/               # Tài liệu chi tiết
+├── docker/             # Dockerfile backend
+├── acne-advisor.code-workspace
+├── docker-compose.yml
+└── .env.example
 ```
 
-Unit and integration tests verify software contracts, graph bounds, regression
-behavior, cache and retrieval wiring, provenance handling, and environment
-readiness. They do not establish representative retrieval quality, medical
-correctness, claim-level faithfulness, clinical effectiveness, or deployment
-readiness. Those qualities require separate system evaluation and clinical
-review.
+Đọc code theo một lượt chat: `src/frontend/src/App.jsx` →
+`src/frontend/src/api/chatApi.js` → `src/api/app.py` → `src/agent/graph.py` →
+`src/agent/nodes/workflow.py`. Tiếp theo đọc `src/retrieval/service.py` cho truy
+xuất và `src/agent/nodes/reason.py` cho tạo câu trả lời.
 
-## Official Formal Evaluation
+## 10. Xử lý lỗi
 
-The completed official historical run is
-[`formal_run_2d5f0124`](evaluation/results/formal_run_2d5f0124/). It evaluated
-commit `2d5f0124dc532a4970a4b08dcd6cf846389a03ff` with pipeline fingerprint
-`f93ad3e8dfb2c39f403b0794`, knowledge build `94d613bc9b33628de3ef`,
-RAGChecker `0.1.9`, and evaluator snapshot `gpt-5.4-2026-03-05`.
+| Hiện tượng                                         | Kiểm tra / xử lý                                                                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Antigravity chọn Python 3.12 hoặc đường dẫn đã mất | Mở workspace dự án, chọn lại `.venv\Scripts\python.exe`; dự án cần 3.11                                                 |
+| `.venv` hỏng sau khi xóa AppData                   | Kiểm tra `.venv/pyvenv.cfg`; dùng Python 3.11 còn hoạt động để tạo lại môi trường và cài lock, giữ riêng `.env`/dữ liệu |
+| Thiếu `pip`                                        | Chạy `.\.venv\Scripts\python.exe -m ensurepip --upgrade`, sau đó cài pip theo hướng dẫn                                 |
+| PowerShell chặn `npm.ps1`                          | Dùng `npm.cmd`                                                                                                          |
+| Docker chưa chạy hoặc thiếu image                  | Mở Docker Desktop, kiểm tra `docker version`, pull bốn image datastore rồi chạy lại                                     |
+| Thiếu cache BGE                                    | Kiểm tra cache/HF_MODEL_CACHE_PATH, tải model một lần trước khi chạy                                                    |
+| UI gọi nhầm API                                    | Kiểm tra cổng, `VITE_API_URL`, CORS; dùng launcher để truyền địa chỉ chính xác                                          |
+| 502 lúc API đang tải model                         | Theo dõi log backend, chờ `/live`, sau đó kiểm tra `/ready`                                                             |
+| `/ready` trả 503                                   | Đọc `/health`, kiểm tra Qdrant/alias/schema và cấu hình provider trước khi sửa dữ liệu                                  |
+| Chat lỗi provider dù health báo cấu hình hợp lệ    | Kiểm tra API key, kết nối, hạn mức; health không sinh câu trả lời                                                       |
+| Notebook xung đột Transformers                     | Chọn kernel evaluation, cài lock của evaluation vào môi trường riêng                                                    |
 
-| Metric | Score |
-|---|---:|
-| Claim Recall | 72.3% |
-| Context Precision | 38.9% |
-| Faithfulness | 87.7% |
-| Claim F1 | 33.8% |
-| Negative Rejection Rate | 80.0% (24/30) |
+## 11. Giới hạn và tài liệu chi tiết
 
-All 100 cases completed with zero infrastructure failures. The raw outputs,
-case-level metrics, checkpoint, calibration evidence, hashes, and interpretation
-boundary are listed in [Official Evaluation Results](evaluation/results/README.md).
-These benchmark results are research evidence, not clinical validation.
-They do not describe the current `d4a1819fe7fb77fe1f40` knowledge build or its
-current pipeline fingerprint. The current-build run has 100 frozen system outputs
-on `main`, but RAGChecker scoring stopped because evaluator credits were exhausted.
-Its locked gold separates 24 confirmed-absence and 6 policy-ambiguous cases. See
-[Evaluation Results](evaluation/results/README.md) for identities and scoring resume.
-The historical [adjudication queue](evaluation/benchmark_adjudication.md) remains
-separate and must not be silently relabeled.
+Kho nguồn còn nhỏ, không bao phủ toàn bộ da liễu. Snapshot NICE có ngày biểu
+diễn `2026-08-03`, khác metadata chính thức `2026-04-30` được ghi nhận trong
+manifest; tính đầy đủ/tương đương phiên bản chính thức còn cần đối chiếu. Không
+âm thầm thay nhãn nguồn hoặc dùng kết quả nghiên cứu như kiểm định lâm sàng.
 
-## Limitations
+Kiểm tra nguồn/cấu trúc xác nhận danh tính nguồn, hình dạng câu trả lời và
+provenance; không chứng minh từng mệnh đề được hỗ trợ hoặc đúng lâm sàng. Các
+quy tắc an toàn bao phủ một tập tình huống hẹp, không phải bộ phân loại y khoa
+tổng quát.
 
-- The indexed corpus contains four curated acne source snapshots and is not
-  comprehensive dermatology coverage.
-- The NICE-derived snapshot has a provenance discrepancy: official NICE
-  metadata reports 30 April 2026, while the local snapshot represents 3 August
-  2026. Its exact current-version provenance has not been independently
-  reconciled.
-- Source allowlisting does not prove sentence-level or claim-level entailment.
-- The official evaluation retains residual retrieval misses, context-packing
-  noise, and localized multi-turn limitations.
-- Structured abstention can still be sensitive to absolute-certainty wording,
-  and evaluator claim extraction has observed variability.
-- End-to-end medical quality and clinical safety effectiveness have not been
-  clinically validated.
-- Dense query embedding uses the external Gemini Embedding 2 provider. The
-  current asymmetric text representation was selected by a bounded development
-  comparison; it is not a formal or clinical quality result.
-- The current build has development retrieval regression evidence, but no new
-  immutable formal RAGChecker result; semantic scoring is incomplete and policy
-  adjudication remains distinct from confirmed-absence evaluation.
-- Deployment assumptions target trusted, local, single-user use.
+Phạm vi triển khai là **cục bộ, một người dùng tin cậy**. Compose chỉ publish
+trên `127.0.0.1`; API lịch sử chưa có xác thực/ủy quyền đa người dùng. Triển
+khai công khai cần bổ sung xác thực, TLS, giới hạn truy cập, cách ly dữ liệu và
+vận hành phù hợp.
 
-## References and Technical Documentation
+| Tài liệu                                                                                       | Nội dung                               |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------- |
+| [Kiến trúc](docs/ARCHITECTURE.md), [workflow Agent](docs/AGENT_WORKFLOW.md)                    | Trách nhiệm và ranh giới thành phần    |
+| [Hướng dẫn đọc code tiếng Việt](docs/CODE_GUIDE_VI.md)                                         | Chi tiết module và đường đi dữ liệu    |
+| [Pipeline dữ liệu](docs/DATA_PIPELINE.md), [vận hành](docs/OPERATIONS.md)                      | Build, kiểm tra, activation, chẩn đoán |
+| [Phương pháp/công thức](docs/METHODS_AND_FORMULAS.md), [truy vết](docs/METHOD_TRACEABILITY.md) | Hợp đồng kỹ thuật và cơ sở lựa chọn    |
+| [An toàn](docs/SAFETY.md)                                                                      | Quy tắc hẹp và nguồn liên quan         |
+| [Observability](docs/OBSERVABILITY.md)                                                         | Trace và Langfuse                      |
+| [Tham chiếu](docs/REFERENCES.md), [registry](data/method_sources.json)                         | Nguồn kỹ thuật và tri thức             |
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Agent Workflow](docs/AGENT_WORKFLOW.md)
-- [Data Pipeline](docs/DATA_PIPELINE.md)
-- [Methods and Formulas](docs/METHODS_AND_FORMULAS.md)
-- [Method Traceability](docs/METHOD_TRACEABILITY.md)
-- [Vietnamese Source Code Guide](docs/CODE_GUIDE_VI.md)
-- [Safety](docs/SAFETY.md)
-- [Operations](docs/OPERATIONS.md)
-- [AI Observability and Langfuse](docs/OBSERVABILITY.md)
-- [Research conclusions and pending reviews](research/README.md)
-- [References](docs/REFERENCES.md)
-- [Method and source registry](data/method_sources.json)
-- [Source manifest](data/sources/manifest.yaml)
-
-Project metadata declares the MIT license in `pyproject.toml`. No standalone
-`LICENSE` file is currently present. Source-corpus, institutional, and
-redistribution requirements should be reviewed before publishing medical
-documents or generated artifacts.
+Metadata trong `pyproject.toml` khai báo MIT; repository hiện chưa có `LICENSE`
+riêng. Quyền sử dụng tài liệu nguồn thuộc từng nhà xuất bản và cần được xem xét
+riêng khi phân phối corpus.

@@ -72,8 +72,11 @@ through Docker DNS, including after backend recreation. Proxy read timeout is
 220 seconds between the 210-second Agent budget and 225-second browser deadline.
 It forwards error statuses and never automatically retries POSTs. Host Vite/API
 development retains `VITE_API_URL=http://127.0.0.1:8000` and
-`scripts/start_local_dev.ps1` starts datastores only. Stop Docker FE/BE first when
-using the same host API port, or choose distinct ports.
+`scripts/start_local_dev.ps1` starts the four datastores plus the host Python API
+and Vite frontend. Stop Docker FE/BE first when using the same host API port, or
+use `-ApiPort 8001`; the launcher passes that URL to Vite. A compatible existing
+API/frontend is reused. Logs and process identities are written under
+`logs/local-dev/`, and cold API startup has a configurable 240-second budget.
 
 `/live` proves only API process liveness. `/health` reports detailed dependency and
 configuration state; `/ready` returns 503 when required core checks fail. No health
@@ -337,7 +340,7 @@ checks.
 Or start components manually:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --reload-dir src --host 127.0.0.1 --port 8000
 Set-Location src\frontend
 npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
@@ -348,6 +351,12 @@ HTTP 400/429/503/504 as reachable backend/provider errors rather than network
 disconnects.
 
 ## Validation Modes
+
+Frontend tooling pins `minimatch` to `11.0.1` through an npm override because
+ESLint's dependency ranges still select vulnerable 10.x releases. This addresses
+[GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249).
+Keep `npm audit`, frontend tests, lint and build passing when changing this pin;
+remove it once the upstream dependency ranges accept a patched release.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\check_release_readiness.py --mode offline
