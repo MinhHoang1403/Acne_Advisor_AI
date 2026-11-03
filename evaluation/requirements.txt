@@ -1,6 +1,12 @@
--r ../requirements.txt
+# Install in evaluation/.venv, separately from the application environment.
+# RAGChecker/refchecker require transformers 4; the application locks transformers 5.
+-r thesis_requirements.txt
 
-# Notebook execution and the fixed evaluator adapter.
+# Notebook execution and offline benchmark helpers.
 jupyterlab>=4.4,<5
-openai>=2.0,<3
-ragchecker==0.1.9
+ipykernel>=6,<8
+ipywidgets>=8,<9
+python-dotenv>=1.0,<2
+transformers>=4.41,<5
+torch==2.13.0
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
