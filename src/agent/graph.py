@@ -15,9 +15,10 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph  # type: ignore[import]
+from langgraph.graph.state import CompiledStateGraph
 
 from src.agent.nodes.workflow import (
     abstain_node,
@@ -47,10 +48,13 @@ def route_agent_action(state: ClinicalState) -> AgentAction:
     return state.get("next_action", "abstain")
 
 
-def build_clinical_graph():
+def build_clinical_graph() -> CompiledStateGraph[Any, None, Any, Any]:
     """Tạo workflow tám node; ``retry`` tái sử dụng đúng node ``retrieve``."""
 
-    builder = StateGraph(ClinicalState)
+    # LangGraph models TypedDict class metadata with its StateLike protocol.
+    # Pyrefly cannot match that protocol to TypedDicts; widen only the schema
+    # class at this library boundary. Node inputs retain ClinicalState typing.
+    builder = StateGraph(cast(type[Any], ClinicalState))
     builder.add_node("prepare", prepare_node)
     builder.add_node("guard", guard_node)
     builder.add_node("decide", decide_node)
@@ -110,7 +114,7 @@ async def run_clinical_agent(
     manifest = build_pipeline_version_manifest()
     fingerprint = compute_pipeline_fingerprint(manifest)
     settings = runtime_resilience_settings_from_env()
-    effective_model_fallback = bool(allow_model_fallback and settings.llm_provider_fallback_enabled)
+    effective_model_fallback = allow_model_fallback and settings.llm_provider_fallback_enabled
     budget = DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
     initial_state: ClinicalState = {
         "request_id": canonical_request_id,

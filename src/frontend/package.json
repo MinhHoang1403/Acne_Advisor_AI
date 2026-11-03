@@ -10,6 +10,9 @@
     "test": "node --test",
     "preview": "vite preview"
   },
+  "overrides": {
+    "minimatch": "11.0.1"
+  },
   "dependencies": {
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
