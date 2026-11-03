@@ -340,7 +340,8 @@ checks.
 Or start components manually:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --reload-dir src --host 127.0.0.1 --port 8000
+$frontendDirectory = (Resolve-Path src/frontend).Path
+.\.venv\Scripts\python.exe -m uvicorn src.api.app:app --reload --reload-dir src --reload-exclude "$frontendDirectory" --host 127.0.0.1 --port 8000
 Set-Location src\frontend
 npm ci
 npm run dev -- --host 127.0.0.1 --port 5173

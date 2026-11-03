@@ -138,9 +138,14 @@ if ($listener) {
         Write-Step "DryRun: would start backend on $backendUrl."
     } else {
         Write-Step "Starting backend."
+        $backendArguments = @(
+            "-m", "uvicorn", "src.api.app:app", "--reload",
+            "--reload-dir", "src", "--reload-exclude", ('"{0}"' -f $frontendDir),
+            "--host", $ApiHost, "--port", "$ApiPort"
+        )
         $backendProcess = Start-Process `
             -FilePath $pythonExe `
-            -ArgumentList @("-m", "uvicorn", "src.api.app:app", "--reload", "--reload-dir", "src", "--host", $ApiHost, "--port", "$ApiPort") `
+            -ArgumentList $backendArguments `
             -WorkingDirectory $repoRoot `
             -WindowStyle Hidden `
             -RedirectStandardOutput (Join-Path $logDir "backend.stdout.log") `
