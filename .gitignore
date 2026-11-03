@@ -68,9 +68,10 @@ dmypy.json
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 
-# Ignore notebooks by default, but keep the active formal evaluation notebook
+# Ignore notebooks by default, but keep the formal and environment-check notebooks
 *.ipynb
 !evaluation/formal_evaluation.ipynb
+!evaluation/environment_check.ipynb
 
 # Local notebook recovery backups
 local_notebook_backups/
