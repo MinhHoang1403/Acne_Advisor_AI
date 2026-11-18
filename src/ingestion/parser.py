@@ -240,7 +240,8 @@ def _migrate_compatible_cached_artifact(
 
 
 def _parse_markdown(path: Path) -> tuple[ParsedUnit, ...]:
-    text = path.read_text(encoding="utf-8")
+    # Dùng utf-8-sig để tự động bỏ BOM nếu file Markdown được lưu từ Windows/trình soạn thảo.
+    text = path.read_text(encoding="utf-8-sig")
     marker = "Markdown Content:"
     if marker in text[:500]:
         text = text.split(marker, 1)[1].lstrip()
@@ -343,7 +344,10 @@ def _join_cross_page_continuations(
 
 
 def _needs_next_page_continuation(text: str) -> bool:
-    return bool(text) and text[-1] not in ".!?"
+    # Bỏ dấu đóng markdown/ngoặc ở cuối trước khi kiểm tra dấu kết câu
+    # để không nối nhầm trang khi câu kết thúc bằng **chữ.** hoặc "(xem thêm)."
+    stripped = (text or "").rstrip(" \t\r\n*_`\"'”’)")
+    return bool(stripped) and stripped[-1] not in ".!?"
 
 
 def _is_structural_start(block: str) -> bool:
@@ -371,6 +375,22 @@ def _parse_json(path: Path) -> tuple[ParsedUnit, ...]:
     )
 
 
+def _extract_page_number(metadata: dict[str, Any]) -> int:
+    """Trích số trang an toàn từ metadata LlamaParse, không lỗi với số La Mã hoặc nhãn chữ."""
+    for key in ("page", "page_label"):
+        raw_value = metadata.get(key)
+        if raw_value is None:
+            continue
+        if isinstance(raw_value, int) and not isinstance(raw_value, bool) and raw_value > 0:
+            return raw_value
+        text = str(raw_value).strip()
+        if text.isdigit():
+            parsed = int(text)
+            if parsed > 0:
+                return parsed
+    return 0
+
+
 async def _parse_pdf(path: Path, *, api_key: str) -> tuple[ParsedUnit, ...]:
     if not api_key.strip():
         raise RuntimeError(
@@ -391,7 +411,7 @@ async def _parse_pdf(path: Path, *, api_key: str) -> tuple[ParsedUnit, ...]:
         metadata: dict[str, Any] = getattr(document, "metadata", {}) or {}
         if not text:
             continue
-        page = int(metadata.get("page_label") or metadata.get("page") or 0)
+        page = _extract_page_number(metadata)
         units.append(ParsedUnit(locator=f"parser_document:{index}", text=text, page_start=page, page_end=page))
     return tuple(units)
 

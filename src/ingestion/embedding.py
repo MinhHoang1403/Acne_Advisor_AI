@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,7 @@ class EmbeddingContract:
 def embed_documents(texts: list[str], *, api_key: str) -> list[list[float]]:
     """Gửi knowledge texts cho Gemini và nhận Dense vectors đúng contract."""
 
+    timeout = max(1.0, float(os.getenv("EMBEDDING_REQUEST_TIMEOUT", "60") or "60"))
     return embed_texts_sync(
         texts,
         model_name=EMBEDDING_MODEL,
@@ -66,6 +68,7 @@ def embed_documents(texts: list[str], *, api_key: str) -> list[list[float]]:
         expected_dimensions=EMBEDDING_DIMENSIONS,
         output_dimensions=EMBEDDING_DIMENSIONS,
         api_key=api_key,
+        request_timeout=timeout,
     )
 
 

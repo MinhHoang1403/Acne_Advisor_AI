@@ -7,10 +7,13 @@ does not call an LLM or participate in runtime retrieval and reranking.
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
+import re
+import threading
+from pathlib import Path
 from typing import Any
 
 from src.knowledge import DrugEntityNormalizer
+from src.knowledge.normalizer import DEFAULT_TAXONOMY_PATH
 
 
 logger = logging.getLogger(__name__)
@@ -50,9 +53,26 @@ def _empty_taxonomy_metadata() -> dict[str, Any]:
     return metadata
 
 
-@lru_cache(maxsize=1)
+_NORMALIZER_CACHE_LOCK = threading.Lock()
+_NORMALIZER_CACHE: tuple[Path, int, int, DrugEntityNormalizer] | None = None
+
+
 def _get_drug_entity_normalizer() -> DrugEntityNormalizer:
-    return DrugEntityNormalizer()
+    global _NORMALIZER_CACHE
+    resolved = DEFAULT_TAXONOMY_PATH.resolve()
+    stat = resolved.stat()
+    with _NORMALIZER_CACHE_LOCK:
+        if (
+            _NORMALIZER_CACHE is not None
+            and _NORMALIZER_CACHE[0] == resolved
+            and _NORMALIZER_CACHE[1] == stat.st_mtime_ns
+            and _NORMALIZER_CACHE[2] == stat.st_size
+        ):
+            return _NORMALIZER_CACHE[3]
+    normalizer = DrugEntityNormalizer()
+    with _NORMALIZER_CACHE_LOCK:
+        _NORMALIZER_CACHE = (resolved, stat.st_mtime_ns, stat.st_size, normalizer)
+    return normalizer
 
 
 def _safe_expand_query(text: str) -> dict[str, Any]:
@@ -81,8 +101,12 @@ def _infer_query_intent_hint(
     hints: list[str] = []
 
     def add_if(intent: str, keywords: list[str]) -> None:
-        if any(keyword in text_lower for keyword in keywords):
-            hints.append(intent)
+        # Khớp theo ranh giới từ để tránh nhận nhầm chuỗi con (vd: "khô" trong "không").
+        for keyword in keywords:
+            token = keyword.strip()
+            if token and re.search(rf"(?<!\w){re.escape(token)}(?!\w)", text_lower, re.UNICODE):
+                hints.append(intent)
+                return
 
     add_if(
         "side_effect",

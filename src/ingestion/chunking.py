@@ -64,7 +64,7 @@ def structural_chunks(text: str, *, max_chars: int = CHUNK_MAX_CHARS) -> list[St
         section_parts = []
         return None
 
-    for block in re.split(r"\n\s*\n", text.strip()):
+    for block in _split_blocks_with_headings(text):
         block = block.strip()
         if not block:
             continue
@@ -92,6 +92,34 @@ def structural_chunks(text: str, *, max_chars: int = CHUNK_MAX_CHARS) -> list[St
             section_parts.append(block)
     flush_section()
     return output
+
+
+def _split_blocks_with_headings(text: str) -> list[str]:
+    """Tách văn bản theo đoạn trống và tách riêng các dòng heading liền kề ngoài code block."""
+    blocks: list[str] = []
+    for raw_block in re.split(r"\n\s*\n", text.strip()):
+        block = raw_block.strip()
+        if not block:
+            continue
+        if block.startswith("```"):
+            blocks.append(block)
+            continue
+        lines = block.splitlines()
+        if sum(1 for line in lines if _HEADING_RE.match(line.strip())) <= 1:
+            blocks.append(block)
+            continue
+        buffer: list[str] = []
+        for line in lines:
+            if _HEADING_RE.match(line.strip()):
+                if buffer:
+                    blocks.append("\n".join(buffer).strip())
+                    buffer = []
+                blocks.append(line.strip())
+            else:
+                buffer.append(line)
+        if buffer:
+            blocks.append("\n".join(buffer).strip())
+    return blocks
 
 
 def _split_with_boundaries(text: str, *, max_chars: int) -> list[str]:
@@ -186,19 +214,38 @@ def _split_oversized_structured_unit(text: str, *, max_chars: int) -> list[str]:
     return _split_with_boundaries(text, max_chars=max_chars)
 
 
+_TABLE_SEPARATOR_RE = re.compile(r"^\|(?:\s*:?-{2,}:?\s*\|)+\s*$")
+
+
 def _split_table_rows(lines: list[str], *, max_chars: int) -> list[str]:
-    """Split oversized Markdown tables between rows, never through a row."""
+    """Split oversized Markdown tables between rows, preserving column headers when they fit."""
 
     rows = [line.strip() for line in lines if line.strip()]
+    header_prefix = ""
+    if (
+        len(rows) >= 2
+        and rows[0].startswith("|")
+        and _TABLE_SEPARATOR_RE.fullmatch(rows[1])
+    ):
+        header_prefix = f"{rows[0]}\n{rows[1]}"
+
     chunks: list[str] = []
     current = ""
-    for row in rows:
+    for index, row in enumerate(rows):
         row_parts = [row] if len(row) <= max_chars else _hard_split(row, max_chars=max_chars)
         for row_part in row_parts:
             candidate = f"{current}\n{row_part}" if current else row_part
             if current and len(candidate) > max_chars:
                 chunks.append(current)
-                current = row_part
+                # Lặp lại header bảng ở chunk tiếp theo nếu đủ chỗ để giữ ngữ cảnh cột.
+                if (
+                    header_prefix
+                    and index >= 2
+                    and len(header_prefix) + 1 + len(row_part) <= max_chars
+                ):
+                    current = f"{header_prefix}\n{row_part}"
+                else:
+                    current = row_part
             else:
                 current = candidate
     if current:

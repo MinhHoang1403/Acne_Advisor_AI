@@ -44,7 +44,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="Verified pre-mutation Qdrant/Neo4j backup required by --activate.",
     )
+    build.add_argument(
+        "--allow-empty-bootstrap",
+        action="store_true",
+        help="Allow --activate without --rollback-root only when Qdrant logical collections/aliases and Neo4j are empty.",
+    )
     validate = subparsers.add_parser("validate", help="Run layered knowledge-build validation.")
+    validate.add_argument("--source", type=Path, default=Path("sample_data"))
     validate.add_argument("--offline", action="store_true")
     subparsers.add_parser(
         "inspect-cache",
@@ -61,15 +67,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 async def async_main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.command == "build":
-        if args.activate and args.rollback_root is None:
-            raise SystemExit("--activate requires --rollback-root")
+        if args.activate and args.rollback_root is None and not args.allow_empty_bootstrap:
+            raise SystemExit("--activate requires --rollback-root or --allow-empty-bootstrap")
         result = await build_knowledge(
             source_dir=args.source, replace_candidate=args.replace_candidate
         )
         if args.activate:
-            result = await activate_knowledge(rollback_root=args.rollback_root)
+            result = await activate_knowledge(
+                source_dir=args.source,
+                rollback_root=args.rollback_root,
+                allow_empty_bootstrap=args.allow_empty_bootstrap,
+            )
     elif args.command == "validate":
-        result = await validate_knowledge(live=not args.offline)
+        result = await validate_knowledge(source_dir=args.source, live=not args.offline)
     elif args.command == "inspect-cache":
         result = await inspect_embedding_cache_reuse()
     elif args.command == "finalize-activation":

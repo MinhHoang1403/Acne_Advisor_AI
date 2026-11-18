@@ -16,12 +16,37 @@ _PAGE_MARKER_RE = re.compile(
     r"^Page\s+\d{1,4}\s+of\s+\d{1,4}(?P<continuation>\s+.*)?$",
     re.IGNORECASE,
 )
+_PDF_LIGATURES = str.maketrans(
+    {
+        "\ufb00": "ff",
+        "\ufb01": "fi",
+        "\ufb02": "fl",
+        "\ufb03": "ffi",
+        "\ufb04": "ffl",
+        "\ufb05": "ft",
+        "\ufb06": "st",
+        "\u00a0": " ",
+        "\u2007": " ",
+        "\u2009": " ",
+        "\u202f": " ",
+        "\u00ad": "",
+        "\u200b": "",
+        "\u200c": "",
+        "\u200d": "",
+        "\ufeff": "",
+    }
+)
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 def normalize_parsed_text(text: str) -> str:
-    """Chuẩn hóa Unicode/newline/spacing và bỏ PDF footer lặp chính xác."""
+    """Chuẩn hóa Unicode/newline/spacing và bỏ ký tự ẩn hoặc PDF footer lặp chính xác."""
 
-    normalized = unicodedata.normalize("NFC", text or "")
+    # Tách ligature PDF (ﬁ, ﬂ...), thay khoảng trắng đặc biệt thành space chuẩn,
+    # bỏ BOM/zero-width/soft-hyphen và ký tự điều khiển C0 trước khi gom NFC.
+    cleaned = (text or "").translate(_PDF_LIGATURES)
+    cleaned = _CONTROL_CHARS_RE.sub("", cleaned)
+    normalized = unicodedata.normalize("NFC", cleaned)
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
     lines: list[str] = []
     for raw_line in normalized.split("\n"):
