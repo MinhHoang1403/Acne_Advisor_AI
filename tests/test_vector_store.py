@@ -56,3 +56,28 @@ async def test_embed_query_does_not_retry_permanent_provider_errors(monkeypatch)
     with pytest.raises(PermanentProviderError):
         await vector_store.embed_query("mụn viêm")
     assert attempts == ["call"]
+
+
+@pytest.mark.asyncio
+async def test_embed_query_forwards_request_timeout_and_resolves_env_key(monkeypatch):
+    seen_timeouts: list[float | None] = []
+    seen_api_keys: list[str | None] = []
+
+    def fake_embed_texts_sync(texts, **kwargs):
+        seen_api_keys.append(kwargs.get("api_key"))
+        seen_timeouts.append(kwargs.get("request_timeout"))
+        return [[0.25, 0.5, 0.75]]
+
+    monkeypatch.setattr(vector_store, "GOOGLE_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_API_KEY", "dynamic-env-key")
+    monkeypatch.setattr(vector_store, "EMBEDDING_DIMENSIONS", 3)
+    monkeypatch.setattr(
+        "src.integrations.google_genai.embed_texts_sync",
+        fake_embed_texts_sync,
+    )
+
+    result = await vector_store.embed_query("adapalene")
+    assert result == [0.25, 0.5, 0.75]
+    assert seen_api_keys == ["dynamic-env-key"]
+    assert len(seen_timeouts) == 1
+    assert seen_timeouts[0] is not None and seen_timeouts[0] > 0

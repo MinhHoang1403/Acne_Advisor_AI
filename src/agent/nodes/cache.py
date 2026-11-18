@@ -25,10 +25,15 @@ from src.observability.versioning import (
 def _resolve_cache_model_key(state: ClinicalState) -> tuple[str, str]:
     """Resolve cùng provider/model key cho cả lookup và store."""
     provider = (state.get("llm_provider") or os.getenv("LLM_PROVIDER", "gemini")).lower()
+    if provider == "local":
+        provider = "ollama"
     model = state.get("llm_model")
     if provider == "gemini":
-        return provider, model or os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
-    if provider in {"ollama", "local"}:
+        resolved = model or os.getenv("GOOGLE_MODEL", "gemini-3.5-flash-lite")
+        if resolved == "gemini-1.5-flash":
+            resolved = "gemini-3.5-flash-lite"
+        return provider, resolved
+    if provider == "ollama":
         resolved = model or os.getenv("OLLAMA_MODEL", "qwen3:8b")
         return "ollama", resolved if ":" in resolved else f"{resolved}:latest"
     return provider, model or "unknown"
@@ -37,8 +42,10 @@ def _resolve_cache_model_key(state: ClinicalState) -> tuple[str, str]:
 async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
     """Đọc exact cache nếu request độc lập và metadata version còn hợp lệ."""
     question = state.get("normalized_question") or state.get("user_question") or ""
+    # Chỉ chuẩn hóa lowercase/bỏ dấu câu để tạo khóa Redis, không ghi đè
+    # normalized_question trong state để bảo toàn dấu câu cho các node phía sau.
     normalized = normalize_question(question)
-    base = {"normalized_question": normalized, "cache_hit": False}
+    base = {"cache_hit": False}
     if state.get("bypass_cache"):
         return {**base, "cache_checked": False, "cache_reason": "bypassed"}
     if state.get("safety_override"):
@@ -61,13 +68,16 @@ async def cache_lookup_node(state: ClinicalState) -> dict[str, Any]:
     if not cached:
         return {**base, "cache_checked": True, "cache_reason": "miss"}
 
-    metadata = cached.get("metadata") or {}
+    metadata = dict(cached.get("metadata") or {})
     if (
         metadata.get("answer_version") != get_answer_cache_version()
         or metadata.get("pipeline_fingerprint") != fingerprint
         or not metadata.get("selected_evidence_ids")
     ):
         return {**base, "cache_checked": True, "cache_reason": "invalid_cache_metadata"}
+
+    if cached.get("created_at") and "created_at" not in metadata:
+        metadata["created_at"] = cached.get("created_at")
 
     answer = repair_mojibake(cached.get("answer", ""))
     return {

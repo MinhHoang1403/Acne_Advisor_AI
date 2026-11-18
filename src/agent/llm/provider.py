@@ -204,13 +204,16 @@ async def _call_provider_once(
 
     if provider == "ollama":
         logger.info("Calling Ollama (%s)...", model)
+        ollama_kwargs: dict[str, object] = {"request_timeout": request_timeout}
+        if response_schema is not None:
+            ollama_kwargs["response_schema"] = response_schema
         return repair_mojibake(
             await generate_ollama_response(
                 model,
                 system_prompt,
                 prompt,
                 temperature,
-                request_timeout=request_timeout,
+                **ollama_kwargs,
             )
         )
 
@@ -354,7 +357,12 @@ async def generate_llm_response(
             ("gemini", fallback_model)
             for fallback_model in parse_google_fallback_models(primary_model=model)
         )
-        available_models = await list_ollama_models(timeout_seconds=min(5.0, budget.remaining_seconds()))
+        remaining_for_tags = budget.remaining_seconds()
+        available_models = (
+            await list_ollama_models(timeout_seconds=min(5.0, remaining_for_tags))
+            if remaining_for_tags > 0
+            else []
+        )
         configured_model = os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
         configured_model = configured_model if ":" in configured_model else f"{configured_model}:latest"
         if configured_model in available_models:

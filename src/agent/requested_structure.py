@@ -104,7 +104,7 @@ def parse_requested_structure(question: str) -> RequestedStructure:
     padded = f" {text} "
     wants_table = _contains_any(text, ["bang", "table"])
     columns, exact_column_count = _extract_columns(text, wants_table=wants_table)
-    exact_item_count = _extract_exact_item_count(text)
+    exact_item_count = _extract_exact_item_count(text, raw_text=raw)
     style_constraints = _extract_style_constraints(text)
 
     if wants_table and exact_column_count is None and columns:
@@ -174,13 +174,31 @@ def _split_items(segment: str) -> list[str]:
     return _dedupe(output)
 
 
-def _extract_exact_item_count(text: str) -> int | None:
-    patterns = [
-        r"(?:liet ke|nêu|neu|dua ra|cho toi|cho tôi)\s+(?:dung\s+)?(?P<count>\d+|mot|hai|ba|bon|tu|nam|sau|bay|tam|chin|muoi)\s+(?:dau hieu|trieu chung|bieu hien|y|muc|bullet|nguyen nhan|thoi quen)",
-        r"(?:dung\s+)?(?P<count>\d+|mot|hai|ba|bon|tu|nam|sau|bay|tam|chin|muoi)\s+(?:dau hieu|trieu chung|bieu hien|y|muc|bullet|nguyen nhan|thoi quen)",
+def _extract_exact_item_count(text: str, *, raw_text: str = "") -> int | None:
+    units = r"(?:dau hieu|trieu chung|bieu hien|y|muc|bullet|nguyen nhan|thoi quen)"
+    word_numbers = r"mot|hai|ba|bon|tu|nam|sau|bay|tam|chin|muoi"
+    explicit_patterns = [
+        rf"\b(?:liet ke|neu|dua ra|cho toi)\s+(?:dung\s+)?(?P<count>\d+|{word_numbers})\s+{units}\b",
+        rf"\bdung\s+(?P<count>\d+|{word_numbers})\s+{units}\b",
+        rf"\b(?P<count>\d+)\s+{units}\b",
     ]
-    for pattern in patterns:
+    for pattern in explicit_patterns:
         match = re.search(pattern, text)
+        if match:
+            return _parse_number(match.group("count"))
+
+    # Chỉ khớp số viết bằng chữ không có từ lệnh trên chuỗi giữ dấu tiếng Việt
+    # để tránh nhầm "từ" -> "tư" (4) hoặc "sau" -> "sáu" (6).
+    if raw_text:
+        lowered = re.sub(r"\s+", " ", unicodedata.normalize("NFC", raw_text).casefold()).strip()
+        accented_words = r"một|hai|ba|bốn|tư|năm|sáu|bảy|tám|chín|mười"
+        accented_units = (
+            r"(?:dấu hiệu|triệu chứng|biểu hiện|ý|mục|bullet|nguyên nhân|thói quen)"
+        )
+        match = re.search(
+            rf"(?<!\w)(?P<count>{accented_words})\s+{accented_units}(?!\w)",
+            lowered,
+        )
         if match:
             return _parse_number(match.group("count"))
     return None

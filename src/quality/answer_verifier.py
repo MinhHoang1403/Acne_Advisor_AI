@@ -9,6 +9,7 @@ kê trong report, không phải chứng nhận nội dung đúng y khoa.
 from __future__ import annotations
 
 from functools import lru_cache
+import re
 from typing import Any
 
 from src.agent.answer_formatting import assess_structural_quality, infer_response_profile
@@ -79,10 +80,26 @@ def verify_answer_quality(
     )
 
 
+_TOPIC_RESET_RE = re.compile(
+    r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b[^.!?;\n]*[.!?;\n]+\s*(?P<question>.+)$",
+    flags=re.IGNORECASE | re.DOTALL,
+)
+
+
+def _effective_scope_query(query: str) -> str:
+    """Bỏ tiền tố topic-reset để không phạt nhầm thực thể người dùng yêu cầu bỏ qua."""
+
+    match = _TOPIC_RESET_RE.match(query or "")
+    if not match:
+        return query
+    remainder = " ".join(match.group("question").split())
+    return remainder or query
+
+
 def _requested_entity_scope_errors(query: str, answer: str) -> list[AnswerQualityIssue]:
     """Catch explicit entity omissions without claiming semantic entailment."""
 
-    requested = _matched_entity_names(query)
+    requested = _matched_entity_names(_effective_scope_query(query))
     addressed = _matched_entity_names(answer)
     missing = sorted(set(requested) - set(addressed))
     if len(requested) >= 2 and missing:

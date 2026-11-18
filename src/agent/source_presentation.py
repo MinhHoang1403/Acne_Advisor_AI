@@ -174,6 +174,36 @@ def is_source_request(question: str) -> bool:
     return any(marker in folded for marker in markers)
 
 
+def is_pure_source_request(question: str) -> bool:
+    """Phân biệt câu chỉ hỏi danh sách nguồn với câu hỏi y khoa có kèm nhắc nguồn."""
+
+    if not is_source_request(question):
+        return False
+    folded = _fold_source_text(question)
+    if "theo kho du lieu" in folded and not any(
+        marker in folded for marker in ("nguon nao", "tai lieu nao", "nguon tham khao")
+    ):
+        return False
+    clinical_intent_markers = (
+        "la gi",
+        "the nao",
+        "ra sao",
+        "khac nhau",
+        "so sanh",
+        "tac dung",
+        "dieu tri",
+        "cham soc",
+        "trieu chung",
+        "nguyen nhan",
+        "co nen",
+        "co the",
+        "khi nao",
+        "tai sao",
+        "vi sao",
+    )
+    return not any(marker in folded for marker in clinical_intent_markers)
+
+
 def build_grounded_source_answer(question: str, allowlist: list[dict[str, Any]] | None) -> str:
     """Trả lời câu hỏi về nguồn chỉ từ retrieval allowlist của request hiện tại."""
 
@@ -416,6 +446,7 @@ __all__ = [
     "build_source_metadata",
     "canonical_source_id",
     "display_names_for_sources",
+    "is_pure_source_request",
     "is_source_request",
     "normalize_source_identifier",
     "validate_answer_source_mentions",

@@ -103,25 +103,32 @@ function renderTable(lines, key) {
   );
 }
 
+const LIST_ITEM_RE = /^(\s*)(?:([-*])|(\d+[.)]))\s+(.+)$/;
+
 function renderList(lines, key) {
   const roots = [];
   const stack = [{ indent: -1, items: roots }];
   for (const line of lines) {
-    const match = line.match(/^(\s*)[-*]\s+(.+)$/);
+    const match = line.match(LIST_ITEM_RE);
     if (!match) continue;
     const indent = match[1].replace(/\t/g, '  ').length;
+    const ordered = Boolean(match[3]);
     while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
       stack.pop();
     }
-    const node = { content: match[2], children: [] };
+    const node = { content: match[4], ordered, children: [] };
     stack[stack.length - 1].items.push(node);
     stack.push({ indent, items: node.children });
   }
 
   function renderItems(items, listKey) {
+    const isOrdered = Boolean(items[0]?.ordered);
     return React.createElement(
-      'ul',
-      { key: listKey, className: 'chat-list' },
+      isOrdered ? 'ol' : 'ul',
+      {
+        key: listKey,
+        className: isOrdered ? 'chat-list chat-list-ordered' : 'chat-list',
+      },
       items.map((item, index) => {
         const children = renderInline(item.content, `${listKey}-li-${index}`);
         if (item.children.length > 0) {
@@ -210,9 +217,18 @@ export function formatText(text) {
       continue;
     }
 
-    if (/^\s*[-*]\s+/.test(line)) {
-      const listLines = [];
-      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
+    const listMatch = line.match(LIST_ITEM_RE);
+    if (listMatch) {
+      const rootOrdered = Boolean(listMatch[3]);
+      const listLines = [lines[index]];
+      index += 1;
+      while (index < lines.length) {
+        const nextMatch = lines[index].match(LIST_ITEM_RE);
+        if (!nextMatch) break;
+        const nextIndent = nextMatch[1].replace(/\t/g, '  ').length;
+        const nextOrdered = Boolean(nextMatch[3]);
+        // Nếu quay về cấp ngoài cùng và đổi kiểu danh sách (ol <-> ul), tách block mới.
+        if (nextIndent === 0 && nextOrdered !== rootOrdered) break;
         listLines.push(lines[index]);
         index += 1;
       }

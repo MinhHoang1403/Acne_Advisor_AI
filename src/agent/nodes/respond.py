@@ -15,6 +15,7 @@ from src.agent.state import ClinicalState
 from src.agent.source_presentation import (
     build_grounded_source_answer,
     build_source_allowlist,
+    is_pure_source_request,
     is_source_request,
     validate_answer_source_mentions,
 )
@@ -48,10 +49,22 @@ async def finalize_response_node(state: ClinicalState) -> dict:
 
     def present_and_validate(draft: str, *, add_disclaimer: bool | None = None) -> tuple[str, dict]:
         started = time.perf_counter()
-        source_request_answer = (
-            build_grounded_source_answer(query, allowlist)
-            if is_source_request(query) and not state.get("fallback_applied") else draft
-        )
+        # Tuyệt đối không ghi đè phản hồi an toàn hoặc fallback deterministic bằng câu liệt kê nguồn.
+        if (
+            is_source_request(query)
+            and not state.get("fallback_applied")
+            and not state.get("safety_override")
+        ):
+            if is_pure_source_request(query) or not state.get("generation_invoked"):
+                source_request_answer = build_grounded_source_answer(query, allowlist)
+            elif allowlist and draft.strip():
+                source_request_answer = (
+                    f"{draft.rstrip()}\n\n{build_grounded_source_answer(query, allowlist)}"
+                )
+            else:
+                source_request_answer = draft
+        else:
+            source_request_answer = draft
         presented = finalize_answer_presentation(
             source_request_answer,
             user_question=query,

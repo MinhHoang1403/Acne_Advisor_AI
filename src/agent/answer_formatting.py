@@ -333,7 +333,7 @@ def repair_terminal_punctuation(text: str) -> str:
     last = _remove_known_disclaimers(text).strip().splitlines()[-1].strip()
     if _is_heading(last) or _is_table_row(last) or _has_dangling_ending(last):
         return text
-    if len(last.split()) >= 8 and not re.search(r"[.!?…)]$", last):
+    if len(last.split()) >= 8 and not _ends_with_terminal_punctuation(last):
         return text.rstrip() + "."
     return text
 
@@ -503,6 +503,13 @@ def _trim_incomplete_terminal_paragraph(text: str) -> str:
     return repair_terminal_punctuation(text)
 
 
+def _ends_with_terminal_punctuation(line: str) -> bool:
+    """Kiểm tra dấu kết câu, cho phép ký tự đóng ngoặc/in đậm đứng sau dấu chấm."""
+
+    trimmed = re.sub(r'[*_`"\'”’)\]]+$', "", (line or "").strip())
+    return bool(re.search(r"[.!?…]$", trimmed))
+
+
 def _has_incomplete_terminal_sentence(text: str) -> bool:
     clean = _remove_known_disclaimers(text).strip()
     if not clean:
@@ -513,7 +520,7 @@ def _has_incomplete_terminal_sentence(text: str) -> bool:
     if _is_table_row(last):
         return False
     return _has_dangling_ending(last) or (
-        len(last.split()) >= 8 and not re.search(r"[.!?…)]$", last)
+        len(last.split()) >= 8 and not _ends_with_terminal_punctuation(last)
     )
 
 

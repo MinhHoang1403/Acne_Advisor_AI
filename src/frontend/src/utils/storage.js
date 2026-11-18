@@ -35,7 +35,11 @@ export function loadSessions() {
  * @param {Array} sessions
  */
 export function saveSessions(sessions) {
-  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+  try {
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+  } catch (err) {
+    console.warn('Failed to save sessions to localStorage:', err);
+  }
 }
 
 /**
