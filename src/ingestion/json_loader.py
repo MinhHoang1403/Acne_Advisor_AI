@@ -28,8 +28,10 @@ def load_web_json_documents_with_stats(
     """Nạp web JSON records và trả documents cùng số record tổng/bị bỏ qua."""
 
     json_path = Path(path)
+    min_chars = max(1, int(min_raw_text_chars))
     try:
-        data = json.loads(json_path.read_text(encoding="utf-8"))
+        # Dùng utf-8-sig để đọc an toàn cả file JSON có BOM.
+        data = json.loads(json_path.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON file at {json_path}: {exc}") from exc
     except OSError as exc:
@@ -50,10 +52,10 @@ def load_web_json_documents_with_stats(
             continue
 
         raw_text = str(record.get("raw_text") or "").strip()
-        if not raw_text:
+        if len(raw_text) < min_chars:
             skipped += 1
             logger.warning(
-                "[JSON LOADER] Skipping empty record %d in %s",
+                "[JSON LOADER] Skipping empty/short record %d in %s",
                 record_index,
                 json_path.name,
             )

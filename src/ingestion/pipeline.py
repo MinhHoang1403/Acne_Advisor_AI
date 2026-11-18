@@ -141,9 +141,12 @@ def _compile_prepared_knowledge(
     )
     cards = build_entity_cards_from_taxonomy()
     graph_records = build_entity_graph_records(cards, kb_version=identity.build_id)
+    method_sources_path = taxonomy_path.parent.parent / "method_sources.json"
+    if not method_sources_path.is_file():
+        method_sources_path = Path("data/method_sources.json")
     taxonomy_source_ids = {
         str(record.get("source_id"))
-        for record in json.loads(Path("data/method_sources.json").read_text(encoding="utf-8"))[
+        for record in json.loads(method_sources_path.read_text(encoding="utf-8"))[
             "sources"
         ]
     }
@@ -363,11 +366,17 @@ async def build_knowledge(
 
 async def validate_knowledge(
     *,
+    source_dir: Path = DEFAULT_SOURCE_DIR,
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
     live: bool = True,
 ) -> dict[str, Any]:
     """So build identity offline và tùy chọn kiểm candidate collections live."""
-    prepared = await prepare_knowledge()
+    # Chỉ truyền source_dir khi khác mặc định để giữ tương thích test stub 0 tham số.
+    prepared = await (
+        prepare_knowledge()
+        if source_dir == DEFAULT_SOURCE_DIR
+        else prepare_knowledge(source_dir=source_dir)
+    )
     manifest = load_build_manifest(manifest_path) if manifest_path.is_file() else None
     layers = list(prepared["offline_validation"]["layers"])
     if manifest is not None:
@@ -407,23 +416,41 @@ async def validate_knowledge(
 
 async def activate_knowledge(
     *,
+    source_dir: Path = DEFAULT_SOURCE_DIR,
     manifest_path: Path = DEFAULT_BUILD_MANIFEST,
-    rollback_root: Path,
+    rollback_root: Path | None = None,
+    allow_empty_bootstrap: bool = False,
 ) -> dict[str, Any]:
-    """Activate candidate đã validate sau khi chứng minh rollback artifacts tồn tại.
+    """Activate candidate đã validate sau khi chứng minh rollback artifacts tồn tại
+    hoặc xác nhận datastore hiện đang sạch hoàn toàn (empty bootstrap).
 
     Tác động ghi gồm thay Neo4j entity graph theo build ID và chuyển hai Qdrant
     logical aliases sang physical candidates. Đây là operator operation có chủ ý,
     không chạy trong API request path.
     """
 
-    _verify_rollback_artifacts(rollback_root)
-    validation = await validate_knowledge(manifest_path=manifest_path, live=True)
+    if rollback_root is not None:
+        _verify_rollback_artifacts(rollback_root)
+    elif allow_empty_bootstrap:
+        await _verify_empty_bootstrap_state()
+    else:
+        raise RuntimeError(
+            "Rollback artifacts are required unless allow_empty_bootstrap=True on clean datastores"
+        )
+    validation = await validate_knowledge(
+        source_dir=source_dir,
+        manifest_path=manifest_path,
+        live=True,
+    )
     if not validation["passed"]:
         raise RuntimeError(f"Candidate cutover validation failed: {validation['errors']}")
 
     manifest = load_build_manifest(manifest_path)
-    prepared = await prepare_knowledge()
+    prepared = await (
+        prepare_knowledge()
+        if source_dir == DEFAULT_SOURCE_DIR
+        else prepare_knowledge(source_dir=source_dir)
+    )
     if manifest["build_id"] != prepared["identity"].build_id:
         raise RuntimeError("Candidate manifest does not match the validated input build identity")
 
@@ -487,7 +514,7 @@ async def activate_knowledge(
         raise RuntimeError(f"Post-cutover validation failed: {cutover_validation['errors']}")
     manifest["status"] = "activated"
     manifest["activation"] = {
-        "rollback_root": rollback_root.as_posix(),
+        "rollback_root": rollback_root.as_posix() if rollback_root is not None else "empty_bootstrap",
         "knowledge_alias": KNOWLEDGE_LOGICAL_COLLECTION,
         "entity_alias": ENTITY_LOGICAL_COLLECTION,
         "graph": graph_result,
@@ -712,6 +739,40 @@ def _legacy_point_ids(path: Path) -> list[str]:
     for entry in (raw.get("documents") or {}).values():
         identifiers.extend(str(value) for value in entry.get("qdrant_point_ids", []))
     return identifiers
+
+
+async def _verify_empty_bootstrap_state() -> None:
+    """Chỉ cho phép kích hoạt không cần rollback snapshot khi live Qdrant và Neo4j sạch dữ liệu cũ."""
+
+    client = AsyncQdrantClient(**qdrant_client_kwargs())
+    try:
+        collections = {item.name for item in (await client.get_collections()).collections}
+        aliases = {item.alias_name for item in (await client.get_aliases()).aliases}
+    finally:
+        await client.close()
+
+    existing_live = sorted(
+        ({KNOWLEDGE_LOGICAL_COLLECTION, ENTITY_LOGICAL_COLLECTION} & (collections | aliases))
+    )
+    if existing_live:
+        raise RuntimeError(
+            "Empty bootstrap refused because live Qdrant collections/aliases already exist: "
+            f"{existing_live}"
+        )
+
+    driver = get_neo4j_driver()
+    try:
+        async with driver.session(database=os.getenv("NEO4J_DATABASE", "neo4j")) as session:
+            result = await session.run("MATCH (n) RETURN count(n) AS total")
+            record = await result.single()
+    finally:
+        await driver.close()
+
+    total_nodes = int((record or {}).get("total", 0))
+    if total_nodes > 0:
+        raise RuntimeError(
+            f"Empty bootstrap refused because Neo4j already contains {total_nodes} nodes"
+        )
 
 
 def _verify_rollback_artifacts(root: Path) -> None:

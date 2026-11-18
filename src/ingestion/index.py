@@ -136,10 +136,10 @@ async def resolve_embeddings(
     retry_count = 0
     delay = batch_delay_seconds
     if delay is None:
-        configured_delay = float(os.getenv("EMBEDDING_BATCH_DELAY", "10") or "10")
-        # Quota được tính theo từng input; delay hữu hạn giữ tốc độ batch trong
-        # giới hạn cấu hình provider và không ảnh hưởng nội dung vector.
-        delay = max(configured_delay, 10.0)
+        raw_delay = os.getenv("EMBEDDING_BATCH_DELAY", "").strip()
+        # Dùng mặc định 10s để tránh vượt rate-limit miễn phí, nhưng tôn trọng giá trị
+        # cấu hình tường minh từ EMBEDDING_BATCH_DELAY khi người dùng thiết lập.
+        delay = max(0.0, float(raw_delay)) if raw_delay else 10.0
     for start in range(0, len(misses), batch_size):
         indexes = misses[start:start + batch_size]
         batch_texts = [texts[index] for index in indexes]
