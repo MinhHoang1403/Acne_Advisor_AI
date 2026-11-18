@@ -122,3 +122,20 @@ test('formatText renders unsafe markdown links as plain text', () => {
   assert.match(collectText(rendered), /data/);
   assert.doesNotMatch(collectText(rendered), /javascript:|data:text/);
 });
+
+test('formatText renders ordered lists and mixed nested lists cleanly', () => {
+  const rendered = formatText(
+    [
+      '1. Làm sạch nhẹ dịu',
+      '  - Dùng sữa rửa mặt không xà phòng',
+      '2. Bôi thuốc theo chỉ định',
+      '- Ghi chú thêm',
+    ].join('\n'),
+  );
+
+  assert.equal(collectByType(rendered, 'ol').length, 1);
+  assert.equal(collectByType(rendered, 'ul').length, 2);
+  assert.equal(collectByType(rendered, 'li').length, 4);
+  assert.match(collectText(rendered), /Làm sạch nhẹ dịu/);
+  assert.match(collectText(rendered), /Ghi chú thêm/);
+});

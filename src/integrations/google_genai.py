@@ -181,6 +181,7 @@ def embed_texts_sync(
     output_dimensions: int | None = None,
     api_key: str | None = None,
     client: Any | None = None,
+    request_timeout: float | None = None,
 ) -> list[list[float]]:
     """Yêu cầu provider embed một batch rồi kiểm count/dimension từng vector.
 
@@ -192,7 +193,10 @@ def embed_texts_sync(
         return []
     active_client = None
     try:
-        active_client = client or build_google_genai_client(api_key=api_key)
+        active_client = client or build_google_genai_client(
+            api_key=api_key,
+            timeout_seconds=request_timeout,
+        )
         config_kwargs: dict[str, Any] = {}
         if output_dimensions is not None:
             config_kwargs["output_dimensionality"] = output_dimensions

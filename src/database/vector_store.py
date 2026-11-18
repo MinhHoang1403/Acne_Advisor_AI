@@ -13,6 +13,7 @@ Neo4j không được truy vấn tại đây. Muốn đổi provider/model embed
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import os
 from pathlib import Path
@@ -58,7 +59,7 @@ def qdrant_client_kwargs() -> dict[str, Any]:
 # Embedding helper
 # ---------------------------------------------------------------------------
 
-def _embed_sync(text: str) -> list[float]:
+def _embed_sync(text: str, *, request_timeout: float | None = None) -> list[float]:
     """Gửi một query tới Gemini embedding provider theo lời gọi đồng bộ.
 
     Gemini Embedding 2 không nhận ``task_type`` qua API. Document và query hiện
@@ -68,7 +69,8 @@ def _embed_sync(text: str) -> list[float]:
     """
     from src.integrations.google_genai import embed_texts_sync
 
-    key = GOOGLE_API_KEY.strip()
+    # Cho phép đọc động từ biến môi trường nếu module được import trước khi key được nạp.
+    key = GOOGLE_API_KEY.strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     if not key:
         raise RuntimeError(
             "GOOGLE_API_KEY is not set. Add it to .env for embedding."
@@ -81,6 +83,7 @@ def _embed_sync(text: str) -> list[float]:
         expected_dimensions=EMBEDDING_DIMENSIONS,
         output_dimensions=EMBEDDING_DIMENSIONS,
         api_key=key,
+        request_timeout=request_timeout,
     )
     return vectors[0]
 
@@ -98,8 +101,17 @@ async def embed_query(text: str) -> list[float]:
     max_attempts = _positive_int_env("EMBEDDING_QUERY_MAX_ATTEMPTS", 3)
     retry_base = _positive_float_env("EMBEDDING_QUERY_RETRY_BASE_DELAY", 1.0)
 
-    async def operation(_: float) -> list[float]:
-        embedding = await asyncio.to_thread(_embed_sync, text)
+    async def operation(effective_timeout: float) -> list[float]:
+        # Chỉ truyền request_timeout nếu callable hỗ trợ (tránh vỡ test stub 1 tham số).
+        params = inspect.signature(_embed_sync).parameters
+        if "request_timeout" in params or any(
+            param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values()
+        ):
+            embedding = await asyncio.to_thread(
+                _embed_sync, text, request_timeout=effective_timeout
+            )
+        else:
+            embedding = await asyncio.to_thread(_embed_sync, text)
         if len(embedding) != EMBEDDING_DIMENSIONS:
             raise ValueError(
                 f"Query embedding dimension mismatch: got {len(embedding)}, "

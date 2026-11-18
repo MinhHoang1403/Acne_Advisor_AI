@@ -8,6 +8,7 @@ một câu hoàn chỉnh, không retry lỗi network/status.
 
 import logging
 import os
+import re
 import httpx
 from typing import Any
 
@@ -58,11 +59,24 @@ def _duration_ms(value: Any) -> float | None:
     return round(float(value) / 1_000_000, 3)
 
 
+def _ollama_json_format(response_schema: object | None) -> Any | None:
+    """Chuyển Pydantic/JSON schema sang tham số ``format`` của Ollama /api/chat."""
+    if response_schema is None:
+        return None
+    model_json_schema = getattr(response_schema, "model_json_schema", None)
+    if callable(model_json_schema):
+        return model_json_schema()
+    if isinstance(response_schema, dict):
+        return response_schema
+    return "json"
+
+
 def build_ollama_chat_payload(
     *,
     model: str,
     messages: list[dict[str, str]],
     temperature: float = 0.2,
+    response_schema: object | None = None,
 ) -> dict[str, Any]:
     """Tạo payload Ollama hữu hạn mà không log nội dung prompt."""
 
@@ -80,10 +94,15 @@ def build_ollama_chat_payload(
             "top_p": _env_float("OLLAMA_TOP_P", 0.9),
         },
     }
+    json_format = _ollama_json_format(response_schema)
+    if json_format is not None:
+        payload["format"] = json_format
     return payload
 
 async def list_ollama_models(timeout_seconds: float | None = None) -> list[str]:
     """Lấy tên model local; lỗi kết nối trả list rỗng để fallback bỏ qua Ollama."""
+    if timeout_seconds is not None and timeout_seconds <= 0:
+        return []
     try:
         timeout = timeout_seconds if timeout_seconds and timeout_seconds > 0 else 5.0
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -102,6 +121,7 @@ async def generate_ollama_response(
     prompt: str,
     temperature: float = 0.2,
     request_timeout: float | None = None,
+    response_schema: object | None = None,
 ) -> str:
     """Yêu cầu Ollama sinh text và thử rút gọn một lần nếu output bị cắt."""
     messages = []
@@ -120,6 +140,7 @@ async def generate_ollama_response(
                     model=model,
                     messages=attempt_messages,
                     temperature=temperature,
+                    response_schema=response_schema,
                 )
                 response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
                 response.raise_for_status()
@@ -144,6 +165,9 @@ async def generate_ollama_response(
                     _duration_ms(data.get("eval_duration")),
                 )
                 content = data.get("message", {}).get("content", "")
+                if isinstance(content, str):
+                    # Loại bỏ thẻ <think>...</think> nếu model local vẫn phát sinh dù đã tắt think.
+                    content = re.sub(r"^\s*<think>.*?</think>\s*", "", content, flags=re.DOTALL)
                 if not truncated:
                     return content
                 if attempt < retry_attempts:

@@ -7,8 +7,10 @@ replace; module không tự build, activate hoặc mutate datastore.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -138,10 +140,26 @@ def save_build_manifest(path: Path, manifest: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+_MANIFEST_CACHE_LOCK = threading.Lock()
+_MANIFEST_CACHE: dict[Path, tuple[int, int, dict[str, Any]]] = {}
+
+
 def load_build_manifest(path: Path) -> dict[str, Any]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    # Cache manifest đã parse theo (đường dẫn, mtime_ns, size) để không đọc/parse JSON
+    # lặp lại trên mỗi truy vấn, nhưng vẫn tự làm mới ngay khi file trên đĩa thay đổi.
+    resolved = path.resolve()
+    stat = resolved.stat()
+    fingerprint = (stat.st_mtime_ns, stat.st_size)
+    with _MANIFEST_CACHE_LOCK:
+        cached = _MANIFEST_CACHE.get(resolved)
+        if cached is not None and cached[0] == fingerprint[0] and cached[1] == fingerprint[1]:
+            return copy.deepcopy(cached[2])
+
+    raw = json.loads(resolved.read_text(encoding="utf-8"))
     if raw.get("schema") != BUILD_MANIFEST_SCHEMA:
         raise ValueError(f"Unsupported knowledge-build manifest at {path}")
+    with _MANIFEST_CACHE_LOCK:
+        _MANIFEST_CACHE[resolved] = (fingerprint[0], fingerprint[1], copy.deepcopy(raw))
     return raw
 
 

@@ -602,23 +602,31 @@ async def _delete_app_redis_cache_keys() -> tuple[int, list[str]]:
     from src.cache.redis_cache import get_redis
 
     patterns = ["cache:answer:*"]
-    redis = await get_redis()
-    if redis is None:
-        return 0, patterns
-
     deleted = 0
-    for pattern in patterns:
-        cursor = 0
-        while True:
-            cursor, keys = await redis.scan(
-                cursor=cursor,
-                match=pattern,
-                count=500,
-            )
-            if keys:
-                deleted += int(await redis.delete(*keys))
-            if cursor == 0:
-                break
+    try:
+        redis = await get_redis()
+        if redis is None:
+            return 0, patterns
+
+        # Xóa cache Redis theo chế độ fail-open vì PostgreSQL đã commit thành công;
+        # nếu Redis lỗi tạm thời cũng không làm mất trạng thái hoặc trả 500 sai lệch.
+        for pattern in patterns:
+            cursor = 0
+            while True:
+                cursor, keys = await redis.scan(
+                    cursor=cursor,
+                    match=pattern,
+                    count=500,
+                )
+                if keys:
+                    deleted += int(await redis.delete(*keys))
+                if cursor == 0:
+                    break
+    except Exception as exc:
+        logger.warning(
+            "Redis cache cleanup failed open: error_type=%s",
+            exc.__class__.__name__,
+        )
     return deleted, patterns
 
 
@@ -892,7 +900,13 @@ async def chat_endpoint(request: ChatRequest):
         # Retrieved context remains diagnostic evidence, not an attribution for
         # a deterministic fallback that did not synthesize an answer from it.
         raw_sources_list = [] if result.get("fallback_applied") else result.get("sources", [])
-        source_contexts = [] if result.get("fallback_applied") else result.get("vector_contexts", [])
+        # Khi cache hit trả về nguồn web/hybrid mà vector_contexts rỗng, fallback sang
+        # source_allowlist để giữ nguyên tiêu đề, cơ quan ban hành và đường dẫn nguồn.
+        source_contexts = (
+            []
+            if result.get("fallback_applied")
+            else (result.get("vector_contexts", []) or result.get("source_allowlist", []))
+        )
         source_metadata = build_source_metadata(
             raw_sources_list,
             source_contexts,
@@ -1454,57 +1468,60 @@ async def sync_sessions(body: SyncRequest):
         async with db_session.begin():
             for s_payload in body.sessions:
                 try:
-                    s_payload.title = repair_mojibake(s_payload.title)
-                    exists = await repo.session_exists(
-                        session=db_session,
-                        session_id=s_payload.id,
-                    )
-                    
-                    if not exists:
-                        # New session — create it
-                        await repo.create_or_update_session(
+                    # Dùng savepoint riêng cho từng session để lỗi ở một session
+                    # chỉ rollback phần đó, không làm hỏng cả transaction sync.
+                    async with db_session.begin_nested():
+                        s_payload.title = repair_mojibake(s_payload.title)
+                        exists = await repo.session_exists(
                             session=db_session,
                             session_id=s_payload.id,
-                            title=s_payload.title,
-                            hidden=s_payload.hidden,
                         )
-                    
-                    # Get existing message IDs to avoid duplicates
-                    existing_msg_ids = await repo.get_message_ids_for_session(
-                        session=db_session,
-                        session_id=s_payload.id,
-                    )
-                    
-                    for idx, msg in enumerate(s_payload.messages):
-                        msg.content = repair_mojibake(msg.content)
-                        # Generate deterministic message ID from session+index
-                        # to avoid duplicates across multiple syncs
-                        msg_id = msg.id or f"{s_payload.id}_msg_{idx}"
                         
-                        if msg_id in existing_msg_ids:
-                            continue  # Already exists, skip
+                        if not exists:
+                            # New session — create it
+                            await repo.create_or_update_session(
+                                session=db_session,
+                                session_id=s_payload.id,
+                                title=s_payload.title,
+                                hidden=s_payload.hidden,
+                            )
                         
-                        # Convert JS timestamp (ms) to datetime
-                        created_at = None
-                        if msg.created_at:
-                            try:
-                                created_at = datetime.fromtimestamp(
-                                    msg.created_at / 1000, tz=timezone.utc
-                                )
-                            except (ValueError, OSError):
-                                created_at = None
-                        
-                        await repo.save_message(
+                        # Get existing message IDs to avoid duplicates
+                        existing_msg_ids = await repo.get_message_ids_for_session(
                             session=db_session,
                             session_id=s_payload.id,
-                            role=msg.role,
-                            content=msg.content,
-                            message_id=msg_id,
-                            sources=msg.sources,
-                            metadata=msg.metadata,
-                            created_at=created_at,
                         )
-                    
+                        
+                        for idx, msg in enumerate(s_payload.messages):
+                            msg.content = repair_mojibake(msg.content)
+                            # Generate deterministic message ID from session+index
+                            # to avoid duplicates across multiple syncs
+                            msg_id = msg.id or f"{s_payload.id}_msg_{idx}"
+                            
+                            if msg_id in existing_msg_ids:
+                                continue  # Already exists, skip
+                            
+                            # Convert JS timestamp (ms) to datetime
+                            created_at = None
+                            if msg.created_at:
+                                try:
+                                    created_at = datetime.fromtimestamp(
+                                        msg.created_at / 1000, tz=timezone.utc
+                                    )
+                                except (ValueError, OSError):
+                                    created_at = None
+                            
+                            await repo.save_message(
+                                session=db_session,
+                                session_id=s_payload.id,
+                                role=msg.role,
+                                content=msg.content,
+                                message_id=msg_id,
+                                sources=msg.sources,
+                                metadata=msg.metadata,
+                                created_at=created_at,
+                            )
+                        
                     synced += 1
                     
                 except Exception as e:

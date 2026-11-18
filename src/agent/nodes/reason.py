@@ -67,9 +67,12 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             observe_medical_prompt_budget,
         )
 
-        answer_contexts = _select_answer_contexts(contexts, limit=5, query=question)
         packed_context = state.get("packed_context") or {}
-        packed_context_text = str(packed_context.get("context_text") or "")
+        packed_items = packed_context.get("items") or []
+        context_limit = len(packed_items) if packed_items else 5
+        answer_contexts = _select_answer_contexts(contexts, limit=context_limit, query=question)
+        # Chỉ truyền packed_context_text khi thực sự có nội dung, tránh che mất fallback legacy contexts.
+        packed_context_text = str(packed_context.get("context_text") or "") or None
 
         prompt_started = time.perf_counter()
         prompt = build_medical_prompt(

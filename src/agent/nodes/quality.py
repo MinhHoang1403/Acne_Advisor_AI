@@ -51,26 +51,31 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
 
     try:
         packed_context = _parse_model(PackedContext, state.get("packed_context"))
-        report_model = verify_answer_quality(
-            query=query,
-            answer=answer,
-            packed_context=packed_context,
-            retrieval_trace=state.get("retrieval_trace"),
-            final_source_ids=list(state.get("sources") or []),
-            request_shape=state.get("request_shape"),
-        )
         profile = state.get("response_profile") or infer_response_profile(
             query,
             severity=state.get("safety_severity"),
             fallback_type=state.get("fallback_type") if state.get("fallback_applied") else None,
             request_shape=state.get("request_shape"),
         )
-        presented = finalize_answer_presentation(
-            answer,
-            user_question=query,
-            response_profile=profile,
-            severity=state.get("safety_severity"),
-            fallback_type=state.get("fallback_type") if state.get("fallback_applied") else None,
+        # Nếu node được gọi trực tiếp chưa qua finalize_response_node thì chuẩn hóa trước khi verify.
+        presented = (
+            answer
+            if state.get("source_validation") is not None
+            else finalize_answer_presentation(
+                answer,
+                user_question=query,
+                response_profile=profile,
+                severity=state.get("safety_severity"),
+                fallback_type=state.get("fallback_type") if state.get("fallback_applied") else None,
+                request_shape=state.get("request_shape"),
+            )
+        )
+        report_model = verify_answer_quality(
+            query=query,
+            answer=presented,
+            packed_context=packed_context,
+            retrieval_trace=state.get("retrieval_trace"),
+            final_source_ids=list(state.get("sources") or []),
             request_shape=state.get("request_shape"),
         )
         report = report_model.model_dump(mode="json")

@@ -55,6 +55,7 @@ export default function App() {
   const [historyHiddenAt, setHistoryHiddenAt] = useState(() => loadHistoryHiddenAt());
   const requestInFlight = useRef(false);
   const selectionSequence = useRef(0);
+  const messageLoadSequence = useRef(0);
   const chatAbortRef = useRef(null);
 
   useEffect(() => () => chatAbortRef.current?.abort(), []);
@@ -155,41 +156,11 @@ export default function App() {
     };
   }, []);
 
-  // Chỉ load danh sách PostgreSQL một lần sau khi backend reachable.
-  useEffect(() => {
-    if (!backendOnline || backendSessionsLoaded.current) return;
-    backendSessionsLoaded.current = true;
-
-    (async () => {
-      try {
-        const backendSessions = await fetchSessions();
-        const normalizedBackendSessions = backendSessions.map((s) => ({
-          id: s.id,
-          title: s.title,
-          createdAt: new Date(s.created_at).getTime(),
-          updatedAt: new Date(s.updated_at).getTime(),
-          hidden: s.hidden,
-          messages: [],
-          _fromBackend: true,
-        }));
-
-        setSessions((prev) => mergeSessionSummaries(prev, normalizedBackendSessions));
-
-        const backendIds = new Set(normalizedBackendSessions.map((s) => s.id));
-        if (!activeSessionId || !backendIds.has(activeSessionId)) {
-          setActiveSessionId((current) => current || normalizedBackendSessions[0]?.id || null);
-        }
-      } catch (err) {
-        backendSessionsLoaded.current = false;
-        console.warn('Failed to load sessions from backend:', err);
-      }
-    })();
-  }, [activeSessionId, backendOnline]);
-
-  // Message bodies được load lười khi người dùng chọn session.
+  // Message bodies được load lười khi người dùng chọn session hoặc khi mở lại tab.
   const _loadMessagesFromBackend = useCallback(async (sessionId) => {
-    if (!backendOnline) return;
+    if (!backendOnline || !sessionId) return;
 
+    const loadSeq = ++messageLoadSequence.current;
     setLoadingMessages(true);
     try {
       const msgs = await fetchMessages(sessionId);
@@ -222,9 +193,51 @@ export default function App() {
     } catch (err) {
       console.warn('Failed to load messages from backend:', err);
     } finally {
-      setLoadingMessages(false);
+      // Chỉ tắt spinner nếu đây vẫn là request tải message mới nhất.
+      if (loadSeq === messageLoadSequence.current) {
+        setLoadingMessages(false);
+      }
     }
   }, [backendOnline]);
+
+  // Chỉ load danh sách PostgreSQL một lần sau khi backend reachable.
+  useEffect(() => {
+    if (!backendOnline || backendSessionsLoaded.current) return;
+    backendSessionsLoaded.current = true;
+
+    (async () => {
+      try {
+        const backendSessions = await fetchSessions();
+        const normalizedBackendSessions = backendSessions.map((s) => ({
+          id: s.id,
+          title: s.title,
+          createdAt: new Date(s.created_at).getTime(),
+          updatedAt: new Date(s.updated_at).getTime(),
+          hidden: s.hidden,
+          messages: [],
+          _fromBackend: true,
+        }));
+
+        setSessions((prev) => mergeSessionSummaries(prev, normalizedBackendSessions));
+
+        const backendIds = new Set(normalizedBackendSessions.map((s) => s.id));
+        const resolvedActiveId =
+          activeSessionId && backendIds.has(activeSessionId)
+            ? activeSessionId
+            : normalizedBackendSessions[0]?.id || null;
+
+        if (!activeSessionId || !backendIds.has(activeSessionId)) {
+          setActiveSessionId((current) => current || normalizedBackendSessions[0]?.id || null);
+        }
+        if (resolvedActiveId && backendIds.has(resolvedActiveId)) {
+          _loadMessagesFromBackend(resolvedActiveId);
+        }
+      } catch (err) {
+        backendSessionsLoaded.current = false;
+        console.warn('Failed to load sessions from backend:', err);
+      }
+    })();
+  }, [activeSessionId, backendOnline, _loadMessagesFromBackend]);
 
   // Event handlers cập nhật local state trước, rồi đồng bộ backend nếu có thể.
   const handleNewChat = useCallback(() => {
@@ -347,7 +360,8 @@ export default function App() {
       }
     } catch (err) {
       console.error('Failed to delete all chat history:', err);
-      setError('Không xoá được lịch sử chat. Hãy kiểm tra backend rồi thử lại.');
+      const detail = err instanceof Error && err.message ? ` (${err.message})` : '';
+      setError(`Không xoá được lịch sử chat${detail}. Hãy kiểm tra backend rồi thử lại.`);
     }
   }, [backendOnline]);
 
