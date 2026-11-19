@@ -62,19 +62,23 @@ def test_release_checker_invalid_env_fixture_fails(tmp_path: Path) -> None:
 
 
 def test_extract_data_counts_reads_current_readiness_schema() -> None:
+    expected_knowledge = checker.EXPECTED_COUNTS["acne_knowledge"]
+    expected_entities = checker.EXPECTED_COUNTS["acne_entities"]
+    expected_nodes = checker.EXPECTED_COUNTS["neo4j_nodes"]
+    expected_rels = checker.EXPECTED_COUNTS["neo4j_relationships"]
     summary = {
         "checks": [
             {
                 "name": "frozen_phase1_manifest",
-                "details": {"counts": {"entities": 32}},
+                "details": {"counts": {"entities": expected_entities}},
             },
             {
                 "name": "qdrant_frozen_knowledge",
-                "details": {"points_count": 536},
+                "details": {"points_count": expected_knowledge},
             },
             {
                 "name": "neo4j_frozen_graph",
-                "details": {"nodes": 32, "relationships": 27},
+                "details": {"nodes": expected_nodes, "relationships": expected_rels},
             },
         ]
     }
@@ -82,10 +86,10 @@ def test_extract_data_counts_reads_current_readiness_schema() -> None:
     counts = checker.extract_data_counts(summary)
 
     assert counts["passed"] is True
-    assert counts["acne_knowledge"] == 536
-    assert counts["acne_entities"] == 32
-    assert counts["neo4j_nodes"] == 32
-    assert counts["neo4j_relationships"] == 27
+    assert counts["acne_knowledge"] == expected_knowledge
+    assert counts["acne_entities"] == expected_entities
+    assert counts["neo4j_nodes"] == expected_nodes
+    assert counts["neo4j_relationships"] == expected_rels
 
 
 def test_release_checker_utf8_stdio_survives_cp1252_console() -> None:
