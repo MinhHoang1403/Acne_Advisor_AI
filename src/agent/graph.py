@@ -245,6 +245,7 @@ async def run_clinical_agent(
         "generation_invoked": final.get("generation_invoked", False),
         "generation_provider": final.get("generation_provider"),
         "generation_model": final.get("generation_model"),
+        "generation_token_usage": final.get("generation_token_usage"),
         "llm_fallback_used": final.get("llm_fallback_used", False),
         "fallback_provider": final.get("fallback_provider"),
         "fallback_model": final.get("fallback_model"),

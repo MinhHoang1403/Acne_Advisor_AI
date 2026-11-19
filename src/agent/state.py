@@ -89,6 +89,7 @@ class ClinicalState(TypedDict, total=False):
     generation_invoked: bool
     generation_provider: str | None
     generation_model: str | None
+    generation_token_usage: dict[str, int] | None
     llm_fallback_used: bool
     fallback_provider: str | None
     fallback_model: str | None

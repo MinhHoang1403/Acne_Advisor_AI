@@ -484,6 +484,9 @@ def _build_stage_telemetry(
                 fallback=fallback_used,
                 provider=result.get("generation_provider") or result.get("actual_provider"),
                 model=result.get("generation_model") or result.get("actual_model"),
+                usage_details=_safe_usage_details(
+                    result.get("generation_token_usage") or state.get("generation_token_usage")
+                ),
             )
         )
         stages.append(_stage("agent", "abstain", "skipped"))
@@ -550,6 +553,18 @@ def _build_stage_telemetry(
         )
 
     return stages
+
+
+def _safe_usage_details(raw: Any) -> dict[str, int] | None:
+    """Chỉ giữ bộ đếm token số nguyên không âm (input/output/total) cho Langfuse."""
+    if not isinstance(raw, dict):
+        return None
+    cleaned: dict[str, int] = {}
+    for key in ("input", "output", "total"):
+        value = raw.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+            cleaned[key] = value
+    return cleaned or None
 
 
 def _stage(

@@ -302,8 +302,16 @@ async def generate_llm_response(
         ],
         "error": None,
         "resilience": None,
+        "token_usage": None,
     }
-    
+
+    from src.observability.contracts import (
+        begin_token_usage_scope,
+        latest_token_usage,
+        reset_token_usage_scope,
+    )
+
+    usage_collector, usage_scope_token = begin_token_usage_scope()
     try:
         # Primary target luôn được thử trước và được ghi ở đầu fallback_chain.
         text, resilience_meta = await _call_provider_resilient(
@@ -319,6 +327,7 @@ async def generate_llm_response(
         )
         result["text"] = text
         result["resilience"] = resilience_meta
+        result["token_usage"] = latest_token_usage(usage_collector)
         result["fallback_chain"][0]["status"] = "success"
         return result
             
@@ -347,6 +356,8 @@ async def generate_llm_response(
             raise e
 
         primary_error = e
+    finally:
+        reset_token_usage_scope(usage_scope_token)
 
     result["fallback_chain"][0]["status"] = "failed"
     result["fallback_chain"][0]["reason"] = _fallback_reason_from_error(primary_error)
@@ -385,6 +396,7 @@ async def generate_llm_response(
             "status": "pending",
         }
         result["fallback_chain"].append(chain_entry)
+        fb_collector, fb_scope_token = begin_token_usage_scope()
         try:
             logger.info("Fallback to %s (%s)...", fallback_provider, fallback_model)
             text, resilience_meta = await _call_provider_resilient(
@@ -403,6 +415,7 @@ async def generate_llm_response(
             result["provider"] = fallback_provider
             result["model"] = fallback_model
             result["resilience"] = resilience_meta
+            result["token_usage"] = latest_token_usage(fb_collector)
             result["fallback_used"] = True
             result["fallback_provider"] = fallback_provider
             result["fallback_model"] = fallback_model
@@ -436,6 +449,8 @@ async def generate_llm_response(
                 _safe_error_text(fb_err),
             )
             continue
+        finally:
+            reset_token_usage_scope(fb_scope_token)
 
     if fallback_targets:
         logger.error("All LLM fallback targets failed.")
