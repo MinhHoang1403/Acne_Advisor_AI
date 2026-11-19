@@ -10,6 +10,8 @@ from typing import Any
 
 
 FILE_SOURCE_DISPLAY_NAMES = {
+    "Acne_data_source.json": "Bộ dữ liệu kiến thức lâm sàng mụn trứng cá",
+    "acne_data_source": "Bộ dữ liệu kiến thức lâm sàng mụn trứng cá",
     "web_raw_dataset.json": "Bộ dữ liệu kiến thức mụn",
     "aad_public_acne_2026_07": "Bộ dữ liệu kiến thức mụn",
     "PIIS0190962223033893.pdf": "Tài liệu chuyên môn về điều trị mụn",
@@ -22,6 +24,8 @@ FILE_SOURCE_DISPLAY_NAMES = {
 }
 
 _SOURCE_IDENTITY_ALIASES = {
+    "acne_data_source.json": "acne_data_source",
+    "acne_data_source": "acne_data_source",
     "web_raw_dataset.json": "aad_public_acne_2026_07",
     "aad_public_acne_2026_07": "aad_public_acne_2026_07",
     "piis0190962223033893.pdf": "aad_acne_guideline_2024",
@@ -337,10 +341,17 @@ def _display_name(
     filename = Path(source_id.replace("\\", "/")).name
     if filename in FILE_SOURCE_DISPLAY_NAMES:
         return FILE_SOURCE_DISPLAY_NAMES[filename]
-    if source_id.casefold().startswith("web_") and authority and document_title:
+    folded_id = source_id.casefold()
+    # Hiển thị "Cơ quan ban hành — Tiêu đề tài liệu" cho cả nguồn web_ lẫn nguồn SRC_
+    # trong bộ dữ liệu chuẩn hóa để phân biệt rõ các nguồn trùng tên (vd: "Acne").
+    if folded_id.startswith(("web_", "src_")) and authority and document_title:
+        if authority.casefold() in document_title.casefold():
+            return document_title
         return f"{authority} — {document_title}"
     if document_title:
         return document_title
+    if folded_id.startswith(("src_", "doc_", "chunk_")):
+        return authority or "Nguồn kiến thức nội bộ"
     if filename:
         stem = Path(filename).stem
         label = re.sub(r"[_-]+", " ", stem).strip()
@@ -413,6 +424,7 @@ def _source_aliases(entry: dict[str, Any]) -> set[str]:
         str(entry.get("canonical_filename") or ""),
         str(entry.get("display_name") or ""),
         str(entry.get("document_title") or ""),
+        str(entry.get("authority") or ""),
         str(entry.get("source_path") or ""),
     }
     return {value for value in values if value.strip()}
