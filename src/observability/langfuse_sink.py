@@ -256,6 +256,16 @@ class LangfuseSink:
             return False
 
 
+_ALLOWED_OTEL_USAGE_ATTRIBUTES = frozenset(
+    {
+        "gen_ai.usage.input_tokens",
+        "gen_ai.usage.output_tokens",
+        "gen_ai.usage.total_tokens",
+        "langfuse.observation.usage_details",
+    }
+)
+
+
 def mask_langfuse_otel_spans(*, params: Any) -> Any:
     """Delete content-bearing OTel attributes before the exporter sends a batch."""
 
@@ -263,10 +273,13 @@ def mask_langfuse_otel_spans(*, params: Any) -> Any:
 
     patches: dict[Any, Any] = {}
     for identifier, span in params.spans.items():
+        # Giữ lại đúng các trường đếm token số học chuẩn của OpenTelemetry/Langfuse
+        # để xem lượng token trên dashboard, nhưng vẫn xóa sạch nội dung prompt/answer/secret.
         delete_attributes = tuple(
             key
             for key in span.attributes
-            if any(marker in key.casefold() for marker in _PROHIBITED_ATTRIBUTE_MARKERS)
+            if key.casefold() not in _ALLOWED_OTEL_USAGE_ATTRIBUTES
+            and any(marker in key.casefold() for marker in _PROHIBITED_ATTRIBUTE_MARKERS)
         )
         if delete_attributes:
             patches[identifier] = OtelSpanPatch(delete_attributes=delete_attributes)
@@ -384,8 +397,11 @@ def _start_stage_observation(parent: Any, stage: StageTelemetry, request_id: str
         "level": _level_for_status(stage.status),
         "status_message": stage.status,
     }
-    if stage.stage == "generate" and stage.model:
-        kwargs["model"] = stage.model
+    if stage.stage == "generate":
+        if stage.model:
+            kwargs["model"] = stage.model
+        if stage.usage_details:
+            kwargs["usage_details"] = dict(stage.usage_details)
     return parent.start_observation(**kwargs)
 
 

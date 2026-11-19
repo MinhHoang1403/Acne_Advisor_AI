@@ -141,6 +141,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "requested_model": response_data.get("requested_model"),
             "actual_provider": response_data["provider"],
             "actual_model": response_data["model"],
+            "generation_token_usage": response_data.get("token_usage"),
             "llm_fallback_used": response_data["fallback_used"],
             "fallback_provider": response_data["fallback_provider"],
             "fallback_model": response_data["fallback_model"],

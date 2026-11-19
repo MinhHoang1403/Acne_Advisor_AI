@@ -2,9 +2,54 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar, Token
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+_TOKEN_USAGE_COLLECTOR: ContextVar[list[dict[str, int]] | None] = ContextVar(
+    "acne_llm_token_usage_collector",
+    default=None,
+)
+
+
+def begin_token_usage_scope() -> tuple[list[dict[str, int]], Token[list[dict[str, int]] | None]]:
+    """Mở vùng thu thập token theo từng lần gọi LLM, an toàn với async và worker thread."""
+    collector: list[dict[str, int]] = []
+    token = _TOKEN_USAGE_COLLECTOR.set(collector)
+    return collector, token
+
+
+def reset_token_usage_scope(token: Token[list[dict[str, int]] | None]) -> None:
+    """Khôi phục ContextVar sau khi kết thúc lời gọi LLM."""
+    _TOKEN_USAGE_COLLECTOR.reset(token)
+
+
+def record_llm_token_usage(
+    *,
+    input_tokens: int,
+    output_tokens: int,
+    total_tokens: int | None = None,
+) -> None:
+    """Ghi nhận bộ đếm token số học từ Gemini/Ollama vào collector hiện hành."""
+    collector = _TOKEN_USAGE_COLLECTOR.get()
+    if collector is None:
+        return
+    if input_tokens < 0 or output_tokens < 0:
+        return
+    total = total_tokens if (total_tokens is not None and total_tokens >= input_tokens + output_tokens) else input_tokens + output_tokens
+    collector.append(
+        {
+            "input": int(input_tokens),
+            "output": int(output_tokens),
+            "total": int(total),
+        }
+    )
+
+
+def latest_token_usage(collector: list[dict[str, int]]) -> dict[str, int] | None:
+    """Lấy bản ghi token mới nhất của lần sinh thành công."""
+    return dict(collector[-1]) if collector else None
 
 StageStatus = Literal["success", "degraded", "failed", "skipped"]
 AgentAction = Literal["retrieve", "retry", "generate", "abstain", "finalize"]
@@ -30,6 +75,7 @@ class StageTelemetry(BaseModel):
     retained_candidate_count: int | None = Field(default=None, ge=0)
     duplicate_candidate_count: int | None = Field(default=None, ge=0)
     candidate_ids: list[str] = Field(default_factory=list)
+    usage_details: dict[str, int] | None = None
 
 
 class AgentDecisionTelemetry(BaseModel):
@@ -84,4 +130,8 @@ __all__ = [
     "PipelineTraceSummary",
     "StageStatus",
     "StageTelemetry",
+    "begin_token_usage_scope",
+    "latest_token_usage",
+    "record_llm_token_usage",
+    "reset_token_usage_scope",
 ]

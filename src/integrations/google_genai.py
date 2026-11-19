@@ -30,11 +30,19 @@ logger = logging.getLogger(__name__)
 
 def _log_token_usage(response: Any, model_name: str) -> None:
     """Operational counters only; never record prompts, answers or credentials."""
+    from src.observability.contracts import record_llm_token_usage
+
     usage = _get_field(response, "usage_metadata")
     prompt = _get_field(usage, "prompt_token_count")
     total = _get_field(usage, "total_token_count")
     if isinstance(prompt, int) and isinstance(total, int) and total >= prompt >= 0:
-        logger.info("Google token usage: model=%s input_tokens=%d output_tokens_including_thinking=%d", model_name, prompt, total - prompt)
+        output_tokens = total - prompt
+        record_llm_token_usage(
+            input_tokens=prompt,
+            output_tokens=output_tokens,
+            total_tokens=total,
+        )
+        logger.info("Google token usage: model=%s input_tokens=%d output_tokens_including_thinking=%d", model_name, prompt, output_tokens)
 
 
 def get_google_api_key(api_key: str | None = None) -> str:

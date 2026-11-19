@@ -59,7 +59,8 @@ services:
       OLLAMA_BASE_URL: "${DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}"
       # A missing optional local model must not veto the primary Gemini service.
       LLM_PROVIDER_FALLBACK_ENABLED: "${DOCKER_LLM_PROVIDER_FALLBACK_ENABLED:-false}"
-      LANGFUSE_ENABLED: "false"
+      LANGFUSE_ENABLED: "${LANGFUSE_ENABLED:-false}"
+      LANGFUSE_BASE_URL: "${DOCKER_LANGFUSE_BASE_URL:-http://host.docker.internal:3000}"
       LLAMA_CLOUD_API_KEY: ""
       OPENAI_API_KEY: ""
       RELEASE_READINESS_TEST_MODE: ""

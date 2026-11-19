@@ -579,3 +579,33 @@ async def test_langfuse_export_failure_does_not_change_chat_response(
     assert response.status_code == 200
     assert response.json()["answer"]
     assert sink.last_error_category == "unavailable"
+
+
+def test_generation_exports_numeric_usage_details_and_mask_preserves_usage_attrs(settings):
+    event = _event(generation_token_usage={"input": 420, "output": 135, "total": 555})
+    _, root = _export(settings, event)
+    generation = next(
+        obs for obs in _all_observations(root) if obs.created.get("as_type") == "generation"
+    )
+    assert generation.created["usage_details"] == {"input": 420, "output": 135, "total": 555}
+
+    params = SimpleNamespace(
+        spans={
+            "span": SimpleNamespace(
+                attributes={
+                    "gen_ai.usage.input_tokens": 420,
+                    "gen_ai.usage.output_tokens": 135,
+                    "langfuse.observation.usage_details": '{"input":420,"output":135,"total":555}',
+                    "http.request.header.auth_token": "secret-token",
+                    "gen_ai.prompt.0.content": RAW_PROMPT,
+                }
+            )
+        }
+    )
+    result = mask_langfuse_otel_spans(params=params)
+    deleted = set(result.span_patches["span"].delete_attributes)
+    assert "gen_ai.usage.input_tokens" not in deleted
+    assert "gen_ai.usage.output_tokens" not in deleted
+    assert "langfuse.observation.usage_details" not in deleted
+    assert "http.request.header.auth_token" in deleted
+    assert "gen_ai.prompt.0.content" in deleted

@@ -146,7 +146,21 @@ async def generate_ollama_response(
                 response.raise_for_status()
                 data = response.json()
                 done_reason = data.get("done_reason")
+                prompt_eval_count = data.get("prompt_eval_count")
                 eval_count = data.get("eval_count")
+                if (
+                    isinstance(prompt_eval_count, int)
+                    and isinstance(eval_count, int)
+                    and prompt_eval_count >= 0
+                    and eval_count >= 0
+                ):
+                    from src.observability.contracts import record_llm_token_usage
+
+                    record_llm_token_usage(
+                        input_tokens=prompt_eval_count,
+                        output_tokens=eval_count,
+                        total_tokens=prompt_eval_count + eval_count,
+                    )
                 num_predict = payload.get("options", {}).get("num_predict")
                 truncated = str(done_reason or "").lower() in {"length", "num_predict", "context_length"}
                 logger.info(
