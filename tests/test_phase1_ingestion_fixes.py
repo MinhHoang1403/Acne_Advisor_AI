@@ -109,3 +109,78 @@ async def test_verify_empty_bootstrap_refuses_non_empty_qdrant(monkeypatch):
     monkeypatch.setattr(pipeline, "AsyncQdrantClient", lambda **_kwargs: NonEmptyQdrant())
     with pytest.raises(RuntimeError, match="Empty bootstrap refused"):
         await pipeline._verify_empty_bootstrap_state()
+
+
+@pytest.mark.asyncio
+async def test_structured_curated_json_preserves_per_record_provenance_and_metadata(
+    tmp_path: Path,
+):
+    from src.ingestion.build import BuildIdentity, compile_knowledge
+    from src.ingestion.parser import load_or_parse_source
+    from src.ingestion.provenance import validate_provenance
+    from src.ingestion.source_manifest import CanonicalSource, sha256_file
+
+    dataset_path = tmp_path / "Acne_data_source.json"
+    records = [
+        {
+            "id": "CHUNK_demo_001",
+            "text": "Adapalene là retinoid bôi ngoài da được khuyến cáo cho mụn trứng cá.",
+            "embedding_text": "EuroGuiDerm Guideline | Treatment | Adapalene là retinoid bôi ngoài da.",
+            "metadata": {
+                "source_id": "SRC_euroguiderm_2025",
+                "document_id": "DOC_euroguiderm_2025",
+                "chunk_id": "CHUNK_demo_001",
+                "title": "EuroGuiDerm Guideline for the Treatment of Acne - Update 2025",
+                "publisher": "European Dermatology Forum",
+                "source_type": "pdf",
+                "source_url": "https://example.test/euroguiderm.pdf#page=12",
+                "published_year": 2025,
+                "accessed_at": "2026-10-08",
+                "document_hash": "a" * 64,
+                "page": 12,
+                "page_end": 12,
+                "section_title": "Topical retinoids",
+                "content_kind": "text",
+                "language": "vi",
+                "scope": "acne_core",
+                "acne_type": ["Comedonal acne"],
+                "category": ["Treatment"],
+            },
+        }
+    ]
+    dataset_path.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+    source = CanonicalSource(
+        source_id="acne_data_source",
+        title="Curated Dataset",
+        authority="Multi-publisher",
+        source_type="curated_structured_acne_corpus",
+        version_date="2026-11-19",
+        original_url="https://example.test/dataset",
+        local_filename="Acne_data_source.json",
+        media_type="application/json",
+        sha256=sha256_file(dataset_path),
+    )
+
+    artifact, cache_hit = await load_or_parse_source(
+        source,
+        source_dir=tmp_path,
+        cache_root=tmp_path / "parsed",
+    )
+    assert cache_hit is False
+    compiled = compile_knowledge(
+        (source,),
+        {source.source_id: artifact},
+        BuildIdentity("1234567890abcdef1234", "s", "t", "c"),
+    )
+    assert len(compiled.records) == 1
+    rec = compiled.records[0]
+    assert validate_provenance(rec) == []
+    assert rec["source_id"] == "SRC_euroguiderm_2025"
+    assert rec["source_title"] == "EuroGuiDerm Guideline for the Treatment of Acne - Update 2025"
+    assert rec["source_authority"] == "European Dermatology Forum"
+    assert rec["source_url"] == "https://example.test/euroguiderm.pdf#page=12"
+    assert rec["page_start"] == 12
+    assert rec["section_path"] == ["Topical retinoids"]
+    assert rec["language"] == "vi"
+    assert rec["acne_type"] == ["Comedonal acne"]
+    assert "adapalene" in rec["active_ingredient"]

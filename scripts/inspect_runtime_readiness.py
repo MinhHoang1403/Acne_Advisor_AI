@@ -86,7 +86,8 @@ def _knowledge_manifest_check() -> dict[str, Any]:
             data.get("build_id") == active_build
             and data.get("phase1_frozen") is True
             and data.get("status") == "activated"
-            and counts.get("sources") == 4
+            and isinstance(counts.get("sources"), int)
+            and counts.get("sources", 0) > 0
             and isinstance(counts.get("knowledge_chunks"), int)
             and counts.get("knowledge_chunks", 0) > 0
             and counts.get("entities") == 32

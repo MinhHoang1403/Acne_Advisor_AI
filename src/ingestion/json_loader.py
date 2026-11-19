@@ -51,7 +51,11 @@ def load_web_json_documents_with_stats(
             )
             continue
 
-        raw_text = str(record.get("raw_text") or "").strip()
+        # Hỗ trợ cả dataset web thô (raw_text) lẫn dataset chunk có cấu trúc (text + metadata).
+        is_structured = isinstance(record.get("metadata"), dict) and "text" in record
+        raw_text = str(
+            record.get("text") if is_structured else record.get("raw_text") or ""
+        ).strip()
         if len(raw_text) < min_chars:
             skipped += 1
             logger.warning(
@@ -61,17 +65,41 @@ def load_web_json_documents_with_stats(
             )
             continue
 
-        metadata = {
-            "source_type": "web_json",
-            "source_file": json_path.name,
-            "source_path": _source_path_key(json_path),
-            "seed_url": str(record.get("seed_url") or ""),
-            "source_url": str(record.get("source_url") or ""),
-            "record_index": record_index,
-        }
-        for optional_key in ("title", "document_id_hint"):
-            if record.get(optional_key):
-                metadata[optional_key] = str(record[optional_key])
+        if is_structured:
+            raw_meta = dict(record.get("metadata") or {})
+            record_id_hint = str(
+                record.get("id") or raw_meta.get("chunk_id") or f"record:{record_index}"
+            ).strip()
+            source_url = str(
+                raw_meta.get("source_url")
+                or raw_meta.get("document_url")
+                or raw_meta.get("final_url")
+                or raw_meta.get("seed_url")
+                or ""
+            ).strip()
+            metadata = {
+                **raw_meta,
+                "structured_record": True,
+                "record_id_hint": record_id_hint,
+                "source_file": json_path.name,
+                "source_path": _source_path_key(json_path),
+                "source_url": source_url,
+                "record_index": record_index,
+            }
+            if record.get("embedding_text"):
+                metadata["embedding_text"] = str(record["embedding_text"]).strip()
+        else:
+            metadata = {
+                "source_type": "web_json",
+                "source_file": json_path.name,
+                "source_path": _source_path_key(json_path),
+                "seed_url": str(record.get("seed_url") or ""),
+                "source_url": str(record.get("source_url") or ""),
+                "record_index": record_index,
+            }
+            for optional_key in ("title", "document_id_hint"):
+                if record.get(optional_key):
+                    metadata[optional_key] = str(record[optional_key])
 
         documents.append(
             {

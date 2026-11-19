@@ -1,65 +1,18 @@
 schema: phase1_source_manifest
 schema_version: 2
-verified_through: '2026-08-14'
-identity_contract: parent_artifact_sha256_child_source_id_from_publisher_and_url_document_id_from_source_id_and_content_hash
+verified_through: '2026-11-19'
+identity_contract: parent_artifact_sha256_child_source_id_from_record_provenance_document_id_from_source_id_and_content_hash
 sources:
-  - source_id: nice_ng198_2026_08
-    title: 'Acne vulgaris: management (NG198)'
-    authority: National Institute for Health and Care Excellence
-    source_type: clinical_guideline
-    version_date: '2026-08-03'
-    retrieved_at: '2026-08-13'
-    original_url: https://www.nice.org.uk/guidance/ng198/resources/acnevulgaris-management-pdf-66142088866501
-    local_filename: nice_ng198_2026-08-03.md
-    media_type: text/markdown
-    sha256: 8a5b8e104c1394a48bf20aaca5724c33c526a0be7466682b57204c8092a94869
-    licensing: NICE notice of rights; local processing only
-    current_as_of_cutoff: null
-    supersedes_source_hash: f90f02cd1e7b01833ffb9d6feb284a878b1e2624729147a2e2e648a7e5eed1ef
-    inclusion_reason: local NICE-derived research snapshot covering acne management and represented as 2026-08-03
-    acquisition_note: official PDF URL rendered to Markdown through a text transport after direct access returned HTTP 403
-    limitation: official NICE metadata reports 2026-04-30; completeness and current official-version equivalence of the local snapshot remain unresolved
-  - source_id: aad_acne_guideline_2024
-    title: Guidelines of care for the management of acne vulgaris
-    authority: American Academy of Dermatology / JAAD
-    source_type: clinical_guideline
-    version_date: '2024'
-    retrieved_at: '2026-05-22'
-    original_url: https://www.jaad.org/article/S0190-9622(23)03389-3/fulltext
-    local_filename: PIIS0190962223033893.pdf
-    media_type: application/pdf
-    sha256: a95361c921e916e9112f4f22c43975506ab8639df9b0e03e059c41a517205423
-    licensing: publisher copyright; local processing only
-    current_as_of_cutoff: true
-    inclusion_reason: current US professional clinical guideline
-  - source_id: vn_moh_dermatology_4416_2023_acne
-    title: Huong dan chan doan va dieu tri cac benh da lieu - acne excerpt
-    authority: Bo Y te Viet Nam
-    source_type: government_clinical_guidance_excerpt
-    version_date: '2023-12-06'
-    retrieved_at: '2026-05-27'
-    original_url: https://moh.gov.vn/
-    local_filename: qd_4416_cut.pdf
-    media_type: application/pdf
-    sha256: 2957dfdfc603040b08d414043066b153127064416011fc17fa630e0f5a199f4b
-    licensing: government guidance; local excerpt processing
-    current_as_of_cutoff: true
-    inclusion_reason: authoritative Vietnamese terminology and clinical context
-    limitation: local file contains pages 433-442 only; direct attachment URL unavailable
-    claim_exclusions: claim_exclusions.yaml
-    claim_exclusions_sha256: bf09e16b37a54815818e1389531a2b8dad21f0b43f52c7dcfdfb633d4b5d3128
-  - source_id: aad_public_acne_2026_07
-    title: Multi-publisher public acne education collection
-    authority: AAD, NHS, WebMD, DermNet, Healthline, and Da Lieu Viet Nam
-    source_type: multi_publisher_web_page_collection
-    version_date: '2026-07-03'
-    retrieved_at: '2026-07-03'
-    original_url: https://www.aad.org/public/diseases/acne
-    local_filename: web_raw_dataset.json
+  - source_id: acne_data_source
+    title: Curated Multi-Publisher Acne Clinical Knowledge Dataset
+    authority: EuroGuiDerm, NICE, AAD/JAAD, Vietnam Ministry of Health, Dermatology Hospitals, FDA, Cochrane, BAD, DailyMed, MotherToBaby, DermNet, Cleveland Clinic, MedlinePlus, and NIAMS
+    source_type: curated_structured_acne_corpus
+    version_date: '2026-11-19'
+    retrieved_at: '2026-11-19'
+    original_url: https://github.com/MinhHoang1403/Acne_Advisor_AI
+    local_filename: Acne_data_source.json
     media_type: application/json
-    sha256: 540def711016b8608832b0ddac1a9004076e3e7e6c87ee783f205fe656e5a235
-    licensing: publisher-specific copyright; factual excerpts retained for local research
+    sha256: 1333459ae25194ac580fc3b1ba31e097e6fed14413242bfe9d02899907fc499c
+    licensing: Multi-publisher clinical guidelines and patient education; local clinical decision-support research corpus
     current_as_of_cutoff: true
-    inclusion_reason: supplemental patient-facing evidence and terminology from six publishers
-    record_catalog: web_records.yaml
-    record_catalog_sha256: 5c403edf97e4da4dd51765a104199af6d9b29ecdc528194907f899d9574df1c5
+    inclusion_reason: Unified, normalized, pre-chunked acne clinical knowledge base covering 53 curated international and Vietnamese medical sources

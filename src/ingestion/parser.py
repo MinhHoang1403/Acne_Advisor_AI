@@ -58,6 +58,7 @@ class ParsedUnit:
     page_start: int = 0
     page_end: int = 0
     source_url: str = ""
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,11 @@ async def load_or_parse_source(
         normalized_text = normalize_parsed_text(unit.text)
         if not normalized_text:
             continue
+        normalized_meta = dict(unit.metadata) if unit.metadata else None
+        if normalized_meta and isinstance(normalized_meta.get("embedding_text"), str):
+            normalized_meta["embedding_text"] = normalize_parsed_text(
+                normalized_meta["embedding_text"]
+            )
         normalized_units_list.append(
             ParsedUnit(
                 locator=unit.locator,
@@ -166,6 +172,7 @@ async def load_or_parse_source(
                 page_start=unit.page_start,
                 page_end=unit.page_end,
                 source_url=unit.source_url,
+                metadata=normalized_meta,
             )
         )
     normalized_units = tuple(normalized_units_list)
@@ -365,14 +372,37 @@ def _is_list_start(block: str) -> bool:
 
 def _parse_json(path: Path) -> tuple[ParsedUnit, ...]:
     documents = load_web_json_documents(path)
-    return tuple(
-        ParsedUnit(
-            locator=(str(item["metadata"].get("source_url") or f"record:{index}")),
-            text=item["text"],
-            source_url=str(item["metadata"].get("source_url") or ""),
-        )
-        for index, item in enumerate(documents)
-    )
+    units: list[ParsedUnit] = []
+    for index, item in enumerate(documents):
+        meta = item.get("metadata") or {}
+        if meta.get("structured_record"):
+            page_start = _extract_page_number({"page": meta.get("page")})
+            page_end = _extract_page_number({"page": meta.get("page_end")}) or page_start
+            locator = str(
+                meta.get("chunk_id")
+                or meta.get("record_id_hint")
+                or meta.get("source_url")
+                or f"record:{index}"
+            )
+            units.append(
+                ParsedUnit(
+                    locator=locator,
+                    text=item["text"],
+                    page_start=page_start,
+                    page_end=page_end,
+                    source_url=str(meta.get("source_url") or ""),
+                    metadata=dict(meta),
+                )
+            )
+        else:
+            units.append(
+                ParsedUnit(
+                    locator=str(meta.get("source_url") or f"record:{index}"),
+                    text=item["text"],
+                    source_url=str(meta.get("source_url") or ""),
+                )
+            )
+    return tuple(units)
 
 
 def _extract_page_number(metadata: dict[str, Any]) -> int:

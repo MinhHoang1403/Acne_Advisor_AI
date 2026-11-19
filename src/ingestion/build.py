@@ -37,6 +37,7 @@ from src.ingestion.provenance import (
     base_source_provenance,
     base_web_record_provenance,
     chunk_id,
+    document_id,
     record_id,
     sha256_text,
 )
@@ -91,6 +92,83 @@ def compute_build_identity(source_manifest_path: Path, taxonomy_path: Path) -> B
     return BuildIdentity(build_id, source_hash, taxonomy_hash, contract_hash)
 
 
+_STRUCTURED_CLINICAL_METADATA_FIELDS = (
+    "language",
+    "scope",
+    "content_kind",
+    "evidence_tier",
+    "acne_type",
+    "differential",
+    "category",
+    "level",
+    "special_group",
+    "skin_type",
+    "care_topic",
+    "doi",
+    "published_year",
+    "last_updated_year",
+    "accessed_at",
+    "table_index",
+    "row_index",
+    "table_title",
+    "section_title",
+    "table_representation",
+    "license",
+    "license_status",
+    "license_url",
+    "redistribution_status",
+    "provenance",
+)
+
+
+def _structured_record_provenance(
+    parent: CanonicalSource,
+    unit_meta: dict[str, Any],
+    unit_source_url: str,
+) -> dict[str, Any]:
+    """Dựng provenance chuẩn hóa cho từng bản ghi đã gắn nhãn nguồn sẵn trong JSON có cấu trúc."""
+
+    child_source_id = str(unit_meta.get("source_id") or parent.source_id).strip()
+    child_title = str(unit_meta.get("title") or parent.title).strip()
+    child_authority = str(unit_meta.get("publisher") or parent.authority).strip()
+    child_source_type = str(unit_meta.get("source_type") or parent.source_type).strip()
+    child_url = str(
+        unit_source_url
+        or unit_meta.get("source_url")
+        or unit_meta.get("document_url")
+        or unit_meta.get("final_url")
+        or unit_meta.get("seed_url")
+        or parent.original_url
+    ).strip()
+    child_version = str(
+        unit_meta.get("last_updated_year")
+        or unit_meta.get("published_year")
+        or unit_meta.get("accessed_at")
+        or parent.version_date
+    ).strip()
+    child_hash = str(
+        unit_meta.get("document_hash")
+        or unit_meta.get("content_hash")
+        or parent.sha256
+    ).strip()
+    child_doc_id = str(
+        unit_meta.get("document_id") or document_id(child_source_id, child_hash)
+    ).strip()
+    return {
+        "source_id": child_source_id,
+        "source_title": child_title,
+        "document_title": child_title,
+        "source_authority": child_authority,
+        "source_type": child_source_type,
+        "source_url": child_url,
+        "source_version_date": child_version,
+        "source_content_hash": child_hash,
+        "document_id": child_doc_id,
+        "parent_source_id": parent.source_id,
+        "parent_source_content_hash": parent.sha256,
+    }
+
+
 def compile_knowledge(
     sources: tuple[CanonicalSource, ...],
     artifacts: dict[str, ParsedArtifact],
@@ -127,16 +205,33 @@ def compile_knowledge(
         source_chunk_count = 0
         filtered = 0
         for unit in artifact.units:
+            unit_meta = unit.metadata if isinstance(unit.metadata, dict) else {}
+            is_structured_unit = bool(
+                unit_meta.get("structured_record")
+                and unit_meta.get("source_id")
+                and unit_meta.get("title")
+            )
             if record_catalog:
                 child_source = record_catalog.get(unit.source_url)
                 if child_source is None:
                     raise ValueError(f"Parsed web unit has no child provenance: {unit.source_url}")
                 source_base = base_web_record_provenance(source, child_source)
+            elif is_structured_unit:
+                source_base = _structured_record_provenance(source, unit_meta, unit.source_url)
             else:
                 source_base = base_source_provenance(source)
             unit_record_id = record_id(source_base["document_id"], unit.locator)
             unit_chunk_index = 0
+            curated_section_path = tuple(
+                part
+                for part in (
+                    str(unit_meta.get("section_title") or "").strip(),
+                    str(unit_meta.get("table_title") or "").strip(),
+                )
+                if part
+            )
             for chunk in structural_chunks(unit.text):
+                effective_section_path = chunk.section_path or curated_section_path
                 curated_text, pre_curation_hash, action_ids = apply_claim_exclusion(
                     chunk.text,
                     source=source,
@@ -145,22 +240,27 @@ def compile_knowledge(
                 applied_actions.update(action_ids)
                 noisy, _reason = is_noisy_chunk(
                     curated_text,
-                    chunk.section_path[-1] if chunk.section_path else None,
+                    effective_section_path[-1] if effective_section_path else None,
                 )
                 content_hash = sha256_text(curated_text)
                 if noisy or content_hash in seen_content:
                     filtered += 1
                     continue
                 seen_content.add(content_hash)
-                scoped_chunk_index = unit_chunk_index if record_catalog else source_chunk_count
+                scoped_chunk_index = (
+                    unit_chunk_index
+                    if (record_catalog or is_structured_unit)
+                    else source_chunk_count
+                )
                 identifier = chunk_id(
                     source_base["document_id"],
                     unit_record_id,
-                    chunk.section_path,
+                    effective_section_path,
                     scoped_chunk_index,
                     content_hash,
                 )
-                source_url = unit.source_url or source.original_url
+                source_url = unit.source_url or source_base["source_url"] or source.original_url
+                header_text = effective_section_path[-1] if effective_section_path else ""
                 payload: dict[str, Any] = {
                     **source_base,
                     "source_url": source_url,
@@ -169,8 +269,8 @@ def compile_knowledge(
                     "record_id": unit_record_id,
                     "page_start": unit.page_start,
                     "page_end": unit.page_end,
-                    "section_path": list(chunk.section_path),
-                    "header": chunk.section_path[-1] if chunk.section_path else "",
+                    "section_path": list(effective_section_path),
+                    "header": header_text,
                     "chunk_index": scoped_chunk_index,
                     "chunk_id": identifier,
                     "chunk_content_hash": content_hash,
@@ -193,6 +293,16 @@ def compile_knowledge(
                     "ingested_at": timestamp,
                     "semantic_enrichment": "removed",
                 }
+                if is_structured_unit:
+                    if unit.page_start > 0:
+                        payload["page"] = unit.page_start
+                    if unit_meta.get("chunk_id"):
+                        payload["original_chunk_id"] = str(unit_meta["chunk_id"])
+                    if header_text and header_text.casefold() not in curated_text[:200].casefold():
+                        payload["embedding_title"] = f"{source_base['source_title']} — {header_text}"
+                    for extra_key in _STRUCTURED_CLINICAL_METADATA_FIELDS:
+                        if extra_key in unit_meta and unit_meta[extra_key] is not None:
+                            payload[extra_key] = unit_meta[extra_key]
                 if action_ids:
                     payload["pre_curation_content_hash"] = pre_curation_hash
                     payload["curation_action_ids"] = list(action_ids)

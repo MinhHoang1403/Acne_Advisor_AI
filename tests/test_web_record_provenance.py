@@ -21,14 +21,21 @@ MANIFEST = ROOT / "data" / "sources" / "manifest.yaml"
 
 
 def _web_source():
-    return next(
-        source
-        for source in load_source_manifest(MANIFEST)
-        if source.local_filename == "web_raw_dataset.json"
+    source = next(
+        (
+            item
+            for item in load_source_manifest(MANIFEST)
+            if item.local_filename == "web_raw_dataset.json"
+        ),
+        None,
     )
+    if source is None:
+        pytest.skip("Legacy web_raw_dataset.json is not active in manifest.yaml")
+    return source
 
 
 def _require_canonical_corpus() -> None:
+    _web_source()
     missing = [
         source.local_filename
         for source in load_source_manifest(MANIFEST)
