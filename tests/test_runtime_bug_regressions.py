@@ -333,3 +333,38 @@ async def test_sync_sessions_isolates_per_session_savepoints(monkeypatch):
     assert fake_db.closed is True
     assert "savepoint_rollback" in fake_db.events
     assert "tx_commit" in fake_db.events
+
+
+def test_source_metadata_formats_curated_src_records_with_authority_and_no_raw_hash():
+    from src.agent.source_presentation import build_source_metadata
+
+    metadata = build_source_metadata(
+        ["SRC_4de7d96ece10d83e3b7a", "SRC_f90c49a2be33071ee705", "SRC_orphan_hash"],
+        contexts=[
+            {
+                "source_id": "SRC_4de7d96ece10d83e3b7a",
+                "source_file": "Acne_data_source.json",
+                "parent_source_id": "acne_data_source",
+                "document_title": "NICE NG198 - Acne vulgaris: management",
+                "source_authority": "NICE",
+                "source_url": "https://www.nice.org.uk/guidance/ng198",
+                "chunk_id": "c-nice",
+            },
+            {
+                "source_id": "SRC_f90c49a2be33071ee705",
+                "source_file": "Acne_data_source.json",
+                "parent_source_id": "acne_data_source",
+                "document_title": "Topical, light-based and complementary interventions for acne",
+                "source_authority": "Cochrane",
+                "source_url": "https://www.cochrane.org/evidence/CD014918",
+                "chunk_id": "c-cochrane",
+            },
+        ],
+    )
+    by_id = {entry["source_id"]: entry["display_name"] for entry in metadata}
+    assert by_id["SRC_4de7d96ece10d83e3b7a"] == "NICE NG198 - Acne vulgaris: management"
+    assert (
+        by_id["SRC_f90c49a2be33071ee705"]
+        == "Cochrane — Topical, light-based and complementary interventions for acne"
+    )
+    assert by_id["SRC_orphan_hash"] == "Nguồn kiến thức nội bộ"
