@@ -24,7 +24,7 @@ dùng tên tiếng Anh như trong code.
 ## Bản đồ source
 
 | Khu vực | Module chính | Trách nhiệm | Không chịu trách nhiệm |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Knowledge preparation | `src/ingestion/parser.py`, `chunking.py`, `filtering.py`, `provenance.py` | Parse source, chia chunk, lọc proof và tạo identity | Không search khi user hỏi |
 | Embedding/indexing | `src/ingestion/embedding.py`, `index.py`, `bm25.py` | Gọi embedding provider, cấu hình/tạo Qdrant candidates | Không tự chạy cosine/BM25 search engine |
 | Build orchestration | `src/ingestion/pipeline.py`, `scripts/knowledge_build.py` | Prepare, validate, build và activate có kiểm soát | Không thuộc normal API request path |
@@ -203,7 +203,7 @@ message ID để tránh insert lặp; transaction commit/rollback thuộc sessio
 ## Muốn thay đổi chức năng thì đọc ở đâu
 
 | Nhu cầu | Bắt đầu tại | Cần kiểm tra cùng |
-|---|---|---|
+| --- | --- | --- |
 | Đổi BM25 config | `src/ingestion/bm25.py` | index rebuild contract, Qdrant collection |
 | Đổi Dense model/dimension | `src/ingestion/embedding.py`, `src/database/vector_store.py` | Google adapter, Qdrant vector config |
 | Đổi RRF `k`/weights | `src/retrieval/rrf.py` | version manifest, retrieval tests |

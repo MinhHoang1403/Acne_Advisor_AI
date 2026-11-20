@@ -59,7 +59,7 @@ CUDA scorer reports its CPU/FP32 fallback when CUDA is unavailable; explicitly s
 each additional process would duplicate model memory and bypass process-local locks.
 
 | Service | Host loopback port | Internal address |
-|---|---|---|
+| --- | --- | --- |
 | UI / Nginx | 8088 (`FRONTEND_PORT`) | frontend:8080 |
 | FastAPI | 8000 (`BACKEND_PORT`) | backend:8000 |
 | PostgreSQL | existing 5433 | postgres:5432 |
@@ -193,7 +193,7 @@ Five HTTP chat scenarios plus one idempotent replay were exercised through
 No further paid probe is needed to start this stack.
 
 | Scenario | Observed result |
-|---|---|
+| --- | --- |
 | Benzoyl peroxide classification, initial implementation | HTTP 200, 18.15 s, two retrievals; exposed answer generation after `abstain/evidence_gap` |
 | Identical request-id replay | Same answer, about 22 ms, no additional generation or history rows |
 | Benzoyl peroxide treatment information | HTTP 200, 5.99 s, one retrieval and source-backed generation |
@@ -320,7 +320,7 @@ Application logic lives under `src/`; scripts are thin operators or bounded
 checks.
 
 | Script | Responsibility |
-|---|---|
+| --- | --- |
 | `knowledge_build.py` | controlled build, validate and status |
 | `init_schema.py`, `init_chat_schema.py` | relational schema initialization |
 | `inspect_runtime_readiness.py`, `pre_ui_runtime_check.py` | local readiness |

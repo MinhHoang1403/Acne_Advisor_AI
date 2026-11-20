@@ -34,34 +34,34 @@ clinical sources are deliberately separated.
   adaptation of retrieval behavior to the request. The project does not
   implement the paper's complexity classifier or strategy set.
 - Ma, X. et al. (2023). *Query Rewriting in Retrieval-Augmented Large Language
-  Models*. EMNLP. https://aclanthology.org/2023.emnlp-main.322/; Wu, Z. et al.
-  (2022). *CONQRR*. EMNLP. https://aclanthology.org/2022.emnlp-main.679/; and
+  Models*. EMNLP. <https://aclanthology.org/2023.emnlp-main.322/;> Wu, Z. et al.
+  (2022). *CONQRR*. EMNLP. <https://aclanthology.org/2022.emnlp-main.679/;> and
   Jang, Y. et al. (2024). *IterCQR: Iterative Conversational Query Reformulation
   with Retrieval Guidance*. NAACL.
-  https://aclanthology.org/2024.naacl-long.449/. These
+  <https://aclanthology.org/2024.naacl-long.449/.> These
   sources motivate evaluating conversational query reformulation. Acne Advisor
   AI rejected the tested prompt rewrite because it reduced top-9 completeness
   and did not add a dedicated rewriter.
 - Liu, N. F. et al. (2024). *Lost in the Middle: How Language Models Use Long
-  Contexts*. TACL. https://aclanthology.org/2024.tacl-1.9/. This is related
+  Contexts*. TACL. <https://aclanthology.org/2024.tacl-1.9/.> This is related
   context-position literature, not evidence that the project's 9-item/7000-char
   budget is optimal.
 - Ammann, P. J. L., Golde, J., and Akbik, A. (2025). *Question Decomposition for
   Retrieval-Augmented Generation*; and Xie, K. et al. (2025). *Do RAG Systems
   Cover What Matters? Evaluating and Optimizing Responses with Sub-Question
   Coverage*:
-  https://aclanthology.org/2025.acl-srw.32/ and
-  https://aclanthology.org/2025.naacl-long.301/. Decomposition remains deferred;
+  <https://aclanthology.org/2025.acl-srw.32/> and
+  <https://aclanthology.org/2025.naacl-long.301/.> Decomposition remains deferred;
   no decomposition agent or framework is implemented.
 
 ## Framework Contracts
 
 - LangGraph, *Graph API* and `StateGraph` reference, verified 2026-08-14.
-  https://docs.langchain.com/oss/python/langgraph/graph-api
-  https://reference.langchain.com/python/langgraph/graph/state/StateGraph
+  <https://docs.langchain.com/oss/python/langgraph/graph-api>
+  <https://reference.langchain.com/python/langgraph/graph/state/StateGraph>
 - LangChain, *Tools* and LangGraph *Agentic RAG*, verified 2026-08-14.
-  https://docs.langchain.com/oss/python/langchain/tools
-  https://docs.langchain.com/oss/python/langgraph/agentic-rag
+  <https://docs.langchain.com/oss/python/langchain/tools>
+  <https://docs.langchain.com/oss/python/langgraph/agentic-rag>
 - Karpukhin, V. et al. (2020). *Dense Passage Retrieval for Open-Domain
   Question Answering*. EMNLP. DOI: 10.18653/v1/2020.emnlp-main.550. Supports
   dense retrieval as a semantic channel. It does not validate Gemini Embedding
@@ -76,17 +76,17 @@ clinical sources are deliberately separated.
 ## Provider Contracts
 
 - Qdrant, *Full-text search* and *BM25 inference*. Verified 2026-08-14.
-  https://qdrant.tech/documentation/search/text-search/full-text-search/
-  https://qdrant.tech/documentation/inference/inference-bm25/
+  <https://qdrant.tech/documentation/search/text-search/full-text-search/>
+  <https://qdrant.tech/documentation/inference/inference-bm25/>
   These pages define provider behavior/configuration, not retrieval quality or
   parameter optimality for Acne Advisor AI.
 - Qdrant, *Collections and distance metrics*. Verified 2026-08-14.
-  https://qdrant.tech/documentation/manage-data/collections/
+  <https://qdrant.tech/documentation/manage-data/collections/>
   This defines the cosine-distance provider contract; it does not validate the
   semantic quality of vectors or ranked results.
 - Google AI for Developers, *Gemini Embedding 2* and *Embeddings*. Verified
-  2026-08-14. https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2
-  https://ai.google.dev/gemini-api/docs/embeddings
+  2026-08-14. <https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2>
+  <https://ai.google.dev/gemini-api/docs/embeddings>
   The documentation supports the model/dimension contract, notes that Gemini
   Embedding 2 does not accept `task_type`, and recommends text-prefix retrieval
   instructions for text-only use cases. It does not validate Vietnamese acne
@@ -94,27 +94,27 @@ clinical sources are deliberately separated.
   asymmetric document/query prefixes were retained only after a bounded project
   comparison and are not a formal or clinical result.
 - BAAI, *bge-reranker-v2-m3* model card.
-  https://huggingface.co/BAAI/bge-reranker-v2-m3. The model card documents the
+  <https://huggingface.co/BAAI/bge-reranker-v2-m3.> The model card documents the
   configured local cross-encoder; it does not calibrate raw scores as medical
   confidence or prove project-specific quality gains.
 - Ru, D. et al. (2024). *RAGChecker: A Fine-grained Framework for Diagnosing
   Retrieval-Augmented Generation*. NeurIPS.
-  https://proceedings.neurips.cc/paper_files/paper/2024/hash/27245589131d17368cccdfa990cbf16e-Abstract.html.
+  <https://proceedings.neurips.cc/paper_files/paper/2024/hash/27245589131d17368cccdfa990cbf16e-Abstract.html.>
   This supports the historical evaluator's fine-grained metrics, not clinical
   validation or automatic approval of disputed benchmark labels.
 - LlamaIndex, `llama-parse` 0.6.94 package contract. Verified 2026-08-14.
-  https://pypi.org/project/llama-parse/0.6.94/
+  <https://pypi.org/project/llama-parse/0.6.94/>
 
 ## Technical Standards
 
 - National Institute of Standards and Technology. *Secure Hash Standard (SHS),
   FIPS PUB 180-4*. Updated August 2015. DOI: 10.6028/NIST.FIPS.180-4.
-  https://csrc.nist.gov/pubs/fips/180-4/upd1/final
+  <https://csrc.nist.gov/pubs/fips/180-4/upd1/final>
   This standard defines SHA-256. It does not validate project field selection,
   input normalization, digest truncation, cache semantics, or authenticity.
 - Davis, K., Peabody, B., and Leach, P. *Universally Unique IDentifiers
   (UUIDs), RFC 9562*. May 2024. DOI: 10.17487/RFC9562.
-  https://www.rfc-editor.org/info/rfc9562/
+  <https://www.rfc-editor.org/info/rfc9562/>
   This standard defines UUIDv5 construction. It does not validate project entity
   canonicalization, source provenance, or identity semantics.
 
@@ -122,7 +122,7 @@ clinical sources are deliberately separated.
 
 - Brooker, M.; Amazon Web Services. *Timeouts, retries, and backoff with jitter*.
   Amazon Builders' Library, 2019.
-  https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+  <https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/>
   This supports finite timeout, bounded retry, exponential backoff, and jitter as
   engineering patterns. It does not prescribe the project's exact timeout,
   retry count, delay cap, or jitter ratio.
@@ -131,7 +131,7 @@ clinical sources are deliberately separated.
 
 - National Institute for Health and Care Excellence. *Acne vulgaris:
   management (NG198)*. Official metadata reports an update on 2026-04-30.
-  https://www.nice.org.uk/guidance/ng198
+  <https://www.nice.org.uk/guidance/ng198>
 - Reynolds, R. V. et al. (2024). *Guidelines of care for the management of acne
   vulgaris*. Journal of the American Academy of Dermatology.
   DOI: 10.1016/j.jaad.2023.12.017.
@@ -139,7 +139,7 @@ clinical sources are deliberately separated.
   doan va dieu tri cac benh da lieu*; the local corpus contains only the acne
   excerpt (pages 433-442).
 - American Academy of Dermatology public acne education pages, source snapshot
-  retrieved 2026-07-03. https://www.aad.org/public/diseases/acne
+  retrieved 2026-07-03. <https://www.aad.org/public/diseases/acne>
 
 ### NICE Source Provenance
 
@@ -158,20 +158,20 @@ dates; they do not establish corpus-wide currency and are not silently inserted
 into the canonical retrieval corpus.
 
 - UK MHRA isotretinoin safety communications, verified 2026-08-14.
-  https://www.gov.uk/drug-safety-update/isotretinoin-roaccutanev-new-safety-measures-to-be-introduced-in-the-coming-months-including-additional-oversight-on-initiation-of-treatment-for-patients-under-18-years
-  https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk
+  <https://www.gov.uk/drug-safety-update/isotretinoin-roaccutanev-new-safety-measures-to-be-introduced-in-the-coming-months-including-additional-oversight-on-initiation-of-treatment-for-patients-under-18-years>
+  <https://www.gov.uk/drug-safety-update/oral-retinoids-pregnancy-prevention-reminder-of-measures-to-minimise-teratogenic-risk>
 - European Medicines Agency, retinoid pregnancy-prevention measures, verified
-  2026-08-14. https://www.ema.europa.eu/en/medicines/human/referrals/retinoid-containing-medicinal-products
+  2026-08-14. <https://www.ema.europa.eu/en/medicines/human/referrals/retinoid-containing-medicinal-products>
 - NHS, *Anaphylaxis*, *Shortness of breath*, and *Chest pain*, verified 2026-08-16.
-  https://www.nhs.uk/conditions/anaphylaxis/
-  https://www.nhs.uk/symptoms/shortness-of-breath/
-  https://www.nhs.uk/symptoms/chest-pain/
+  <https://www.nhs.uk/conditions/anaphylaxis/>
+  <https://www.nhs.uk/symptoms/shortness-of-breath/>
+  <https://www.nhs.uk/symptoms/chest-pain/>
 - St John Ambulance, *Severe bleeding*, clinically reviewed 2025-04-28 and
-  verified 2026-08-16. https://www.sja.org.uk/first-aid-advice/severe-bleeding/
+  verified 2026-08-16. <https://www.sja.org.uk/first-aid-advice/severe-bleeding/>
   The runtime compatibility ID `NHS_FIRST_AID_HEAVY_BLEEDING` retains an older
   NHS URL that now redirects to St John Ambulance; current attribution is St
   John Ambulance. This safety cross-check is not part of the retrieval corpus.
 - World Health Organization, *Suicide: questions and answers*, verified
-  2026-08-14. https://www.who.int/news-room/questions-and-answers/item/suicide
+  2026-08-14. <https://www.who.int/news-room/questions-and-answers/item/suicide>
 - DailyMed, isotretinoin medication guide, verified 2026-08-14.
-  https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72867c88-070f-4608-bfef-cc5225ebce6d
+  <https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=72867c88-070f-4608-bfef-cc5225ebce6d>

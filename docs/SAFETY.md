@@ -32,7 +32,7 @@ quality or external validity.
 ## Deterministic Override Provenance
 
 | Override | Trigger boundary | Authoritative policy source |
-|---|---|---|
+| --- | --- | --- |
 | anaphylaxis-like emergency | current breathing difficulty with face/eyelid/lip/mouth/tongue/throat swelling, rapid/generalized rash or hives, difficulty swallowing, or altered consciousness | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) |
 | breathing difficulty after medication | personal, current, unnegated breathing difficulty after taking or using medication | [NHS Anaphylaxis](https://www.nhs.uk/conditions/anaphylaxis/) and [NHS Shortness of breath](https://www.nhs.uk/symptoms/shortness-of-breath/) |
 | significant bleeding after acne manipulation | current heavy or uncontrolled bleeding after squeezing or puncturing acne | [St John Ambulance severe bleeding](https://www.sja.org.uk/first-aid-advice/severe-bleeding/) |
