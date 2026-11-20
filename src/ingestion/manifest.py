@@ -141,26 +141,26 @@ def save_build_manifest(path: Path, manifest: dict[str, Any]) -> None:
 
 
 _MANIFEST_CACHE_LOCK = threading.Lock()
-_MANIFEST_CACHE: dict[Path, tuple[int, int, dict[str, Any]]] = {}
+_MANIFEST_CACHE: dict[Path, tuple[bytes, dict[str, Any]]] = {}
 
 
 def load_build_manifest(path: Path) -> dict[str, Any]:
-    # Cache manifest đã parse theo (đường dẫn, mtime_ns, size) để không đọc/parse JSON
-    # lặp lại trên mỗi truy vấn, nhưng vẫn tự làm mới ngay khi file trên đĩa thay đổi.
+    # Cache manifest đã parse theo nội dung byte thực tế để tránh lỗi độ phân giải mtime
+    # trên Windows khi file được ghi đè liên tiếp cùng kích thước.
     resolved = path.resolve()
-    stat = resolved.stat()
-    fingerprint = (stat.st_mtime_ns, stat.st_size)
+    raw_bytes = resolved.read_bytes()
     with _MANIFEST_CACHE_LOCK:
         cached = _MANIFEST_CACHE.get(resolved)
-        if cached is not None and cached[0] == fingerprint[0] and cached[1] == fingerprint[1]:
-            return copy.deepcopy(cached[2])
+        if cached is not None and cached[0] == raw_bytes:
+            return copy.deepcopy(cached[1])
 
-    raw = json.loads(resolved.read_text(encoding="utf-8"))
-    if raw.get("schema") != BUILD_MANIFEST_SCHEMA:
+    raw = json.loads(raw_bytes.decode("utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema") != BUILD_MANIFEST_SCHEMA:
         raise ValueError(f"Unsupported knowledge-build manifest at {path}")
+    manifest_data: dict[str, Any] = dict(raw)
     with _MANIFEST_CACHE_LOCK:
-        _MANIFEST_CACHE[resolved] = (fingerprint[0], fingerprint[1], copy.deepcopy(raw))
-    return raw
+        _MANIFEST_CACHE[resolved] = (raw_bytes, copy.deepcopy(manifest_data))
+    return manifest_data
 
 
 def validate_build_id(value: str | None, *, setting_name: str = "KB_VERSION") -> str:
