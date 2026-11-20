@@ -25,7 +25,7 @@ client gửi hiện chưa có contract đảm bảo đây là định danh opaqu
 ## Mô hình trace
 
 | Observation | Langfuse type | Parent | Metadata được phép |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `chat-request` | `span` | root | request ID, trạng thái, tổng latency, action, count, version/fingerprint, lỗi đã phân loại, fallback/safety category |
 | `retrieve` | `retriever` | request | trạng thái, latency, attempt, selected/retained/duplicate count, tối đa 20 opaque candidate IDs |
 | `dense`, `bm25` | `retriever` | retrieve | trạng thái từng channel, latency, count, opaque IDs, loại lỗi |
@@ -173,7 +173,7 @@ Không cần thêm React, Prometheus hoặc Grafana. Trong Langfuse, tạo một
 và dùng các widget/filter sau:
 
 | Câu hỏi vận hành | Measure / filter |
-|---|---|
+| --- | --- |
 | Traffic, success, degraded, failed | count root `chat-request`, group/filter `metadata.status` |
 | Latency request | percentile/average latency của root; đối chiếu `metadata.duration_ms` |
 | Retrieval health | `retrieve`, `dense`, `bm25`; group `metadata.status`, `metadata.error_type` |
@@ -210,7 +210,7 @@ Advisor AI. Lưu baseline, lý do chọn threshold, owner và runbook trước k
 ## Nguồn và quyết định thiết kế
 
 | Nguồn chính thức | Quyết định được hỗ trợ |
-|---|---|
+| --- | --- |
 | [Langfuse Python SDK 4.15.4](https://pypi.org/project/langfuse/4.15.4/) | Pin SDK v4 tương thích Python 3.11 |
 | [SDK overview](https://langfuse.com/docs/observability/sdk/overview) | OpenTelemetry, batching, fail-safe SDK boundary |
 | [Trace IDs](https://langfuse.com/docs/observability/features/trace-ids-and-distributed-tracing) | Dẫn xuất trace ID xác định từ request ID |

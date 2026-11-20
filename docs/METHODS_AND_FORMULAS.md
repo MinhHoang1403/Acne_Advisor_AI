@@ -236,7 +236,7 @@ overlap as optimal.
 ## Parameter Classification
 
 | Parameter | Value | Classification |
-|---|---:|---|
+| --- | ---: | --- |
 | chunk maximum | 2400 Unicode characters | versioned build engineering contract |
 | chunk overlap | 0 | versioned build engineering contract |
 | Dense dimensions | 3072 | provider/index compatibility contract |
@@ -270,7 +270,7 @@ adaptations, and limitations are mapped in
 Project claims use these labels:
 
 | Classification | Meaning |
-|---|---|
+| --- | --- |
 | `IMPLEMENTED_RESEARCH_METHOD` | a cited method is present in code, with project-specific adaptation stated |
 | `OFFICIAL_PROVIDER_CONTRACT` | behavior required by an external SDK/service contract |
 | `OFFICIAL_FRAMEWORK_CONTRACT` | orchestration or API behavior required by framework documentation |

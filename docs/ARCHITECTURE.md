@@ -64,7 +64,7 @@ bounded by `ActionPolicy`; retrieval can execute at most twice, and all stages
 share a finite request deadline.
 
 | Responsibility | Canonical location |
-|---|---|
+| --- | --- |
 | Knowledge compilation and activation | `src/ingestion/`, `scripts/knowledge_build.py` |
 | Dense + BM25 + RRF retrieval | `src/retrieval/service.py`, `src/retrieval/rrf.py` |
 | Local candidate reranking | `src/retrieval/reranker.py` |
@@ -133,7 +133,7 @@ boundary, not to a hidden runtime verifier model.
 ## Failure and Fallback Contract
 
 | Failure point | Bounded behavior |
-|---|---|
+| --- | --- |
 | Safety match | Produce the source-mapped system response and bypass cache/model/retrieval/generation. |
 | Exact cache unavailable or miss | Continue through the normal graph; cache failure is non-fatal. |
 | Invalid or unavailable ActionDecision | Fail closed to abstention or the owned infrastructure fallback within the request budget. |
@@ -176,7 +176,7 @@ without merging repeated text or leaking state across a new chat/session switch.
 ## Package Boundaries
 
 | Package | Current responsibility |
-|---|---|
+| --- | --- |
 | `src/ingestion` | content-addressed knowledge compilation and controlled activation |
 | `src/knowledge` | taxonomy identities, EntityCards, and deterministic graph build |
 | `src/retrieval` | source-evidence retrieval, local reranking, and context packing |

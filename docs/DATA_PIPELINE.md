@@ -34,7 +34,7 @@ data/sources/manifest.yaml
 ```
 
 | Responsibility | Code |
-|---|---|
+| --- | --- |
 | Source identity and verification | `src/ingestion/source_manifest.py` |
 | Parsed artifact cache | `src/ingestion/parser.py` |
 | Normalization | `src/ingestion/normalization.py` |

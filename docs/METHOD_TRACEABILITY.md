@@ -16,7 +16,7 @@ nghĩa phương pháp đã tối ưu hoặc được xác nhận hiệu quả l�
 ## Phương pháp đang hoạt động
 
 | Phương pháp | Code owner | Nguồn | Phân loại | Thích nghi và giới hạn |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Dense retrieval | `src/database/vector_store.py`, `src/retrieval/service.py` | `karpukhin_dpr_2020`, `qdrant_cosine_search_2026` | `IMPLEMENTED_RESEARCH_METHOD` + `OFFICIAL_PROVIDER_CONTRACT` | Gemini Embedding 2 và Qdrant thay DPR encoder/index; không chứng minh chất lượng tiếng Việt hoặc y khoa. |
 | Gemini Embedding 2 | `src/integrations/google_genai.py`, `src/ingestion/embedding.py` | `google_gemini_embedding2_2026` | `OFFICIAL_PROVIDER_CONTRACT` | 3072 chiều, cosine, không dùng `task_type`; document là `title: {title} \| text: {content}`, query là `task: question answering \| query: {content}`. Provider docs không chứng minh format này tối ưu. |
 | Native BM25 | `src/ingestion/bm25.py`, `src/database/vector_store.py` | `robertson_zaragoza_bm25_2009`, `qdrant_bm25_2026` | `IMPLEMENTED_RESEARCH_METHOD` + `OFFICIAL_PROVIDER_CONTRACT` | Qdrant thực thi; tokenizer `word`, lowercase, ASCII folding, language `none`, IDF collection-side. `k1=1.2`, `b=0.75`, `avg_len=256` không được tuyên bố tối ưu. |
@@ -58,7 +58,7 @@ chính thức hoặc tuyên bố tối ưu phổ quát.
 ## Nghiên cứu liên quan nhưng không triển khai
 
 | Nguồn | Vai trò | Trạng thái project |
-|---|---|---|
+| --- | --- | --- |
 | Rewrite-Retrieve-Read, CONQRR, IterCQR | query/conversational reformulation | Đã dùng để định hướng thí nghiệm; prompt B bị loại, không thêm rewriter. |
 | Adaptive-RAG | request-dependent retrieval strategy | Chỉ là context; không có complexity classifier. |
 | `question_decomposition_2025`, `subquestion_coverage_2025` | multi-part retrieval | Đã xem xét, hoãn; không có decomposition agent/framework. |
