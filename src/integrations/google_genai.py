@@ -12,7 +12,7 @@ import math
 import logging
 import os
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from google import genai
 from google.genai import errors, types
@@ -214,7 +214,10 @@ def embed_texts_sync(
             model=model_name,
             # SDK gom list[str] thành một Content có nhiều Parts; batch embedding
             # cần một Content độc lập cho mỗi text để output count khớp input.
-            contents=[types.Content(parts=[types.Part(text=text)]) for text in texts],
+            contents=cast(
+                types.ContentListUnion,
+                [types.Content(parts=[types.Part(text=text)]) for text in texts],
+            ),
             config=types.EmbedContentConfig(**config_kwargs),
         )
         vectors = extract_embedding_vectors(response, expected_count=len(texts))
@@ -290,7 +293,7 @@ def normalize_google_genai_exception(exc: Exception) -> Exception:
     if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
         return ProviderTimeoutError("Google GenAI request timed out.")
     if isinstance(exc, errors.APIError):
-        code = int(getattr(exc, "code", 0) or 0)
+        code = exc.code or 0
         if code in {408, 504}:
             return ProviderTimeoutError(f"Google GenAI request timed out with HTTP {code}.")
         if code == 429 and _has_non_retryable_quota(exc):

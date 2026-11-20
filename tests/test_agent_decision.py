@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 import pytest
 
@@ -11,11 +12,13 @@ from src.agent.action_decision import (
     select_agent_action,
     validate_agent_decision,
 )
+from src.agent.action_policy import DecisionAction, DecisionReason
 from src.agent.nodes import workflow
+from src.agent.state import ClinicalState
 
 
 async def _model(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
-    async def fake_generate(**kwargs: object) -> dict:
+    async def fake_generate(**kwargs: object) -> dict[str, Any]:
         assert kwargs["response_schema"] is AgentDecision
         return {
             "text": payload,
@@ -29,7 +32,7 @@ async def _model(monkeypatch: pytest.MonkeyPatch, payload: str) -> None:
 
 def _direct_support_fields(
     evidence_id: str = "evidence-1",
-) -> dict[str, object]:
+) -> dict[str, list[str]]:
     return {"direct_supporting_evidence_ids": [evidence_id]}
 
 
@@ -201,7 +204,7 @@ async def test_referral_evidence_remains_visible_for_standalone_and_multiturn_de
     conversation_context: dict[str, object],
     referral_position: int,
 ) -> None:
-    async def evidence_aware_model(**kwargs: object) -> dict:
+    async def evidence_aware_model(**kwargs: object) -> dict[str, Any]:
         payload = json.loads(str(kwargs["prompt"]))
         visible_text = payload["evidence_for_relevance_check"]
         if "đi khám bác sĩ da liễu" in visible_text:
@@ -530,7 +533,7 @@ def test_decision_prompt_exposes_exact_validator_evidence_identity() -> None:
 async def test_action_provider_failure_keeps_provider_unavailable_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def unavailable(**_: object) -> dict:
+    async def unavailable(**_: object) -> dict[str, Any]:
         raise RuntimeError("provider unavailable")
 
     monkeypatch.setattr(decision_module, "generate_llm_response", unavailable)
@@ -562,9 +565,9 @@ def test_generate_without_evidence_is_rejected() -> None:
     ],
 )
 def test_invalid_action_reason_pairs_fail_closed(
-    action: str,
-    reason_code: str,
-    state: dict,
+    action: DecisionAction,
+    reason_code: DecisionReason,
+    state: ClinicalState,
 ) -> None:
     decision = AgentDecision(
         action=action,
@@ -596,8 +599,8 @@ def test_invalid_action_reason_pairs_fail_closed(
     ],
 )
 def test_action_reason_contract_accepts_only_legal_semantic_pairs(
-    action: str,
-    reason_code: str,
+    action: DecisionAction,
+    reason_code: DecisionReason,
 ) -> None:
     query = "different acne query" if action in {"retrieve", "retry"} else None
     missing_evidence = "specific missing treatment relation" if action == "retry" else None
@@ -747,7 +750,7 @@ async def test_repeated_referral_turns_do_not_require_safety_abstention_with_val
         _generate_payload("referral-evidence"),
     )
     question = "Khi nào người bị mụn nên đi khám bác sĩ thay vì tự chăm sóc ở nhà?"
-    histories = [
+    histories: list[list[dict[str, str]]] = [
         [],
         [
             {"role": "user", "content": question},
@@ -900,7 +903,7 @@ async def test_explicit_topic_switch_cannot_restore_superseded_topic_in_initial_
 async def test_multiturn_history_has_one_semantic_owner(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, str] = {}
 
-    async def fake_generate(**kwargs: object) -> dict:
+    async def fake_generate(**kwargs: object) -> dict[str, Any]:
         captured["prompt"] = str(kwargs["prompt"])
         return {
             "text": (
@@ -975,7 +978,7 @@ async def test_model_standalone_query_reaches_retrieval_for_multiturn_contracts(
 ) -> None:
     captured: dict[str, str] = {}
 
-    async def fake_generate(**_: object) -> dict:
+    async def fake_generate(**_: object) -> dict[str, Any]:
         return {
             "text": json.dumps(
                 {
@@ -990,7 +993,7 @@ async def test_model_standalone_query_reaches_retrieval_for_multiturn_contracts(
             "fallback_used": False,
         }
 
-    async def fake_retrieve(payload: dict[str, object]) -> dict:
+    async def fake_retrieve(payload: dict[str, object]) -> dict[str, Any]:
         captured["query"] = str(payload["query"])
         return {
             "vector_contexts": [],
@@ -1003,14 +1006,14 @@ async def test_model_standalone_query_reaches_retrieval_for_multiturn_contracts(
 
     monkeypatch.setattr(decision_module, "generate_llm_response", fake_generate)
     monkeypatch.setattr(workflow, "retrieve_evidence", FakeTool())
-    state = {
+    state: ClinicalState = {
         "normalized_question": current_question,
         "conversation_context": {"messages": history},
         "retrieval_attempt": 0,
         "retry_history": [],
     }
     decision = await select_agent_action(state)
-    await workflow.retrieve_node({**state, **decision})
+    await workflow.retrieve_node(cast(ClinicalState, {**state, **decision}))
 
     assert decision["next_action"] == "retrieve"
     assert decision["retrieval_query"] == expected_query
