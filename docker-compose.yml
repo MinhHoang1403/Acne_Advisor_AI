@@ -70,8 +70,18 @@ services:
       TRANSFORMERS_OFFLINE: "1"
       OBSERVABILITY_TRACE_DIR: /tmp/acne-traces
       RERANKER_DEVICE: "${RERANKER_DEVICE:-cuda}"
+      RERANKER_BATCH_SIZE: "${RERANKER_BATCH_SIZE:-16}"
+      RERANKER_TIMEOUT_SECONDS: "${RERANKER_TIMEOUT_SECONDS:-8}"
+      RETRIEVAL_CONTEXT_MAX_CHARS: "${RETRIEVAL_CONTEXT_MAX_CHARS:-10000}"
       OMP_NUM_THREADS: "${OMP_NUM_THREADS:-2}"
       TOKENIZERS_PARALLELISM: "false"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:

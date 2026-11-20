@@ -12,9 +12,13 @@ from src.agent.answer_formatting import assess_structural_quality
 
 SAFE_FALLBACK_FLOW_VERSION = "safe_fallback_flow_v4"
 
+# Câu từ chối chung theo văn phong tư vấn lịch sự, thấu cảm để người dùng không bị hụt hẫng.
 GENERIC_NON_SAFETY_FALLBACK_ANSWER = (
-    "Mình chưa thể đưa ra câu trả lời đủ tin cậy cho câu hỏi này lúc này. "
-    "Bạn có thể thử diễn đạt cụ thể hơn hoặc thử lại sau."
+    "Cảm ơn bạn đã đặt câu hỏi. Với vấn đề này, mình chưa có đủ cơ sở y khoa rõ ràng "
+    "để tư vấn chính xác nên không muốn trả lời phỏng đoán dễ gây hiểu nhầm cho bạn. "
+    "Bạn có thể chia sẻ cụ thể hơn tình trạng da hoặc khía cạnh bạn đang quan tâm "
+    "(như loại mụn, biểu hiện trên da hay hoạt chất đang dùng), hoặc trao đổi trực tiếp "
+    "với bác sĩ da liễu để được kiểm tra kỹ hơn nhé."
 )
 
 _FALLBACK_REASON_LABELS: dict[str, str] = {
@@ -161,23 +165,24 @@ def build_safe_fallback_answer(
 
     if fallback_type == "empty_query":
         return (
-            "Mình chưa nhận được câu hỏi đủ rõ. "
-            "Bạn hãy nêu cụ thể điều muốn biết về mụn hoặc chăm sóc da."
+            "Chào bạn, mình chưa thấy rõ nội dung câu hỏi. "
+            "Bạn có thể chia sẻ cụ thể hơn về tình trạng mụn, biểu hiện trên da hoặc "
+            "sản phẩm chăm sóc da bạn đang quan tâm nhé."
         )
     if fallback_type == "out_of_scope":
         return (
-            "Mình chỉ có thể hỗ trợ các câu hỏi về mụn và chăm sóc da liên quan. "
-            "Bạn có thể hỏi lại trong phạm vi này."
+            "Cảm ơn bạn đã hỏi, nhưng câu hỏi này nằm ngoài phạm vi hỗ trợ về mụn và "
+            "chăm sóc da của mình. Nếu bạn có băn khoăn nào liên quan đến mụn trứng cá, "
+            "hoạt chất trị mụn hay cách chăm sóc da mụn, mình rất sẵn lòng giải đáp nhé."
         )
     if fallback_type == "cannot_safely_proceed":
         return (
-            "Mình chưa thể xử lý câu hỏi này một cách an toàn ở thời điểm hiện tại. "
-            "Bạn có thể viết lại câu hỏi rõ hơn hoặc thử lại sau."
+            "Với tình huống này, mình chưa thể tư vấn trực tiếp một cách an toàn vì cần "
+            "được đánh giá kỹ hơn trên thực tế. Bạn nên theo dõi sát biểu hiện trên da và "
+            "trao đổi sớm với bác sĩ da liễu hoặc cơ sở y tế để được hướng dẫn phù hợp, "
+            "hoặc nêu rõ hơn câu hỏi nếu bạn cần thêm thông tin tham khảo nhé."
         )
-    return (
-        "Mình chưa có đủ thông tin đáng tin cậy để trả lời chính xác câu hỏi này. "
-        "Bạn có thể nêu cụ thể hơn điều muốn biết."
-    )
+    return GENERIC_NON_SAFETY_FALLBACK_ANSWER
 
 
 def fallback_reason_label(reason_code: str | None) -> str | None:
