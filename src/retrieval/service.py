@@ -127,7 +127,8 @@ class EvidenceRetriever:
 
         candidate_limit = _bounded_env("RETRIEVAL_CANDIDATE_LIMIT", 16, 1, 50)
         context_items = min(top_k, _bounded_env("RETRIEVAL_CONTEXT_MAX_ITEMS", 9, 1, 20))
-        context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 7000, 512, 20000)
+        # Cho phép đóng gói 6-8 đoạn chứng cứ trọn vẹn nhằm giảm nguy cơ thiếu chi tiết và phải retry.
+        context_chars = _bounded_env("RETRIEVAL_CONTEXT_MAX_CHARS", 10000, 512, 20000)
         retained_candidates = _load_retained_candidates(
             retained_retrieval_candidates,
             limit=candidate_limit * 2,

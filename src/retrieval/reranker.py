@@ -107,8 +107,8 @@ class RerankerSettings:
     model_name: str = DEFAULT_RERANKER_MODEL
     device: str = DEFAULT_RERANKER_DEVICE
     precision: str = DEFAULT_RERANKER_PRECISION
-    batch_size: int = 4
-    timeout_seconds: float = 20.0
+    batch_size: int = 16
+    timeout_seconds: float = 8.0
 
     @classmethod
     def from_env(cls) -> RerankerSettings:
@@ -120,9 +120,9 @@ class RerankerSettings:
             precision=canonical_reranker_precision(
                 os.getenv("RERANKER_PRECISION", DEFAULT_RERANKER_PRECISION)
             ),
-            batch_size=_bounded_int_env("RERANKER_BATCH_SIZE", 4, 1, 64),
+            batch_size=_bounded_int_env("RERANKER_BATCH_SIZE", 16, 1, 64),
             timeout_seconds=_bounded_float_env(
-                "RERANKER_TIMEOUT_SECONDS", 20.0, 0.1, 120.0
+                "RERANKER_TIMEOUT_SECONDS", 8.0, 0.1, 120.0
             ),
         )
 
