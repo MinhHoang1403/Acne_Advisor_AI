@@ -212,13 +212,19 @@ class EvidenceRetriever:
                 "Local reranker fallback preserved deterministic candidate order: %s",
                 rerank_outcome.fallback_reason,
             )
+        packed_input_candidates = _prune_low_relevance_reranked_candidates(
+            rerank_outcome.candidates,
+            rerank_status=rerank_outcome.status,
+            min_score=_bounded_float_env("RETRIEVAL_RERANK_MIN_SCORE", 0.20, 0.0, 1.0),
+            relative_ratio=_bounded_float_env("RETRIEVAL_RERANK_RELATIVE_RATIO", 0.30, 0.0, 1.0),
+        )
         normalized = NormalizedQuery(
             original_query=rerank_query or query,
             normalized_text=effective_rerank_query,
         )
         packed = pack_context(
             normalized,
-            rerank_outcome.candidates,
+            packed_input_candidates,
             max_items=context_items,
             max_chars=context_chars,
         )
@@ -655,6 +661,39 @@ def _source_id(payload: dict[str, Any]) -> str:
         or payload.get("document_id")
         or ""
     ).strip()
+
+
+def _prune_low_relevance_reranked_candidates(
+    candidates: list[RetrievedCandidate],
+    *,
+    rerank_status: str,
+    min_score: float = 0.20,
+    relative_ratio: float = 0.30,
+    min_keep: int = 2,
+) -> list[RetrievedCandidate]:
+    """Loại bỏ các đoạn nhiễu ở đuôi danh sách sau khi cross-encoder chấm điểm thấp.
+
+    Chỉ áp dụng khi reranker chạy thành công và toàn bộ điểm nằm trong thang xác suất
+    sigmoid ``[0.0, 1.0]`` với ứng viên đầu bảng đủ tin cậy (``top_score >= min_score``).
+    Luôn giữ tối thiểu ``min_keep`` ứng viên cao nhất để không làm mất ngữ cảnh cần thiết.
+    """
+
+    if rerank_status != "ok" or len(candidates) <= min_keep or min_score <= 0.0:
+        return candidates
+    scores = [item.rerank_score for item in candidates]
+    if not all(isinstance(score, (int, float)) and 0.0 <= float(score) <= 1.0 for score in scores):
+        return candidates
+    top_score = float(scores[0])  # type: ignore[arg-type]
+    if top_score < min_score:
+        return candidates
+
+    threshold = max(min_score, top_score * relative_ratio)
+    kept: list[RetrievedCandidate] = []
+    for idx, item in enumerate(candidates):
+        score = float(item.rerank_score)  # type: ignore[arg-type]
+        if idx < min_keep or score >= threshold:
+            kept.append(item)
+    return kept
 
 
 def _bounded_env(name: str, default: int, minimum: int, maximum: int) -> int:
