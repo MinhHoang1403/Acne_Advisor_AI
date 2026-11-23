@@ -32,7 +32,8 @@ from ragas.embeddings.base import BaseRagasEmbedding
 
 DEFAULT_DATASET_PATH = Path("evaluation/dataset.json")
 DEFAULT_RESULTS_DIR = Path("evaluation/results")
-DEFAULT_JUDGE_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_JUDGE_MODEL = "gemini-4-hydrogen"
+DEFAULT_FALLBACK_JUDGE_MODEL = "gemini-3.5-flash-lite"
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSIONS = 3072
 
@@ -318,10 +319,11 @@ async def score_records_with_ragas(
     *,
     judge_model: str = DEFAULT_JUDGE_MODEL,
     judge_provider: str = "google",
+    fallback_judge_model: str | None = DEFAULT_FALLBACK_JUDGE_MODEL,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     api_key: str | None = None,
     request_delay_seconds: float | None = None,
-    max_rate_limit_retries: int = 3,
+    max_rate_limit_retries: int = 2,
 ) -> list[dict[str, Any]]:
     """Chấm 5 chỉ số RAGAS trên các ca cần trả lời và kiểm tra tỷ lệ từ chối an toàn."""
 
@@ -339,17 +341,32 @@ async def score_records_with_ragas(
         embedding_model=embedding_model,
         api_key=api_key,
     )
-    faithfulness_metric = Faithfulness(llm=judge_llm)
-    relevancy_metric = AnswerRelevancy(llm=judge_llm, embeddings=embeddings)
-    precision_metric = ContextPrecision(llm=judge_llm)
-    recall_metric = ContextRecall(llm=judge_llm)
-    correctness_metric = FactualCorrectness(llm=judge_llm)
+    fallback_llm: Any | None = None
+    if fallback_judge_model and fallback_judge_model != judge_model and judge_provider.strip().lower() == "google":
+        fallback_llm, _ = build_ragas_evaluators(
+            judge_model=fallback_judge_model,
+            judge_provider="google",
+            embedding_model=embedding_model,
+            api_key=api_key,
+        )
+
+    def _build_metric_set(llm_instance: Any) -> dict[str, Any]:
+        return {
+            "faithfulness": Faithfulness(llm=llm_instance),
+            "answer_relevancy": AnswerRelevancy(llm=llm_instance, embeddings=embeddings),
+            "context_precision": ContextPrecision(llm=llm_instance),
+            "context_recall": ContextRecall(llm=llm_instance),
+            "factual_correctness": FactualCorrectness(llm=llm_instance),
+        }
+
+    primary_metrics = _build_metric_set(judge_llm)
+    fallback_metrics = _build_metric_set(fallback_llm) if fallback_llm is not None else None
 
     use_parallel = judge_provider.strip().lower() == "openai"
     pacing_delay = (
         0.0
         if request_delay_seconds is None and use_parallel
-        else 4.5
+        else 2.5
         if request_delay_seconds is None
         else max(0.0, request_delay_seconds)
     )
@@ -381,66 +398,45 @@ async def score_records_with_ragas(
         reference = str(rec.get("reference") or "")
 
         if response_text and contexts:
-            metric_factories = (
-                (
-                    "faithfulness",
-                    lambda ui=user_input, rp=response_text, cx=contexts: faithfulness_metric.ascore(
-                        user_input=ui,
-                        response=rp,
-                        retrieved_contexts=cx,
-                    ),
-                ),
-                (
-                    "answer_relevancy",
-                    lambda ui=user_input, rp=response_text: relevancy_metric.ascore(
-                        user_input=ui,
-                        response=rp,
-                    ),
-                ),
-                (
-                    "context_precision",
-                    lambda ui=user_input, rf=reference, cx=contexts: precision_metric.ascore(
-                        user_input=ui,
-                        reference=rf,
-                        retrieved_contexts=cx,
-                    ),
-                ),
-                (
-                    "context_recall",
-                    lambda ui=user_input, rf=reference, cx=contexts: recall_metric.ascore(
-                        user_input=ui,
-                        retrieved_contexts=cx,
-                        reference=rf,
-                    ),
-                ),
-                (
-                    "factual_correctness",
-                    lambda rp=response_text, rf=reference: correctness_metric.ascore(
-                        response=rp,
-                        reference=rf,
-                    ),
-                ),
-            )
+            def _make_call(mset: dict[str, Any], key: str) -> Any:
+                if key == "faithfulness":
+                    return mset[key].ascore(user_input=user_input, response=response_text, retrieved_contexts=contexts)
+                if key == "answer_relevancy":
+                    return mset[key].ascore(user_input=user_input, response=response_text)
+                if key == "context_precision":
+                    return mset[key].ascore(user_input=user_input, reference=reference, retrieved_contexts=contexts)
+                if key == "context_recall":
+                    return mset[key].ascore(user_input=user_input, retrieved_contexts=contexts, reference=reference)
+                return mset[key].ascore(response=response_text, reference=reference)
+
+            async def _score_one_metric(key: str) -> Any:
+                try:
+                    return await _run_metric_with_retry(
+                        lambda k=key: _make_call(primary_metrics, k),
+                        max_retries=max_rate_limit_retries,
+                    )
+                except Exception as primary_exc:
+                    if fallback_metrics is not None and _is_rate_limit_error(primary_exc):
+                        return await _run_metric_with_retry(
+                            lambda k=key: _make_call(fallback_metrics, k),
+                            max_retries=1,
+                        )
+                    raise
+
             if use_parallel:
                 results = await asyncio.gather(
-                    *(
-                        _run_metric_with_retry(fn, max_retries=max_rate_limit_retries)
-                        for _, fn in metric_factories
-                    ),
+                    *(_score_one_metric(key) for key in RAGAS_METRIC_KEYS),
                     return_exceptions=True,
                 )
-                for (key, _), outcome in zip(metric_factories, results, strict=True):
+                for key, outcome in zip(RAGAS_METRIC_KEYS, results, strict=True):
                     if isinstance(outcome, BaseException):
                         metric_errors[key] = f"{type(outcome).__name__}: {outcome}"
                     else:
                         scores[key] = _clean_score(getattr(outcome, "value", outcome))
             else:
-                for key, fn in metric_factories:
+                for key in RAGAS_METRIC_KEYS:
                     try:
-                        outcome = await _run_metric_with_retry(
-                            fn,
-                            max_retries=max_rate_limit_retries,
-                        )
+                        outcome = await _score_one_metric(key)
                         scores[key] = _clean_score(getattr(outcome, "value", outcome))
                     except Exception as exc:
                         metric_errors[key] = f"{type(exc).__name__}: {exc}"
