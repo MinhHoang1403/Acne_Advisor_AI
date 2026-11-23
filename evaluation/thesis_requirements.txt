@@ -1,3 +1,0 @@
-# Exact semantic-evaluator environment used by the approved calibration run.
-openai==2.38.0
-ragchecker==0.1.9
