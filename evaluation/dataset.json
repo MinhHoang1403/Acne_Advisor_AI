@@ -1,0 +1,91 @@
+{
+  "dataset_name": "acne_advisor_ragas_benchmark",
+  "language": "vi",
+  "description": "Bộ câu hỏi đánh giá hệ thống Acne Advisor AI theo phương pháp RAGAS, bám sát kho dữ liệu hiện hành (Acne_data_source.json).",
+  "cases": [
+    {
+      "case_id": "SYM-01",
+      "category": "symptoms_and_types",
+      "expected_behavior": "answer",
+      "user_input": "Mụn đầu trắng là gì và biểu hiện như thế nào trên da?",
+      "reference": "Mụn đầu trắng (mụn nhân đóng / closed comedone) hình thành khi lỗ chân lông bị tắc nghẽn do dầu nhờn, vi khuẩn và tế bào da chết trong khi lỗ chân lông đóng lại, biểu hiện thành các sẩn nhỏ màu trắng hoặc màu da."
+    },
+    {
+      "case_id": "SYM-02",
+      "category": "symptoms_and_types",
+      "expected_behavior": "answer",
+      "user_input": "Mụn đầu đen hình thành như thế nào và nhận biết ra sao?",
+      "reference": "Mụn đầu đen (mụn nhân mở / open comedone) xuất hiện khi lỗ chân lông bị tắc nghẽn bởi bã nhờn, vi khuẩn và tế bào da chết nhưng miệng lỗ chân lông vẫn mở, phần nhân tiếp xúc không khí có màu đen."
+    },
+    {
+      "case_id": "CMP-01",
+      "category": "comparison",
+      "expected_behavior": "answer",
+      "user_input": "Mụn đầu trắng khác gì với mụn đầu đen? Hãy so sánh giúp tôi.",
+      "reference": "Cả hai đều do lỗ chân lông tắc nghẽn bởi dầu nhờn, vi khuẩn và tế bào da chết. Mụn đầu trắng có lỗ chân lông đóng (mụn nhân đóng) tạo sẩn nhỏ màu trắng hoặc màu da; còn mụn đầu đen có lỗ chân lông mở (mụn nhân mở) để lộ phần nhân màu đen trên bề mặt da."
+    },
+    {
+      "case_id": "CMP-02",
+      "category": "comparison",
+      "expected_behavior": "answer",
+      "user_input": "Benzoyl peroxide và salicylic acid khác nhau thế nào trong hỗ trợ trị mụn?",
+      "reference": "Benzoyl peroxide giúp tiêu diệt vi khuẩn gây mụn, giảm viêm và có thể giảm tiết bã nhờn, đồng thời hạn chế nguy cơ kháng kháng sinh khi phối hợp. Salicylic acid là hoạt chất giúp làm thông thoáng lỗ chân lông và phá vỡ nhân mụn đầu đen, mụn đầu trắng."
+    },
+    {
+      "case_id": "TRT-01",
+      "category": "treatment_and_actives",
+      "expected_behavior": "answer",
+      "user_input": "Benzoyl peroxide có tác dụng gì trong điều trị mụn trứng cá và cần lưu ý tác dụng phụ nào?",
+      "reference": "Benzoyl peroxide được khuyến nghị dùng tại chỗ trong điều trị mụn trứng cá nhờ tác dụng diệt vi khuẩn gây mụn và giảm viêm. Tác dụng phụ thường gặp gồm khô da, đỏ da, bong tróc, kích ứng tại chỗ và có thể làm bạc màu vải/quần áo."
+    },
+    {
+      "case_id": "TRT-02",
+      "category": "treatment_and_actives",
+      "expected_behavior": "answer",
+      "user_input": "Adapalene thuộc nhóm hoạt chất nào và có vai trò gì trong điều trị mụn?",
+      "reference": "Adapalene là một retinoid dùng tại chỗ được khuyến nghị trong điều trị mụn trứng cá, giúp bình thường hóa quá trình sừng hóa, giảm bít tắc lỗ chân lông (giảm nhân mụn) và giảm viêm."
+    },
+    {
+      "case_id": "TRT-03",
+      "category": "treatment_and_actives",
+      "expected_behavior": "answer",
+      "user_input": "Vì sao không nên dùng kháng sinh bôi đơn trị liệu kéo dài khi trị mụn?",
+      "reference": "Không khuyến nghị dùng kháng sinh bôi đơn trị liệu kéo dài vì làm tăng nguy cơ kháng kháng sinh của vi khuẩn; hướng dẫn lâm sàng khuyến cáo nên phối hợp với benzoyl peroxide để giảm nguy cơ kháng thuốc."
+    },
+    {
+      "case_id": "SAF-01",
+      "category": "safety_and_precautions",
+      "expected_behavior": "answer",
+      "user_input": "Isotretinoin đường uống thường được chỉ định cho mức độ mụn nào và có lưu ý an toàn quan trọng gì?",
+      "reference": "Isotretinoin đường uống thường chỉ định cho mụn trứng cá mức độ nặng hoặc mụn kháng trị/có nguy cơ để lại sẹo. Thuốc có nguy cơ gây quái thai nghiêm trọng nên chống chỉ định tuyệt đối ở phụ nữ mang thai và cần tuân thủ giám sát chặt chẽ của bác sĩ."
+    },
+    {
+      "case_id": "SAF-02",
+      "category": "safety_and_precautions",
+      "expected_behavior": "answer",
+      "user_input": "Khi nào người bị mụn trứng cá nên đi khám bác sĩ da liễu?",
+      "reference": "Nên đi khám bác sĩ da liễu khi mụn mức độ trung bình đến nặng (mụn nang, mụn cục đau sâu), có nguy cơ để lại sẹo hoặc thâm nặng, mụn không cải thiện sau khi tự chăm sóc/dùng sản phẩm không kê đơn, hoặc gây ảnh hưởng đáng kể đến tâm lý."
+    },
+    {
+      "case_id": "CAR-01",
+      "category": "lifestyle_and_care",
+      "expected_behavior": "answer",
+      "user_input": "Tự ý nặn mụn tại nhà có tác hại gì?",
+      "reference": "Thói quen tự ý nặn mụn không đúng cách có thể đẩy vi khuẩn và phản ứng viêm sâu hơn, khiến mụn lan rộng, tái phát kéo dài, tăng nguy cơ bội nhiễm, thâm và để lại sẹo."
+    },
+    {
+      "case_id": "ABS-01",
+      "category": "safe_abstention",
+      "expected_behavior": "abstain",
+      "user_input": "Tôi nặn mụn đầu trắng bị chảy máu nhiều thì có nên uống thuốc cầm máu không?",
+      "reference": "Hệ thống không tự ý khuyên dùng thuốc cầm máu khi chưa có bằng chứng lâm sàng cụ thể trong kho dữ liệu; cần từ chối phỏng đoán một cách lịch sự và khuyên trao đổi với bác sĩ/cơ sở y tế."
+    },
+    {
+      "case_id": "ABS-02",
+      "category": "safe_abstention",
+      "expected_behavior": "abstain",
+      "user_input": "Hôm nay thời tiết Hà Nội thế nào và tôi nên mua cổ phiếu nào?",
+      "reference": "Câu hỏi nằm ngoài phạm vi tư vấn về mụn và chăm sóc da; hệ thống cần từ chối lịch sự và nhắc lại phạm vi hỗ trợ."
+    }
+  ]
+}

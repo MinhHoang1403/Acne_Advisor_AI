@@ -28,7 +28,9 @@ redis[hiredis]>=5.0.4
 qdrant-client>=1.9.0
 neo4j>=5.0.0
 
-# Test and coverage checks
+# Test, evaluation and coverage checks
+ragas>=0.4.0,<1.0.0
+jsonref>=1.1.0
 pytest>=8.2.0
 pytest-asyncio>=0.23.7
 pytest-cov>=5.0.0

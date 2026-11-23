@@ -1,57 +1,27 @@
-<!-- markdownlint-configure-file
-{"MD013":{"tables":false,"code_blocks":false}}
--->
+# Đánh giá Hệ thống Acne Advisor AI bằng RAGAS
 
-# Môi trường notebook đánh giá
+Thư mục này chứa quy trình đánh giá hệ thống RAG hiện tại bằng **RAGAS** (*Retrieval Augmented Generation Assessment*, Es et al., 2023, `arXiv:2309.15217`).
 
-Dùng Python 3.11.9 và hai môi trường riêng. Ứng dụng trong `.venv` khóa
-`sentence-transformers==5.6.0` / `transformers==5.15.1`; RAGChecker 0.1.9 phụ
-thuộc `refchecker`, cần `transformers<5`. Hai bộ thư viện này không thể cài
-chung theo các phiên bản đã khóa.
+## 1. Cấu trúc thư mục
 
-Chạy từ thư mục gốc dự án trên Windows:
+| Thành phần | Chức năng |
+| --- | --- |
+| `evaluation/dataset.json` | Bộ câu hỏi đánh giá chuẩn (12 câu hỏi tiếng Việt bám sát kho dữ liệu `Acne_data_source.json`, gồm cả câu trả lời và câu từ chối an toàn). |
+| `evaluation/ragas_runner.py` | Module lõi gọi hệ thống `run_clinical_agent`, chấm 5 chỉ số RAGAS bằng Gemini (`google-genai`) và xuất báo cáo Markdown/JSON. |
+| `evaluation/ragas_evaluation.ipynb` | Jupyter Notebook trực quan để chạy toàn bộ quy trình đánh giá và xuất kết quả ra file `.md`. |
+| `evaluation/results/` | Thư mục chứa kết quả xuất ra: `ragas_evaluation_report.md` và `ragas_evaluation_raw.json`. |
 
-```powershell
-py -3.11 -m venv evaluation/.venv
-evaluation/.venv/Scripts/python.exe -m pip install --upgrade pip==26.1.2
-evaluation/.venv/Scripts/python.exe -m pip install -r evaluation/requirements.lock.txt
-evaluation/.venv/Scripts/python.exe -m ipykernel install --user --name acne-advisor-evaluation --display-name "Acne Advisor AI (evaluation)"
-evaluation/.venv/Scripts/python.exe -m jupyterlab --notebook-dir=.
-```
+## 2. Các chỉ số đánh giá
 
-Trong Antigravity, VS Code hoặc Jupyter, chọn kernel **Acne Advisor AI
-(evaluation)** để chạy `evaluation/environment_check.ipynb`, phân tích kết quả
-đã lưu và dùng RAGChecker. Notebook kiểm tra môi trường không gọi API, chạy
-benchmark hoặc ghi đè kết quả nghiên cứu. `openai==2.38.0` và
-`ragchecker==0.1.9` giữ theo `thesis_requirements.txt`. Lock file cũng cài model
-spaCy `en_core_web_sm==3.8.0`.
+1. **Faithfulness (Độ trung thực với bằng chứng):** Tỷ lệ mệnh đề trong câu trả lời được chứng minh trực tiếp bởi các đoạn chứng cứ truy hồi (`retrieved_contexts`), giúp phát hiện ảo giác (hallucination).
+2. **Answer Relevancy (Độ liên quan câu trả lời):** Mức độ câu trả lời bám sát đúng trọng tâm câu hỏi của người dùng (sử dụng embeddings `models/gemini-embedding-2`).
+3. **Context Precision (Độ chính xác ngữ cảnh):** Kiểm tra các đoạn chứng cứ hữu ích có được xếp ở thứ hạng cao hay không.
+4. **Context Recall (Độ bao phủ ngữ cảnh):** Kiểm tra ngữ cảnh truy hồi có phủ đủ thông tin trong đáp án chuẩn (`reference`) hay không.
+5. **Factual Correctness (Độ chính xác nội dung):** So sánh độ chính xác sự kiện giữa câu trả lời của hệ thống và đáp án chuẩn.
+6. **Safe Abstention Accuracy (Tỷ lệ từ chối an toàn):** Đánh giá riêng các câu hỏi ngoài phạm vi hoặc thiếu bằng chứng y khoa xem hệ thống có từ chối đúng thay vì phỏng đoán hay không.
 
-Kernel **Acne Advisor AI (runtime)** dùng `.venv` ở gốc dự án cho các đoạn mã
-chạy Agent/reranker. Đăng ký lại nếu cần:
+## 3. Cách chạy đánh giá
 
-```powershell
-.venv/Scripts/python.exe -m pip install ipykernel -c requirements.lock.txt
-.venv/Scripts/python.exe -m ipykernel install --user --name acne-advisor-runtime --display-name "Acne Advisor AI (runtime)"
-```
-
-Không cài `requirements.lock.txt` của ứng dụng vào `evaluation/.venv`. Thu thập
-output bằng môi trường runtime; chấm output đã lưu bằng môi trường evaluation.
-Notebook `formal_evaluation.ipynb` và `Dockerfile.thesis` giữ quy trình nghiên
-cứu cũ, vốn giả định một môi trường chung. Notebook còn kiểm tra commit,
-fingerprint và KB lịch sử; khôi phục thư viện không thay đổi các điều kiện đó.
-Không chạy toàn bộ notebook lịch sử để kiểm tra cài đặt; dùng
-`environment_check.ipynb`.
-
-Kiểm tra xung đột thư viện:
-
-```powershell
-evaluation/.venv/Scripts/python.exe -m pip check
-.venv/Scripts/python.exe -m pip check
-```
-
-Khi chủ động cập nhật dependency đánh giá, cài công cụ `uv` rồi tạo lại lock
-bằng:
-
-```powershell
-uv pip compile evaluation/requirements.txt --python-version 3.11.9 --python-platform x86_64-pc-windows-msvc --output-file evaluation/requirements.lock.txt
-```
+1. Đảm bảo các container Docker (`acne_qdrant`, `acne_postgres`, `acne_redis`, `acne_neo4j`) đang chạy và `.env` đã có `GOOGLE_API_KEY`.
+2. Mở file `evaluation/ragas_evaluation.ipynb` bằng VS Code / Jupyter (chọn kernel `.venv` của dự án) và chạy lần lượt các cell (`Run All`).
+3. Xem báo cáo chi tiết tại `evaluation/results/ragas_evaluation_report.md`.
