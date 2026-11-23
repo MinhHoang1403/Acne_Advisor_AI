@@ -20,11 +20,11 @@ def test_ragas_dataset_schema_is_valid_and_balanced() -> None:
     meta, cases = load_evaluation_dataset(DEFAULT_DATASET_PATH)
 
     assert meta["dataset_name"] == "acne_advisor_ragas_benchmark"
-    assert len(cases) >= 10
+    assert len(cases) >= 18
     answer_cases = [c for c in cases if c.expected_behavior == "answer"]
     abstain_cases = [c for c in cases if c.expected_behavior == "abstain"]
-    assert len(answer_cases) >= 8
-    assert len(abstain_cases) >= 2
+    assert len(answer_cases) >= 14
+    assert len(abstain_cases) >= 4
 
 
 def test_project_gemini_embeddings_delegates_to_project_adapter(
