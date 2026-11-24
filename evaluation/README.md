@@ -6,7 +6,7 @@ Thư mục này chứa quy trình đánh giá hệ thống RAG hiện tại bằ
 
 | Thành phần | Chức năng |
 | --- | --- |
-| `evaluation/dataset.json` | Bộ câu hỏi đánh giá chuẩn (20 câu hỏi tiếng Việt thuộc 7 nhóm chủ đề bám sát kho dữ liệu `Acne_data_source.json`, gồm 16 câu trả lời và 4 câu từ chối an toàn). |
+| `evaluation/dataset.json` | Bộ câu hỏi đánh giá chuẩn (50 câu hỏi tiếng Việt thuộc 7 nhóm chủ đề bám sát kho dữ liệu `Acne_data_source.json`, gồm 42 câu trả lời và 8 câu từ chối an toàn). |
 | `evaluation/ragas_runner.py` | Module lõi gọi hệ thống `run_clinical_agent`, chấm 5 chỉ số RAGAS bằng Gemini (`google-genai`) và xuất báo cáo Markdown/JSON. |
 | `evaluation/ragas_evaluation.ipynb` | Jupyter Notebook trực quan để chạy toàn bộ quy trình đánh giá và xuất kết quả ra file `.md`. |
 | `evaluation/results/` | Thư mục chứa kết quả xuất ra: `ragas_evaluation_report.md` và `ragas_evaluation_raw.json`. |
@@ -17,7 +17,7 @@ Thư mục này chứa quy trình đánh giá hệ thống RAG hiện tại bằ
 2. **Answer Relevancy (Độ liên quan câu trả lời):** Mức độ câu trả lời bám sát đúng trọng tâm câu hỏi của người dùng (sử dụng embeddings `models/gemini-embedding-2`).
 3. **Context Precision (Độ chính xác ngữ cảnh):** Kiểm tra các đoạn chứng cứ hữu ích có được xếp ở thứ hạng cao hay không.
 4. **Context Recall (Độ bao phủ ngữ cảnh):** Kiểm tra ngữ cảnh truy hồi có phủ đủ thông tin trong đáp án chuẩn (`reference`) hay không.
-5. **Factual Correctness (Độ chính xác nội dung):** So sánh độ chính xác sự kiện giữa câu trả lời của hệ thống và đáp án chuẩn.
+5. **Answer Correctness (Độ chính xác câu trả lời):** Kết hợp độ chính xác sự kiện (75%) và độ tương đồng ngữ nghĩa (25%) giữa câu trả lời của hệ thống và đáp án chuẩn.
 6. **Safe Abstention Accuracy (Tỷ lệ từ chối an toàn):** Đánh giá riêng các câu hỏi ngoài phạm vi hoặc thiếu bằng chứng y khoa xem hệ thống có từ chối đúng thay vì phỏng đoán hay không.
 
 ## 3. Cách chạy đánh giá

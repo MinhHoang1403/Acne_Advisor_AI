@@ -381,7 +381,11 @@ def _append_disclaimer_once(text: str, disclaimer: str) -> str:
 
 
 def _remove_greetings(text: str) -> str:
-    return re.sub(r"^(Chào bạn|Xin chào)[,!]?\s*", "", text, count=1, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^(Chào bạn|Xin chào)[,!]?\s*", "", text, count=1, flags=re.IGNORECASE)
+    if cleaned != text and cleaned and cleaned[0].islower():
+        # Khi cắt bỏ lời chào mở đầu ("Chào bạn, ..."), viết hoa lại chữ cái đầu câu còn lại.
+        return cleaned[0].upper() + cleaned[1:]
+    return cleaned
 
 
 def _remove_source_lines(text: str) -> str:

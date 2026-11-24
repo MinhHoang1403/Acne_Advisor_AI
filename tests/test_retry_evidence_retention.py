@@ -394,7 +394,9 @@ async def test_combined_reranker_does_not_privilege_an_attempt(
         retrieval_attempt=2,
     )
 
-    assert [item["id"] for item in second.vector_contexts] == expected
+    assert second.metadata["retrieval_trace"]["retry_evidence"]["reranked_candidate_ids"] == expected
+    # Ứng viên nhiễu điểm thấp (0.1 < 0.25) bị lọc khỏi packed context trước khi đóng gói.
+    assert [item["id"] for item in second.vector_contexts] == expected[:2]
 
 
 def test_candidate_dedup_uses_stable_identity_not_text_similarity() -> None:
