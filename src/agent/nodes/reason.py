@@ -37,6 +37,64 @@ def _runtime_budget(state: ClinicalState, settings: RuntimeResilienceSettings) -
     return DeadlineBudget.from_timeout(settings.agent_total_timeout_seconds)
 
 
+def _prioritize_supporting_contexts(
+    contexts: list[dict[str, Any]],
+    packed_context: dict[str, Any],
+    supporting_ids: list[str] | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Đưa các đoạn bằng chứng được ``action_decision`` xác nhận hỗ trợ trực tiếp lên đầu.
+
+    Áp dụng nguyên lý Corrective RAG (Yan et al., 2024) và Lost in the Middle (Liu et al.,
+    2023): chỉ giữ các đoạn trực tiếp hỗ trợ khi ``direct_supporting_evidence_ids`` khớp
+    với tập chứng cứ đã đóng gói để loại bỏ đoạn nhiễu gây giảm Context Precision và Faithfulness.
+    """
+
+    valid_ids = [str(item).strip() for item in (supporting_ids or []) if str(item).strip()]
+    if not valid_ids:
+        return contexts, packed_context
+
+    order_map = {item_id: rank for rank, item_id in enumerate(valid_ids)}
+    matched_contexts = [
+        ctx for ctx in contexts if _context_id(ctx) in order_map
+    ]
+    if not matched_contexts:
+        return contexts, packed_context
+
+    matched_contexts.sort(key=lambda ctx: order_map.get(_context_id(ctx) or "", len(order_map)))
+
+    updated_packed = dict(packed_context)
+    packed_items = [
+        item for item in (packed_context.get("items") or []) if isinstance(item, dict)
+    ]
+    def _packed_item_id(item: dict[str, Any]) -> str:
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        return str(item.get("item_id") or item.get("id") or payload.get("chunk_id") or "").strip()
+
+    matched_items = [item for item in packed_items if _packed_item_id(item) in order_map]
+    if matched_items:
+        matched_items.sort(key=lambda item: order_map.get(_packed_item_id(item), len(order_map)))
+        rebuilt_blocks: list[str] = []
+        for idx, item in enumerate(matched_items, 1):
+            payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+            source_id = str(
+                payload.get("source_id")
+                or payload.get("source_path")
+                or payload.get("source_file")
+                or payload.get("document_id")
+                or "unknown"
+            )
+            chunk_id = str(payload.get("chunk_id") or item.get("item_id") or f"chunk-{idx}")
+            text = str(item.get("text") or "").strip()
+            if text:
+                rebuilt_blocks.append(f"[Evidence {idx} | source={source_id} | chunk={chunk_id}]\n{text}")
+        updated_packed["items"] = matched_items
+        updated_packed["chunk_items_count"] = len(matched_items)
+        if rebuilt_blocks:
+            updated_packed["context_text"] = "\n\n".join(rebuilt_blocks)
+
+    return matched_contexts, updated_packed
+
+
 def _select_answer_contexts(
     contexts: list[dict[str, Any]], limit: int = 5, query: str = ""
 ) -> list[dict[str, Any]]:
@@ -68,6 +126,13 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         )
 
         packed_context = state.get("packed_context") or {}
+        decision = state.get("agent_decision") or {}
+        supporting_ids = decision.get("direct_supporting_evidence_ids")
+        contexts, packed_context = _prioritize_supporting_contexts(
+            contexts,
+            packed_context,
+            supporting_ids if isinstance(supporting_ids, list) else None,
+        )
         packed_items = packed_context.get("items") or []
         context_limit = len(packed_items) if packed_items else 5
         answer_contexts = _select_answer_contexts(contexts, limit=context_limit, query=question)
@@ -123,6 +188,8 @@ async def generate_answer_node(state: ClinicalState) -> dict:
 
         return {
             "draft_answer": draft,
+            "vector_contexts": answer_contexts,
+            "packed_context": packed_context,
             "sources": [
                 str(entry.get("source_id"))
                 for entry in source_allowlist

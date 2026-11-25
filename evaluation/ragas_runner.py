@@ -11,7 +11,7 @@ Module cung cấp:
 2. Hàm chạy trực tiếp ``run_clinical_agent`` trên bộ câu hỏi chuẩn để thu thập câu trả lời,
    ngữ cảnh truy hồi thực tế, độ trễ và lượng token.
 3. Hàm chấm 5 chỉ số RAGAS cốt lõi (Faithfulness, AnswerRelevancy, ContextPrecision,
-   ContextRecall, FactualCorrectness) kết hợp tỷ lệ từ chối an toàn (Safe Abstention Accuracy).
+   ContextRecall, AnswerCorrectness) kết hợp tỷ lệ từ chối an toàn (Safe Abstention Accuracy).
 4. Hàm xuất báo cáo chi tiết ra file Markdown (``.md``) và JSON thô.
 """
 
@@ -32,8 +32,11 @@ from ragas.embeddings.base import BaseRagasEmbedding
 
 DEFAULT_DATASET_PATH = Path("evaluation/dataset.json")
 DEFAULT_RESULTS_DIR = Path("evaluation/results")
-DEFAULT_JUDGE_MODEL = "gemini-4-hydrogen"
-DEFAULT_FALLBACK_JUDGE_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_JUDGE_PROVIDER = "nvidia"
+DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEFAULT_JUDGE_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+DEFAULT_FALLBACK_JUDGE_MODEL = "mistralai/mistral-large-4-1t-a52b"
+DEFAULT_FALLBACK_JUDGE_MODELS = ("mistralai/mistral-large-4-1t-a52b",)
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSIONS = 3072
 
@@ -42,7 +45,7 @@ RAGAS_METRIC_KEYS = (
     "answer_relevancy",
     "context_precision",
     "context_recall",
-    "factual_correctness",
+    "answer_correctness",
 )
 
 METRIC_LABELS_VI: dict[str, str] = {
@@ -50,7 +53,7 @@ METRIC_LABELS_VI: dict[str, str] = {
     "answer_relevancy": "Độ liên quan câu trả lời (Answer Relevancy)",
     "context_precision": "Độ chính xác ngữ cảnh (Context Precision)",
     "context_recall": "Độ bao phủ ngữ cảnh (Context Recall)",
-    "factual_correctness": "Độ chính xác so với đáp án chuẩn (Factual Correctness)",
+    "answer_correctness": "Độ chính xác câu trả lời (Answer Correctness)",
 }
 
 
@@ -186,11 +189,16 @@ async def run_system_on_dataset(
     *,
     llm_provider: str | None = None,
     llm_model: str | None = None,
+    verbose: bool = False,
+    max_provider_retries: int = 2,
+    provider_retry_delay_seconds: float = 12.0,
+    case_delay_seconds: float = 1.0,
 ) -> list[dict[str, Any]]:
     """Chạy trực tiếp hệ thống ``run_clinical_agent`` trên từng ca đánh giá.
 
     Tắt đọc cache (``bypass_cache=True``) để mỗi lần đánh giá phản ánh đúng chất lượng
-    truy hồi và sinh câu trả lời hiện hành của hệ thống.
+    truy hồi và sinh câu trả lời hiện hành của hệ thống. Tự động thử lại có giới hạn nếu
+    gặp lỗi hạ tầng tạm thời từ provider (429/503/``provider_unavailable``) khi chạy batch dài.
     """
 
     from src.agent.graph import run_clinical_agent
@@ -202,55 +210,92 @@ async def run_system_on_dataset(
         started = time.perf_counter()
         error_text: str | None = None
         result: dict[str, Any] = {}
-        try:
-            result = await run_clinical_agent(
-                message=case.user_input,
-                conversation_history=[],
-                llm_provider=llm_provider,
-                llm_model=llm_model,
-                bypass_cache=True,
-                include_generation_diagnostics=True,
-                session_id=f"ragas-eval-{case.case_id.lower()}",
-            )
-        except Exception as exc:
-            error_text = f"{type(exc).__name__}: {exc}"
+        for attempt in range(max_provider_retries + 1):
+            error_text = None
+            result = {}
+            try:
+                result = await run_clinical_agent(
+                    message=case.user_input,
+                    conversation_history=[],
+                    llm_provider=llm_provider,
+                    llm_model=llm_model,
+                    bypass_cache=True,
+                    include_generation_diagnostics=True,
+                    session_id=f"ragas-eval-{case.case_id.lower()}",
+                )
+            except Exception as exc:
+                error_text = f"{type(exc).__name__}: {exc}"
+            daily_quota_detail = _extract_daily_quota_detail(result, error_text)
+            if daily_quota_detail is not None:
+                raise RuntimeError(
+                    f"System LLM ({llm_provider or 'default'}/{llm_model or 'default'}) đã cạn hạn mức theo ngày (RPD) "
+                    f"tại ca {case.case_id}: {daily_quota_detail}. "
+                    "Hãy chờ reset hạn mức ngày hoặc đổi model/API key trước khi chạy lại bộ đánh giá."
+                )
+            transient_fallback = result.get("fallback_reason_code") in {
+                "provider_unavailable",
+                "generation_unavailable",
+            }
+            transient_error = error_text is not None and _is_rate_limit_error(RuntimeError(error_text))
+            if (transient_fallback or transient_error) and attempt < max_provider_retries:
+                backoff = provider_retry_delay_seconds * (attempt + 1)
+                if verbose:
+                    print(
+                        f"[System {idx}/{len(cases)}] {case.case_id} gặp lỗi tạm thời từ provider "
+                        f"(attempt {attempt + 1}/{max_provider_retries + 1}), chờ {backoff:.0f}s rồi thử lại...",
+                        flush=True,
+                    )
+                await asyncio.sleep(backoff)
+                started = time.perf_counter()
+                continue
+            break
         elapsed_ms = round((time.perf_counter() - started) * 1000.0, 2)
 
         decision = result.get("agent_decision") or {}
         token_usage = result.get("generation_token_usage") or {}
-        records.append(
-            {
-                "index": idx,
-                "case_id": case.case_id,
-                "category": case.category,
-                "expected_behavior": case.expected_behavior,
-                "user_input": case.user_input,
-                "reference": case.reference,
-                "response": str(result.get("answer") or result.get("final_answer") or "").strip(),
-                "retrieved_contexts": _extract_retrieved_contexts(result),
-                "sources": list(result.get("sources") or []),
-                "action": str(decision.get("action") or ""),
-                "reason_code": str(decision.get("reason_code") or ""),
-                "fallback_applied": bool(result.get("fallback_applied")),
-                "safety_override": bool(result.get("safety_decision")),
-                "actual_provider": result.get("actual_provider"),
-                "actual_model": result.get("actual_model"),
-                "latency_ms": elapsed_ms,
-                "token_usage": dict(token_usage) if isinstance(token_usage, dict) else {},
-                "error": error_text,
-            }
-        )
+        record = {
+            "index": idx,
+            "case_id": case.case_id,
+            "category": case.category,
+            "expected_behavior": case.expected_behavior,
+            "user_input": case.user_input,
+            "reference": case.reference,
+            "response": str(result.get("answer") or result.get("final_answer") or "").strip(),
+            "retrieved_contexts": _extract_retrieved_contexts(result),
+            "sources": list(result.get("sources") or []),
+            "action": str(decision.get("action") or ""),
+            "reason_code": str(decision.get("reason_code") or ""),
+            "fallback_applied": bool(result.get("fallback_applied")),
+            "safety_override": bool(result.get("safety_decision")),
+            "actual_provider": result.get("actual_provider"),
+            "actual_model": result.get("actual_model"),
+            "latency_ms": elapsed_ms,
+            "token_usage": dict(token_usage) if isinstance(token_usage, dict) else {},
+            "error": error_text,
+        }
+        records.append(record)
+        if verbose:
+            print(
+                f"[System {idx}/{len(cases)}] {case.case_id} | action={record['action'] or '-'} "
+                f"| contexts={len(record['retrieved_contexts'])} | {elapsed_ms:.0f}ms"
+                + (f" | ERROR={error_text}" if error_text else ""),
+                flush=True,
+            )
+        if case_delay_seconds > 0 and idx < len(cases):
+            await asyncio.sleep(case_delay_seconds)
     return records
 
 
 def build_ragas_evaluators(
     *,
     judge_model: str = DEFAULT_JUDGE_MODEL,
-    judge_provider: str = "google",
+    judge_provider: str = DEFAULT_JUDGE_PROVIDER,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     api_key: str | None = None,
+    judge_api_key: str | None = None,
+    judge_base_url: str | None = None,
 ) -> tuple[Any, ProjectGeminiEmbeddings]:
-    """Khởi tạo Judge LLM (Gemini hoặc OpenAI) và Embeddings cho RAGAS 0.4.x."""
+    """Khởi tạo Judge LLM (NVIDIA NIM, Gemini hoặc OpenAI) và Embeddings cho RAGAS 0.4.x."""
 
     from ragas.llms import llm_factory
 
@@ -259,13 +304,44 @@ def build_ragas_evaluators(
         raise RuntimeError("Thiếu GOOGLE_API_KEY trong biến môi trường cho embeddings.")
 
     provider_norm = judge_provider.strip().lower()
-    if provider_norm == "openai":
-        from openai import OpenAI
+    if provider_norm == "nvidia":
+        import instructor
+        from openai import AsyncOpenAI
 
-        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        nvidia_key = (judge_api_key or os.getenv("NVIDIA_API_KEY", "")).strip()
+        if not nvidia_key:
+            raise RuntimeError("Thiếu NVIDIA_API_KEY để chạy RAGAS judge với provider='nvidia'.")
+        base_url = (
+            judge_base_url
+            or os.getenv("NVIDIA_BASE_URL", DEFAULT_NVIDIA_BASE_URL)
+            or DEFAULT_NVIDIA_BASE_URL
+        ).strip()
+        nvidia_client = AsyncOpenAI(
+            api_key=nvidia_key,
+            base_url=base_url,
+            timeout=60.0,
+            max_retries=1,
+        )
+        # Dùng MD_JSON và tắt thinking mặc định để model 550B/1T trên NVIDIA NIM
+        # xuất JSON chuẩn Pydantic nhanh, ổn định và không bị cắt bởi chuỗi suy nghĩ dài.
+        judge_llm = llm_factory(
+            judge_model,
+            provider="openai",
+            client=nvidia_client,
+            mode=instructor.Mode.MD_JSON,
+            max_tokens=2048,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        )
+    elif provider_norm == "openai":
+        from openai import AsyncOpenAI
+
+        openai_key = (judge_api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         if not openai_key:
             raise RuntimeError("Thiếu OPENAI_API_KEY để chạy RAGAS judge với provider='openai'.")
-        openai_client = OpenAI(api_key=openai_key)
+        openai_kwargs: dict[str, Any] = {"api_key": openai_key, "timeout": 60.0}
+        if judge_base_url:
+            openai_kwargs["base_url"] = judge_base_url.strip()
+        openai_client = AsyncOpenAI(**openai_kwargs)
         judge_llm = llm_factory(judge_model, provider="openai", client=openai_client)
     else:
         from google import genai
@@ -291,6 +367,52 @@ def _clean_score(value: Any) -> float | None:
     return round(numeric, 4)
 
 
+def _is_daily_quota_error(exc: BaseException | str) -> bool:
+    """Phát hiện lỗi cạn hạn mức theo ngày (RPD) để dừng/chuyển judge ngay, tránh chờ retry vô ích."""
+
+    text = exc.lower() if isinstance(exc, str) else f"{type(exc).__name__}: {exc}".lower()
+    return any(
+        marker in text
+        for marker in (
+            "requestsperday",
+            "per day",
+            "per day limit exceeded",
+            "daily project quota",
+            "daily quota",
+            "generate_content_free_tier_requests",
+        )
+    )
+
+
+def _extract_daily_quota_detail(result: dict[str, Any], error_text: str | None) -> str | None:
+    """Trích thông điệp lỗi RPD từ exception hoặc metadata fallback của ``run_clinical_agent``."""
+
+    candidates: list[str] = []
+    if error_text:
+        candidates.append(error_text)
+    if isinstance(result, dict):
+        for key in ("fallback_reason", "retrieval_error"):
+            value = result.get(key)
+            if isinstance(value, str) and value.strip():
+                candidates.append(value.strip())
+        decision = result.get("agent_decision")
+        if isinstance(decision, dict):
+            for key in ("error", "rationale", "reason"):
+                value = decision.get(key)
+                if isinstance(value, str) and value.strip():
+                    candidates.append(value.strip())
+        for item in result.get("agent_decision_history") or []:
+            if isinstance(item, dict):
+                for key in ("error", "rationale", "reason"):
+                    value = item.get(key)
+                    if isinstance(value, str) and value.strip():
+                        candidates.append(value.strip())
+    for detail in candidates:
+        if _is_daily_quota_error(detail):
+            return detail
+    return None
+
+
 def _is_rate_limit_error(exc: BaseException) -> bool:
     text = f"{type(exc).__name__}: {exc}".lower()
     return any(marker in text for marker in ("429", "503", "resource_exhausted", "rate limit", "unavailable"))
@@ -299,56 +421,70 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
 async def _run_metric_with_retry(
     factory: Any,
     *,
-    max_retries: int = 3,
-    base_backoff: float = 20.0,
+    max_retries: int = 2,
+    base_backoff: float = 10.0,
 ) -> Any:
-    """Chạy 1 metric RAGAS kèm tự động lùi thời gian khi gặp giới hạn 429 RPM."""
+    """Chạy 1 metric RAGAS kèm tự động lùi thời gian khi gặp 429 RPM/503 tạm thời."""
 
     for attempt in range(max_retries + 1):
         try:
             return await factory()
         except Exception as exc:
-            if attempt >= max_retries or not _is_rate_limit_error(exc):
+            if _is_daily_quota_error(exc) or attempt >= max_retries or not _is_rate_limit_error(exc):
                 raise
             await asyncio.sleep(base_backoff * (attempt + 1))
     raise RuntimeError("Unreachable retry state.")
+
+
+def _strip_presentation_disclaimer(text: str) -> str:
+    """Loại bỏ dòng disclaimer trình bày của hệ thống trước khi tách mệnh đề chấm RAGAS.
+
+    Disclaimer là thông báo pháp lý cố định do presentation layer chèn vào sau khi sinh,
+    không phải mệnh đề y khoa của LLM nên không được tính là mệnh đề sai/không có bằng chứng.
+    """
+
+    from src.agent.answer_formatting import CANONICAL_DISCLAIMER, LEGACY_DISCLAIMERS
+
+    cleaned = text.strip()
+    for disclaimer in (CANONICAL_DISCLAIMER, *LEGACY_DISCLAIMERS):
+        cleaned = cleaned.replace(disclaimer, "").strip()
+    return cleaned
 
 
 async def score_records_with_ragas(
     records: list[dict[str, Any]],
     *,
     judge_model: str = DEFAULT_JUDGE_MODEL,
-    judge_provider: str = "google",
+    judge_provider: str = DEFAULT_JUDGE_PROVIDER,
     fallback_judge_model: str | None = DEFAULT_FALLBACK_JUDGE_MODEL,
+    fallback_judge_models: tuple[str, ...] | list[str] | None = None,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     api_key: str | None = None,
+    judge_api_key: str | None = None,
+    judge_base_url: str | None = None,
     request_delay_seconds: float | None = None,
     max_rate_limit_retries: int = 2,
+    verbose: bool = False,
 ) -> list[dict[str, Any]]:
     """Chấm 5 chỉ số RAGAS trên các ca cần trả lời và kiểm tra tỷ lệ từ chối an toàn."""
 
     from ragas.metrics.collections import (
+        AnswerCorrectness,
         AnswerRelevancy,
         ContextPrecision,
         ContextRecall,
-        FactualCorrectness,
         Faithfulness,
     )
 
+    provider_norm = judge_provider.strip().lower()
     judge_llm, embeddings = build_ragas_evaluators(
         judge_model=judge_model,
-        judge_provider=judge_provider,
+        judge_provider=provider_norm,
         embedding_model=embedding_model,
         api_key=api_key,
+        judge_api_key=judge_api_key,
+        judge_base_url=judge_base_url,
     )
-    fallback_llm: Any | None = None
-    if fallback_judge_model and fallback_judge_model != judge_model and judge_provider.strip().lower() == "google":
-        fallback_llm, _ = build_ragas_evaluators(
-            judge_model=fallback_judge_model,
-            judge_provider="google",
-            embedding_model=embedding_model,
-            api_key=api_key,
-        )
 
     def _build_metric_set(llm_instance: Any) -> dict[str, Any]:
         return {
@@ -356,20 +492,56 @@ async def score_records_with_ragas(
             "answer_relevancy": AnswerRelevancy(llm=llm_instance, embeddings=embeddings),
             "context_precision": ContextPrecision(llm=llm_instance),
             "context_recall": ContextRecall(llm=llm_instance),
-            "factual_correctness": FactualCorrectness(llm=llm_instance),
+            "answer_correctness": AnswerCorrectness(
+                llm=llm_instance,
+                embeddings=embeddings,
+                weights=[0.75, 0.25],
+            ),
         }
 
-    primary_metrics = _build_metric_set(judge_llm)
-    fallback_metrics = _build_metric_set(fallback_llm) if fallback_llm is not None else None
+    # Xây chuỗi judge ưu tiên: judge chính + các model dự phòng cùng provider (tự động loại trùng).
+    judge_chain: list[tuple[str, dict[str, Any]]] = [(judge_model, _build_metric_set(judge_llm))]
+    if provider_norm in {"google", "nvidia"}:
+        raw_fallbacks: list[str] = []
+        if fallback_judge_models is not None:
+            raw_fallbacks.extend(str(m).strip() for m in fallback_judge_models if str(m).strip())
+        elif fallback_judge_model:
+            raw_fallbacks.append(str(fallback_judge_model).strip())
+        seen_models = {judge_model}
+        for fb_model in raw_fallbacks:
+            if fb_model in seen_models:
+                continue
+            seen_models.add(fb_model)
+            fb_llm, _ = build_ragas_evaluators(
+                judge_model=fb_model,
+                judge_provider=provider_norm,
+                embedding_model=embedding_model,
+                api_key=api_key,
+                judge_api_key=judge_api_key,
+                judge_base_url=judge_base_url,
+            )
+            judge_chain.append((fb_model, _build_metric_set(fb_llm)))
 
-    use_parallel = judge_provider.strip().lower() == "openai"
+    exhausted_daily_models: set[str] = set()
+
+    use_parallel = provider_norm == "openai"
     pacing_delay = (
         0.0
         if request_delay_seconds is None and use_parallel
+        else 1.0
+        if request_delay_seconds is None and provider_norm == "nvidia"
         else 2.5
         if request_delay_seconds is None
         else max(0.0, request_delay_seconds)
     )
+
+    short_labels = {
+        "faithfulness": "faith",
+        "answer_relevancy": "rel",
+        "context_precision": "prec",
+        "context_recall": "rec",
+        "answer_correctness": "corr",
+    }
 
     scored_records: list[dict[str, Any]] = []
     for rec in records:
@@ -392,7 +564,7 @@ async def score_records_with_ragas(
             continue
 
         enriched["abstention_correct"] = None
-        response_text = str(rec.get("response") or "").strip()
+        response_text = _strip_presentation_disclaimer(str(rec.get("response") or ""))
         contexts = list(rec.get("retrieved_contexts") or [])
         user_input = str(rec.get("user_input") or "")
         reference = str(rec.get("reference") or "")
@@ -407,21 +579,34 @@ async def score_records_with_ragas(
                     return mset[key].ascore(user_input=user_input, reference=reference, retrieved_contexts=contexts)
                 if key == "context_recall":
                     return mset[key].ascore(user_input=user_input, retrieved_contexts=contexts, reference=reference)
-                return mset[key].ascore(response=response_text, reference=reference)
+                return mset[key].ascore(user_input=user_input, response=response_text, reference=reference)
 
             async def _score_one_metric(key: str) -> Any:
-                try:
-                    return await _run_metric_with_retry(
-                        lambda k=key: _make_call(primary_metrics, k),
-                        max_retries=max_rate_limit_retries,
-                    )
-                except Exception as primary_exc:
-                    if fallback_metrics is not None and _is_rate_limit_error(primary_exc):
+                last_exc: Exception | None = None
+                for idx_j, (model_name, mset) in enumerate(judge_chain):
+                    if model_name in exhausted_daily_models:
+                        continue
+                    try:
                         return await _run_metric_with_retry(
-                            lambda k=key: _make_call(fallback_metrics, k),
-                            max_retries=1,
+                            lambda ms=mset, k=key: _make_call(ms, k),
+                            max_retries=max_rate_limit_retries if idx_j == 0 else 1,
                         )
-                    raise
+                    except Exception as exc:
+                        last_exc = exc
+                        if _is_daily_quota_error(exc):
+                            exhausted_daily_models.add(model_name)
+                            if verbose:
+                                print(
+                                    f"  [Judge] {model_name} hết quota theo ngày -> chuyển sang model dự phòng.",
+                                    flush=True,
+                                )
+                            continue
+                        if _is_rate_limit_error(exc):
+                            continue
+                        raise
+                if last_exc is not None:
+                    raise last_exc
+                raise RuntimeError("Tất cả judge model đều đã cạn quota theo ngày.")
 
             if use_parallel:
                 results = await asyncio.gather(
@@ -448,6 +633,15 @@ async def score_records_with_ragas(
         enriched["ragas_scores"] = scores
         enriched["metric_errors"] = metric_errors
         scored_records.append(enriched)
+        if verbose:
+            score_str = ", ".join(
+                f"{short_labels[k]}={_fmt_score(scores[k])}" for k in RAGAS_METRIC_KEYS
+            )
+            print(
+                f"[RAGAS {len(scored_records)}/{len(records)}] {rec['case_id']} | {score_str}"
+                + (f" | errs={list(metric_errors.keys())}" if metric_errors else ""),
+                flush=True,
+            )
 
     return scored_records
 
@@ -623,7 +817,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
             "",
             "## 3. Phân tích theo nhóm câu hỏi",
             "",
-            "| Nhóm câu hỏi | Số ca | Faithfulness | Answer Relevancy | Context Precision | Context Recall | Factual Correctness | Độ trễ TB (ms) |",
+            "| Nhóm câu hỏi | Số ca | Faithfulness | Answer Relevancy | Context Precision | Context Recall | Answer Correctness | Độ trễ TB (ms) |",
             "| --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
     )
@@ -633,7 +827,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
         lines.append(
             f"| `{cat}` | {info['count']} | {_fmt_score(cm['faithfulness'])} | "
             f"{_fmt_score(cm['answer_relevancy'])} | {_fmt_score(cm['context_precision'])} | "
-            f"{_fmt_score(cm['context_recall'])} | {_fmt_score(cm['factual_correctness'])} | "
+            f"{_fmt_score(cm['context_recall'])} | {_fmt_score(cm['answer_correctness'])} | "
             f"{info['mean_latency_ms']} |"
         )
 
@@ -660,7 +854,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
             f"| `{rec['case_id']}` | `{rec['category']}` | `{rec.get('action') or '-'}` | "
             f"{_fmt_score(sc.get('faithfulness'))} | {_fmt_score(sc.get('answer_relevancy'))} | "
             f"{_fmt_score(sc.get('context_precision'))} | {_fmt_score(sc.get('context_recall'))} | "
-            f"{_fmt_score(sc.get('factual_correctness'))} | {abstain_col} | {rec.get('latency_ms')} |"
+            f"{_fmt_score(sc.get('answer_correctness'))} | {abstain_col} | {rec.get('latency_ms')} |"
         )
 
     lines.extend(["", "## 5. Chi tiết câu trả lời & ngữ cảnh từng ca", ""])
@@ -680,7 +874,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
                 f"Relevancy=`{_fmt_score(sc.get('answer_relevancy'))}`, "
                 f"Precision=`{_fmt_score(sc.get('context_precision'))}`, "
                 f"Recall=`{_fmt_score(sc.get('context_recall'))}`, "
-                f"Correctness=`{_fmt_score(sc.get('factual_correctness'))}`"
+                f"Correctness=`{_fmt_score(sc.get('answer_correctness'))}`"
             )
         else:
             lines.append(f"- **Kiểm tra từ chối an toàn:** `{rec.get('abstention_correct')}`")

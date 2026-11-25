@@ -215,8 +215,8 @@ class EvidenceRetriever:
         packed_input_candidates = _prune_low_relevance_reranked_candidates(
             rerank_outcome.candidates,
             rerank_status=rerank_outcome.status,
-            min_score=_bounded_float_env("RETRIEVAL_RERANK_MIN_SCORE", 0.20, 0.0, 1.0),
-            relative_ratio=_bounded_float_env("RETRIEVAL_RERANK_RELATIVE_RATIO", 0.30, 0.0, 1.0),
+            min_score=_bounded_float_env("RETRIEVAL_RERANK_MIN_SCORE", 0.18, 0.0, 1.0),
+            relative_ratio=_bounded_float_env("RETRIEVAL_RERANK_RELATIVE_RATIO", 0.22, 0.0, 1.0),
         )
         normalized = NormalizedQuery(
             original_query=rerank_query or query,
@@ -667,18 +667,18 @@ def _prune_low_relevance_reranked_candidates(
     candidates: list[RetrievedCandidate],
     *,
     rerank_status: str,
-    min_score: float = 0.20,
-    relative_ratio: float = 0.30,
+    min_score: float = 0.18,
+    relative_ratio: float = 0.22,
     min_keep: int = 2,
 ) -> list[RetrievedCandidate]:
     """Loại bỏ các đoạn nhiễu ở đuôi danh sách sau khi cross-encoder chấm điểm thấp.
 
-    Chỉ áp dụng khi reranker chạy thành công và toàn bộ điểm nằm trong thang xác suất
-    sigmoid ``[0.0, 1.0]`` với ứng viên đầu bảng đủ tin cậy (``top_score >= min_score``).
-    Luôn giữ tối thiểu ``min_keep`` ứng viên cao nhất để không làm mất ngữ cảnh cần thiết.
+    ``rerank_candidates`` trả về ``status="succeeded"`` khi chấm thành công. Chỉ lọc
+    khi toàn bộ điểm nằm trong thang xác suất sigmoid ``[0.0, 1.0]`` với ứng viên đầu
+    bảng đủ tin cậy (``top_score >= min_score``), luôn giữ tối thiểu ``min_keep`` đoạn.
     """
 
-    if rerank_status != "ok" or len(candidates) <= min_keep or min_score <= 0.0:
+    if rerank_status not in {"succeeded", "ok"} or len(candidates) <= min_keep or min_score <= 0.0:
         return candidates
     scores = [item.rerank_score for item in candidates]
     if not all(isinstance(score, (int, float)) and 0.0 <= float(score) <= 1.0 for score in scores):
