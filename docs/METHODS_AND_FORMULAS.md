@@ -10,7 +10,7 @@ Google owns vector generation; the project sends text and validates output count
 and dimension; Qdrant owns cosine search over stored vectors. Official Gemini
 Embedding 2 documentation does not accept `task_type` and recommends embedding
 task instructions as text prefixes for text-only retrieval. Build
-`d4a1819fe7fb77fe1f40` therefore uses the exact representations
+`b768fae999391f47760a` therefore uses the exact representations
 `title: {title} | text: {content}` for documents and
 `task: question answering | query: {content}` for queries. Model, dimension,
 distance, representation identifier, and represented text all participate in

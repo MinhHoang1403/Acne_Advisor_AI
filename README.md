@@ -166,23 +166,23 @@ request.
 
 Build đã kích hoạt được ghi trong
 [`data/knowledge_build_manifest.json`](data/knowledge_build_manifest.json):
-**`d4a1819fe7fb77fe1f40`**.
+**`b768fae999391f47760a`**.
 
-| Tài sản          | Quy mô / cấu hình                                 |
-| ---------------- | ------------------------------------------------- |
-| Bộ nguồn         | 4 snapshot/nhóm nguồn được quản lý trong manifest |
-| Knowledge chunks | 536 đoạn                                          |
-| EntityCards      | 32 thẻ                                            |
-| Neo4j            | 32 node, 27 quan hệ                               |
-| Dense vectors    | `models/gemini-embedding-2`, 3.072 chiều, cosine  |
-| Sparse vectors   | BM25 gốc của Qdrant                               |
-| Alias logic      | `acne_knowledge`, `acne_entities`                 |
+| Tài sản          | Quy mô / cấu hình                                                      |
+| ---------------- | ---------------------------------------------------------------------- |
+| Bộ nguồn         | 1 gói nguồn chuẩn hóa (`Acne_data_source.json`, gồm 53 nguồn y khoa)   |
+| Knowledge chunks | 968 đoạn                                                               |
+| EntityCards      | 32 thẻ                                                                 |
+| Neo4j            | 32 node, 27 quan hệ                                                    |
+| Dense vectors    | `models/gemini-embedding-2`, 3.072 chiều, cosine                       |
+| Sparse vectors   | BM25 gốc của Qdrant                                                    |
+| Alias logic      | `acne_knowledge`, `acne_entities`                                      |
 
-Nguồn gồm snapshot NICE NG198, hướng dẫn AAD/JAAD, trích đoạn hướng dẫn da liễu
-Bộ Y tế Việt Nam và tập trang giáo dục cộng đồng từ nhiều nhà xuất bản. Danh
-tính, hash và giới hạn nguồn nằm trong
-[manifest nguồn](data/sources/manifest.yaml). “4 nguồn” không có nghĩa chỉ có 4
-trang web.
+Bộ nguồn tổng hợp từ các hướng dẫn và tài liệu da liễu uy tín quốc tế & Việt Nam
+(EuroGuiDerm, NICE NG198, AAD/JAAD, Bộ Y tế Việt Nam, bệnh viện da liễu, FDA,
+Cochrane, BAD, DailyMed, MotherToBaby, DermNet, Cleveland Clinic, MedlinePlus,
+NIAMS). Danh tính, hash và giới hạn nguồn nằm trong
+[manifest nguồn](data/sources/manifest.yaml).
 
 **Git lưu mã nguồn, manifest và các kết quả nghiên cứu được chọn.** File nguồn
 trong `sample_data/`, dữ liệu database trong `data/`, API key, môi trường
@@ -379,7 +379,7 @@ mật.
 | Database   | `DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`, `NEO4J_URI`     | Host/container dùng địa chỉ khác nhau; Compose đặt địa chỉ nội bộ                     |
 | Frontend   | `VITE_API_URL`, `CORS_ALLOW_ORIGINS`                       | Host mặc định API 8000; Docker dùng `/api` cùng origin                                |
 | Theo dõi   | `OBSERVABILITY_ENABLED`, `LANGFUSE_ENABLED`                | Tùy chọn, mặc định tắt; JSONL/Langfuse phục vụ chẩn đoán                              |
-| Nghiên cứu | `LLAMA_CLOUD_API_KEY`, `OPENAI_API_KEY`                    | Parse PDF/đánh giá tương ứng; không bắt buộc cho chat đã có chỉ mục                   |
+| Đánh giá / Parse | `LLAMA_CLOUD_API_KEY`, `NVIDIA_API_KEY`, `RAGAS_JUDGE_MODEL` | Parse PDF và Judge RAGAS độc lập (NVIDIA NIM); không bắt buộc cho chat đã có chỉ mục |
 
 Chọn Ollama chỉ thay đường tạo văn bản; Dense embedding hiện vẫn dùng API Google
 nên toàn bộ pipeline chưa offline. Health kiểm tra cấu hình/key hiện diện và
@@ -447,36 +447,35 @@ GitHub Actions chạy Python trên Windows/Python 3.11.9 và frontend trên Node
 Test xác nhận hợp đồng phần mềm, không thay thế đánh giá ngữ nghĩa hoặc kiểm
 định y khoa.
 
-### Môi trường notebook riêng
+### Bộ đánh giá định lượng RAGAS (50 câu hỏi)
 
-Ứng dụng khóa `sentence-transformers==5.6.0` / `transformers==5.15.1`;
-RAGChecker 0.1.9 cần Transformers 4 qua `refchecker`. Dùng **`evaluation/.venv`
-riêng**, theo [hướng dẫn notebook](evaluation/README.md).
+Hệ thống sử dụng bộ đánh giá định lượng **RAGAS** (*Retrieval Augmented
+Generation Assessment*, Es et al., 2023, `arXiv:2309.15217`) chạy trực tiếp trên
+môi trường **`.venv`** gốc (kernel `Python 3 (.venv)`), không cần môi trường
+riêng. Chi tiết cấu trúc và cách chạy nằm tại
+[hướng dẫn đánh giá](evaluation/README.md) và
+[notebook đánh giá 50 ca](evaluation/ragas_evaluation.ipynb).
 
-Chọn kernel **Acne Advisor AI (evaluation)** cho
-[notebook kiểm tra môi trường](evaluation/environment_check.ipynb). Notebook
-kiểm tra thư viện, spaCy và việc đọc benchmark/kết quả đã lưu, không gọi API
-đánh giá. Kernel **Acne Advisor AI (runtime)** dùng `.venv` ở gốc cho
-Agent/reranker. Không cài gộp hai bộ dependency.
+- **Bộ dữ liệu:** [`evaluation/dataset.json`](evaluation/dataset.json) gồm
+  **50 câu hỏi** (42 câu có bằng chứng thuộc 6 nhóm lâm sàng + 8 câu từ chối an
+  toàn / ngoài phạm vi / cấp cứu).
+- **Cấu hình chấm độc lập (tránh thiên vị tự chấm):** System LLM
+  `gemini-3.5-flash-lite`, Judge LLM độc lập qua NVIDIA NIM
+  `nvidia/nemotron-3-ultra-550b-a55b` (dự phòng
+  `mistralai/mistral-large-4-1t-a52b`), Embedding `models/gemini-embedding-2`.
+- **Kết quả mới nhất trên KB `b768fae999391f47760a` (0 lỗi runtime):**
 
-### Phân biệt kết quả lịch sử và build hiện tại
+| Chỉ số | Trung bình | Số ca chấm |
+| --- | :---: | :---: |
+| Faithfulness (*Độ trung thực với bằng chứng*) | **0.910** | 41/42 |
+| Answer Relevancy (*Độ liên quan câu trả lời*) | **0.931** | 42/42 |
+| Context Precision (*Độ chính xác ngữ cảnh*) | **0.980** | 42/42 |
+| Context Recall (*Độ bao phủ ngữ cảnh*) | **0.894** | 42/42 |
+| Answer Correctness (*Độ chính xác câu trả lời*) | **0.739** | 42/42 |
+| Safe Abstention Accuracy (*Tỷ lệ từ chối an toàn*) | **1.000** | 8/8 |
 
-| Bộ kết quả                                                                   | Hệ thống / KB                                | Trạng thái                                                                  |
-| ---------------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------- |
-| [formal_run_2d5f0124](evaluation/results/formal_run_2d5f0124/)               | Commit `2d5f0124`, KB `94d613bc9b33628de3ef` | Hoàn tất 100 ca, không có lỗi hạ tầng                                       |
-| [thesis_evaluation_366f3ad8](evaluation/results/thesis_evaluation_366f3ad8/) | Commit `366f3ad8`, KB `d4a1819fe7fb77fe1f40` | 100 output đã khóa; chấm RAGChecker chưa hoàn tất vì hết tín dụng evaluator |
-
-Kết quả lịch sử: Claim Recall **72,3%**, Context Precision **38,9%**,
-Faithfulness **87,7%**, Claim F1 **33,8%** trên 70 ca answerable; Negative
-Rejection Rate **80,0% (24/30)**. Không gán các số này cho mã nguồn/build mới
-hơn.
-
-Gold của build hiện tại tách **24 ca xác nhận thiếu bằng chứng** và **6 ca mơ hồ
-chính sách**. Notebook nghiên cứu cũ kiểm tra commit, fingerprint, KB lịch sử;
-khôi phục môi trường không bỏ qua các điều kiện đó. Đọc
-[kết quả](evaluation/results/README.md),
-[giao thức luận văn](evaluation/THESIS_EVALUATION_PROTOCOL.md) và
-[chỉ mục nghiên cứu](research/README.md) trước khi tiếp tục chấm API.
+Các nghiên cứu và thí nghiệm ngoại tuyến trước đó được lưu độc lập tại
+[chỉ mục nghiên cứu](research/README.md).
 
 ## 9. Cấu trúc mã nguồn
 
@@ -498,7 +497,7 @@ acne-agent-system/
 ├── scripts/            # Lệnh vận hành và kiểm tra
 ├── tests/              # Kiểm thử và fixture
 ├── data/               # Manifest được quản lý; dữ liệu runtime bỏ qua Git
-├── evaluation/         # Benchmark, kernel riêng, kết quả đánh giá
+├── evaluation/         # Bộ đánh giá 50 ca RAGAS (dataset, runner, notebook)
 ├── research/           # Experiment đã lưu, không phải backend khác
 ├── docs/               # Tài liệu chi tiết
 ├── docker/             # Dockerfile backend
@@ -526,7 +525,7 @@ xuất và `src/agent/nodes/reason.py` cho tạo câu trả lời.
 | 502 lúc API đang tải model                         | Theo dõi log backend, chờ `/live`, sau đó kiểm tra `/ready`                                                             |
 | `/ready` trả 503                                   | Đọc `/health`, kiểm tra Qdrant/alias/schema và cấu hình provider trước khi sửa dữ liệu                                  |
 | Chat lỗi provider dù health báo cấu hình hợp lệ    | Kiểm tra API key, kết nối, hạn mức; health không sinh câu trả lời                                                       |
-| Notebook xung đột Transformers                     | Chọn kernel evaluation, cài lock của evaluation vào môi trường riêng                                                    |
+| Notebook RAGAS lỗi hạn mức hoặc timeout Judge      | Kiểm tra `GOOGLE_API_KEY`, `NVIDIA_API_KEY` và `RAGAS_FALLBACK_JUDGE_MODELS` trong `.env`                               |
 
 ## 11. Giới hạn và tài liệu chi tiết
 

@@ -64,9 +64,9 @@ Its approval flag is not carried into the canonical notebook.
 
 ## Formal evaluation
 
-See [evaluation results](../evaluation/results/README.md) and the
-[thesis protocol](../evaluation/THESIS_EVALUATION_PROTOCOL.md). The 100 frozen
-current-build system outputs and locked gold are preserved on `main`; semantic
-scoring remains blocked by evaluator credits. Resume scoring from those exact
-outputs rather than regenerating successful cases. The completed historical
-formal result remains separate and immutable.
+The legacy RAGChecker thesis evaluation package has been superseded on `main` by
+the 50-case RAGAS evaluation suite documented in
+[evaluation/README.md](../evaluation/README.md) and executed in
+[evaluation/ragas_evaluation.ipynb](../evaluation/ragas_evaluation.ipynb). The
+research studies and manifests retained in this directory remain historical
+reference artifacts only.
