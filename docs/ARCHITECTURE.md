@@ -200,8 +200,10 @@ outputs, retrieved evidence, citations, latency, fallback accounting, and semant
 quality, but it cannot change runtime state, source labels, or benchmark truth.
 Deterministic checks remain authoritative for safety outcomes, evidence-gap
 classification, citation IDs, provenance, pipeline identity, retry accounting,
-provider/fallback identity, latency, and runtime errors. RAGChecker remains the
-current semantic evaluator unless a separate calibrated migration is approved.
+provider/fallback identity, latency, and runtime errors. Quantitative RAG
+evaluation uses RAGAS (`evaluation/ragas_runner.py`, `evaluation/ragas_evaluation.ipynb`)
+with an independent NVIDIA NIM judge (`nvidia/nemotron-3-ultra-550b-a55b`), while
+historical RAGChecker experiments remain archived under `research/`.
 
 PostgreSQL stores chat history, Redis stores versioned eligible answers,
 Qdrant serves read-only runtime evidence, and Neo4j stores the structural graph.
