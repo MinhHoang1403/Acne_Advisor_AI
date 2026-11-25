@@ -171,7 +171,90 @@ def test_daily_quota_error_detector_distinguishes_rpd_from_rpm() -> None:
     from evaluation.ragas_runner import _is_daily_quota_error, _is_rate_limit_error
 
     rpd_exc = RuntimeError("429 RESOURCE_EXHAUSTED: GenerateRequestsPerDayPerProjectPerModel-FreeTier limit 20")
+    project_rpd_msg = "Google GenAI daily project quota is exhausted (HTTP 429)."
     rpm_exc = RuntimeError("503 UNAVAILABLE: temporary spike")
     assert _is_daily_quota_error(rpd_exc) is True
+    assert _is_daily_quota_error(project_rpd_msg) is True
     assert _is_daily_quota_error(rpm_exc) is False
     assert _is_rate_limit_error(rpm_exc) is True
+
+
+@pytest.mark.asyncio
+async def test_run_system_on_dataset_fails_fast_on_daily_quota_exhaustion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from evaluation.ragas_runner import EvaluationCase, run_system_on_dataset
+
+    calls = 0
+
+    async def fake_warmup() -> None:
+        return None
+
+    async def fake_run_agent(**kwargs: Any) -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        return {
+            "answer": "Xin lỗi, hệ thống tạm bận.",
+            "fallback_applied": True,
+            "fallback_reason_code": "provider_unavailable",
+            "fallback_reason": "Google GenAI daily project quota is exhausted (HTTP 429).",
+            "agent_decision": {"action": "abstain", "reason_code": "provider_unavailable"},
+        }
+
+    monkeypatch.setattr("evaluation.ragas_runner._warmup_reranker", fake_warmup)
+    monkeypatch.setattr("src.agent.graph.run_clinical_agent", fake_run_agent)
+
+    cases = [
+        EvaluationCase(
+            case_id="NEW-SYM-01",
+            category="symptoms_and_types",
+            user_input="Mụn nang là gì?",
+            reference="Mụn nang là tổn thương viêm sâu.",
+            expected_behavior="answer",
+        )
+    ]
+
+    with pytest.raises(RuntimeError, match="cạn hạn mức theo ngày"):
+        await run_system_on_dataset(
+            cases,
+            llm_provider="gemini",
+            llm_model="gemini-3.5-flash-lite",
+            max_provider_retries=2,
+            provider_retry_delay_seconds=0.01,
+        )
+
+    assert calls == 1
+
+
+def test_build_ragas_evaluators_nvidia_uses_md_json_and_disables_thinking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import instructor
+    from evaluation.ragas_runner import (
+        DEFAULT_JUDGE_MODEL,
+        DEFAULT_NVIDIA_BASE_URL,
+        build_ragas_evaluators,
+    )
+
+    captured: dict[str, Any] = {}
+
+    def fake_llm_factory(model: str, **kwargs: Any) -> dict[str, Any]:
+        captured["model"] = model
+        captured["kwargs"] = kwargs
+        return {"fake_llm": model}
+
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-test-key")
+    monkeypatch.setenv("NVIDIA_BASE_URL", DEFAULT_NVIDIA_BASE_URL)
+    monkeypatch.setattr("ragas.llms.llm_factory", fake_llm_factory)
+
+    llm, emb = build_ragas_evaluators(judge_provider="nvidia")
+
+    assert llm == {"fake_llm": DEFAULT_JUDGE_MODEL}
+    assert captured["model"] == DEFAULT_JUDGE_MODEL
+    assert captured["kwargs"]["provider"] == "openai"
+    assert captured["kwargs"]["mode"] == instructor.Mode.MD_JSON
+    assert captured["kwargs"]["extra_body"] == {
+        "chat_template_kwargs": {"enable_thinking": False}
+    }
+    assert emb.dimensions == 3072

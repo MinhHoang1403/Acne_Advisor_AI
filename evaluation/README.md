@@ -7,9 +7,9 @@ Thư mục này chứa quy trình đánh giá hệ thống RAG hiện tại bằ
 | Thành phần | Chức năng |
 | --- | --- |
 | `evaluation/dataset.json` | Bộ câu hỏi đánh giá chuẩn (50 câu hỏi tiếng Việt thuộc 7 nhóm chủ đề bám sát kho dữ liệu `Acne_data_source.json`, gồm 42 câu trả lời và 8 câu từ chối an toàn). |
-| `evaluation/ragas_runner.py` | Module lõi gọi hệ thống `run_clinical_agent`, chấm 5 chỉ số RAGAS bằng Gemini (`google-genai`) và xuất báo cáo Markdown/JSON. |
-| `evaluation/ragas_evaluation.ipynb` | Jupyter Notebook trực quan để chạy toàn bộ quy trình đánh giá và xuất kết quả ra file `.md`. |
-| `evaluation/results/` | Thư mục chứa kết quả xuất ra: `ragas_evaluation_report.md` và `ragas_evaluation_raw.json`. |
+| `evaluation/ragas_runner.py` | Module lõi gọi hệ thống `run_clinical_agent`, chấm 5 chỉ số RAGAS bằng LLM Judge độc lập qua NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`, dự phòng `mistralai/mistral-large-4-1t-a52b`) kết hợp embeddings `models/gemini-embedding-2`, và xuất báo cáo Markdown/JSON. |
+| `evaluation/ragas_evaluation.ipynb` | Jupyter Notebook trực quan để chạy toàn bộ quy trình đánh giá 50 ca và xuất kết quả ra file `.md` / `.json`. |
+| `evaluation/results/` | Thư mục chứa kết quả xuất ra sau mỗi lần chạy: `ragas_evaluation_report.md`, `ragas_evaluation_raw.json` và checkpoint `ragas_system_records.json`. |
 
 ## 2. Các chỉ số đánh giá
 
@@ -22,6 +22,6 @@ Thư mục này chứa quy trình đánh giá hệ thống RAG hiện tại bằ
 
 ## 3. Cách chạy đánh giá
 
-1. Đảm bảo các container Docker (`acne_qdrant`, `acne_postgres`, `acne_redis`, `acne_neo4j`) đang chạy và `.env` đã có `GOOGLE_API_KEY`.
+1. Đảm bảo các container Docker (`acne_qdrant`, `acne_postgres`, `acne_redis`, `acne_neo4j`) đang chạy và `.env` đã có `GOOGLE_API_KEY` (cho hệ thống + embeddings) cùng `NVIDIA_API_KEY` (cho RAGAS Judge).
 2. Mở file `evaluation/ragas_evaluation.ipynb` bằng VS Code / Jupyter (chọn kernel `.venv` của dự án) và chạy lần lượt các cell (`Run All`).
 3. Xem báo cáo chi tiết tại `evaluation/results/ragas_evaluation_report.md`.

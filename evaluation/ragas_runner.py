@@ -32,9 +32,11 @@ from ragas.embeddings.base import BaseRagasEmbedding
 
 DEFAULT_DATASET_PATH = Path("evaluation/dataset.json")
 DEFAULT_RESULTS_DIR = Path("evaluation/results")
-DEFAULT_JUDGE_MODEL = "gemini-3.6-flash"
-DEFAULT_FALLBACK_JUDGE_MODEL = "gemini-3.5-flash"
-DEFAULT_FALLBACK_JUDGE_MODELS = ("gemini-3.5-flash", "gemini-3.5-flash-lite")
+DEFAULT_JUDGE_PROVIDER = "nvidia"
+DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
+DEFAULT_JUDGE_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
+DEFAULT_FALLBACK_JUDGE_MODEL = "mistralai/mistral-large-4-1t-a52b"
+DEFAULT_FALLBACK_JUDGE_MODELS = ("mistralai/mistral-large-4-1t-a52b",)
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSIONS = 3072
 
@@ -223,6 +225,13 @@ async def run_system_on_dataset(
                 )
             except Exception as exc:
                 error_text = f"{type(exc).__name__}: {exc}"
+            daily_quota_detail = _extract_daily_quota_detail(result, error_text)
+            if daily_quota_detail is not None:
+                raise RuntimeError(
+                    f"System LLM ({llm_provider or 'default'}/{llm_model or 'default'}) đã cạn hạn mức theo ngày (RPD) "
+                    f"tại ca {case.case_id}: {daily_quota_detail}. "
+                    "Hãy chờ reset hạn mức ngày hoặc đổi model/API key trước khi chạy lại bộ đánh giá."
+                )
             transient_fallback = result.get("fallback_reason_code") in {
                 "provider_unavailable",
                 "generation_unavailable",
@@ -280,11 +289,13 @@ async def run_system_on_dataset(
 def build_ragas_evaluators(
     *,
     judge_model: str = DEFAULT_JUDGE_MODEL,
-    judge_provider: str = "google",
+    judge_provider: str = DEFAULT_JUDGE_PROVIDER,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     api_key: str | None = None,
+    judge_api_key: str | None = None,
+    judge_base_url: str | None = None,
 ) -> tuple[Any, ProjectGeminiEmbeddings]:
-    """Khởi tạo Judge LLM (Gemini hoặc OpenAI) và Embeddings cho RAGAS 0.4.x."""
+    """Khởi tạo Judge LLM (NVIDIA NIM, Gemini hoặc OpenAI) và Embeddings cho RAGAS 0.4.x."""
 
     from ragas.llms import llm_factory
 
@@ -293,13 +304,44 @@ def build_ragas_evaluators(
         raise RuntimeError("Thiếu GOOGLE_API_KEY trong biến môi trường cho embeddings.")
 
     provider_norm = judge_provider.strip().lower()
-    if provider_norm == "openai":
-        from openai import OpenAI
+    if provider_norm == "nvidia":
+        import instructor
+        from openai import AsyncOpenAI
 
-        openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+        nvidia_key = (judge_api_key or os.getenv("NVIDIA_API_KEY", "")).strip()
+        if not nvidia_key:
+            raise RuntimeError("Thiếu NVIDIA_API_KEY để chạy RAGAS judge với provider='nvidia'.")
+        base_url = (
+            judge_base_url
+            or os.getenv("NVIDIA_BASE_URL", DEFAULT_NVIDIA_BASE_URL)
+            or DEFAULT_NVIDIA_BASE_URL
+        ).strip()
+        nvidia_client = AsyncOpenAI(
+            api_key=nvidia_key,
+            base_url=base_url,
+            timeout=60.0,
+            max_retries=1,
+        )
+        # Dùng MD_JSON và tắt thinking mặc định để model 550B/1T trên NVIDIA NIM
+        # xuất JSON chuẩn Pydantic nhanh, ổn định và không bị cắt bởi chuỗi suy nghĩ dài.
+        judge_llm = llm_factory(
+            judge_model,
+            provider="openai",
+            client=nvidia_client,
+            mode=instructor.Mode.MD_JSON,
+            max_tokens=2048,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        )
+    elif provider_norm == "openai":
+        from openai import AsyncOpenAI
+
+        openai_key = (judge_api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         if not openai_key:
             raise RuntimeError("Thiếu OPENAI_API_KEY để chạy RAGAS judge với provider='openai'.")
-        openai_client = OpenAI(api_key=openai_key)
+        openai_kwargs: dict[str, Any] = {"api_key": openai_key, "timeout": 60.0}
+        if judge_base_url:
+            openai_kwargs["base_url"] = judge_base_url.strip()
+        openai_client = AsyncOpenAI(**openai_kwargs)
         judge_llm = llm_factory(judge_model, provider="openai", client=openai_client)
     else:
         from google import genai
@@ -325,18 +367,50 @@ def _clean_score(value: Any) -> float | None:
     return round(numeric, 4)
 
 
-def _is_daily_quota_error(exc: BaseException) -> bool:
-    """Phát hiện lỗi cạn hạn mức theo ngày (RPD) để chuyển judge ngay, tránh chờ retry vô ích."""
+def _is_daily_quota_error(exc: BaseException | str) -> bool:
+    """Phát hiện lỗi cạn hạn mức theo ngày (RPD) để dừng/chuyển judge ngay, tránh chờ retry vô ích."""
 
-    text = f"{type(exc).__name__}: {exc}".lower()
+    text = exc.lower() if isinstance(exc, str) else f"{type(exc).__name__}: {exc}".lower()
     return any(
         marker in text
         for marker in (
             "requestsperday",
             "per day",
+            "per day limit exceeded",
+            "daily project quota",
+            "daily quota",
             "generate_content_free_tier_requests",
         )
     )
+
+
+def _extract_daily_quota_detail(result: dict[str, Any], error_text: str | None) -> str | None:
+    """Trích thông điệp lỗi RPD từ exception hoặc metadata fallback của ``run_clinical_agent``."""
+
+    candidates: list[str] = []
+    if error_text:
+        candidates.append(error_text)
+    if isinstance(result, dict):
+        for key in ("fallback_reason", "retrieval_error"):
+            value = result.get(key)
+            if isinstance(value, str) and value.strip():
+                candidates.append(value.strip())
+        decision = result.get("agent_decision")
+        if isinstance(decision, dict):
+            for key in ("error", "rationale", "reason"):
+                value = decision.get(key)
+                if isinstance(value, str) and value.strip():
+                    candidates.append(value.strip())
+        for item in result.get("agent_decision_history") or []:
+            if isinstance(item, dict):
+                for key in ("error", "rationale", "reason"):
+                    value = item.get(key)
+                    if isinstance(value, str) and value.strip():
+                        candidates.append(value.strip())
+    for detail in candidates:
+        if _is_daily_quota_error(detail):
+            return detail
+    return None
 
 
 def _is_rate_limit_error(exc: BaseException) -> bool:
@@ -381,11 +455,13 @@ async def score_records_with_ragas(
     records: list[dict[str, Any]],
     *,
     judge_model: str = DEFAULT_JUDGE_MODEL,
-    judge_provider: str = "google",
+    judge_provider: str = DEFAULT_JUDGE_PROVIDER,
     fallback_judge_model: str | None = DEFAULT_FALLBACK_JUDGE_MODEL,
     fallback_judge_models: tuple[str, ...] | list[str] | None = None,
     embedding_model: str = DEFAULT_EMBEDDING_MODEL,
     api_key: str | None = None,
+    judge_api_key: str | None = None,
+    judge_base_url: str | None = None,
     request_delay_seconds: float | None = None,
     max_rate_limit_retries: int = 2,
     verbose: bool = False,
@@ -400,11 +476,14 @@ async def score_records_with_ragas(
         Faithfulness,
     )
 
+    provider_norm = judge_provider.strip().lower()
     judge_llm, embeddings = build_ragas_evaluators(
         judge_model=judge_model,
-        judge_provider=judge_provider,
+        judge_provider=provider_norm,
         embedding_model=embedding_model,
         api_key=api_key,
+        judge_api_key=judge_api_key,
+        judge_base_url=judge_base_url,
     )
 
     def _build_metric_set(llm_instance: Any) -> dict[str, Any]:
@@ -420,9 +499,9 @@ async def score_records_with_ragas(
             ),
         }
 
-    # Xây chuỗi judge ưu tiên: judge chính + các fallback Google (tự động loại trùng).
+    # Xây chuỗi judge ưu tiên: judge chính + các model dự phòng cùng provider (tự động loại trùng).
     judge_chain: list[tuple[str, dict[str, Any]]] = [(judge_model, _build_metric_set(judge_llm))]
-    if judge_provider.strip().lower() == "google":
+    if provider_norm in {"google", "nvidia"}:
         raw_fallbacks: list[str] = []
         if fallback_judge_models is not None:
             raw_fallbacks.extend(str(m).strip() for m in fallback_judge_models if str(m).strip())
@@ -435,18 +514,22 @@ async def score_records_with_ragas(
             seen_models.add(fb_model)
             fb_llm, _ = build_ragas_evaluators(
                 judge_model=fb_model,
-                judge_provider="google",
+                judge_provider=provider_norm,
                 embedding_model=embedding_model,
                 api_key=api_key,
+                judge_api_key=judge_api_key,
+                judge_base_url=judge_base_url,
             )
             judge_chain.append((fb_model, _build_metric_set(fb_llm)))
 
     exhausted_daily_models: set[str] = set()
 
-    use_parallel = judge_provider.strip().lower() == "openai"
+    use_parallel = provider_norm == "openai"
     pacing_delay = (
         0.0
         if request_delay_seconds is None and use_parallel
+        else 1.0
+        if request_delay_seconds is None and provider_norm == "nvidia"
         else 2.5
         if request_delay_seconds is None
         else max(0.0, request_delay_seconds)
