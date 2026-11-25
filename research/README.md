@@ -1,72 +1,32 @@
-# Research evidence on the canonical main checkout
+# Chỉ mục Nghiên cứu & Thực nghiệm Ngoại tuyến (`research/`)
 
-Production has one implementation under `src/`. The scripts retained here are
-frozen offline analysis/replay tools, not an alternative backend, an active
-development branch, or an adopted evidence selector. No research prototype is
-imported by the normal answer path.
+Hệ thống chính thức chỉ có **một** bản triển khai duy nhất trong thư mục `src/`. Toàn bộ các script và báo cáo được giữ lại tại thư mục `research/` là **tài liệu phân tích và đối chứng ngoại tuyến ở trạng thái lưu trữ**, **không** phải một nhánh backend thay thế và **không** được import vào luồng xử lý câu hỏi trực tuyến.
 
-## Current evidence and pending review
+## 1. Các nghiên cứu trọng tâm đã ghi nhận
 
-- [Evidence-loss forensics](RAG_EVIDENCE_LOSS_ROOT_CAUSE_STUDY.md): 85/88 required
-  evidence occurrences were acquired and 58/88 packed; 20 character-budget and
-  7 item-budget losses explain the post-acquisition gap. No implementation bug
-  was confirmed. Inputs are the frozen thesis outputs now retained on `main`.
-- [Controlled packing study](BUDGET_AWARE_PACKING_CONTROLLED_STUDY.md) and
-  [locked protocol](BUDGET_AWARE_PACKING_PROTOCOL.md): exact baseline replay,
-  treatment 65/88 versus 58/88, but +12/-5 requirements, costly selection and
-  no eligible independent holdout. `EXPERIMENT_FAILED`; not adopted. Keep the
-  approximately 2.35 MiB ignored candidate cache at
-  `data/cache/research_budget_aware_packing/candidates.json` for offline replay.
-- [Local extraction contract study](LOCAL_RAGCHECKER_EXTRACTION_CONTRACT_STUDY.md):
-  `INDEPENDENT_GOLD_REVIEW_REQUIRED`. Candidate C produced parser-valid outputs
-  but still has unresolved semantic review items. Its protocol, A/B/C outputs,
-  developer-review packet, draft holdout and overlap audit are retained under
-  `results/local_extraction_contract_*`. The original local 4B/9B calibration
-  outputs are retained as the review baseline. Failed model runners and alternate
-  evaluator implementations are not maintained here.
-- [Controlled evidence mapping review](CONTROLLED_EVIDENCE_REVIEW.md): eight
-  technical mappings still need researcher decisions. Unchecked boxes remain
-  unchecked; this packet is not independent clinical validation or final gold.
+- **[Phân tích nguyên nhân mất bằng chứng (RAG Evidence-Loss Study)](RAG_EVIDENCE_LOSS_ROOT_CAUSE_STUDY.md):** Phân tích trên 88 vị trí bằng chứng mục tiêu cho thấy hệ thống truy xuất được `85/88` và đóng gói vào ngữ cảnh `58/88`; nguyên nhân chênh lệch nằm ở giới hạn ký tự (`20` ca) và giới hạn số đoạn (`7` ca), không phải lỗi thực thi truy xuất.
+- **[Nghiên cứu đóng gói theo ngân sách (Budget-Aware Packing Study)](BUDGET_AWARE_PACKING_CONTROLLED_STUDY.md) & [Giao thức khóa](BUDGET_AWARE_PACKING_PROTOCOL.md):** So sánh có đối chứng nâng tỷ lệ đóng gói từ `58/88` lên `65/88` nhưng phát sinh thêm chi phí lựa chọn và đánh đổi `+12/-5` yêu cầu, không có tập kiểm định độc lập hợp lệ — kết luận `EXPERIMENT_FAILED` (không đưa vào sản phẩm). Cache ứng viên ngoại tuyến tại `data/cache/research_budget_aware_packing/candidates.json` được giữ cho mục đích tái chạy phân tích ngoại tuyến.
+- **[Nghiên cứu hợp đồng trích xuất cục bộ (Local Extraction Contract Study)](LOCAL_RAGCHECKER_EXTRACTION_CONTRACT_STUDY.md):** Ghi nhận kết quả thử nghiệm extractor cục bộ (`Candidate C`) cùng dữ liệu hiệu chuẩn 4B/9B trong `results/local_extraction_contract_*` ở trạng thái `INDEPENDENT_GOLD_REVIEW_REQUIRED`.
+- **[Rà soát ánh xạ bằng chứng (Controlled Evidence Review)](CONTROLLED_EVIDENCE_REVIEW.md):** Danh sách 8 mục ánh xạ kỹ thuật lưu trữ chờ rà soát bổ sung; không thay thế kiểm định lâm sàng độc lập.
 
-The local extraction holdout concerns evaluator claims, not context packing.
-It must not be presented as an independent packing holdout. Historical references
-to branch names or runner paths in the frozen study reports describe the original
-execution; ongoing work uses `main` and the retained review artifacts.
+## 2. Bảng tổng hợp các thực nghiệm đã đóng
 
-## Closed experiments: conclusions to preserve
+| Nghiên cứu / Commit nguồn | Kết quả ghi nhận | Quyết định với bản chính (`main`) |
+| --- | --- | --- |
+| Local RAGChecker 4B (`0a598a8`) | `LOCAL_EVALUATOR_QUALITY_FAILED`; chưa đạt hiệu chuẩn | Không áp dụng |
+| Local RAGChecker 9B (`9e52989`) | Cải thiện kiểm tra nhưng cổng trích xuất chưa đạt | Không áp dụng |
+| RAGAS shadow (`1c4748c`) | `RAGAS_CALIBRATION_BLOCKER` ở thời điểm thử nghiệm cũ | Đã thay bằng bộ RAGAS 50 ca mới ở thư mục `evaluation/` |
+| Focused evidence selector (`104c4fe`) | Thiếu tập kiểm định holdout độc lập; loại prototype facet/BGE | Không áp dụng |
+| GPU evidence selection (`ed0b469`) | Chưa đủ cơ sở kết luận; cần rà soát nhãn thêm | Không áp dụng |
+| Information-need decomposition (`7806b52`) | Chưa đạt ngưỡng ổn định (`3/13` ca phát triển đạt) | Giữ nguyên routing hiện tại |
+| Requested-information representation (`a2fd3f4`) | Không đạt cổng schema và các ca trọng yếu | Không thay thế runtime |
+| Retrieval-first boundary (`a410730`) | `RETRIEVAL_FIRST_QUERY_REWRITE_BLOCKER` | Giữ nguyên ranh giới action/query-rewrite |
+| Simple-path baseline (`6baa08a`) | Chưa chốt cổng an toàn/nhãn | Không thay thế baseline |
+| Retrieval methods (`72046e2`) | So sánh phục vụ nghiên cứu, chưa có cơ sở chuyển sản phẩm | Giữ nguyên cơ chế truy xuất hiện hành |
+| Reranker studies (`a374b8e`, `7e02625`, `0d96c9a`) | Tích hợp kết luận BF16; loại bỏ giới hạn depth-24 | Giữ full-union inference (PR #115) |
+| Retry evidence loss (`b6e1fd6`) | Hợp nhất kết quả giữ lại và truy xuất mới để rerank lại | Đã tích hợp vào sản phẩm qua PR #116 |
+| Evidence-path audit (`a99f259`) | Các bản vá đóng gói/suy luận tuần tự đã có bản triển khai mới hơn trên `main` | Không áp dụng lại bản vá cũ |
 
-| Study / source commit | Supported outcome | Production disposition |
-|---|---|---|
-| Local RAGChecker 4B, `0a598a8` | `LOCAL_EVALUATOR_QUALITY_FAILED`; stable execution did not satisfy calibration | No migration |
-| Local RAGChecker 9B, `9e52989` | Checking improved, extraction gate still failed; hybrid execution alone was insufficient | No migration |
-| RAGAS shadow, `1c4748c` | `RAGAS_CALIBRATION_BLOCKER`; formal shadow was not run | RAGChecker remains the semantic evaluator |
-| Focused evidence selector, `104c4fe` | No defensible final holdout; facet/BGE prototype rejected | No selector adoption |
-| GPU evidence selection, `ed0b469` | Rejected/inconclusive candidates; label review needed | No selector adoption |
-| Information-need decomposition, `7806b52` | Critical/stability gates failed; only 3/13 GOOD development cases | No routing change |
-| Requested-information representation, `a2fd3f4` | Schema and critical-case gates failed | No runtime replacement |
-| Retrieval-first boundary, `a410730` | `RETRIEVAL_FIRST_QUERY_REWRITE_BLOCKER` | Keep the existing action/query-rewrite boundary |
-| Simple-path baseline, `6baa08a` | Safety/label gates not frozen | No production baseline replacement |
-| Retrieval methods, `72046e2` | Research-only comparison; no production adoption established | Keep the current retrieval contract |
-| Reranker studies, `a374b8e`, `7e02625`, `0d96c9a` | BF16 finding integrated; depth-24 cap rejected | PR #115 keeps full-union inference |
-| Retry evidence loss, `b6e1fd6` | Retained/acquired union reranked with the targeted query | Already integrated through PR #116 |
-| Evidence-path audit, `a99f259` | Packing trace and serialized-inference fixes have subsequent implementations on main | Do not reapply the older patch |
+## 3. Quan hệ với bộ đánh giá chính thức hiện tại
 
-Old architecture audit/checkpoint reports are superseded by `docs/ARCHITECTURE.md`.
-The old formatting stash belonged to a removed deterministic-answer architecture;
-the current presentation and cache-version contracts supersede it. The other code
-stash only removed the retired `src/web/index.html` frontend.
-
-An old notebook stash changed only `RESEARCHER_REVIEW_APPROVED=False` to `True`
-and captured a superseded run: Claim Recall 60.5%, Context Precision 26.3%,
-Faithfulness 74.3%, Claim F1 37.3%, rejection 21/30. Those outputs did not establish
-an immutable current-run identity and must not replace either retained formal run.
-Its approval flag is not carried into the canonical notebook.
-
-## Formal evaluation
-
-The legacy RAGChecker thesis evaluation package has been superseded on `main` by
-the 50-case RAGAS evaluation suite documented in
-[evaluation/README.md](../evaluation/README.md) and executed in
-[evaluation/ragas_evaluation.ipynb](../evaluation/ragas_evaluation.ipynb). The
-research studies and manifests retained in this directory remain historical
-reference artifacts only.
+Bộ đánh giá RAGChecker luận văn trước đây đã được thay thế trên `main` bằng **bộ đánh giá định lượng RAGAS 50 ca** sử dụng Judge độc lập qua NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`). Xem chi tiết cấu trúc, cách chạy và báo cáo hiện hành tại [evaluation/README.md](../evaluation/README.md) và [evaluation/ragas_evaluation.ipynb](../evaluation/ragas_evaluation.ipynb). Toàn bộ báo cáo và dữ liệu trong `research/` chỉ giữ lại làm tài liệu tham khảo lịch sử.
