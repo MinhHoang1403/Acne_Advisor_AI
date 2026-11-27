@@ -214,6 +214,7 @@ export default function App() {
   useEffect(() => {
     if (!backendOnline || backendSessionsLoaded.current) return;
     backendSessionsLoaded.current = true;
+    const selectionAtBoot = selectionSequence.current;
 
     (async () => {
       try {
@@ -230,17 +231,16 @@ export default function App() {
 
         setSessions((prev) => mergeSessionSummaries(prev, normalizedBackendSessions));
 
-        const backendIds = new Set(normalizedBackendSessions.map((s) => s.id));
-        const resolvedActiveId =
-          activeSessionId && backendIds.has(activeSessionId)
-            ? activeSessionId
-            : normalizedBackendSessions[0]?.id || null;
+        // Không tự động ghi đè phiên chat nếu người dùng đã chủ động bấm "Cuộc trò chuyện mới" hoặc chọn phiên khác.
+        if (selectionAtBoot !== selectionSequence.current) return;
 
-        if (!activeSessionId || !backendIds.has(activeSessionId)) {
-          setActiveSessionId((current) => current || normalizedBackendSessions[0]?.id || null);
+        const backendIds = new Set(normalizedBackendSessions.map((s) => s.id));
+        const nextActiveId = activeSessionId || normalizedBackendSessions[0]?.id || null;
+        if (!activeSessionId && nextActiveId) {
+          setActiveSessionId(nextActiveId);
         }
-        if (resolvedActiveId && backendIds.has(resolvedActiveId)) {
-          _loadMessagesFromBackend(resolvedActiveId);
+        if (nextActiveId && backendIds.has(nextActiveId)) {
+          _loadMessagesFromBackend(nextActiveId);
         }
       } catch (err) {
         backendSessionsLoaded.current = false;
@@ -427,12 +427,7 @@ export default function App() {
 
       // Append user message bằng functional update để không mutate React state.
       const currentSessionObj = sessions.find((s) => s.id === currentSessionId) || { messages: [] };
-      const baseMessages =
-        currentSessionObj.messages.length > 0 &&
-        currentSessionObj.messages[currentSessionObj.messages.length - 1]?.role === 'user' &&
-        currentSessionObj.messages[currentSessionObj.messages.length - 1]?.pendingRequest
-          ? currentSessionObj.messages
-          : currentSessionObj.messages;
+      const baseMessages = currentSessionObj.messages;
       const turn = prepareChatTurn({
         sessionId: currentSessionId, message: trimmedMessage, modelConfig,
         messages: baseMessages,
@@ -537,7 +532,7 @@ export default function App() {
           }
         }
 
-        // Giữ toàn bộ response data để ChatMessage render source/metadata.
+        // Giữ toàn bộ response data để ChatMessage render source/metadata (chống nhân đôi nếu đã đồng bộ từ DB).
         const assistantMsgObj = { role: 'assistant', content: data.answer, data };
         setSessions((prev) =>
           prev.map((s) => {
@@ -548,6 +543,10 @@ export default function App() {
                 delete message.pendingRequest;
                 return message;
               });
+              const tailMsg = completed[completed.length - 1];
+              if (tailMsg?.role === 'assistant' && tailMsg?.content === data.answer) {
+                return { ...s, messages: completed };
+              }
               return { ...s, messages: [...completed, assistantMsgObj] };
             }
             return s;
@@ -667,6 +666,7 @@ export default function App() {
       <ChatWindow
         chatHistory={chatHistory}
         isLoading={isActiveSessionStreaming}
+        isRequestInFlight={isLoading}
         loadingMessages={loadingMessages}
         streamingStage={isActiveSessionStreaming ? streamingStage : ''}
         streamingDraft={isActiveSessionStreaming ? streamingDraft : ''}

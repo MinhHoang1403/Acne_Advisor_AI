@@ -165,7 +165,7 @@ async def generate_text_async(
                 contents=prompt,
                 config=config,
             )
-        except Exception:
+        except BaseException:
             if emitted_any_delta:
                 emit_stream_reset()
                 emitted_any_delta = False

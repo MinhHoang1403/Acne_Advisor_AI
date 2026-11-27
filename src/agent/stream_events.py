@@ -30,7 +30,7 @@ def begin_chat_stream_scope() -> tuple[
 ]:
     """Khởi tạo hàng đợi SSE riêng biệt cho request hiện hành."""
 
-    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=512)
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1024)
     token = _STREAM_QUEUE.set(queue)
     return queue, token
 
@@ -91,7 +91,12 @@ def emit_stream_reset() -> None:
     try:
         queue.put_nowait({"event": "reset", "data": {}})
     except asyncio.QueueFull:
-        return
+        # Đảm bảo tín hiệu reset không bao giờ bị rơi mất khi hàng đợi đầy bằng cách rút bỏ 1 delta cũ.
+        try:
+            queue.get_nowait()
+            queue.put_nowait({"event": "reset", "data": {}})
+        except (asyncio.QueueEmpty, asyncio.QueueFull):
+            return
 
 
 __all__ = [

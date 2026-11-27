@@ -49,7 +49,7 @@
       "category": "symptoms_and_types",
       "dialogue_type": "colloquial_patient",
       "expected_behavior": "answer",
-      "user_input": "Em có thói quen hay đưa tay lên mặt cạy gãi suốt làm mụn cứ trầy xước thành vết trợt và thâm sẹo, tình trạng trứng cá do cào gãi này thường gặp ở ai ạ?",
+      "user_input": "Em có thói quen hay đưa tay lên mặt cạy gãi suốt làm mụn cứ trầy xước thành vết trợt và để lại sẹo, tình trạng trứng cá do cào gãi này thường gặp ở nhóm đối tượng nào ạ?",
       "reference": "Trứng cá do cào gãi có tổn thương không viêm nhẹ hoặc sẩn viêm nhưng bị cào gãi thường xuyên để lại vết trợt và sẹo; tình trạng này thường gặp ở phụ nữ trẻ có các vấn đề tâm lý hoặc đang sử dụng thuốc chống trầm cảm."
     },
     {
@@ -333,8 +333,8 @@
       "category": "comparison",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Giữa adapalene (Differin) và tretinoin thường (Retin-A), hoạt chất nào ổn định hơn khi dùng cùng benzoyl peroxide?",
-      "reference": "Adapalene bền vững hóa học hơn và có thể phối hợp cùng benzoyl peroxide (như dạng phối hợp liều cố định), trong khi một số dạng tretinoin thông thường dễ bị benzoyl peroxide oxy hóa làm mất tác dụng nếu bôi cùng thời điểm."
+      "user_input": "Giữa gel Differin và kem Retin-A bôi trị mụn, thuốc nào bền vững hóa học hơn khi dùng cùng benzoyl peroxide?",
+      "reference": "Adapalene (Differin) bền vững hóa học hơn và có thể phối hợp cùng benzoyl peroxide (như dạng phối hợp liều cố định), trong khi một số dạng tretinoin thông thường (Retin-A) dễ bị benzoyl peroxide oxy hóa làm mất tác dụng nếu bôi cùng thời điểm."
     },
     {
       "case_id": "CMP-09",
@@ -357,8 +357,8 @@
       "category": "comparison",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Mức độ an toàn của spironolactone (Aldactone) trong thời kỳ mang thai và trong thời kỳ cho con bú khác nhau ra sao?",
-      "reference": "Spironolactone cần tránh sử dụng trong thời kỳ mang thai (do đặc tính kháng androgen), nhưng khi cho con bú thuốc chỉ bài tiết vào sữa mẹ với lượng rất nhỏ nên nhìn chung không gây tác dụng phụ cho đa số trẻ bú mẹ (vẫn cần theo dõi các biểu hiện bất thường của trẻ và trao đổi với bác sĩ)."
+      "user_input": "Mức độ an toàn của thuốc uống Aldactone trị mụn nội tiết trong thời kỳ mang thai và trong thời kỳ cho con bú khác nhau ra sao?",
+      "reference": "Spironolactone (Aldactone) cần tránh sử dụng trong thời kỳ mang thai (do đặc tính kháng androgen), nhưng khi cho con bú thuốc chỉ bài tiết vào sữa mẹ với lượng rất nhỏ nên nhìn chung không gây tác dụng phụ cho đa số trẻ bú mẹ (vẫn cần theo dõi các biểu hiện bất thường của trẻ và trao đổi với bác sĩ)."
     },
     {
       "case_id": "CMP-12",
@@ -430,8 +430,8 @@
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Cách bôi trifarotene (Aklief) được hướng dẫn như thế nào để giảm kích ứng giai đoạn đầu?",
-      "reference": "Trifarotene được bôi lớp mỏng 1 lần mỗi ngày vào buổi tối; trong vài tuần đầu có thể giảm tần suất bôi (như bôi cách ngày hoặc kết hợp dưỡng ẩm) để hạn chế kích ứng da."
+      "user_input": "Cách bôi kem Aklief trị mụn được hướng dẫn như thế nào để giảm kích ứng da giai đoạn đầu?",
+      "reference": "Trifarotene (Aklief) được bôi lớp mỏng 1 lần mỗi ngày vào buổi tối; trong vài tuần đầu có thể giảm tần suất bôi (như bôi cách ngày hoặc kết hợp dưỡng ẩm) để hạn chế kích ứng da."
     },
     {
       "case_id": "TRT-03",
@@ -454,15 +454,15 @@
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Hoạt chất axit azelaic (như trong Skinoren) có tác dụng gì đối với cả mụn trứng cá và vết thâm sau mụn?",
-      "reference": "Axit azelaic là axit dicarboxylic tự nhiên có đặc tính kháng khuẩn, tiêu nhân mụn và chống viêm nhẹ cho cả mụn viêm và không viêm; đồng thời hoạt chất này còn ức chế enzyme tyrosinase nên giúp cải thiện tình trạng tăng sắc tố sau viêm (thâm mụn)."
+      "user_input": "Kem bôi Skinoren có tác dụng gì đối với cả mụn trứng cá và vết thâm sau mụn?",
+      "reference": "Axit azelaic (hoạt chất trong Skinoren) là axit dicarboxylic tự nhiên có đặc tính kháng khuẩn, tiêu nhân mụn và chống viêm nhẹ cho cả mụn viêm và không viêm; đồng thời hoạt chất này còn ức chế enzyme tyrosinase nên giúp cải thiện tình trạng tăng sắc tố sau viêm (thâm mụn)."
     },
     {
       "case_id": "TRT-06",
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Clascoterone bôi tại chỗ (Winlevi) thuộc nhóm thuốc gì, dùng cho độ tuổi nào và cách bôi như thế nào?",
+      "user_input": "Kem bôi Winlevi 1% trị mụn trứng cá thuộc nhóm cơ chế tác dụng gì, dùng cho độ tuổi nào và cách bôi mỗi ngày ra sao?",
       "reference": "Clascoterone bôi tại chỗ (kem 1% Winlevi) là thuốc kháng androgen tại chỗ, được FDA phê duyệt điều trị mụn trứng cá cho người từ 12 tuổi trở lên với cách dùng bôi 2 lần mỗi ngày."
     },
     {
@@ -494,7 +494,7 @@
       "category": "treatment_and_actives",
       "dialogue_type": "colloquial_patient",
       "expected_behavior": "answer",
-      "user_input": "Mặt em nổi mấy cục mụn bọc sưng đau, có người mách đi rạch da lấy hết chân mụn ra là trị dứt điểm không mọc lại nữa, có nên làm vậy không ạ?",
+      "user_input": "Mặt em nổi nhiều mụn đầu trắng và mụn đầu đen, có người mách đi rạch da lấy hết chân mụn ra là trị dứt điểm không mọc lại nữa, có nên làm vậy không ạ?",
       "reference": "Không nên nghe theo quan niệm rạch da lấy hết 'chân' mụn để trị dứt điểm, vì thủ thuật chích/lấy nhân mụn chỉ hỗ trợ giải phóng nhân ở mụn đầu trắng/đầu đen trong điều kiện vô trùng chứ không giải quyết nguyên nhân gốc rễ hình thành mụn hay tồn tại 'chân mụn' để lấy hết; tự ý rạch nặn hoặc làm nơi không vô trùng rất dễ gây nhiễm trùng nặng và sẹo xấu."
     },
     {
@@ -502,8 +502,8 @@
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Với người bị mụn trứng cá vừa đến nặng có kèm mụn ở lưng khó tự bôi thuốc, phác đồ phối hợp gel adapalene + benzoyl peroxide (như Epiduo) cùng doxycycline hoặc lymecycline uống có ưu điểm gì theo NICE?",
-      "reference": "Theo NICE, phác đồ phối hợp cố định adapalene + benzoyl peroxide bôi buổi tối kèm lymecycline hoặc doxycycline đường uống giúp thành phần thuốc uống tác động hiệu quả tới các vùng da rộng khó bôi thuốc tại chỗ như vùng lưng, đồng thời đáp ứng điều kiện điều trị chuẩn trước khi cân nhắc các bước chuyên sâu hơn."
+      "user_input": "Với người bị mụn trứng cá vừa đến nặng có kèm mụn ở lưng khó tự bôi thuốc, phác đồ phối hợp gel Epiduo bôi buổi tối cùng doxycycline hoặc lymecycline uống có ưu điểm gì theo NICE?",
+      "reference": "Theo NICE, phác đồ phối hợp cố định adapalene + benzoyl peroxide (Epiduo) bôi buổi tối kèm lymecycline hoặc doxycycline đường uống giúp thành phần thuốc uống tác động hiệu quả tới các vùng da rộng khó bôi thuốc tại chỗ như vùng lưng, đồng thời đáp ứng điều kiện điều trị chuẩn trước khi cân nhắc các bước chuyên sâu hơn."
     },
     {
       "case_id": "TRT-12",
@@ -548,24 +548,24 @@
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Thuốc bôi phối hợp cố định adapalene và benzoyl peroxide (như Epiduo hoặc Azaduo) có vai trò gì trong điều trị mụn trứng cá?",
-      "reference": "Phối hợp liều cố định adapalene và benzoyl peroxide được khuyến cáo mạnh trong điều trị mụn trứng cá nhờ kết hợp tác dụng tiêu nhân mụn/bình thường hóa sừng hóa và kháng viêm của adapalene với tác dụng diệt khuẩn C. acnes nhanh, không gây kháng thuốc của benzoyl peroxide."
+      "user_input": "Thuốc bôi phối hợp cố định như Epiduo hoặc Azaduo có vai trò gì trong điều trị mụn trứng cá?",
+      "reference": "Phối hợp liều cố định adapalene và benzoyl peroxide (như Epiduo hoặc Azaduo) được khuyến cáo mạnh trong điều trị mụn trứng cá nhờ kết hợp tác dụng tiêu nhân mụn/bình thường hóa sừng hóa và kháng viêm của adapalene với tác dụng diệt khuẩn C. acnes nhanh, không gây kháng thuốc của benzoyl peroxide."
     },
     {
       "case_id": "TRT-15",
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Vì sao khi dùng kháng sinh clindamycin bôi (như Dalacin T) trị mụn viêm thì bác sĩ luôn khuyên phải phối hợp cùng benzoyl peroxide hoặc dạng kết hợp sẵn (như Klenzit-C kèm BPO)?",
-      "reference": "Không nên dùng clindamycin bôi đơn trị liệu kéo dài vì dễ làm vi khuẩn C. acnes phát triển đề kháng kháng sinh; việc phối hợp cùng benzoyl peroxide giúp tăng hiệu quả lâm sàng và ngăn ngừa sự hình thành chủng vi khuẩn kháng thuốc."
+      "user_input": "Vì sao khi dùng thuốc bôi Dalacin T trị mụn viêm thì bác sĩ luôn khuyên phải phối hợp thêm thuốc kháng khuẩn khác hoặc chuyển sang dạng kết hợp cố định như gel Duac?",
+      "reference": "Không nên dùng clindamycin bôi (Dalacin T) đơn trị liệu kéo dài vì dễ làm vi khuẩn C. acnes phát triển đề kháng kháng sinh; việc phối hợp cùng benzoyl peroxide (hoặc dùng dạng kết hợp cố định clindamycin + benzoyl peroxide như Duac) giúp tăng hiệu quả lâm sàng và ngăn ngừa sự hình thành chủng vi khuẩn kháng thuốc."
     },
     {
       "case_id": "TRT-16",
       "category": "treatment_and_actives",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Khi dùng gel hoặc sữa rửa mặt chứa benzoyl peroxide (như Benzac AC hoặc PanOxyl), vì sao cần cẩn thận khi tiếp xúc với quần áo màu, vỏ gối và khăn mặt?",
-      "reference": "Benzoyl peroxide có đặc tính oxy hóa tẩy màu mạnh nên dễ làm phai hoặc mất màu vải vóc như quần áo màu, khăn mặt, ga gối cũng như làm bạc màu tóc và lông mày nếu dính vào; cần rửa sạch tay sau khi bôi và để thuốc khô hoàn toàn trước khi mặc áo hoặc nằm ngủ."
+      "user_input": "Khi dùng gel Benzac AC hoặc sữa rửa mặt PanOxyl trị mụn, vì sao cần cẩn thận khi tiếp xúc với quần áo màu, vỏ gối và khăn mặt?",
+      "reference": "Benzoyl peroxide (hoạt chất trong Benzac AC và PanOxyl) có đặc tính oxy hóa tẩy màu mạnh nên dễ làm phai hoặc mất màu vải vóc như quần áo màu, khăn mặt, ga gối cũng như làm bạc màu tóc và lông mày nếu dính vào; cần rửa sạch tay sau khi bôi và để thuốc khô hoàn toàn trước khi mặc áo hoặc nằm ngủ."
     },
     {
       "case_id": "SAF-01",
@@ -620,7 +620,7 @@
       "category": "safety_and_precautions",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Kem bôi clascoterone 1% (Winlevi) có cảnh báo an toàn nội tiết nào cần lưu ý, nhất là ở bệnh nhân nhỏ tuổi hoặc khi bôi diện rộng?",
+      "user_input": "Kem bôi Winlevi 1% có cảnh báo an toàn nội tiết nào cần lưu ý, nhất là ở bệnh nhân nhỏ tuổi hoặc khi bôi diện rộng?",
       "reference": "Khi sử dụng kem clascoterone 1% (Winlevi), có thể xảy ra ức chế trục hạ đồi - tuyến yên - thượng thận (HPA axis suppression) trong hoặc sau điều trị, đặc biệt khi bôi diện rộng, kéo dài, băng kín hoặc ở bệnh nhân nhi dễ nhạy cảm hơn với độc tính toàn thân; ngoài ra cần lưu ý kích ứng tại chỗ và nguy cơ tăng kali máu, và nên ngưng thuốc nếu xuất hiện ức chế trục HPA."
     },
     {
@@ -628,16 +628,16 @@
       "category": "safety_and_precautions",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Phụ nữ trẻ khỏe mạnh uống spironolactone (Aldactone) trị mụn có bắt buộc phải xét nghiệm kali máu định kỳ thường quy không?",
-      "reference": "Theo hướng dẫn AAD 2024 và EuroGuiDerm, việc xét nghiệm theo dõi kali máu thường quy không bắt buộc ở phụ nữ trẻ khỏe mạnh dùng spironolactone trị mụn, nhưng cần cân nhắc kiểm tra ở bệnh nhân lớn tuổi, có bệnh lý nền (như bệnh thận, tim mạch) hoặc đang dùng thuốc ảnh hưởng nồng độ kali."
+      "user_input": "Phụ nữ trẻ khỏe mạnh uống Aldactone trị mụn nội tiết có bắt buộc phải xét nghiệm kali máu định kỳ thường quy không?",
+      "reference": "Theo hướng dẫn AAD 2024 và EuroGuiDerm, việc xét nghiệm theo dõi kali máu thường quy không bắt buộc ở phụ nữ trẻ khỏe mạnh dùng spironolactone (Aldactone) trị mụn, nhưng cần cân nhắc kiểm tra ở bệnh nhân lớn tuổi, có bệnh lý nền (như bệnh thận, tim mạch) hoặc đang dùng thuốc ảnh hưởng nồng độ kali."
     },
     {
       "case_id": "SAF-09",
       "category": "safety_and_precautions",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Tazarotene bôi tại chỗ (Tazorac) có dùng được khi đang mang thai không?",
-      "reference": "Không, tazarotene bôi tại chỗ chống chỉ định trong thời kỳ mang thai dựa trên nghiên cứu độc tính sinh sản ở động vật, dược lý nhóm retinoid và khả năng hấp thu toàn thân."
+      "user_input": "Thuốc bôi Tazorac trị mụn có dùng được khi đang mang thai không?",
+      "reference": "Không, tazarotene bôi tại chỗ (Tazorac) chống chỉ định trong thời kỳ mang thai dựa trên nghiên cứu độc tính sinh sản ở động vật, dược lý nhóm retinoid và khả năng hấp thu toàn thân."
     },
     {
       "case_id": "SAF-10",
@@ -692,17 +692,17 @@
           "content": "Các thuốc retinoid bôi như tretinoin được khuyến cáo ngừng sử dụng trước và trong thai kỳ."
         }
       ],
-      "user_input": "Ở người trưởng thành khỏe mạnh không mang thai, trung bình mất khoảng bao lâu để phần lớn hoạt chất tretinoin bôi được đào thải khỏi cơ thể?",
-      "standalone_question": "Ở người lớn khỏe mạnh không mang thai, mất trung bình bao lâu sau khi ngưng bôi tretinoin tại chỗ để phần lớn thuốc được chuyển hóa và đào thải khỏi cơ thể?",
-      "reference": "Ở người trưởng thành khỏe mạnh không mang thai, trung bình mất tới khoảng 1 ngày để phần lớn lượng tretinoin bôi tại chỗ được chuyển hóa và đào thải khỏi cơ thể (tuy nhiên người bệnh vẫn nên trao đổi với bác sĩ về thời điểm ngừng thuốc trước khi mang thai)."
+      "user_input": "Ở người trưởng thành khỏe mạnh không mang thai, tối đa trung bình mất khoảng bao lâu để phần lớn hoạt chất tretinoin bôi được đào thải khỏi cơ thể?",
+      "standalone_question": "Ở người lớn khỏe mạnh không mang thai, tối đa trung bình mất khoảng bao lâu sau khi ngưng bôi tretinoin tại chỗ để phần lớn thuốc được chuyển hóa và đào thải khỏi cơ thể?",
+      "reference": "Ở người trưởng thành khỏe mạnh không mang thai, tối đa trung bình mất khoảng 1 ngày (up to 1 day on average) để phần lớn lượng tretinoin bôi tại chỗ được chuyển hóa và đào thải khỏi cơ thể; người bệnh nên trao đổi với bác sĩ về thời điểm ngưng thuốc trước khi cố gắng mang thai."
     },
     {
       "case_id": "SAF-13",
       "category": "safety_and_precautions",
       "dialogue_type": "brand_bridge",
       "expected_behavior": "answer",
-      "user_input": "Người bệnh đang uống isotretinoin (như Roaccutane hoặc Accutane) cần lưu ý gì về cách uống thuốc trong bữa ăn để hấp thu tốt và hạn chế khô môi mắt?",
-      "reference": "Viên nang isotretinoin thường được uống 1-2 lần mỗi ngày ngay sau bữa ăn hoặc cùng thức ăn và đồ uống để thuốc hấp thu tốt hơn; trong suốt quá trình dùng thuốc nên thoa son dưỡng ẩm môi và nhỏ nước mắt nhân tạo thường xuyên để giảm khô nứt môi và khô mắt."
+      "user_input": "Người bệnh đang uống Roaccutane hoặc Accutane trị mụn nặng cần lưu ý gì về cách uống thuốc trong bữa ăn để hấp thu tốt và hạn chế khô môi mắt?",
+      "reference": "Viên nang isotretinoin (như Roaccutane hoặc Accutane) thường được uống 1-2 lần mỗi ngày ngay sau bữa ăn hoặc cùng thức ăn và đồ uống để thuốc hấp thu tốt hơn; trong suốt quá trình dùng thuốc nên thoa son dưỡng ẩm môi và nhỏ nước mắt nhân tạo thường xuyên để giảm khô nứt môi và khô mắt."
     },
     {
       "case_id": "SAF-14",

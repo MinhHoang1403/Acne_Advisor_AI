@@ -82,7 +82,10 @@ def evaluate_safety(
 def _evaluate_single_safety_query(query: str) -> SafetyDecision | None:
     """Evaluate one bounded text after subject and intent safeguards."""
 
-    text = normalize_text(query, preserve_boundaries=True)
+    # Đánh dấu riêng động từ "dừng" (có dấu huyền) trước khi bỏ dấu để không bị nhập nhằng
+    # với động từ "dùng" (sử dụng thuốc) trong logic kiểm tra khoảng chờ đào thải isotretinoin.
+    disambig_query = re.sub(r"(?i)\bdừng\b", "ngưng", str(query or ""))
+    text = normalize_text(disambig_query, preserve_boundaries=True)
     for rule in SAFETY_RULES:
         if rule.trigger(text) and not (
             rule.severity != "policy" and _non_current_information_request(query, text)
@@ -298,12 +301,21 @@ ISOTRETINOIN_CONCEPTS: tuple[str, ...] = (
 def _isotretinoin_pregnancy(text: str) -> bool:
     # Câu hỏi tra cứu khoảng thời gian chờ đào thải sau khi đã ngưng/hoàn thành isotretinoin
     # cần được chuyển vào luồng truy xuất bằng chứng (1 tháng sau ngưng thuốc), trừ khi đang mang thai.
+    # Tuyệt đối không dùng token "dung" không dấu ở đây để tránh nhầm với "đã dùng isotretinoin".
     active_pregnancy_now = re.search(
-        r"\b(?:dang\s+(?:mang\s+thai|co\s+thai|co\s+bau|bau)|phat\s+hien.{0,20}(?:mang\s+thai|co\s+thai|co\s+bau)|thu\s+(?:que|thai).{0,20}2\s+vach)\b",
+        r"\b(?:dang\s+(?:mang\s+thai|co\s+thai|co\s+bau|bau)"
+        r"|(?:mang\s+thai|co\s+thai|co\s+bau)\s+(?:roi|luon|\d+\s*(?:tuan|thang))"
+        r"|(?:lo|vua|moi|gio|hien)\s+(?:mang\s+thai|co\s+thai|co\s+bau)"
+        r"|phat\s+hien.{0,20}(?:mang\s+thai|co\s+thai|co\s+bau)"
+        r"|(?:thu\s+(?:que|thai)|que\s+thu).{0,20}(?:2|hai)\s+vach"
+        r"|(?:2|hai)\s+vach"
+        r"|i\s+am\s+pregnant|currently\s+pregnant)\b",
         text,
     )
+    stop_verb_group = r"(?:ngung|nghi\s+(?:thuoc|uong|isotretinoin)|da\s+nghi|sau\s+khi\s+nghi|hoan\s+thanh|ket\s+thuc|het\s+lieu\s+trinh|xong\s+lieu\s+trinh)"
+    duration_group = r"(?:bao\s+lau|khi\s+nao|may\s+thang|may\s+tuan)"
     post_stop_washout_inquiry = re.search(
-        r"\b(?:sau\s+khi|khi\s+da|da)\s+(?:ngung|nghi|dung|hoan\s+thanh|ket\s+thuc|het\s+lieu\s+trinh)\b.{0,80}\b(?:bao\s+lau|khi\s+nao|may\s+thang|may\s+tuan)\b",
+        rf"\b(?:{stop_verb_group}\b.{{0,80}}\b{duration_group}|{duration_group}\b.{{0,45}}\b{stop_verb_group})\b",
         text,
     )
     if post_stop_washout_inquiry is not None and active_pregnancy_now is None:
@@ -382,6 +394,7 @@ def _isotretinoin_pregnancy_and_mental_health(text: str) -> bool:
                 "psychiatric",
             ),
         ),
+        max_span_tokens=36,
     )
 
 

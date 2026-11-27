@@ -8,6 +8,7 @@ export default function ChatWindow({
   chatHistory,
   sidebarOpen = true,
   isLoading,
+  isRequestInFlight = false,
   loadingMessages = false,
   streamingStage = '',
   streamingDraft = '',
@@ -118,7 +119,20 @@ export default function ChatWindow({
               </div>
             </div>
           ) : (
-            <EmptyState onSendQuestion={onSendQuestion} />
+            <>
+              <EmptyState onSendQuestion={onSendQuestion} />
+              {error && (
+                <div className="chat-messages-list">
+                  <div className="chat-message chat-message-assistant">
+                    <div className="chat-message-inner">
+                      <div className="chat-error" role="alert">
+                        <span>{error}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )
         ) : (
           <div className="chat-messages-list">
@@ -191,7 +205,7 @@ export default function ChatWindow({
         )}
       </div>
 
-      {showScrollBottom && (
+      {showScrollBottom && chatHistory.length > 0 && (
         <button
           type="button"
           className="chat-scroll-bottom-btn"
@@ -210,7 +224,7 @@ export default function ChatWindow({
       <ChatInput
         message={message}
         setMessage={setMessage}
-        isLoading={isLoading}
+        isLoading={isLoading || isRequestInFlight}
         onSubmit={onSubmit}
         onCancel={onCancel}
         modelConfig={modelConfig}

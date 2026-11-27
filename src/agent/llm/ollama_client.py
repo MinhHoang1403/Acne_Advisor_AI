@@ -85,6 +85,11 @@ def build_ollama_chat_payload(
 ) -> dict[str, Any]:
     """Tạo payload Ollama hữu hạn mà không log nội dung prompt."""
 
+    effective_temp = (
+        0.0
+        if response_schema is not None and temperature == 0.0
+        else _env_float("OLLAMA_TEMPERATURE", temperature)
+    )
     payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
@@ -93,8 +98,8 @@ def build_ollama_chat_payload(
         "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m").strip() or "30m",
         "options": {
             "num_predict": _env_int("OLLAMA_NUM_PREDICT", 640),
-            "num_ctx": _env_int("OLLAMA_NUM_CTX", 4096),
-            "temperature": _env_float("OLLAMA_TEMPERATURE", temperature),
+            "num_ctx": _env_int("OLLAMA_NUM_CTX", 16384),
+            "temperature": effective_temp,
             "top_k": _env_int("OLLAMA_TOP_K", 20),
             "top_p": _env_float("OLLAMA_TOP_P", 0.9),
         },
@@ -201,7 +206,7 @@ async def generate_ollama_response(
                                         emit_stream_delta(piece)
                                 if frame.get("done"):
                                     data = frame
-                    except Exception:
+                    except BaseException:
                         if emitted_delta:
                             emit_stream_reset()
                         raise
@@ -248,8 +253,9 @@ async def generate_ollama_response(
                 )
                 content = data.get("message", {}).get("content", "")
                 if isinstance(content, str):
-                    # Loại bỏ thẻ <think>...</think> nếu model local vẫn phát sinh dù đã tắt think.
+                    # Loại bỏ thẻ <think>...</think> (kể cả khi bị cắt dở chưa kịp đóng thẻ) nếu model local vẫn sinh ra.
                     content = re.sub(r"^\s*<think>.*?</think>\s*", "", content, flags=re.DOTALL)
+                    content = re.sub(r"^\s*<think>.*", "", content, flags=re.DOTALL)
                 if not truncated:
                     return content
                 if attempt < retry_attempts:

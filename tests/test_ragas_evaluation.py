@@ -382,3 +382,41 @@ async def test_multi_turn_case_passes_history_and_closes_judge_clients(
     assert all(q.startswith("Isotretinoin") for q in captured_questions)
     assert closed_count == 2
     assert isinstance(EvaluationCase("X", "cat", "answer", "q", "r"), EvaluationCase)
+
+
+def test_lexical_graph_brand_bridges_and_mixed_accent_facets() -> None:
+    from src.knowledge.lexical_graph import (
+        extract_clinical_facets_from_text,
+        extract_query_graph_anchors,
+    )
+    from src.quality.answer_verifier import verify_answer_quality
+    from src.quality.safe_fallback import GENERIC_NON_SAFETY_FALLBACK_ANSWER
+
+    winlevi_anchors = extract_query_graph_anchors("Kem bôi Winlevi 1% trị mụn trứng cá")
+    assert "clascoterone" in winlevi_anchors.entity_names
+
+    duac_anchors = extract_query_graph_anchors("Vì sao bác sĩ khuyên dùng gel Duac trị mụn viêm?")
+    assert {"clindamycin", "benzoyl_peroxide"}.issubset(set(duac_anchors.entity_names))
+
+    mixed_facets = extract_clinical_facets_from_text(
+        "Mình bị mun an và sẹo lõm lâu năm", allow_ascii_fallback=True
+    )
+    assert "comedonal_acne" in mixed_facets.get("acne_subtype", [])
+
+    # Không bắt nhầm "mụn nặng" thành "mun nang" hay "bi mun an uong gi" thành "mụn ẩn"
+    severe_facets = extract_clinical_facets_from_text(
+        "Mình bị mụn nặng ở hai má", allow_ascii_fallback=True
+    )
+    assert "nodulocystic_acne" not in severe_facets.get("acne_subtype", [])
+    diet_facets = extract_clinical_facets_from_text(
+        "bi mun an uong gi cho mat da", allow_ascii_fallback=True
+    )
+    assert "comedonal_acne" not in diet_facets.get("acne_subtype", [])
+
+    # Safe fallback không bị gắn cờ sai lệch thực thể bởi answer_verifier
+    report = verify_answer_quality(
+        query="Tinh chất nọc ong pha rượu gạo bôi isotretinoin liều bao nhiêu?",
+        answer=GENERIC_NON_SAFETY_FALLBACK_ANSWER,
+        fallback_applied=True,
+    )
+    assert report.passed is True

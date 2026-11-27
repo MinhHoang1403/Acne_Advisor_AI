@@ -42,11 +42,13 @@ export default function ModelSelector({ onModelConfigChange, backendOnline = tru
     }
   );
   const [loading, setLoading] = useState(true);
+  const [retryTick, setRetryTick] = useState(0);
 
-  // Fetch models from API (tự tải lại khi backend vừa online mà danh sách chưa có)
+  // Fetch models from API (tự tải lại khi backend vừa online hoặc sau lỗi mạng tạm thời)
   useEffect(() => {
     if (models.length > 0) return undefined;
     let isMounted = true;
+    let retryTimer = null;
     fetchModels()
       .then(data => {
         if (isMounted) {
@@ -70,15 +72,27 @@ export default function ModelSelector({ onModelConfigChange, backendOnline = tru
       })
       .catch(err => {
         console.error('Failed to fetch models:', err);
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          if (backendOnline && retryTick < 3) {
+            retryTimer = setTimeout(() => {
+              if (isMounted) setRetryTick((n) => n + 1);
+            }, 4000);
+          }
+        }
       });
-    return () => { isMounted = false; };
-  }, [backendOnline, models.length]);
+    return () => {
+      isMounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [backendOnline, models.length, retryTick]);
 
   // Sync state upward and to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('acneAdvisorSelectedProvider', selectedProvider);
-    localStorage.setItem('acneAdvisorSelectedModel', selectedModel);
+    if (selectedModel || !loading) {
+      localStorage.setItem('acneAdvisorSelectedModel', selectedModel);
+    }
     localStorage.setItem('acneAdvisorAllowModelFallback', allowFallback);
 
     if (onModelConfigChange) {
@@ -88,7 +102,7 @@ export default function ModelSelector({ onModelConfigChange, backendOnline = tru
         allowModelFallback: allowFallback
       });
     }
-  }, [selectedProvider, selectedModel, allowFallback, onModelConfigChange]);
+  }, [selectedProvider, selectedModel, allowFallback, loading, onModelConfigChange]);
 
   useEffect(() => {
     if (!optionsOpen) return;

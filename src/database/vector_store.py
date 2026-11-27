@@ -45,6 +45,7 @@ QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "").strip()
 QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "acne_knowledge")
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "3072"))
+_IMPORT_TIME_EMBEDDING_DIMENSIONS = EMBEDDING_DIMENSIONS
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-2")
 
@@ -115,7 +116,11 @@ async def embed_query(text: str) -> list[float]:
         and os.getenv("EMBEDDING_QUERY_CACHE_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
     )
     active_model = os.getenv("EMBEDDING_MODEL", EMBEDDING_MODEL)
-    active_dims = _positive_int_env("EMBEDDING_DIMENSIONS", EMBEDDING_DIMENSIONS)
+    active_dims = (
+        EMBEDDING_DIMENSIONS
+        if EMBEDDING_DIMENSIONS != _IMPORT_TIME_EMBEDDING_DIMENSIONS
+        else _positive_int_env("EMBEDDING_DIMENSIONS", EMBEDDING_DIMENSIONS)
+    )
     cache_key = (
         active_model,
         active_dims,
@@ -144,15 +149,15 @@ async def embed_query(text: str) -> list[float]:
             )
         else:
             embedding = await asyncio.to_thread(_embed_sync, target_text)
-        if len(embedding) != EMBEDDING_DIMENSIONS:
+        if len(embedding) != active_dims:
             raise ValueError(
                 f"Query embedding dimension mismatch: got {len(embedding)}, "
-                f"expected {EMBEDDING_DIMENSIONS}. Check EMBEDDING_MODEL and EMBEDDING_DIMENSIONS."
+                f"expected {active_dims}. Check EMBEDDING_MODEL and EMBEDDING_DIMENSIONS."
             )
         return embedding
 
     embedding, _ = await call_provider_with_resilience(
-        provider_name=f"embedding:{EMBEDDING_MODEL}",
+        provider_name=f"embedding:{active_model}",
         operation=operation,
         budget=DeadlineBudget.from_timeout(settings.retrieval_timeout_seconds),
         timeout_seconds=settings.retrieval_timeout_seconds,

@@ -438,3 +438,59 @@ def test_ordinary_skincare_remains_outside_medication_management(question: str) 
 )
 def test_comparison_intent_covers_explicit_and_comparative_forms(question: str) -> None:
     assert is_comparison_intent(question) is True
+
+
+def test_prescription_execution_avoids_tinh_trang_lieu_trinh_false_positive_and_catches_dung_cho_toi() -> None:
+    assert (
+        is_prescription_execution_request(
+            "Cho em hỏi tình trạng mụn ẩn thì liệu trình chăm sóc cho da dầu như thế nào?"
+        )
+        is False
+    )
+    assert (
+        is_prescription_execution_request(
+            "Giải thích cho tôi nguyên tắc bác sĩ kê đơn cho bệnh nhân bị mụn nặng."
+        )
+        is False
+    )
+    assert is_prescription_execution_request("Kê đơn thuốc dùng cho tôi.") is True
+    assert (
+        is_prescription_execution_request(
+            "Em bôi mãi chưa khỏi, kê đơn thuốc uống giúp em với."
+        )
+        is True
+    )
+
+
+def test_safety_policy_isotretinoin_dung_vs_ngung_and_ongoing_suffix_symptoms() -> None:
+    from src.agent.safety_policy import evaluate_safety
+
+    # "đã dùng ... bao lâu" kèm đang mang thai phải bật cảnh báo khẩn cấp, không nhầm với "dừng"
+    urgent_exposure = evaluate_safety(
+        "Em đã dùng isotretinoin bao lâu nay và giờ có bầu rồi thì phải làm sao?"
+    )
+    assert urgent_exposure is not None
+    assert urgent_exposure.rule_id == "isotretinoin_pregnancy"
+
+    # Tra cứu thời gian đào thải sau khi dừng/ngưng thuốc (không mang thai) phải đi vào truy xuất
+    assert evaluate_safety("Sau khi dừng isotretinoin bao lâu thì mang thai được?") is None
+    assert evaluate_safety("Ngưng isotretinoin bao lâu thì có thể mang thai?") is None
+    assert evaluate_safety("Bao lâu sau khi ngưng isotretinoin thì được mang thai?") is None
+
+    # Triệu chứng kéo dài "từ tối qua" / "từ hôm qua" phải được nhận diện là đang diễn ra
+    neuro = evaluate_safety(
+        "Mình đang uống Acnotin trị mụn nang thì từ tối qua bị đau đầu dữ dội kèm nhìn mờ và buồn nôn, có sao không?"
+    )
+    assert neuro is not None
+    assert neuro.rule_id == "isotretinoin_severe_headache_visual_symptoms"
+
+    # Kết hợp đa lượt isotretinoin + mang thai + trầm cảm (span > 24 tokens)
+    combined = evaluate_safety(
+        "Nhưng hôm nay em trễ kinh và thử thai lên 2 vạch đang mang thai rồi, kèm theo mấy hôm nay em thấy trầm cảm hoảng loạn lắm.",
+        conversation_history=[
+            {"role": "user", "content": "Em đang uống isotretinoin 20mg mỗi ngày theo đơn trị mụn bọc."},
+            {"role": "assistant", "content": "Bạn cần tuân thủ hướng dẫn của bác sĩ."},
+        ],
+    )
+    assert combined is not None
+    assert combined.rule_id == "isotretinoin_pregnancy_and_mental_health"

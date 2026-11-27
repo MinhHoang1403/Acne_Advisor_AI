@@ -138,7 +138,10 @@ def validate_action_proposal(
         return _rejected(proposal, "retry_budget_exhausted")
     if (
         context.attempt_index <= 0
-        or (not context.evidence_available and context.retrieval_status != "no_evidence")
+        or (
+            not context.evidence_available
+            and context.retrieval_status not in {"no_evidence", "recoverable_error"}
+        )
         or query is None
         or missing_evidence is None
     ):

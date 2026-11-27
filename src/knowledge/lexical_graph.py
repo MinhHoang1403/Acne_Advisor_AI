@@ -699,6 +699,16 @@ EXTENDED_CLINICAL_BRAND_SYNONYMS: tuple[tuple[str, tuple[str, ...], tuple[tuple[
         (("active_ingredient", "spironolactone"),),
     ),
     (
+        "Winlevi",
+        ("winlevi",),
+        (("active_ingredient", "clascoterone"),),
+    ),
+    (
+        "Duac",
+        ("duac", "benzaclin"),
+        (("active_ingredient", "clindamycin"), ("active_ingredient", "benzoyl_peroxide")),
+    ),
+    (
         "Diane-35",
         ("diane-35", "diane 35", "yaz", "yasmin"),
         (("drug_class", "combined_oral_contraceptive"),),
@@ -755,6 +765,11 @@ class QueryGraphAnchors:
         }
 
 
+_FOLDED_MUN_AN_DIET_COLLISION_RE = re.compile(
+    r"(?<![0-9a-zA-ZÀ-ỹ_])mun\s+an\s+(?:uong|gi|kieng|cay|ngot|do)(?![0-9a-zA-ZÀ-ỹ_])"
+)
+
+
 def extract_clinical_facets_from_text(
     text: str | None,
     *,
@@ -765,16 +780,27 @@ def extract_clinical_facets_from_text(
     normalized = normalize_lookup_text(text)
     if not normalized:
         return {}
-    folded = fold_ascii_text(text) if allow_ascii_fallback else ""
-    has_non_ascii = any(ord(ch) > 127 for ch in normalized)
 
     matched_by_group: dict[str, list[str]] = defaultdict(list)
     for spec, accented_patterns, folded_patterns in _COMPILED_FACET_PATTERNS:
         matched = any(pattern.search(normalized) for pattern in accented_patterns)
-        # Chỉ kích hoạt ASCII-folding cho truy vấn người dùng gõ không dấu (tránh
-        # bắt nhầm từ đồng âm khi đánh chỉ mục tài liệu chuẩn có đầy đủ dấu).
-        if not matched and allow_ascii_fallback and not has_non_ascii and folded:
-            matched = any(pattern.search(folded) for pattern in folded_patterns)
+        # Khi cho phép fallback không dấu trên câu hỏi người dùng (kể cả câu pha trộn từ có dấu
+        # và từ gõ tắt không dấu như "mình bị mun an và sẹo rỗ"), chỉ khớp các cụm không dấu
+        # xuất hiện nguyên vẹn ở dạng ASCII trên normalized để không làm biến dạng từ có dấu
+        # khác nghĩa (vd: "mụn nặng" != "mun nang", "mụn ăn" != "mun an").
+        if not matched and allow_ascii_fallback:
+            for pattern in folded_patterns:
+                for m in pattern.finditer(normalized):
+                    if (
+                        spec.facet_key == "comedonal_acne"
+                        and m.group(0) == "mun an"
+                        and _FOLDED_MUN_AN_DIET_COLLISION_RE.match(normalized, m.start())
+                    ):
+                        continue
+                    matched = True
+                    break
+                if matched:
+                    break
         if matched:
             matched_by_group[spec.facet_group].append(spec.facet_key)
 
@@ -1300,9 +1326,15 @@ async def sync_lexical_graph_to_neo4j(
             )
             await res.consume()
 
-        # Xóa trước các quan hệ lexical cũ để đảm bảo idempotent tuyệt đối khi chạy lại cùng build_id
+        # Xóa trước các quan hệ lexical thuộc cùng build_id (hoặc chưa gắn kb_version) để idempotent
+        # tuyệt đối mà không ảnh hưởng đến phiên bản đồ thị khác nếu tồn tại song song.
         for rel_type in LEXICAL_GRAPH_RELATIONSHIPS:
-            clean_res = await session.run(f"MATCH ()-[r:{rel_type}]->() DELETE r")
+            clean_res = await session.run(
+                f"MATCH ()-[r:{rel_type}]->() "
+                "WHERE r.kb_version IS NULL OR r.kb_version = $kb_version "
+                "DELETE r",
+                kb_version=clean_build_id,
+            )
             await clean_res.consume()
 
         # 2. Merge các quan hệ cấu trúc và ngữ nghĩa lâm sàng
