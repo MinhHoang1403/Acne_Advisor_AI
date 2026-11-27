@@ -36,11 +36,11 @@ DEFAULT_DATASET_PATH = Path("evaluation/dataset.json")
 DEFAULT_RESULTS_DIR = Path("evaluation/results")
 DEFAULT_JUDGE_PROVIDER = "nvidia"
 DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
-DEFAULT_JUDGE_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
-DEFAULT_FALLBACK_JUDGE_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+DEFAULT_JUDGE_MODEL = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+DEFAULT_FALLBACK_JUDGE_MODEL = "mistralai/mistral-large-4-1t-a52b"
 DEFAULT_FALLBACK_JUDGE_MODELS = (
-    "nvidia/nemotron-3.5-super-vl-120b-a12b",
     "mistralai/mistral-large-4-1t-a52b",
+    "nvidia/nemotron-3-ultra-550b-a55b",
 )
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 DEFAULT_EMBEDDING_DIMENSIONS = 3072
@@ -598,16 +598,17 @@ def build_ragas_evaluators(
             timeout=60.0,
             max_retries=1,
         )
-        # Dùng MD_JSON, tắt thinking mặc định và cấp đủ 8192 output tokens để câu trả lời
-        # tiếng Việt dài (bảng so sánh, đa khía cạnh y khoa) không bao giờ bị cắt cụt giữa JSON.
-        judge_llm = llm_factory(
-            effective_model,
-            provider="openai",
-            client=nvidia_client,
-            mode=instructor.Mode.MD_JSON,
-            max_tokens=judge_max_tokens,
-            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-        )
+        # Dùng MD_JSON và cấp đủ 8192 output tokens để câu trả lời tiếng Việt dài không bị cắt cụt;
+        # chỉ truyền chat_template_kwargs.enable_thinking=False cho họ mô hình hỗ trợ vLLM template này.
+        factory_kwargs: dict[str, Any] = {
+            "provider": "openai",
+            "client": nvidia_client,
+            "mode": instructor.Mode.MD_JSON,
+            "max_tokens": judge_max_tokens,
+        }
+        if any(family in effective_model.lower() for family in ("nemotron", "qwen", "deepseek")):
+            factory_kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+        judge_llm = llm_factory(effective_model, **factory_kwargs)
     elif effective_provider == "openai":
         from openai import AsyncOpenAI
 
@@ -919,6 +920,8 @@ async def score_records_with_ragas(
                 judge_chain.append((fb_model, _build_metric_set(fb_llm)))
 
         exhausted_daily_models: set[str] = set()
+        degraded_timeout_models: set[str] = set()
+        consecutive_transient_failures: dict[str, int] = {m: 0 for m, _ in judge_chain}
 
         effective_concurrency = (
             max(1, int(metric_concurrency))
@@ -1053,7 +1056,13 @@ async def score_records_with_ragas(
             async def _score_one_metric(key: str) -> Any:
                 async with sem:
                     last_exc: Exception | None = None
-                    for idx_j, (model_name, mset) in enumerate(judge_chain):
+                    # Ưu tiên các model đang phản hồi tốt lên trước; đẩy các model bị nghẽn liên tiếp xuống cuối chuỗi dự phòng.
+                    ordered_chain = [
+                        item for item in judge_chain if item[0] not in degraded_timeout_models
+                    ] + [
+                        item for item in judge_chain if item[0] in degraded_timeout_models
+                    ]
+                    for idx_j, (model_name, mset) in enumerate(ordered_chain):
                         if model_name in exhausted_daily_models:
                             continue
                         try:
@@ -1062,6 +1071,8 @@ async def score_records_with_ragas(
                                 max_retries=max_rate_limit_retries if idx_j == 0 else 1,
                                 metric_timeout_seconds=metric_timeout_seconds,
                             )
+                            consecutive_transient_failures[model_name] = 0
+                            degraded_timeout_models.discard(model_name)
                             if pacing_delay > 0:
                                 await asyncio.sleep(pacing_delay)
                             return res
@@ -1080,6 +1091,20 @@ async def score_records_with_ragas(
                                     )
                                 continue
                             if _is_rate_limit_error(exc) and not is_foreign_embed_quota:
+                                consecutive_transient_failures[model_name] = (
+                                    consecutive_transient_failures.get(model_name, 0) + 1
+                                )
+                                if (
+                                    consecutive_transient_failures[model_name] >= 3
+                                    and len(judge_chain) > 1
+                                    and model_name not in degraded_timeout_models
+                                ):
+                                    degraded_timeout_models.add(model_name)
+                                    if verbose:
+                                        print(
+                                            f"  [Judge] {model_name} timeout liên tiếp -> tự động ưu tiên model dự phòng phản hồi nhanh.",
+                                            flush=True,
+                                        )
                                 continue
                             raise
                     if last_exc is not None:
