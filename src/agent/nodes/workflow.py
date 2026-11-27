@@ -22,6 +22,7 @@ from src.agent.nodes.preparation import prepare_request_node
 from src.agent.source_presentation import build_source_allowlist
 from src.agent.safety_policy import evaluate_safety
 from src.agent.state import ClinicalState
+from src.agent.stream_events import emit_stream_stage
 from src.quality.safe_fallback import (
     fallback_reason_code_from_agent_reason,
     fallback_type_for_reason,
@@ -48,6 +49,7 @@ async def prepare_node(state: ClinicalState) -> dict[str, Any]:
 async def guard_node(state: ClinicalState) -> dict[str, Any]:
     """Áp dụng safety override hẹp; nếu không khớp mới đọc exact cache."""
 
+    emit_stream_stage("guard", "Đang kiểm tra an toàn & bộ nhớ đệm...")
     started = time.perf_counter()
     question = state.get("normalized_question") or state.get("user_question") or ""
     safety = evaluate_safety(
@@ -117,6 +119,13 @@ async def decide_node(state: ClinicalState) -> dict[str, Any]:
 
     if state.get("safety_override") or state.get("cache_hit"):
         return {"next_action": "finalize"}
+    attempts_so_far = int(state.get("retrieval_attempt", 0) or 0)
+    emit_stream_stage(
+        "decide",
+        "Đang thẩm định mức độ đầy đủ của bằng chứng..."
+        if attempts_so_far > 0
+        else "Đang phân tích câu hỏi...",
+    )
     updates = await select_agent_action(state)
     decision = updates.get("agent_decision") or {}
     attempts_used = int(state.get("retrieval_attempt", 0) or 0)
@@ -193,6 +202,12 @@ async def retrieve_node(state: ClinicalState) -> dict[str, Any]:
     retained_candidates = list(state.get("retained_retrieval_candidates") or [])
 
     started = time.perf_counter()
+    emit_stream_stage(
+        "retrieve",
+        "Đang tìm kiếm bổ sung trên kho tri thức y khoa..."
+        if attempt > 1
+        else "Đang tra cứu tài liệu y khoa (Dense + BM25 + GraphRAG)...",
+    )
     try:
         payload = await retrieve_evidence.ainvoke(
             {
@@ -421,6 +436,7 @@ async def assess_evidence_node(state: ClinicalState) -> dict[str, Any]:
 async def generate_node(state: ClinicalState) -> dict[str, Any]:
     """Sinh một lần từ packed evidence rồi quyết định fallback cho provider output."""
 
+    emit_stream_stage("generate", "Đang tổng hợp câu trả lời từ tài liệu y khoa...")
     generated = await generate_answer_node(state)
     generation_metadata = {
         "generation_invoked": True,
@@ -483,6 +499,7 @@ async def abstain_node(state: ClinicalState) -> dict[str, Any]:
 async def finalize_node(state: ClinicalState) -> dict[str, Any]:
     """Áp dụng presentation, verifier và exact cache theo thứ tự."""
 
+    emit_stream_stage("finalize", "Đang kiểm chứng trích dẫn & định dạng...")
     started = time.perf_counter()
     updates = await finalize_response_node(state)
     quality = await answer_quality_node({**state, **updates})

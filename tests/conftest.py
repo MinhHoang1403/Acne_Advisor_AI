@@ -20,3 +20,12 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def _reset_process_query_embedding_cache():
+    from src.database.vector_store import clear_query_embedding_cache
+
+    clear_query_embedding_cache()
+    yield
+    clear_query_embedding_cache()

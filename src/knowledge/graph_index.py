@@ -24,7 +24,7 @@ from src.knowledge.graph_schema import (
 
 logger = logging.getLogger(__name__)
 
-NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://127.0.0.1:7687")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 
@@ -36,9 +36,12 @@ def get_neo4j_driver() -> Any:
     except ImportError as exc:
         raise RuntimeError("Missing dependency. Run: pip install neo4j") from exc
 
+    from src.retrieval.graph_retriever import _neo4j_runtime_config
+
+    uri, user, password = _neo4j_runtime_config()
     return AsyncGraphDatabase.driver(
-        NEO4J_URI,
-        auth=(NEO4J_USERNAME, NEO4J_PASSWORD),
+        uri,
+        auth=(user, password),
     )
 
 

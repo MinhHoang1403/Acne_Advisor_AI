@@ -18,6 +18,7 @@ ErrorFamily = Literal[
     "dense_embedding",
     "dense_store",
     "bm25_store",
+    "graph_store",
     "retrieval",
     "reranker",
     "context_packing",
@@ -41,6 +42,7 @@ ERROR_FAMILY_OWNERS: dict[str, str] = {
     "dense_embedding": "retrieval/integrations",
     "dense_store": "retrieval/qdrant",
     "bm25_store": "retrieval/bm25",
+    "graph_store": "retrieval/neo4j",
     "retrieval": "retrieval",
     "reranker": "retrieval/reranker",
     "context_packing": "retrieval/context_packer",
@@ -91,6 +93,8 @@ def classify_error(
         "dense_store": "dense_store",
         "bm25": "bm25_store",
         "bm25_store": "bm25_store",
+        "graph": "graph_store",
+        "graph_store": "graph_store",
         "retrieve": "retrieval",
         "retrieval": "retrieval",
         "rerank": "reranker",
@@ -124,14 +128,27 @@ def classify_error(
         return family, ERROR_FAMILY_OWNERS[family]
 
     # Provider errors without a more precise stage retain a useful broad family.
-    if error_code == "provider_timeout" or "providertimeout" in normalized_type:
+    cause = getattr(exc, "__cause__", None) if isinstance(exc, BaseException) else None
+    cause_code = str(getattr(cause, "error_code", "") or "").strip().casefold()
+    provider_attr = str(getattr(exc, "provider_name", "") or getattr(cause, "provider_name", "") or "").casefold()
+    if error_code in {"provider_timeout", "stage_timeout"} or "providertimeout" in normalized_type:
+        if provider_attr.startswith("embedding:"):
+            return "dense_embedding", ERROR_FAMILY_OWNERS["dense_embedding"]
         return "generation_timeout", ERROR_FAMILY_OWNERS["generation_timeout"]
+    if error_code == "retry_exhausted":
+        if provider_attr.startswith("embedding:"):
+            return "dense_embedding", ERROR_FAMILY_OWNERS["dense_embedding"]
+        if cause_code in {"provider_timeout", "stage_timeout"}:
+            return "generation_timeout", ERROR_FAMILY_OWNERS["generation_timeout"]
+        return "generation_provider", ERROR_FAMILY_OWNERS["generation_provider"]
     if error_code in {
         "provider_unavailable",
         "permanent_provider_error",
         "provider_quota_exhausted",
     }:
         return "generation_provider", ERROR_FAMILY_OWNERS["generation_provider"]
+    if normalized_stage == "agent":
+        return "api_internal", ERROR_FAMILY_OWNERS["api_internal"]
 
     return "unknown", "unknown"
 

@@ -35,7 +35,7 @@ async def run_check() -> dict[str, Any]:
     decision = await generation_fallback_decision_node({"draft_answer": ""})
     fallback = await safe_fallback_node(decision)
     cases = [
-        _case("empty_query", "chưa nhận được câu hỏi" in build_safe_fallback_answer("empty_query")),
+        _case("empty_query", "chưa thấy rõ nội dung câu hỏi" in build_safe_fallback_answer("empty_query")),
         _case("no_source_evidence", no_evidence["fallback_type"] == "no_retrieval_evidence"),
         _case(
             "provider_error",

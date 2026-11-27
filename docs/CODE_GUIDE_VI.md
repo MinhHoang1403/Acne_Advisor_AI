@@ -6,16 +6,16 @@ dùng tên tiếng Anh như trong code.
 
 ## Luồng request chính
 
-1. Frontend gửi `POST /chat` qua
+1. Frontend gửi `POST /chat/stream` (SSE thời gian thực, tự fallback sang `POST /chat`) qua
    [`src/frontend/src/api/chatApi.js`](../src/frontend/src/api/chatApi.js).
 2. [`src/api/app.py`](../src/api/app.py) kiểm input, gọi LangGraph Agent và map lỗi
-   runtime sang HTTP response.
+   runtime sang HTTP/SSE response.
 3. [`src/agent/graph.py`](../src/agent/graph.py) chạy workflow tám node với một
    deadline dùng chung.
 4. [`src/agent/action_decision.py`](../src/agent/action_decision.py) yêu cầu model
    chọn action; Python kiểm schema, state và giới hạn retrieval.
-5. [`src/retrieval/service.py`](../src/retrieval/service.py) chạy Dense và BM25
-   song song, fuse rank bằng RRF rồi đóng gói context.
+5. [`src/retrieval/service.py`](../src/retrieval/service.py) chạy Dense, BM25 và
+   Neo4j GraphRAG song song, fuse rank bằng Tri-Channel RRF, rerank bằng BGE + mở rộng `NEXT_CHUNK` rồi đóng gói context.
 6. [`src/agent/nodes/reason.py`](../src/agent/nodes/reason.py) xây prompt từ packed
    evidence và gọi LLM provider để sinh draft.
 7. Response đi qua presentation, source validation, verifier kỹ thuật, exact cache
@@ -39,7 +39,7 @@ dùng tên tiếng Anh như trong code.
 | Resilience | `src/resilience/` | Deadline, timeout, retry và error classification | Không quyết định provider content |
 | Provider adapters | `src/integrations/google_genai.py`, `src/agent/llm/` | Đóng gói SDK/HTTP contract | Provider mới thực thi model inference |
 | Persistence | `src/database/connection.py`, `repositories/chat_history.py` | PostgreSQL session/transaction và chat SQL | Không lưu knowledge vectors |
-| Structural knowledge | `src/knowledge/`, Neo4j | EntityCards và deterministic entity graph | Không grounding normal answer runtime |
+| Structural & Lexical Graph | `src/knowledge/`, `src/retrieval/graph_retriever.py`, Neo4j | EntityCards (32 nút chuẩn) + đồ thị từ vựng/lâm sàng 968 đoạn đồng bộ 1-1 từ Qdrant (fail-open) | Không dùng metadata rời chưa kiểm chứng làm bằng chứng y khoa |
 | API | `src/api/app.py` | HTTP validation, orchestration boundary, response metadata | Không sở hữu retrieval/generation algorithms |
 | Frontend | `src/frontend/src/App.jsx`, `api/chatApi.js`, `components/` | Session UI, request lifecycle và rendering | Không đánh giá safety/evidence |
 | Operator checks | `scripts/check_*.py`, `inspect_*.py`, `pre_ui_runtime_check.py` | Readiness/contract reports có timeout | Không thay đổi dữ liệu trừ script init/build được gọi rõ ràng |
@@ -182,9 +182,11 @@ tổng thời gian request. Đây là resource policy, không phải confidence 
 
 ## Structural knowledge và verifier
 
-Taxonomy normalizer, EntityCards và Neo4j graph giúp build/validate các quan hệ
-cấu trúc. Normal chat runtime không truy vấn Neo4j/EntityCards để grounding; do đó
-không được mô tả graph records như answer evidence.
+Taxonomy normalizer và 32 EntityCards chuẩn trong Neo4j được tách biệt nhãn với tầng
+đồ thị từ vựng (`KnowledgeChunk`, `ClinicalFacet`, `NEXT_CHUNK`). Kênh GraphRAG
+chỉ trả về các đoạn văn bản nguồn đã kiểm duyệt đồng bộ 1-1 với Qdrant (`chunk_id == point_id`),
+đi qua Tri-Channel RRF và BGE reranker; hệ thống không bao giờ đưa siêu dữ liệu
+taxonomy thô chưa có văn bản nguồn vào làm bằng chứng trả lời.
 
 Answer verifier kiểm Markdown/presentation contract và packed evidence identity.
 Nó không so từng claim với source, không làm clinical review và không thể chứng

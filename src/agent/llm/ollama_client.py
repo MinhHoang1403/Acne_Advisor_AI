@@ -6,6 +6,7 @@ khác provider retry trong resilience layer: nó dùng instruction rút gọn đ
 một câu hoàn chỉnh, không retry lỗi network/status.
 """
 
+import json
 import logging
 import os
 import re
@@ -17,6 +18,10 @@ from src.quality.safe_fallback import sanitize_fallback_reason
 logger = logging.getLogger(__name__)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+
+def _ollama_base_url() -> str:
+    return (os.getenv("OLLAMA_BASE_URL") or OLLAMA_BASE_URL or "http://localhost:11434").rstrip("/")
 _COMPACT_RETRY_INSTRUCTION = (
     "Câu trả lời trước đã bị cắt vì quá dài. Hãy trả lời lại từ đầu, ngắn gọn và hoàn chỉnh "
     "bằng tiếng Việt trong tối đa 160 từ. Giữ nguyên mọi yêu cầu về an toàn, thực thể, "
@@ -106,7 +111,7 @@ async def list_ollama_models(timeout_seconds: float | None = None) -> list[str]:
     try:
         timeout = timeout_seconds if timeout_seconds and timeout_seconds > 0 else 5.0
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
+            response = await client.get(f"{_ollama_base_url()}/api/tags")
             response.raise_for_status()
             data = response.json()
             models = [model.get("name") for model in data.get("models", [])]
@@ -124,13 +129,24 @@ async def generate_ollama_response(
     response_schema: object | None = None,
 ) -> str:
     """Yêu cầu Ollama sinh text và thử rút gọn một lần nếu output bị cắt."""
+    from src.agent.stream_events import (
+        emit_stream_delta,
+        emit_stream_reset,
+        is_chat_stream_active,
+    )
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    use_live_stream = response_schema is None and is_chat_stream_active()
+    base_url = _ollama_base_url()
+    cumulative_input_tokens = 0
+    cumulative_output_tokens = 0
+
     try:
-        timeout = request_timeout or float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))
+        timeout = request_timeout or float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "160"))
         # Chặn ở một compact retry để output dài không tạo vòng request vô hạn.
         retry_attempts = max(0, min(_env_int("OLLAMA_TRUNCATION_RETRY_ATTEMPTS", 1), 1))
         attempt_messages = messages
@@ -142,9 +158,59 @@ async def generate_ollama_response(
                     temperature=temperature,
                     response_schema=response_schema,
                 )
-                response = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-                response.raise_for_status()
-                data = response.json()
+                if use_live_stream:
+                    payload["stream"] = True
+                    pieces: list[str] = []
+                    data: dict[str, Any] = {}
+                    think_resolved = False
+                    pending_prefix = ""
+                    emitted_delta = False
+                    try:
+                        async with client.stream("POST", f"{base_url}/api/chat", json=payload) as response:
+                            response.raise_for_status()
+                            async for raw_line in response.aiter_lines():
+                                if not raw_line.strip():
+                                    continue
+                                frame = json.loads(raw_line)
+                                piece = str((frame.get("message") or {}).get("content") or "")
+                                if piece:
+                                    pieces.append(piece)
+                                    if not think_resolved:
+                                        pending_prefix += piece
+                                        stripped_leading = pending_prefix.lstrip()
+                                        if stripped_leading.startswith("<think>"):
+                                            if "</think>" in stripped_leading:
+                                                after_think = re.sub(
+                                                    r"^\s*<think>.*?</think>\s*",
+                                                    "",
+                                                    pending_prefix,
+                                                    flags=re.DOTALL,
+                                                )
+                                                think_resolved = True
+                                                pending_prefix = ""
+                                                if after_think:
+                                                    emitted_delta = True
+                                                    emit_stream_delta(after_think)
+                                        elif len(stripped_leading) >= 7 or not "<think>".startswith(stripped_leading):
+                                            think_resolved = True
+                                            emitted_delta = True
+                                            emit_stream_delta(pending_prefix)
+                                            pending_prefix = ""
+                                    else:
+                                        emitted_delta = True
+                                        emit_stream_delta(piece)
+                                if frame.get("done"):
+                                    data = frame
+                    except Exception:
+                        if emitted_delta:
+                            emit_stream_reset()
+                        raise
+                    data["message"] = {"content": "".join(pieces)}
+                else:
+                    response = await client.post(f"{base_url}/api/chat", json=payload)
+                    response.raise_for_status()
+                    data = response.json()
+
                 done_reason = data.get("done_reason")
                 prompt_eval_count = data.get("prompt_eval_count")
                 eval_count = data.get("eval_count")
@@ -156,10 +222,12 @@ async def generate_ollama_response(
                 ):
                     from src.observability.contracts import record_llm_token_usage
 
+                    cumulative_input_tokens += prompt_eval_count
+                    cumulative_output_tokens += eval_count
                     record_llm_token_usage(
-                        input_tokens=prompt_eval_count,
-                        output_tokens=eval_count,
-                        total_tokens=prompt_eval_count + eval_count,
+                        input_tokens=cumulative_input_tokens,
+                        output_tokens=cumulative_output_tokens,
+                        total_tokens=cumulative_input_tokens + cumulative_output_tokens,
                     )
                 num_predict = payload.get("options", {}).get("num_predict")
                 truncated = str(done_reason or "").lower() in {"length", "num_predict", "context_length"}
@@ -185,6 +253,8 @@ async def generate_ollama_response(
                 if not truncated:
                     return content
                 if attempt < retry_attempts:
+                    if use_live_stream:
+                        emit_stream_reset()
                     logger.warning(
                         "Ollama generation reached output limit; retrying once with a compact-answer instruction: model=%s",
                         model,

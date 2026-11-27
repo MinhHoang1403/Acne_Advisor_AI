@@ -17,19 +17,25 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 # Nạp .env trước khi khởi tạo config/module phụ thuộc environment.
 load_dotenv()
 
 # API process sở hữu cấu hình logging cơ bản; payload/secret không được log.
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(name)s - %(message)s")
+_LOG_LEVEL_NAME = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+logging.basicConfig(
+    level=getattr(logging, _LOG_LEVEL_NAME, logging.INFO),
+    format="%(levelname)s - %(name)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 from src.agent.graph import run_clinical_agent
 from src.agent.source_presentation import build_source_metadata, display_names_for_sources
+from src.agent.stream_events import bind_chat_stream_queue, reset_chat_stream_scope
 from src.agent.text_encoding import repair_mojibake
 from src.observability.langfuse_sink import (
     begin_langfuse_request,
@@ -223,8 +229,11 @@ async def shutdown_runtime_connections():
             await engine.dispose()
 
 
+from src.retrieval.graph_retriever import Neo4jGraphStore
+
 app.router.add_event_handler("shutdown", shutdown_langfuse)
 app.router.add_event_handler("shutdown", shutdown_reranker_executor)
+app.router.add_event_handler("shutdown", Neo4jGraphStore.close_shared_driver)
 app.router.add_event_handler("shutdown", shutdown_runtime_connections)
 app.router.add_event_handler("startup", warm_process_reranker)
 
@@ -806,16 +815,10 @@ def _display_name_for_model(model_id: str) -> str:
     }
     return aliases.get(model_id, model_id)
 
-@app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
-async def chat_endpoint(request: ChatRequest):
-    """
-    Main chat endpoint to interact with the LangGraph Agent.
-    After the agent responds, awaits persistence of the user message and
-    assistant response to PostgreSQL. Persistence errors remain non-fatal.
-    """
+def _acquire_chat_turn_lock(request: ChatRequest) -> tuple[str, str]:
+    """Chuẩn hóa đầu vào, kiểm tra giới hạn độ dài và khóa chống gửi trùng phiên/request."""
+
     request_id = str(request.request_id or uuid.uuid4())
-    request_started = time.perf_counter()
-    result: dict[str, Any] = {"request_id": request_id}
     request.message = repair_mojibake(request.message)
     request.conversation_history = _repair_history_messages(request.conversation_history)
 
@@ -823,32 +826,176 @@ async def chat_endpoint(request: ChatRequest):
     if not message_trimmed:
         raise HTTPException(
             status_code=400,
-            detail={"code": "empty_message", "message": "Câu hỏi không được để trống."}
+            detail={"code": "empty_message", "message": "Câu hỏi không được để trống."},
         )
-        
+
     if len(message_trimmed) > MAX_MESSAGE_CHARS:
         raise HTTPException(
             status_code=400,
-            detail={"code": "message_too_long", "message": f"Câu hỏi của bạn hơi dài. Vui lòng rút gọn dưới {MAX_MESSAGE_CHARS} ký tự hoặc tách thành nhiều câu hỏi nhỏ."}
+            detail={
+                "code": "message_too_long",
+                "message": (
+                    f"Câu hỏi của bạn hơi dài. Vui lòng rút gọn dưới {MAX_MESSAGE_CHARS} ký tự "
+                    "hoặc tách thành nhiều câu hỏi nhỏ."
+                ),
+            },
         )
-        
-    # Determine session_id — use frontend's if provided, else generate one
+
     session_id = request.session_id or str(uuid.uuid4())[:12]
-    
-    # Cap conversation history. If client did not send it, load recent DB history
-    # so same-session follow-ups work through API clients as well as the frontend.
-    # Request locking to prevent concurrent processing for the same session
     if session_id in active_requests or request_id in active_request_ids:
         raise HTTPException(
             status_code=409,
-            detail={"code": "request_in_progress", "message": "Câu hỏi trước đang được xử lý. Vui lòng chờ hoàn tất rồi gửi câu tiếp theo."}
+            detail={
+                "code": "request_in_progress",
+                "message": "Câu hỏi trước đang được xử lý. Vui lòng chờ hoàn tất rồi gửi câu tiếp theo.",
+            },
         )
-        
+
     active_requests.add(session_id)
     active_request_ids.add(request_id)
-    langfuse_handle = begin_langfuse_request(request_id)
-    
+    return request_id, session_id
+
+
+@app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
+async def chat_endpoint(request: ChatRequest):
+    """
+    Main chat endpoint to interact with the LangGraph Agent.
+    After the agent responds, awaits persistence of the user message and
+    assistant response to PostgreSQL. Persistence errors remain non-fatal.
+    """
+    request_id, session_id = _acquire_chat_turn_lock(request)
+    return await _execute_locked_chat_turn(
+        request,
+        request_id=request_id,
+        session_id=session_id,
+    )
+
+
+@app.post("/chat/stream")
+async def chat_stream_endpoint(request: ChatRequest, background_tasks: BackgroundTasks):
+    """SSE endpoint phát trực tiếp tiến độ từng chặng và luồng văn bản sinh thời gian thực.
+
+    Vẫn giữ nguyên 100% quy trình hậu kiểm ``answer_verifier``, lưu lịch sử PostgreSQL
+    và exact cache Redis trước khi phát sự kiện ``complete`` cuối cùng.
+    """
+
+    request_id, session_id = _acquire_chat_turn_lock(request)
+    lock_released = False
+
+    def _release_stream_locks() -> None:
+        nonlocal lock_released
+        if lock_released:
+            return
+        lock_released = True
+        active_request_ids.discard(request_id)
+        active_requests.discard(session_id)
+
+    # Đảm bảo nhả khóa an toàn ngay cả khi client ngắt kết nối trước khi ASGI bắt đầu duyệt generator.
+    background_tasks.add_task(_release_stream_locks)
+
+    def _sse_frame(event_name: str, data: dict[str, Any]) -> str:
+        return f"event: {event_name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    async def _run_stream_worker(stream_queue: asyncio.Queue[dict[str, Any]]) -> ChatResponse:
+        # Gắn và khôi phục ContextVar hoàn toàn bên trong coroutine thường (không vắt qua yield).
+        stream_token = bind_chat_stream_queue(stream_queue)
+        try:
+            return await _execute_locked_chat_turn(
+                request,
+                request_id=request_id,
+                session_id=session_id,
+                release_locks=False,
+            )
+        finally:
+            reset_chat_stream_scope(stream_token)
+
+    async def _event_stream():
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=512)
+        worker_task = asyncio.create_task(_run_stream_worker(queue))
+        get_item_task: asyncio.Task[dict[str, Any]] | None = None
+        try:
+            while not worker_task.done():
+                get_item_task = asyncio.create_task(queue.get())
+                done, _pending = await asyncio.wait(
+                    {get_item_task, worker_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if get_item_task in done:
+                    msg = get_item_task.result()
+                    get_item_task = None
+                    yield _sse_frame(msg["event"], msg["data"])
+                else:
+                    get_item_task.cancel()
+                    await asyncio.gather(get_item_task, return_exceptions=True)
+                    get_item_task = None
+
+            while not queue.empty():
+                msg = queue.get_nowait()
+                yield _sse_frame(msg["event"], msg["data"])
+
+            final_response = await worker_task
+            yield _sse_frame(
+                "complete",
+                final_response.model_dump(mode="json", exclude_none=True),
+            )
+        except asyncio.CancelledError:
+            if not worker_task.done():
+                worker_task.cancel()
+                await asyncio.gather(worker_task, return_exceptions=True)
+            raise
+        except HTTPException as http_exc:
+            detail_obj = (
+                http_exc.detail
+                if isinstance(http_exc.detail, dict)
+                else {"message": str(http_exc.detail)}
+            )
+            yield _sse_frame(
+                "error",
+                {"status": http_exc.status_code, "detail": detail_obj},
+            )
+        except Exception as exc:
+            _log_error_type("Unhandled error in chat stream:", exc)
+            yield _sse_frame(
+                "error",
+                {
+                    "status": 500,
+                    "detail": {"message": "Backend không thể xử lý yêu cầu. Vui lòng thử lại."},
+                },
+            )
+        finally:
+            if get_item_task is not None and not get_item_task.done():
+                get_item_task.cancel()
+                await asyncio.gather(get_item_task, return_exceptions=True)
+            if not worker_task.done():
+                worker_task.cancel()
+                await asyncio.gather(worker_task, return_exceptions=True)
+            _release_stream_locks()
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        background=background_tasks,
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+async def _execute_locked_chat_turn(
+    request: ChatRequest,
+    *,
+    request_id: str,
+    session_id: str,
+    release_locks: bool = True,
+) -> ChatResponse:
+    request_started = time.perf_counter()
+    result: dict[str, Any] = {"request_id": request_id}
+    langfuse_handle = None
+
     try:
+        langfuse_handle = begin_langfuse_request(request_id)
         replay = await _load_completed_request(request)
         if replay is not None:
             return replay
@@ -990,7 +1137,7 @@ async def chat_endpoint(request: ChatRequest):
                     sum(
                         1
                         for issue in answer_quality_report.get("issues", [])
-                        if isinstance(issue, dict) and issue.get("severity") == "critical"
+                        if isinstance(issue, dict) and issue.get("severity") in {"error", "critical"}
                     )
                     if isinstance(answer_quality_report, dict)
                     else 0
@@ -1182,10 +1329,11 @@ async def chat_endpoint(request: ChatRequest):
         # Return generic 500 error without leaking sensitive info
         raise HTTPException(status_code=500, detail="Internal server error processing the request.")
     finally:
-        active_request_ids.discard(request_id)
         if langfuse_handle is not None:
             langfuse_handle.close()
-        active_requests.discard(session_id)
+        if release_locks:
+            active_request_ids.discard(request_id)
+            active_requests.discard(session_id)
 
 
 async def _persist_chat_to_db(

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchModels } from '../api/chatApi.js';
 
 function modelId(model) {
@@ -25,9 +25,10 @@ function compactModelLabel(model) {
     .trim();
 }
 
-export default function ModelSelector({ onModelConfigChange }) {
+export default function ModelSelector({ onModelConfigChange, backendOnline = true }) {
   const [models, setModels] = useState([]);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const containerRef = useRef(null);
   const [selectedProvider, setSelectedProvider] = useState(
     () => localStorage.getItem('acneAdvisorSelectedProvider') || 'gemini'
   );
@@ -42,8 +43,9 @@ export default function ModelSelector({ onModelConfigChange }) {
   );
   const [loading, setLoading] = useState(true);
 
-  // Fetch models from API
+  // Fetch models from API (tự tải lại khi backend vừa online mà danh sách chưa có)
   useEffect(() => {
+    if (models.length > 0) return undefined;
     let isMounted = true;
     fetchModels()
       .then(data => {
@@ -71,7 +73,7 @@ export default function ModelSelector({ onModelConfigChange }) {
         if (isMounted) setLoading(false);
       });
     return () => { isMounted = false; };
-  }, []);
+  }, [backendOnline, models.length]);
 
   // Sync state upward and to localStorage whenever they change
   useEffect(() => {
@@ -88,6 +90,26 @@ export default function ModelSelector({ onModelConfigChange }) {
     }
   }, [selectedProvider, selectedModel, allowFallback, onModelConfigChange]);
 
+  useEffect(() => {
+    if (!optionsOpen) return;
+    const handlePointerDown = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOptionsOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setOptionsOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [optionsOpen]);
+
   const handleModelChange = (e) => {
     const val = e.target.value;
     const selectedOption = models.find(m => `${m.provider}|${modelId(m)}` === val);
@@ -100,7 +122,7 @@ export default function ModelSelector({ onModelConfigChange }) {
   const selectedTitle = selectedOption ? modelLabel(selectedOption) : selectedModel || 'Model';
 
   return (
-    <div className="model-selector-container">
+    <div className="model-selector-container" ref={containerRef}>
       <div className="model-selector-main">
         <select
           id="model-selector"
@@ -111,8 +133,8 @@ export default function ModelSelector({ onModelConfigChange }) {
           aria-label="Chọn model trả lời"
           title={selectedTitle}
         >
-          {loading && <option>Đang tải model...</option>}
-          {!loading && models.length === 0 && <option>Không có model khả dụng</option>}
+          {loading && <option value={`${selectedProvider}|${selectedModel}`}>Đang tải model...</option>}
+          {!loading && models.length === 0 && <option value={`${selectedProvider}|${selectedModel}`}>Không có model khả dụng</option>}
           {!loading && models.map(m => (
             <option
               key={`${m.provider}|${modelId(m)}`}

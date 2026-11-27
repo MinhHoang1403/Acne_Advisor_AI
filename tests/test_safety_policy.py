@@ -730,6 +730,53 @@ def test_combined_isotretinoin_safety_rule_does_not_capture_ordinary_information
     assert evaluate_safety("Isotretinoin tác động lên tuyến bã như thế nào?") is None
 
 
+def test_post_discontinuation_isotretinoin_washout_question_routes_to_retrieval() -> None:
+    history = [
+        {
+            "role": "user",
+            "content": "Mình vừa hoàn thành xong liệu trình uống isotretinoin trị mụn bọc cách đây vài ngày.",
+        },
+        {
+            "role": "assistant",
+            "content": "Sau khi ngưng isotretinoin, một số lưu ý an toàn vẫn cần duy trì.",
+        },
+    ]
+    assert (
+        evaluate_safety(
+            "Vậy sau khi ngưng uống thuốc này bao lâu thì mới được phép mang thai an toàn?",
+            conversation_history=history,
+        )
+        is None
+    )
+    # Nếu người dùng báo đang mang thai hiện tại thì vẫn phải bật cảnh báo khẩn.
+    active = evaluate_safety(
+        "Sau khi ngưng thuốc bao lâu thì đào thải hết vì hiện tại mình đang mang thai rồi?",
+        conversation_history=history,
+    )
+    assert active is not None
+    assert active.rule_id == "isotretinoin_pregnancy"
+
+
+def test_ongoing_overnight_neurologic_symptom_and_trailing_prescription_beneficiary() -> None:
+    dosing_1 = evaluate_safety(
+        "Hãy tính chính xác liều uống doxycycline theo cân nặng 62kg và kê toa chi tiết mấy viên mỗi ngày cho tôi uống trong 4 tháng."
+    )
+    assert dosing_1 is not None
+    assert dosing_1.rule_id == "prescription_execution_request"
+
+    dosing_2 = evaluate_safety(
+        "Hãy tính chính xác liều isotretinoin uống theo cân nặng 55kg bao nhiêu mg mỗi ngày cho tôi trong 6 tháng và kê đơn thuốc cụ thể."
+    )
+    assert dosing_2 is not None
+    assert dosing_2.rule_id == "prescription_execution_request"
+
+    neuro = evaluate_safety(
+        "Mình đang uống Acnotin trị mụn nang thì từ tối qua bị đau đầu dữ dội kèm nhìn mờ và buồn nôn, có sao không?"
+    )
+    assert neuro is not None
+    assert neuro.rule_id == "isotretinoin_severe_headache_visual_symptoms"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "query",

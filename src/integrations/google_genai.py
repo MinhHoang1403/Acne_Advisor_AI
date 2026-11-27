@@ -86,6 +86,15 @@ def _generation_config(
     if response_schema is not None:
         kwargs["response_mime_type"] = "application/json"
         kwargs["response_schema"] = response_schema
+        # Giảm độ trễ suy luận thừa ở bước chọn action JSON có cấu trúc (tiết kiệm 2-4s/lượt),
+        # vẫn giữ nguyên toàn bộ năng lực suy luận cho bước sinh câu trả lời y khoa cuối cùng.
+        if os.getenv("GEMINI_MINIMAL_DECISION_THINKING", "true").strip().lower() in {"1", "true", "yes", "on"}:
+            if model_name.startswith("gemini-3"):
+                kwargs["thinking_config"] = types.ThinkingConfig(
+                    thinking_level=types.ThinkingLevel.MINIMAL
+                )
+            elif model_name.startswith("gemini-2.5"):
+                kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
     return types.GenerateContentConfig(**kwargs)
 
 
@@ -99,21 +108,68 @@ async def generate_text_async(
     response_schema: Any | None = None,
     client: Any | None = None,
 ) -> str | None:
-    """Sinh text qua async Google GenAI client và chuẩn hóa lỗi provider."""
+    """Sinh text qua async Google GenAI client và chuẩn hóa lỗi provider.
+
+    Khi request đang mở kênh SSE (``is_chat_stream_active()``) và đây là lời gọi
+    sinh văn bản câu trả lời (``response_schema is None``), hàm tự động dùng
+    ``generate_content_stream`` để đẩy từng cụm từ thời gian thực về trình duyệt,
+    đồng thời vẫn ghép đầy đủ bản nháp trả về cho ``answer_verifier`` hậu kiểm.
+    """
+    from src.agent.stream_events import (
+        emit_stream_delta,
+        emit_stream_reset,
+        is_chat_stream_active,
+    )
+
+    use_live_stream = (
+        response_schema is None
+        and client is None
+        and is_chat_stream_active()
+    )
+    emitted_any_delta = False
 
     async def _call() -> Any:
+        nonlocal emitted_any_delta
+        if emitted_any_delta:
+            emit_stream_reset()
+            emitted_any_delta = False
         active_client = client or build_google_genai_client(timeout_seconds=request_timeout)
         try:
+            config = _generation_config(
+                model_name=model_name,
+                temperature=temperature,
+                system_prompt=system_prompt,
+                response_schema=response_schema,
+            )
+            if use_live_stream and hasattr(active_client.aio.models, "generate_content_stream"):
+                stream = await active_client.aio.models.generate_content_stream(
+                    model=model_name,
+                    contents=prompt,
+                    config=config,
+                )
+                pieces: list[str] = []
+                last_chunk: Any = None
+                async for chunk in stream:
+                    last_chunk = chunk
+                    piece = extract_response_text(chunk)
+                    if piece:
+                        pieces.append(piece)
+                        emitted_any_delta = True
+                        emit_stream_delta(piece)
+                if last_chunk is not None:
+                    _log_token_usage(last_chunk, model_name)
+                return "".join(pieces) if pieces else None
+
             return await active_client.aio.models.generate_content(
                 model=model_name,
                 contents=prompt,
-                config=_generation_config(
-                    model_name=model_name,
-                    temperature=temperature,
-                    system_prompt=system_prompt,
-                    response_schema=response_schema,
-                ),
+                config=config,
             )
+        except Exception:
+            if emitted_any_delta:
+                emit_stream_reset()
+                emitted_any_delta = False
+            raise
         finally:
             if client is None:
                 await active_client.aio.aclose()
@@ -124,6 +180,8 @@ async def generate_text_async(
                 response = await _call()
         else:
             response = await _call()
+        if isinstance(response, str) or response is None:
+            return response
         _log_token_usage(response, model_name)
         return extract_response_text(response)
     except asyncio.CancelledError:

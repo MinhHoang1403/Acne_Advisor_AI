@@ -71,7 +71,7 @@ jobs:
             "genai\.configure",
             "genai\.embed_content"
           ) -join "|"
-          $matches = Get-ChildItem src,tests,scripts -Recurse -File -Include *.py |
+          $matches = Get-ChildItem src,tests,scripts,evaluation -Recurse -File -Include *.py |
             Where-Object { $_.FullName -notmatch "__pycache__" } |
             Select-String -Pattern $patterns -CaseSensitive:$false
           if ($matches) {
@@ -82,7 +82,7 @@ jobs:
       - name: Python lint
         shell: pwsh
         run: |
-          python -m ruff check src scripts tests
+          python -m ruff check src scripts evaluation tests
 
       - name: Full test suite
         shell: pwsh

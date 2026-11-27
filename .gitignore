@@ -68,16 +68,12 @@ dmypy.json
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 
-# Ignore notebooks by default, but keep the formal and environment-check notebooks
+# Ignore notebooks by default, but keep the RAGAS evaluation notebook
 *.ipynb
-!evaluation/formal_evaluation.ipynb
-!evaluation/environment_check.ipynb
+!evaluation/ragas_evaluation.ipynb
 
 # Local notebook recovery backups
 local_notebook_backups/
-
-# Local evidence retained while replacing evaluation frameworks
-/local_eval_backup/
 
 # ---------------------------------------------------------------------------
 # Node.js / Web (src/frontend)
@@ -163,8 +159,6 @@ reports/
 # Local reports and maintenance audit artifacts
 # ---------------------------------------------------------------------------
 /output/
-/FINAL_KL_Acne_Rag.docx
-/.audit_work/
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx
@@ -206,13 +200,7 @@ tmp/
 temp/
 
 # ---------------------------------------------------------------------------
-# Formal evaluation runtime outputs
-# Runtime outputs stay local by default. The completed official run is retained
-# as immutable research evidence and is explicitly version-controlled below.
+# Evaluation runtime outputs
 # ---------------------------------------------------------------------------
 evaluation/results/*
-!evaluation/results/README.md
-!evaluation/results/formal_run_2d5f0124/
-!evaluation/results/formal_run_2d5f0124/**
-!evaluation/results/thesis_evaluation_366f3ad8/
-!evaluation/results/thesis_evaluation_366f3ad8/**
+!evaluation/results/.gitkeep

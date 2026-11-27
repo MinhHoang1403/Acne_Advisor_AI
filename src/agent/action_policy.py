@@ -175,7 +175,10 @@ def comparison_key(value: str) -> str:
 
 
 def _normalize_optional_text(value: str | None) -> str | None:
-    return " ".join(str(value or "").split()) or None
+    cleaned = " ".join(str(value or "").split())
+    if not cleaned or cleaned.casefold() in {"null", "none"}:
+        return None
+    return cleaned
 
 
 def _normalize_evidence_ids(values: tuple[str, ...] | None) -> tuple[str, ...]:

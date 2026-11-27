@@ -11,6 +11,7 @@ import {
 } from './api/connectivity.js';
 import {
   sendChatMessage,
+  streamChatMessage,
   checkBackendHealth,
   fetchSessions,
   fetchMessages,
@@ -52,13 +53,22 @@ export default function App() {
     reason: null,
   });
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [streamingSessionId, setStreamingSessionId] = useState(null);
+  const [streamingStage, setStreamingStage] = useState('');
+  const [streamingDraft, setStreamingDraft] = useState('');
+  const [modelConfig, setModelConfig] = useState(null);
   const [historyHiddenAt, setHistoryHiddenAt] = useState(() => loadHistoryHiddenAt());
   const requestInFlight = useRef(false);
   const selectionSequence = useRef(0);
   const messageLoadSequence = useRef(0);
   const chatAbortRef = useRef(null);
+  const streamDraftBufferRef = useRef('');
+  const streamRafRef = useRef(null);
 
-  useEffect(() => () => chatAbortRef.current?.abort(), []);
+  useEffect(() => () => {
+    chatAbortRef.current?.abort();
+    if (streamRafRef.current) cancelAnimationFrame(streamRafRef.current);
+  }, []);
 
   const backendSessionsLoaded = useRef(false);
   const healthTimerRef = useRef(null);
@@ -293,10 +303,16 @@ export default function App() {
 
       // Chuyển sang session visible gần nhất nếu session đang mở bị ẩn.
       if (activeSessionId === id) {
+        selectionSequence.current++;
+        setError(null);
         const remaining = sessions
           .filter((s) => s.id !== id && !s.hidden)
           .sort((a, b) => b.updatedAt - a.updatedAt);
-        setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
+        const nextId = remaining.length > 0 ? remaining[0].id : null;
+        setActiveSessionId(nextId);
+        if (nextId && backendOnline) {
+          _loadMessagesFromBackend(nextId);
+        }
       }
 
       // Đồng bộ flag với PostgreSQL khi backend reachable.
@@ -308,11 +324,12 @@ export default function App() {
         }
       }
     },
-    [activeSessionId, sessions, backendOnline]
+    [activeSessionId, sessions, backendOnline, _loadMessagesFromBackend]
   );
 
   const handleClearLocalHistory = useCallback(() => {
     selectionSequence.current++;
+    chatAbortRef.current?.abort();
     clearLocalChatCache();
     setSessions([]);
     setActiveSessionId(null);
@@ -336,6 +353,8 @@ export default function App() {
     );
     if (!confirmed) return;
 
+    selectionSequence.current++;
+    chatAbortRef.current?.abort();
     try {
       const result = await deleteAllChatSessions();
       console.info('Deleted chat history:', result);
@@ -372,6 +391,9 @@ export default function App() {
 
       setError(null);
       setIsLoading(true);
+      setStreamingStage('Đang tiếp nhận câu hỏi...');
+      setStreamingDraft('');
+      streamDraftBufferRef.current = '';
       requestInFlight.current = true;
       const selectionAtSubmit = selectionSequence.current;
       const controller = new AbortController();
@@ -379,6 +401,7 @@ export default function App() {
 
       let currentSessionId = activeSessionId;
       let generatedSessionTitle = null;
+      const createdLocalSession = !currentSessionId;
 
       // Tạo session local trước để user message xuất hiện ngay.
       if (!currentSessionId) {
@@ -400,12 +423,19 @@ export default function App() {
           generatedSessionTitle = deriveChatTitleFromFirstUserMessage(trimmedMessage);
         }
       }
+      setStreamingSessionId(currentSessionId);
 
       // Append user message bằng functional update để không mutate React state.
       const currentSessionObj = sessions.find((s) => s.id === currentSessionId) || { messages: [] };
+      const baseMessages =
+        currentSessionObj.messages.length > 0 &&
+        currentSessionObj.messages[currentSessionObj.messages.length - 1]?.role === 'user' &&
+        currentSessionObj.messages[currentSessionObj.messages.length - 1]?.pendingRequest
+          ? currentSessionObj.messages
+          : currentSessionObj.messages;
       const turn = prepareChatTurn({
         sessionId: currentSessionId, message: trimmedMessage, modelConfig,
-        messages: currentSessionObj.messages,
+        messages: baseMessages,
       });
       const userMsgObj = { role: 'user', content: trimmedMessage, pendingRequest: turn };
       setSessions((prev) =>
@@ -416,6 +446,13 @@ export default function App() {
                 ? generatedSessionTitle
                 : s.title;
             if (turn.isRetry) return { ...s, title, updatedAt: Date.now() };
+            if (
+              s.messages.length > 0 &&
+              s.messages[s.messages.length - 1]?.role === 'user' &&
+              s.messages[s.messages.length - 1]?.pendingRequest
+            ) {
+              return { ...s, title, messages: [...s.messages.slice(0, -1), userMsgObj], updatedAt: Date.now() };
+            }
             return { ...s, title, messages: [...s.messages, userMsgObj], updatedAt: Date.now() };
           }
           return s;
@@ -426,20 +463,61 @@ export default function App() {
       const history = turn.history;
 
       try {
-        const data = await sendChatMessage({
-          message: trimmedMessage,
-          sessionId: currentSessionId,
-          conversationHistory: history,
-          requestId: turn.requestId,
-          signal: controller.signal,
-          llmProvider: modelConfig?.llmProvider,
-          llmModel: modelConfig?.llmModel,
-          allowModelFallback: modelConfig?.allowModelFallback,
-        });
+        let data;
+        try {
+          data = await streamChatMessage({
+            message: trimmedMessage,
+            sessionId: currentSessionId,
+            conversationHistory: history,
+            requestId: turn.requestId,
+            signal: controller.signal,
+            llmProvider: modelConfig?.llmProvider,
+            llmModel: modelConfig?.llmModel,
+            allowModelFallback: modelConfig?.allowModelFallback,
+            onStage: (stagePayload) => {
+              if (stagePayload?.label) {
+                setStreamingStage(stagePayload.label);
+              }
+            },
+            onDelta: (deltaText) => {
+              streamDraftBufferRef.current += deltaText;
+              if (!streamRafRef.current) {
+                streamRafRef.current = requestAnimationFrame(() => {
+                  streamRafRef.current = null;
+                  setStreamingDraft(streamDraftBufferRef.current);
+                });
+              }
+            },
+            onReset: () => {
+              streamDraftBufferRef.current = '';
+              if (streamRafRef.current) {
+                cancelAnimationFrame(streamRafRef.current);
+                streamRafRef.current = null;
+              }
+              setStreamingDraft('');
+            },
+          });
+        } catch (streamErr) {
+          if (streamErr?.status === 404 || streamErr?.status === 405) {
+            data = await sendChatMessage({
+              message: trimmedMessage,
+              sessionId: currentSessionId,
+              conversationHistory: history,
+              requestId: turn.requestId,
+              signal: controller.signal,
+              llmProvider: modelConfig?.llmProvider,
+              llmModel: modelConfig?.llmModel,
+              allowModelFallback: modelConfig?.allowModelFallback,
+            });
+          } else {
+            throw streamErr;
+          }
+        }
 
         // Backend có thể canonicalize session ID; cập nhật cả state và active ID.
         const responseSessionId = data.session_id || currentSessionId;
         if (responseSessionId !== currentSessionId) {
+          setStreamingSessionId(responseSessionId);
           setSessions((prev) =>
             prev.map((s) => {
               if (s.id === currentSessionId) {
@@ -477,7 +555,30 @@ export default function App() {
         );
         return true;
       } catch (err) {
-        if (err?.isCanceled || selectionAtSubmit !== selectionSequence.current) return false;
+        if (err?.isCanceled) {
+          setSessions((prev) => {
+            const next = [];
+            for (const s of prev) {
+              if (s.id !== currentSessionId) {
+                next.push(s);
+                continue;
+              }
+              const remainingMessages = s.messages.filter(
+                (m) => m.pendingRequest?.requestId !== turn.requestId,
+              );
+              if (createdLocalSession && remainingMessages.length === 0) {
+                continue;
+              }
+              next.push({ ...s, messages: remainingMessages });
+            }
+            return next;
+          });
+          if (createdLocalSession && selectionAtSubmit === selectionSequence.current) {
+            setActiveSessionId(null);
+          }
+          return false;
+        }
+        if (selectionAtSubmit !== selectionSequence.current) return false;
         setError(err?.message || 'Backend không thể xử lý yêu cầu. Vui lòng thử lại.');
 
         if (shouldTreatChatErrorAsDisconnected(err)) {
@@ -499,6 +600,14 @@ export default function App() {
         return false;
       } finally {
         if (chatAbortRef.current === controller) chatAbortRef.current = null;
+        if (streamRafRef.current) {
+          cancelAnimationFrame(streamRafRef.current);
+          streamRafRef.current = null;
+        }
+        streamDraftBufferRef.current = '';
+        setStreamingSessionId(null);
+        setStreamingStage('');
+        setStreamingDraft('');
         setIsLoading(false);
         requestInFlight.current = false;
       }
@@ -506,13 +615,33 @@ export default function App() {
     [activeSessionId, sessions, isLoading, backendOnline]
   );
 
-  const handleSubmit = useCallback(async (text, modelConfig) => {
+  const handleCancelRequest = useCallback(() => {
+    chatAbortRef.current?.abort();
+  }, []);
+
+  const handleToggleSidebar = useCallback(() => {
+    setSidebarOpen((open) => !open);
+  }, []);
+
+  const handleSubmit = useCallback(async (text, selectedModelConfig) => {
     const selectionAtSubmit = selectionSequence.current;
-    const success = await sendQuestion(text, modelConfig);
-    if (success && selectionAtSubmit === selectionSequence.current) {
-      setMessage('');
+    const effectiveModelConfig = selectedModelConfig ?? modelConfig;
+    // Xóa thanh nhập liệu ngay lập tức khi gửi thành công lên hàng đợi để phản hồi xúc giác tức thì;
+    // khôi phục lại nội dung nếu lượt gửi thất bại và người dùng chưa gõ câu mới.
+    const previousText = text;
+    setMessage('');
+    const success = await sendQuestion(text, effectiveModelConfig);
+    if (!success && selectionAtSubmit === selectionSequence.current) {
+      setMessage((curr) => (curr ? curr : previousText));
     }
-  }, [sendQuestion]);
+  }, [sendQuestion, modelConfig]);
+
+  const handleStarterQuestion = useCallback(
+    (promptText) => handleSubmit(promptText, modelConfig),
+    [handleSubmit, modelConfig],
+  );
+
+  const isActiveSessionStreaming = isLoading && activeSessionId === streamingSessionId;
 
   // Sidebar và ChatWindow dùng cùng state owner để session selection nhất quán.
   return (
@@ -533,18 +662,25 @@ export default function App() {
         onHideAllSessions={handleHideAllSessions}
         onShowHistory={handleShowHistory}
         onDeleteAllSessions={handleDeleteAllSessions}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={handleToggleSidebar}
       />
       <ChatWindow
         chatHistory={chatHistory}
-        isLoading={isLoading || loadingMessages}
+        isLoading={isActiveSessionStreaming}
+        loadingMessages={loadingMessages}
+        streamingStage={isActiveSessionStreaming ? streamingStage : ''}
+        streamingDraft={isActiveSessionStreaming ? streamingDraft : ''}
         error={error}
         message={message}
         setMessage={setMessage}
         onSubmit={handleSubmit}
-        onSendQuestion={sendQuestion}
+        onCancel={handleCancelRequest}
+        onSendQuestion={handleStarterQuestion}
         sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={handleToggleSidebar}
+        modelConfig={modelConfig}
+        onModelConfigChange={setModelConfig}
+        backendOnline={backendOnline}
       />
     </div>
   );

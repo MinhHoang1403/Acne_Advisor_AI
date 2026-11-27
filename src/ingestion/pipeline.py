@@ -58,6 +58,7 @@ from src.ingestion.validation import (
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy, entity_card_to_text
 from src.knowledge.graph_schema import build_entity_graph_records
 from src.knowledge.graph_index import get_neo4j_driver, replace_entity_graph
+from src.knowledge.lexical_graph import build_lexical_graph_records, sync_lexical_graph_to_neo4j
 
 
 DEFAULT_SOURCE_DIR = Path("sample_data")
@@ -467,6 +468,15 @@ async def activate_knowledge(
             prepared["graph_records"],
             build_id=manifest["build_id"],
         )
+        lexical_records = build_lexical_graph_records(
+            prepared["compiled"].records,
+            build_id=manifest["build_id"],
+        )
+        lexical_graph_result = await sync_lexical_graph_to_neo4j(
+            driver,
+            lexical_records,
+            build_id=manifest["build_id"],
+        )
     finally:
         await driver.close()
 
@@ -515,6 +525,7 @@ async def activate_knowledge(
         knowledge_alias_validation,
         entity_alias_validation,
         graph_result["validation"],
+        lexical_graph_result["validation"],
     )
     if not cutover_validation["passed"]:
         raise RuntimeError(f"Post-cutover validation failed: {cutover_validation['errors']}")
@@ -705,20 +716,26 @@ async def _inspect_activated_graph_state(
     expected_nodes: int = EXPECTED_GRAPH_NODES,
     expected_relationships: int = EXPECTED_GRAPH_RELATIONSHIPS,
 ) -> dict[str, Any]:
-    """Read global graph counts and ensure every record belongs to ``build_id``."""
+    """Read canonical entity graph counts and ensure every record belongs to ``build_id``."""
+
+    from src.knowledge.graph_schema import ENTITY_GRAPH_LABELS, ENTITY_GRAPH_RELATIONSHIPS
 
     driver = get_neo4j_driver()
     try:
         async with driver.session(database=os.getenv("NEO4J_DATABASE") or "neo4j") as session:
             node_result = await session.run(
-                "MATCH (n) RETURN count(n) AS total, "
+                "MATCH (n) WHERE any(lbl IN labels(n) WHERE lbl IN $entity_labels) "
+                "RETURN count(n) AS total, "
                 "sum(CASE WHEN n.kb_version = $build_id THEN 1 ELSE 0 END) AS matching",
                 build_id=build_id,
+                entity_labels=list(ENTITY_GRAPH_LABELS),
             )
             relationship_result = await session.run(
-                "MATCH ()-[r]->() RETURN count(r) AS total, "
+                "MATCH ()-[r]->() WHERE type(r) IN $entity_rels "
+                "RETURN count(r) AS total, "
                 "sum(CASE WHEN r.kb_version = $build_id THEN 1 ELSE 0 END) AS matching",
                 build_id=build_id,
+                entity_rels=list(ENTITY_GRAPH_RELATIONSHIPS),
             )
             node_record = await node_result.single()
             relationship_record = await relationship_result.single()

@@ -22,7 +22,7 @@ body,
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Be Vietnam Pro', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #1f2937;
   background-color: #ffffff;
   -webkit-font-smoothing: antialiased;
@@ -826,11 +826,11 @@ body {
 }
 
 .loading-dot {
-  width: 8px;
-  height: 8px;
-  background-color: #d1d5db;
+  width: 7px;
+  height: 7px;
+  background-color: #9ca3af;
   border-radius: 50%;
-  animation: bounce 1s ease-in-out infinite;
+  animation: dotWave 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
 @keyframes pulse {
@@ -838,9 +838,9 @@ body {
   50% { opacity: 0.5; }
 }
 
-@keyframes bounce {
-  0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-6px); }
+@keyframes dotWave {
+  0%, 80%, 100% { opacity: 0.35; transform: scale(0.88); }
+  40% { opacity: 1; transform: scale(1.08); }
 }
 
 /* ── Error ──────────────────────────────────────────────── */
@@ -1468,7 +1468,7 @@ summary:focus-visible {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
   color: #667085;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
   font-size: 10px;
   letter-spacing: 0;
   text-transform: none;
@@ -2653,4 +2653,242 @@ summary:focus-visible {
 .sidebar-offline-banner-checking,
 .sidebar-offline-banner-recovering {
   display: none;
+}
+
+/* ============================================================
+   Craft-floor UX refinements, live SSE streaming & 60fps polish
+   ============================================================ */
+::selection {
+  background: rgba(15, 23, 42, 0.11);
+  color: #0f172a;
+}
+
+.chat-textarea {
+  caret-color: #0f172a;
+}
+
+.chat-char-counter {
+  font-variant-numeric: tabular-nums;
+  transition: color 0.16s ease;
+}
+
+.chat-char-counter-warn {
+  color: #b45309;
+  font-weight: 500;
+}
+
+/* Smooth subtle entrance for newly appended turns */
+@keyframes messageAppear {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message {
+  animation: messageAppear 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Live stage status & streaming draft feedback */
+.loading-dots-wrapper {
+  gap: 10px;
+  min-height: 32px;
+  height: auto;
+  flex-wrap: wrap;
+}
+
+.loading-stage-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 450;
+  letter-spacing: -0.005em;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+.chat-streaming-text > p:last-child::after,
+.chat-streaming-text > ul:last-child > li:last-child::after,
+.chat-streaming-text > ol:last-child > li:last-child::after,
+.chat-streaming-text > pre:last-child > code::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 15px;
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  border-radius: 2px;
+  background-color: #111827;
+  animation: pulse 0.95s ease-in-out infinite;
+}
+
+.chat-stream-stage-inline {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 11.5px;
+}
+
+.chat-stream-stage-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #111827;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* Answer action toolbar: Copy + Details */
+.answer-toolbar-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.answer-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.answer-copy-btn:hover {
+  border-color: var(--border-subtle);
+  background: #f9fafb;
+  color: #111827;
+}
+
+.answer-copy-btn:active,
+.answer-details-toggle:active,
+.new-chat-btn:active,
+.suggestion-btn:active,
+.chat-send-btn-active:active {
+  transform: scale(0.98);
+}
+
+.answer-copy-btn-copied {
+  color: #065f46;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.answer-details-toggle {
+  font-size: 11px;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: #6b7280;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.answer-details-count {
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stop button during active streaming */
+.chat-stop-btn {
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.chat-stop-btn:hover {
+  background: #374151;
+}
+
+/* Floating scroll-to-bottom pill */
+.chat-scroll-bottom-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  z-index: 55;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  color: #1f2937;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-scroll-bottom-btn:hover {
+  background: #ffffff;
+  border-color: #9ca3af;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+
+/* Inline session rename input */
+.session-rename-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 11px;
+  border: 1px solid #9ca3af;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.06);
+}
+
+/* Mobile sidebar backdrop scrim */
+.sidebar-mobile-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    background: rgba(15, 23, 42, 0.24);
+    backdrop-filter: blur(1.5px);
+  }
+
+  .chat-scroll-bottom-btn {
+    bottom: 128px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

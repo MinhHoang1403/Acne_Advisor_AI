@@ -27,8 +27,11 @@ export default function Sidebar({
   onToggleSidebar,
 }) {
   const [menuOpenForId, setMenuOpenForId] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
   const [historyMenuOpen, setHistoryMenuOpen] = useState(false);
   const historyMenuRef = useRef(null);
+  const renameInputRef = useRef(null);
 
   const visibleSessions = sessions
     .filter((s) => !s.hidden && (!historyHiddenAt || s.createdAt > historyHiddenAt))
@@ -46,17 +49,21 @@ export default function Sidebar({
       : 'Đang dùng lịch sử cục bộ vì chưa kết nối backend.');
 
   useEffect(() => {
-    if (!historyMenuOpen) return;
+    if (!historyMenuOpen && !menuOpenForId) return;
 
     const handlePointerDown = (event) => {
-      if (historyMenuRef.current && !historyMenuRef.current.contains(event.target)) {
+      if (historyMenuOpen && historyMenuRef.current && !historyMenuRef.current.contains(event.target)) {
         setHistoryMenuOpen(false);
+      }
+      if (menuOpenForId && !event.target.closest?.('.session-item-wrapper')) {
+        setMenuOpenForId(null);
       }
     };
 
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
         setHistoryMenuOpen(false);
+        setMenuOpenForId(null);
       }
     };
 
@@ -66,16 +73,30 @@ export default function Sidebar({
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [historyMenuOpen]);
+  }, [historyMenuOpen, menuOpenForId]);
 
-  const handleRename = (e, id) => {
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingId]);
+
+  const startRename = (e, id) => {
     e.stopPropagation();
     setMenuOpenForId(null);
     const session = sessions.find((s) => s.id === id);
     if (!session) return;
-    const newTitle = prompt('Nhập tên mới cho đoạn chat:', session.title);
-    if (newTitle && newTitle.trim()) {
-      onRenameSession(id, newTitle.trim());
+    setRenamingId(id);
+    setRenameDraft(session.title || '');
+  };
+
+  const commitRename = (id) => {
+    const trimmed = renameDraft.trim();
+    const session = sessions.find((s) => s.id === id);
+    setRenamingId(null);
+    if (trimmed && session && trimmed !== session.title) {
+      onRenameSession(id, trimmed);
     }
   };
 
@@ -91,7 +112,11 @@ export default function Sidebar({
   };
 
   return (
-    <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`} aria-label="Lịch sử chat">
+    <aside
+      className={`sidebar ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+      aria-label="Lịch sử chat"
+      inert={!sidebarOpen || undefined}
+    >
       {/* App Title & Subtitle */}
       <div className="sidebar-header">
         <div className="sidebar-brand-row">
@@ -191,43 +216,70 @@ export default function Sidebar({
         <div className="sidebar-sessions-list">
           {visibleSessions.map((session) => (
             <div key={session.id} className="session-item-wrapper">
-              <button
-                className={`session-item ${activeSessionId === session.id ? 'session-item-active' : ''}`}
-                onClick={() => onSelectSession(session.id)}
-                title={session.title}
-                aria-current={activeSessionId === session.id ? 'page' : undefined}
-              >
-                {session.title}
-              </button>
-              <button
-                className={`session-menu-btn ${
-                  menuOpenForId === session.id || activeSessionId === session.id
-                    ? 'session-menu-btn-visible'
-                    : ''
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpenForId(menuOpenForId === session.id ? null : session.id);
-                }}
-                title="Tùy chọn"
-                aria-label={`Tùy chọn cho ${session.title}`}
-                aria-haspopup="menu"
-                aria-expanded={menuOpenForId === session.id}
-              >
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
-                  />
-                </svg>
-              </button>
+              {renamingId === session.id ? (
+                <input
+                  ref={renameInputRef}
+                  type="text"
+                  className="session-rename-input"
+                  value={renameDraft}
+                  maxLength={120}
+                  aria-label="Đổi tên đoạn chat"
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onBlur={() => commitRename(session.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitRename(session.id);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setRenamingId(null);
+                    }
+                  }}
+                />
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={`session-item ${activeSessionId === session.id ? 'session-item-active' : ''}`}
+                    onClick={() => onSelectSession(session.id)}
+                    onDoubleClick={(e) => startRename(e, session.id)}
+                    title={session.title}
+                    aria-current={activeSessionId === session.id ? 'page' : undefined}
+                  >
+                    {session.title}
+                  </button>
+                  <button
+                    type="button"
+                    className={`session-menu-btn ${
+                      menuOpenForId === session.id || activeSessionId === session.id
+                        ? 'session-menu-btn-visible'
+                        : ''
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenForId(menuOpenForId === session.id ? null : session.id);
+                    }}
+                    title="Tùy chọn"
+                    aria-label={`Tùy chọn cho ${session.title}`}
+                    aria-haspopup="menu"
+                    aria-expanded={menuOpenForId === session.id}
+                  >
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"
+                      />
+                    </svg>
+                  </button>
+                </>
+              )}
 
               {/* Dropdown menu */}
               {menuOpenForId === session.id && (
-                <div className="session-dropdown" onMouseLeave={() => setMenuOpenForId(null)}>
-                  <button className="dropdown-item" onClick={(e) => handleRename(e, session.id)}>
+                <div className="session-dropdown" role="menu">
+                  <button type="button" className="dropdown-item" onClick={(e) => startRename(e, session.id)} role="menuitem">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
@@ -238,7 +290,7 @@ export default function Sidebar({
                     </svg>
                     Đổi tên
                   </button>
-                  <button className="dropdown-item dropdown-item-danger" onClick={(e) => handleHide(e, session.id)}>
+                  <button type="button" className="dropdown-item dropdown-item-danger" onClick={(e) => handleHide(e, session.id)} role="menuitem">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"

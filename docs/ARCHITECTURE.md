@@ -34,10 +34,11 @@ User -> FastAPI -> LangGraph
                      +-> narrow source-mapped safety policy / exact cache
                      +-> model-selected typed action
                      +-> retrieve_evidence
-                     |      +-> Dense search
-                     |      +-> native BM25 search
-                     |      +-> equal-weight RRF
-                     |      +-> local BGE cross-encoder reranking
+                     |      +-> Dense search (Qdrant cosine)
+                     |      +-> native BM25 search (Qdrant sparse)
+                     |      +-> Neo4j Lexical & Clinical Graph search (fail-open)
+                     |      +-> Tri-Channel RRF (1.0 : 1.0 : 0.85)
+                     |      +-> local BGE cross-encoder reranking + NEXT_CHUNK table expansion
                      |      +-> whole-chunk provenance packing
                      +-> assess evidence presence and source identity
                      +-> retrieve again when requested (maximum two executions)
@@ -65,8 +66,9 @@ share a finite request deadline.
 
 | Responsibility | Canonical location |
 | --- | --- |
-| Knowledge compilation and activation | `src/ingestion/`, `scripts/knowledge_build.py` |
-| Dense + BM25 + RRF retrieval | `src/retrieval/service.py`, `src/retrieval/rrf.py` |
+| Knowledge compilation and activation | `src/ingestion/`, `scripts/knowledge_build.py`, `scripts/sync_knowledge_graph.py` |
+| Tri-Channel Dense + BM25 + GraphRAG + RRF | `src/retrieval/service.py`, `src/retrieval/graph_retriever.py`, `src/retrieval/rrf.py` |
+| Neo4j Lexical & Clinical Graph builder | `src/knowledge/lexical_graph.py`, `src/knowledge/graph_index.py` |
 | Local candidate reranking | `src/retrieval/reranker.py` |
 | Bounded context packing | `src/retrieval/context_packer.py` |
 | LangGraph orchestration and decisions | `src/agent/graph.py`, `src/agent/nodes/workflow.py` |
@@ -76,10 +78,13 @@ share a finite request deadline.
 | Exact normalized answer cache | `src/cache/exact_cache.py` |
 | API and persistence | `src/api/`, `src/database/` |
 
-The runtime has one typed evidence tool: `retrieve_evidence`. EntityCards and
-Neo4j remain structural knowledge assets for build validation, inspection, and
-research. They are intentionally absent from the normal answer path and do not
-count as runtime medical evidence.
+The runtime has one typed evidence tool: `retrieve_evidence`. In Neo4j, the
+32 canonical EntityCards remain isolated from the lexical layer, while the 968
+`KnowledgeChunk` nodes mirror the exact activated Qdrant chunks (`chunk_id == point_id`)
+with source provenance, `NEXT_CHUNK` table adjacency, `MENTIONS_ENTITY`, and
+`HAS_CLINICAL_FACET` links. Raw taxonomy metadata never enters the prompt as
+standalone medical evidence; only provenance-complete `KnowledgeChunk` records
+participate in RRF and BGE reranking.
 
 ## Online Runtime Responsibilities
 
@@ -92,12 +97,15 @@ for one reviewed case. Python `ActionPolicy` owns legal transitions, query novel
 evidence-ID membership, and attempt limits; invalid proposals fail closed to
 abstention.
 
-Each retrieval executes Dense and native BM25 search, equal-weight RRF, local BGE
-cross-encoder reranking, and whole-chunk context packing. The first acquisition
-query is also its rerank query. A retry uses the targeted evidence-gap query for
-both new acquisition and reranking. Prior and newly acquired candidates are
-merged, stable-deduplicated, and the complete union is reranked before packing.
-The full-union invariant is retained because an evaluated depth cap discarded a
+Each retrieval executes concurrent Dense, native BM25, and Neo4j Lexical/Clinical
+Graph search, Tri-Channel RRF (`1.0 : 1.0 : 0.85`), local BGE cross-encoder
+reranking (augmented with canonical INN active ingredients when commercial brands
+are detected, plus `NEXT_CHUNK` table continuation scoring), submodular graph-anchor
+coverage ordering, and whole-chunk context packing. The first acquisition query is
+also its base rerank query. A retry uses the targeted evidence-gap query for both
+new acquisition and reranking. Prior and newly acquired candidates are merged,
+stable-deduplicated, and the complete union is reranked before packing. The
+full-union invariant is retained because an evaluated depth cap discarded a
 reviewed required candidate before the reranker could score it.
 
 The BGE owner is one process-wide `CandidateReranker`. The requested production
@@ -206,22 +214,28 @@ with an independent NVIDIA NIM judge (`nvidia/nemotron-3-ultra-550b-a55b`), whil
 historical RAGChecker experiments remain archived under `research/`.
 
 PostgreSQL stores chat history, Redis stores versioned eligible answers,
-Qdrant serves read-only runtime evidence, and Neo4j stores the structural graph.
-Only Qdrant knowledge chunks participate in online medical grounding. Redis
-uses exact normalized question identity plus provider, model, pipeline
-fingerprint, and cache version; it performs no semantic lookup.
+Qdrant serves read-only Dense + BM25 runtime evidence, and Neo4j serves both the
+canonical structural graph (32 entities / 27 edges) and the synchronized lexical
+chunk graph (`KnowledgeChunk`, `ClinicalFacet`, `NEXT_CHUNK`). Every Neo4j candidate
+maps 1-to-1 to a provenance-verified source chunk (`chunk_id`). Redis uses exact
+normalized question identity plus provider, model, pipeline fingerprint, and cache
+version; it performs no semantic lookup.
 
 ## Application Boundary
 
-`src/api/app.py::chat_endpoint` is the primary HTTP entrypoint and calls
-`src/agent/graph.py::run_clinical_agent` directly. Retrieval, context packing,
-prompt assembly, and provider dispatch remain internal Python calls; there is
-no separate project-internal context service.
+`src/api/app.py::chat_endpoint` (`POST /chat`) and `chat_stream_endpoint`
+(`POST /chat/stream` SSE) are the primary HTTP entrypoints and call
+`src/agent/graph.py::run_clinical_agent` directly through a shared turn-locking
+execution helper. Retrieval, context packing, prompt assembly, and provider
+dispatch remain internal Python calls; there is no separate project-internal
+context service.
 
 The React client starts at `src/frontend/src/main.jsx`. `App.jsx::sendQuestion`
-calls `chatApi.js::sendChatMessage`, then updates session state from
-`ChatResponse`. `ChatWindow.jsx` and `ChatMessage.jsx` render answers and source
-labels. Provider credentials remain backend-only.
+calls `chatApi.js::streamChatMessage` (falling back seamlessly to `sendChatMessage`
+when SSE is unavailable), renders live stage progress and `requestAnimationFrame`-batched
+token deltas, and finalizes session state from `ChatResponse` only after backend
+verification completes. `ChatWindow.jsx` and `ChatMessage.jsx` render answers and
+source labels. Provider credentials remain backend-only.
 
 Generation sends policy through the provider's system-instruction field. The
 question, bounded history, source allowlist, and exact packed evidence remain
@@ -237,8 +251,8 @@ answer table, and the verifier does not judge ordinary medical truth.
 - The decision model sees the full bounded packed evidence in the normal runtime;
   the compatibility path without `PackedContext` has a separate item limit.
 - Context budgets are versioned engineering policies, not proven optimal values.
-- Neo4j is not an online evidence source, and its unavailability does not remove
-  already activated Qdrant evidence.
+- Neo4j is an optional fail-open retrieval channel; its unavailability degrades
+  cleanly to Qdrant Dense + BM25 without removing activated Qdrant evidence.
 - The supported deployment is local and single-user. The current HTTP history
   routes are not a public multi-tenant authorization boundary.
 

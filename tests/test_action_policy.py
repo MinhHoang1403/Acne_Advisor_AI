@@ -249,7 +249,7 @@ def test_prompt_schema_and_budget_match_pre_extraction_baseline() -> None:
     )
 
     assert hashlib.sha256(system_prompt.encode()).hexdigest() == (
-        "d83eaccc6edb42ece911544df6147565ae6aac37c35a0a6bcb66c06c24d72094"
+        "232c3a9777c8afe7f9f0a67eec8595f34aa10ae1625787d28c14b6ee59b925a5"
     )
     assert hashlib.sha256(payload.encode()).hexdigest() == (
         "502f9114c170990e4415d45e2a56680ef271aab33ff343637fd04224af57ac59"

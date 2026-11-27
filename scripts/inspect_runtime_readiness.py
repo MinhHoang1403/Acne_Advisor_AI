@@ -58,7 +58,7 @@ def inspect_readiness() -> dict[str, Any]:
             "bounded_evidence_retry": True,
             "explicit_abstention": True,
             "entity_runtime_retrieval": False,
-            "graph_runtime_retrieval": False,
+            "graph_runtime_retrieval": bool((manifest.get("graph_rag") or {}).get("enabled")),
             "reranker": bool((manifest.get("reranker") or {}).get("enabled")),
             "candidate_policy": False,
             "evidence_selector": False,
@@ -160,20 +160,38 @@ def _qdrant_check() -> dict[str, Any]:
 def _neo4j_check() -> dict[str, Any]:
     try:
         from neo4j import GraphDatabase
+        from src.knowledge.graph_schema import ENTITY_GRAPH_LABELS, ENTITY_GRAPH_RELATIONSHIPS
+        from src.retrieval.graph_retriever import _neo4j_runtime_config
 
-        driver = GraphDatabase.driver(
-            os.getenv("NEO4J_URI", "bolt://127.0.0.1:7687"),
-            auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD", "password")),
-        )
+        uri, user, password = _neo4j_runtime_config()
+        driver = GraphDatabase.driver(uri, auth=(user, password))
         with driver:
             with driver.session(database=os.getenv("NEO4J_DATABASE", "neo4j")) as session:
-                record = session.run(
-                    "MATCH (n) WITH count(n) AS nodes MATCH ()-[r]->() RETURN nodes, count(r) AS relationships"
+                entity_record = session.run(
+                    "MATCH (n) WHERE any(lbl IN labels(n) WHERE lbl IN $entity_labels) "
+                    "WITH count(n) AS nodes "
+                    "MATCH ()-[r]->() WHERE type(r) IN $entity_rels "
+                    "RETURN nodes, count(r) AS relationships",
+                    entity_labels=list(ENTITY_GRAPH_LABELS),
+                    entity_rels=list(ENTITY_GRAPH_RELATIONSHIPS),
                 ).single()
-        details = {"nodes": record["nodes"], "relationships": record["relationships"]}
+                total_record = session.run(
+                    "MATCH (n) WITH count(n) AS total_nodes "
+                    "MATCH ()-[r]->() RETURN total_nodes, count(r) AS total_relationships"
+                ).single()
+        nodes = int((entity_record or {}).get("nodes", 0))
+        relationships = int((entity_record or {}).get("relationships", 0))
+        total_nodes = int((total_record or {}).get("total_nodes", 0))
+        total_rels = int((total_record or {}).get("total_relationships", 0))
+        details = {
+            "nodes": nodes,
+            "relationships": relationships,
+            "lexical_nodes": max(0, total_nodes - nodes),
+            "lexical_relationships": max(0, total_rels - relationships),
+        }
         return {
             "name": "neo4j_frozen_graph",
-            "passed": details == {"nodes": 32, "relationships": 27},
+            "passed": nodes == 32 and relationships == 27,
             "details": details,
         }
     except Exception as exc:

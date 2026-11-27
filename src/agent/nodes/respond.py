@@ -47,11 +47,17 @@ async def finalize_response_node(state: ClinicalState) -> dict:
         )
     )
 
-    def present_and_validate(draft: str, *, add_disclaimer: bool | None = None) -> tuple[str, dict]:
+    def present_and_validate(
+        draft: str,
+        *,
+        add_disclaimer: bool | None = None,
+        is_cached: bool = False,
+    ) -> tuple[str, dict]:
         started = time.perf_counter()
-        # Tuyệt đối không ghi đè phản hồi an toàn hoặc fallback deterministic bằng câu liệt kê nguồn.
+        # Tuyệt đối không ghi đè phản hồi an toàn, fallback hoặc bản trả lời đã định dạng trong cache.
         if (
-            is_source_request(query)
+            not is_cached
+            and is_source_request(query)
             and not state.get("fallback_applied")
             and not state.get("safety_override")
         ):
@@ -89,6 +95,7 @@ async def finalize_response_node(state: ClinicalState) -> dict:
         cached_answer = state.get("final_answer") or state.get("cached_answer") or ""
         final_answer, source_validation = present_and_validate(
             repair_mojibake(cached_answer),
+            is_cached=True,
         )
         return {
             "final_answer": final_answer,
