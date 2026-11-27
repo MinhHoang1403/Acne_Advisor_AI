@@ -44,7 +44,7 @@ from src.resilience.contracts import RuntimeResilienceSettings, runtime_resilien
 logger = logging.getLogger(__name__)
 
 AGENT_DECISION_VERSION = "direct_proposition_support_action_decision"
-DECISION_EVIDENCE_MAX_ITEMS = 8
+DECISION_EVIDENCE_MAX_ITEMS = 9
 _EXPLICIT_TOPIC_RESET = re.compile(
     r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b(?P<superseded>[^.!?;\n]*)[.!?;\n]+\s*(?P<question>.+)$",
     flags=re.IGNORECASE | re.DOTALL,
@@ -249,7 +249,14 @@ async def select_agent_action(state: ClinicalState) -> dict[str, Any]:
             provider_metadata["error"] = sanitize_fallback_reason(exc)
 
     if validated.action == "abstain" and fallback_reason_code is None:
-        fallback_reason_code = fallback_reason_code_from_agent_reason(validated.reason_code)
+        if (
+            validated.reason_code == "evidence_gap"
+            and state.get("fallback_reason_code") == "retrieval_unavailable"
+            and not bool((state.get("evidence_assessment") or {}).get("usable"))
+        ):
+            fallback_reason_code = "retrieval_unavailable"
+        else:
+            fallback_reason_code = fallback_reason_code_from_agent_reason(validated.reason_code)
 
     effective_query = validated.retrieval_query
     updates: dict[str, Any] = {
@@ -331,7 +338,7 @@ def _decision_evidence_view(
         item_id = str(context.get("id") or context.get("chunk_id") or "").strip()
         if item_id:
             packed_ids.append(item_id)
-        if position > DECISION_EVIDENCE_MAX_ITEMS:
+        if len(visible_items) >= DECISION_EVIDENCE_MAX_ITEMS:
             continue
 
         text = str(context.get("text") or context.get("content") or "").strip()
@@ -544,19 +551,59 @@ def _apply_explicit_topic_reset(
     if not current_question:
         return decision
     superseded_raw = " ".join((match.group("superseded") or "").split())
-    ignore_words = {"chuyện", "chuyen", "việc", "viec", "phần", "phan", "câu", "cau", "đó", "do", "này", "nay", "đi", "di", "nhé", "nhe"}
+    ignore_words = {
+        "chuyện",
+        "chuyen",
+        "việc",
+        "viec",
+        "phần",
+        "phan",
+        "câu",
+        "cau",
+        "chủ",
+        "chu",
+        "đề",
+        "de",
+        "đó",
+        "do",
+        "này",
+        "nay",
+        "đi",
+        "di",
+        "nhé",
+        "nhe",
+        "trước",
+        "truoc",
+        "mụn",
+        "mun",
+        "acne",
+    }
+    current_tokens = set(re.findall(r"\w+", current_question.casefold(), flags=re.UNICODE))
     superseded_tokens = {
         tok
         for tok in re.findall(r"\w+", superseded_raw.casefold(), flags=re.UNICODE)
         if len(tok) >= 3 and tok not in ignore_words
-    }
+    } - current_tokens
+    if not superseded_tokens:
+        # Khi người dùng dùng đại từ như "Bỏ qua chuyện đó đi", lấy các từ khóa đặc trưng từ
+        # lịch sử hội thoại trước đó (ngoại trừ các từ có mặt trong câu hỏi mới) để kiểm tra rò rỉ.
+        history_text = " ".join(
+            str(msg.get("content") or "")
+            for msg in _bounded_history(state)
+            if str(msg.get("role") or "") == "user"
+        )
+        superseded_tokens = {
+            tok
+            for tok in re.findall(r"\w+", history_text.casefold(), flags=re.UNICODE)
+            if len(tok) >= 4 and tok not in ignore_words
+        } - current_tokens
     proposed_query = (decision.retrieval_query or "").strip()
     if not proposed_query:
         return decision.model_copy(update={"retrieval_query": current_question})
     proposed_tokens = set(re.findall(r"\w+", proposed_query.casefold(), flags=re.UNICODE))
     # Chỉ ghi đè bằng câu hỏi gốc khi model làm rò rỉ chủ đề đã yêu cầu bỏ qua vào retrieval_query;
     # nếu model đã tuân thủ loại bỏ chủ đề cũ thì giữ nguyên truy vấn song ngữ đã tối ưu.
-    if not superseded_tokens or (superseded_tokens & proposed_tokens):
+    if superseded_tokens and (superseded_tokens & proposed_tokens):
         return decision.model_copy(update={"retrieval_query": current_question})
     return decision
 
@@ -571,19 +618,22 @@ def _history_for_current_question(
     state: ClinicalState,
     current_question: str,
 ) -> list[dict[str, str]]:
-    """Bỏ các exchange lặp lại nhưng giữ context có trước lần hỏi đầu tiên."""
+    """Bỏ các lượt hỏi lặp lại liền kề ở cuối hội thoại nhưng giữ nguyên chủ đề mới nhất phía trước."""
 
     history = _bounded_history(state)
     current_key = _comparison_key(current_question)
     if not current_key:
         return history
-    for index, item in enumerate(history):
-        if (
-            str(item.get("role") or "") == "user"
-            and _comparison_key(str(item.get("content") or "")) == current_key
-        ):
-            return history[:index]
-    return history
+    cutoff: int | None = None
+    for index in range(len(history) - 1, -1, -1):
+        item = history[index]
+        if str(item.get("role") or "") != "user":
+            continue
+        if _comparison_key(str(item.get("content") or "")) == current_key:
+            cutoff = index
+        else:
+            break
+    return history[:cutoff] if cutoff is not None else history
 
 
 def _runtime_settings(state: ClinicalState) -> RuntimeResilienceSettings:

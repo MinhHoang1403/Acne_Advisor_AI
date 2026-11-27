@@ -192,7 +192,15 @@ def _bounded_header_value(value: Any) -> str:
         text = ", ".join(str(item) for item in value if str(item).strip())
     else:
         text = str(value or "")
-    return " ".join(text.replace("|", "/").split())[:120]
+    cleaned = " ".join(text.replace("|", "/").split())
+    if len(cleaned) <= 120:
+        return cleaned
+    window = cleaned[:120]
+    for sep in (", ", " "):
+        cut = window.rfind(sep)
+        if cut >= 40:
+            return window[:cut].rstrip(",; ")
+    return window
 
 
 def _source_id(payload: dict[str, Any]) -> str:

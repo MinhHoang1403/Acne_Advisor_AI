@@ -305,22 +305,30 @@ class EvidenceRetriever:
                 retrieval_attempt=retrieval_attempt,
             )
 
-        packed_input_candidates = _prune_low_relevance_reranked_candidates(
-            reranked_candidates,
-            rerank_status=rerank_outcome.status,
-            min_score=_bounded_float_env("RETRIEVAL_RERANK_MIN_SCORE", 0.18, 0.0, 1.0),
-            relative_ratio=_bounded_float_env("RETRIEVAL_RERANK_RELATIVE_RATIO", 0.22, 0.0, 1.0),
-        )
+        reordered_candidates = reranked_candidates
         if (
             self._graph_enabled
             and graph_results
             and rerank_outcome.status in {"succeeded", "ok"}
             and not rerank_outcome.fallback_used
         ):
-            packed_input_candidates = _reorder_for_graph_anchor_coverage(
-                packed_input_candidates,
+            reordered_candidates = _reorder_for_graph_anchor_coverage(
+                reranked_candidates,
                 top_k=context_items,
             )
+
+        packed_input_candidates = _prune_low_relevance_reranked_candidates(
+            reordered_candidates,
+            rerank_status=rerank_outcome.status,
+            min_score=_bounded_float_env("RETRIEVAL_RERANK_MIN_SCORE", 0.18, 0.0, 1.0),
+            relative_ratio=_bounded_float_env("RETRIEVAL_RERANK_RELATIVE_RATIO", 0.22, 0.0, 1.0),
+        )
+        kept_after_prune_ids = {item.candidate_id for item in packed_input_candidates}
+        pruned_low_score_ids = {
+            item.candidate_id
+            for item in reordered_candidates
+            if item.candidate_id not in kept_after_prune_ids
+        }
         normalized = NormalizedQuery(
             original_query=rerank_query or query,
             normalized_text=effective_rerank_query,
@@ -382,7 +390,11 @@ class EvidenceRetriever:
             candidate_trace["graph"] = _channel_candidate_trace(graph_results)
             rrf_trace["graph_weight"] = effective_graph_weight
 
-        candidate_trace["fused"] = _fused_candidate_trace(reranked_candidates, packed)
+        candidate_trace["fused"] = _fused_candidate_trace(
+            reranked_candidates,
+            packed,
+            pruned_ids=pruned_low_score_ids,
+        )
 
         if self._graph_enabled:
             architecture_name = (
@@ -497,14 +509,18 @@ class EvidenceRetriever:
         if self._graph_store is None or not reranked_candidates:
             return reranked_candidates, []
 
-        top_score = float(reranked_candidates[0].rerank_score or 0.0)
+        raw_top = reranked_candidates[0].rerank_score
+        if not isinstance(raw_top, (int, float)) or not (0.0 <= float(raw_top) <= 1.0):
+            return reranked_candidates, []
+        top_score = float(raw_top)
         if top_score < 0.35:
             return reranked_candidates, []
 
         table_seeds = [
             item.candidate_id
             for item in reranked_candidates[:3]
-            if float(item.rerank_score or 0.0) >= 0.35
+            if isinstance(item.rerank_score, (int, float))
+            and 0.35 <= float(item.rerank_score) <= 1.0
             and str(item.payload.get("content_kind") or "") == "table"
         ]
         if not table_seeds:
@@ -715,7 +731,10 @@ def merge_retrieval_candidates(
             merged_by_id[candidate.candidate_id] = candidate
             continue
         merged_by_id[candidate.candidate_id] = existing.model_copy(
-            update={"debug": _merge_candidate_debug(existing.debug, candidate.debug)}
+            update={
+                "payload": _merge_candidate_payload(existing.payload, candidate.payload),
+                "debug": _merge_candidate_debug(existing.debug, candidate.debug),
+            }
         )
         if candidate.candidate_id not in duplicate_ids:
             duplicate_ids.append(candidate.candidate_id)
@@ -759,8 +778,32 @@ def _candidate_with_attempt_metadata(
     return candidate.model_copy(update={"debug": debug, "rerank_score": None, "rerank_rank": None})
 
 
+def _merge_candidate_payload(first: dict[str, Any], duplicate: dict[str, Any]) -> dict[str, Any]:
+    """Hợp nhất bằng chứng đồ thị Neo4j giữa các lượt retry mà không ghi đè nội dung gốc."""
+
+    merged = dict(first)
+    ev1 = first.get("graph_evidence")
+    ev2 = duplicate.get("graph_evidence")
+    if isinstance(ev1, dict) and isinstance(ev2, dict):
+        merged["graph_evidence"] = {
+            key: list(dict.fromkeys([*(ev1.get(key) or ()), *(ev2.get(key) or ())]))
+            for key in ("matched_entities", "matched_facets", "expanded_paths")
+        }
+    elif isinstance(ev2, dict) and not isinstance(ev1, dict):
+        merged["graph_evidence"] = dict(ev2)
+    return merged
+
+
 def _merge_candidate_debug(first: dict[str, Any], duplicate: dict[str, Any]) -> dict[str, Any]:
     debug = dict(first)
+    for key in ("dense_rank", "bm25_rank", "graph_rank", "dense_score", "bm25_score"):
+        if debug.get(key) is None and duplicate.get(key) is not None:
+            debug[key] = duplicate[key]
+    if duplicate.get("graph_score") is not None:
+        debug["graph_score"] = max(
+            float(debug.get("graph_score") or 0.0),
+            float(duplicate.get("graph_score") or 0.0),
+        )
     seen = {
         int(value)
         for value in [
@@ -815,6 +858,8 @@ def _channel_candidate_trace(items: list[dict[str, Any]]) -> list[dict[str, Any]
 def _fused_candidate_trace(
     candidates: list[RetrievedCandidate],
     packed: Any,
+    *,
+    pruned_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Expose RRF and packer outcomes for diagnostics without changing selection."""
 
@@ -824,6 +869,8 @@ def _fused_candidate_trace(
         for entry in packed.debug.get("dropped") or []
         if isinstance(entry, dict)
     }
+    for cid in pruned_ids or set():
+        dropped_by_id.setdefault(cid, "low_rerank_score")
     not_examined_by_id = {
         str(entry.get("candidate_id") or ""): str(entry.get("reason") or "")
         for entry in packed.debug.get("not_examined") or []
@@ -985,14 +1032,14 @@ def _reorder_for_graph_anchor_coverage(
     if len(candidates) <= 2 or top_k <= 1:
         return candidates
     scores = [item.rerank_score for item in candidates]
-    if not all(isinstance(s, (int, float)) for s in scores):
+    if not all(isinstance(s, (int, float)) and 0.0 <= float(s) <= 1.0 for s in scores):
         return candidates
 
     top_score = float(scores[0])  # type: ignore[arg-type]
     if top_score < 0.25:
         return candidates
 
-    eligibility_floor = max(0.24, top_score * 0.34)
+    eligibility_floor = max(0.18, top_score * 0.22)
     all_universe_tokens: set[str] = set()
     tokens_by_id: dict[str, set[str]] = {}
     for cand in candidates:

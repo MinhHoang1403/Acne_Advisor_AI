@@ -736,7 +736,12 @@ async def list_models():
     if gemini_model == "gemini-1.5-flash":
         gemini_model = DEFAULT_GEMINI_MODEL
     gemini_fallback_models = parse_google_fallback_models(primary_model=gemini_model)
-    qwen3_8b_available = "qwen3:8b" in ollama_models
+    configured_ollama_model = os.getenv("OLLAMA_MODEL", "qwen3:8b").strip() or "qwen3:8b"
+    short_ollama_names = {str(m).split(":")[0] for m in ollama_models if m}
+    ollama_available = (
+        configured_ollama_model in ollama_models
+        or configured_ollama_model in short_ollama_names
+    )
 
     def model_entry(
         *,
@@ -782,10 +787,14 @@ async def list_models():
     models.append(
         model_entry(
             provider="ollama",
-            model_id="qwen3:8b",
-            display_name="Qwen3 8B Local",
+            model_id=configured_ollama_model,
+            display_name=(
+                "Qwen3 8B Local"
+                if configured_ollama_model == "qwen3:8b"
+                else f"{configured_ollama_model} (Local)"
+            ),
             model_type="local",
-            available=qwen3_8b_available,
+            available=ollama_available,
         )
     )
 
@@ -910,7 +919,7 @@ async def chat_stream_endpoint(request: ChatRequest, background_tasks: Backgroun
             reset_chat_stream_scope(stream_token)
 
     async def _event_stream():
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=512)
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1024)
         worker_task = asyncio.create_task(_run_stream_worker(queue))
         get_item_task: asyncio.Task[dict[str, Any]] | None = None
         try:
@@ -1123,6 +1132,10 @@ async def _execute_locked_chat_turn(
             "safety_decision": result.get("safety_decision"),
             "source_metadata": source_metadata,
             "used_retrieval": used_retrieval,
+            "retrieval_status": result.get("retrieval_status"),
+            "fallback_applied": bool(result.get("fallback_applied")),
+            "fallback_type": result.get("fallback_type"),
+            "fallback_cache_eligible": result.get("fallback_cache_eligible"),
             "pipeline_fingerprint": pipeline_fingerprint,
             "pipeline_manifest": {
                 "phase": pipeline_manifest.get("phase") if isinstance(pipeline_manifest, dict) else None,

@@ -294,13 +294,26 @@ async def check_qdrant() -> CheckResult:
         )
 
 
+def _neo4j_preflight_config() -> tuple[str, str, str]:
+    uri = os.getenv("NEO4J_URI", NEO4J_URI).strip() or NEO4J_URI
+    user = os.getenv("NEO4J_USERNAME", "").strip()
+    password = os.getenv("NEO4J_PASSWORD", "").strip()
+    auth_env = os.getenv("NEO4J_AUTH", "").strip()
+    if (not user or not password) and "/" in auth_env:
+        parsed_user, parsed_pass = auth_env.split("/", 1)
+        user = user or parsed_user.strip()
+        password = password or parsed_pass.strip()
+    return uri, (user or NEO4J_USERNAME), (password or NEO4J_PASSWORD)
+
+
 async def check_neo4j() -> CheckResult:
     try:
         from neo4j import AsyncGraphDatabase
 
+        uri, user, password = _neo4j_preflight_config()
         driver = AsyncGraphDatabase.driver(
-            NEO4J_URI,
-            auth=(NEO4J_USERNAME, NEO4J_PASSWORD),
+            uri,
+            auth=(user, password),
         )
         try:
             await driver.verify_connectivity()

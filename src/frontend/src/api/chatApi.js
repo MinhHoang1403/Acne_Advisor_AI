@@ -236,6 +236,29 @@ export async function streamChatMessage({
         let buffer = '';
         let completedPayload = null;
 
+        const handleFrame = (frame) => {
+          if (frame.event === 'stage') {
+            onStage?.(frame.data);
+          } else if (frame.event === 'delta' && typeof frame.data?.delta === 'string') {
+            onDelta?.(frame.data.delta);
+          } else if (frame.event === 'reset') {
+            onReset?.();
+          } else if (frame.event === 'complete') {
+            completedPayload = frame.data;
+          } else if (frame.event === 'error') {
+            const status = Number(frame.data?.status) || 500;
+            const detailMsg = frame.data?.detail?.message;
+            const err = new Error(
+              (status === 400 || status === 409 || status === 422) && detailMsg
+                ? detailMsg
+                : STATUS_MESSAGES[status] || detailMsg || 'Backend không thể xử lý yêu cầu. Vui lòng thử lại.',
+            );
+            err.status = status;
+            err.code = frame.data?.detail?.code;
+            throw err;
+          }
+        };
+
         try {
           while (true) {
             const { value, done } = await reader.read();
@@ -245,26 +268,7 @@ export async function streamChatMessage({
             buffer = parsed.remainder;
 
             for (const frame of parsed.events) {
-              if (frame.event === 'stage') {
-                onStage?.(frame.data);
-              } else if (frame.event === 'delta' && typeof frame.data?.delta === 'string') {
-                onDelta?.(frame.data.delta);
-              } else if (frame.event === 'reset') {
-                onReset?.();
-              } else if (frame.event === 'complete') {
-                completedPayload = frame.data;
-              } else if (frame.event === 'error') {
-                const status = Number(frame.data?.status) || 500;
-                const detailMsg = frame.data?.detail?.message;
-                const err = new Error(
-                  (status === 400 || status === 409 || status === 422) && detailMsg
-                    ? detailMsg
-                    : STATUS_MESSAGES[status] || detailMsg || 'Backend không thể xử lý yêu cầu. Vui lòng thử lại.',
-                );
-                err.status = status;
-                err.code = frame.data?.detail?.code;
-                throw err;
-              }
+              handleFrame(frame);
             }
           }
         } finally {
@@ -279,7 +283,7 @@ export async function streamChatMessage({
         if (buffer.trim()) {
           const tail = parseSseBlocks(`${buffer}\n\n`);
           for (const frame of tail.events) {
-            if (frame.event === 'complete') completedPayload = frame.data;
+            handleFrame(frame);
           }
         }
 

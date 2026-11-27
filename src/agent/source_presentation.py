@@ -367,9 +367,11 @@ def _source_id_from_context(context: dict[str, Any]) -> str:
             context.get("source_id"),
             context.get("source_file"),
             context.get("source_path"),
+            context.get("document_id"),
             _metadata_value(context, "source_id"),
             _metadata_value(context, "source_file"),
             _metadata_value(context, "source_path"),
+            _metadata_value(context, "document_id"),
         )
     )
 

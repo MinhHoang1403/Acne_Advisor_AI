@@ -286,25 +286,44 @@ def is_prescription_execution_request(text: str) -> bool:
     if _is_personalized_quantitative_dose_selection(text):
         return True
 
+    raw_lower = " ".join(str(text or "").casefold().split())
     normalized = normalize_text(text)
-    tokens = normalized.split()
     if not has_first_person_reference(normalized):
         return False
-    if any(marker in normalized for marker in ("bac si da", "khi nao bac si", "tai lieu", "noi gi ve")):
-        return False
-
-    action_positions = [
-        start
-        for phrase in ("ke", "chon", "cho")
-        for start, _ in _phrase_spans(tokens, [phrase])
-    ]
     if any(
-        ({*NEGATION_TOKENS, "dung"}).intersection(tokens[max(0, position - 2) : position])
-        for position in action_positions
+        marker in normalized
+        for marker in (
+            "bac si da",
+            "bac si ke",
+            "khi nao bac si",
+            "nguyen tac",
+            "quy trinh",
+            "tai lieu",
+            "noi gi ve",
+        )
     ):
         return False
 
-    patterns = (
+    # Tách ranh giới dấu phẩy / mệnh đề để phủ định ở vế trước ("chưa khỏi, kê đơn...") không lan sang động từ kê đơn.
+    clause_marked_raw = re.sub(r"[,.;:!?\r\n]+", f" {CLAUSE_BOUNDARY} ", str(text or ""))
+    clause_tokens = normalize_text(clause_marked_raw).split()
+
+    has_raw_dung_prohibition = re.search(r"\bđừng\b", raw_lower) is not None
+
+    def _verb_is_negated(tok_list: list[str], verb_idx: int) -> bool:
+        prefix: list[str] = []
+        for back_idx in range(verb_idx - 1, max(-1, verb_idx - 3), -1):
+            if tok_list[back_idx] in {CLAUSE_BOUNDARY, SOFT_CLAUSE_BOUNDARY}:
+                break
+            prefix.append(tok_list[back_idx])
+        if NEGATION_TOKENS.intersection(prefix):
+            return True
+        if "dung" in prefix:
+            has_non_ascii = any(ord(ch) > 127 for ch in raw_lower)
+            return has_raw_dung_prohibition if has_non_ascii else True
+        return False
+
+    direct_patterns: tuple[tuple[str, ...], ...] = (
         ("ke", "toi", "don"),
         ("ke", "toi", "thuoc"),
         ("ke", "don", "toi"),
@@ -316,21 +335,55 @@ def is_prescription_execution_request(text: str) -> bool:
         ("cho", "toi", "toa"),
         ("cho", "toi", "don"),
     )
-    if any(contains_bounded_sequence(normalized, pattern, max_gap=3) for pattern in patterns):
-        return True
-    # Bắt các câu mệnh lệnh tiếng Việt đặt "cho tôi / cho em / giúp tôi" ở cuối mệnh đề sau động từ kê đơn / tính liều.
-    trailing_beneficiary_patterns = (
-        ("ke", "don", "cho"),
-        ("ke", "toa", "cho"),
-        ("tinh", "lieu", "cho"),
-        ("cho", "toi", "ke", "don"),
-        ("cho", "em", "ke", "don"),
-    )
-    return any(
-        contains_bounded_sequence(normalized, pattern, max_gap=12)
-        and any(f"{prep} {fp}" in normalized for prep in ("cho", "giup") for fp in FIRST_PERSON)
-        for pattern in trailing_beneficiary_patterns
-    )
+    for pattern in direct_patterns:
+        expanded = [
+            (pattern[0], fp, pattern[2]) if pattern[1] == "toi" else (pattern[0], pattern[1], fp)
+            for fp in FIRST_PERSON
+        ]
+        for pat in expanded:
+            for verb_start, _ in _phrase_spans(clause_tokens, [pat[0]]):
+                if _verb_is_negated(clause_tokens, verb_start):
+                    continue
+                window_toks: list[str] = []
+                for w_idx in range(verb_start, min(len(clause_tokens), verb_start + 13)):
+                    if w_idx > verb_start and clause_tokens[w_idx] == CLAUSE_BOUNDARY:
+                        break
+                    window_toks.append(clause_tokens[w_idx])
+                if contains_bounded_sequence(" ".join(window_toks), pat, max_gap=4):
+                    return True
+
+    # Bắt các câu mệnh lệnh tiếng Việt đặt "cho tôi / cho em / giúp tôi" ở sau cụm kê đơn / tính liều,
+    # đồng thời loại trừ triệt để câu hỏi thông thường "Cho em hỏi tình trạng ... liệu trình chăm sóc".
+    for idx in range(len(clause_tokens) - 1):
+        verb = clause_tokens[idx]
+        matched_end = -1
+        if (verb, clause_tokens[idx + 1]) in {
+            ("ke", "don"),
+            ("ke", "toa"),
+            ("ke", "thuoc"),
+            ("chon", "lieu"),
+        }:
+            matched_end = idx + 2
+        elif verb == "tinh" and "tình" not in raw_lower and "liệu trình" not in raw_lower:
+            for lieu_idx in range(idx + 1, min(len(clause_tokens), idx + 4)):
+                if clause_tokens[lieu_idx] == CLAUSE_BOUNDARY:
+                    break
+                if clause_tokens[lieu_idx] == "lieu":
+                    next_tok = clause_tokens[lieu_idx + 1] if lieu_idx + 1 < len(clause_tokens) else ""
+                    if next_tok != "trinh":
+                        matched_end = lieu_idx + 1
+                    break
+        if matched_end < 0 or _verb_is_negated(clause_tokens, idx):
+            continue
+        tail_toks = [
+            t
+            for t in clause_tokens[matched_end : min(len(clause_tokens), matched_end + 16)]
+            if t != CLAUSE_BOUNDARY
+        ]
+        tail = " ".join(tail_toks)
+        if any(f"{prep} {fp}" in tail for prep in ("cho", "giup") for fp in FIRST_PERSON):
+            return True
+    return False
 
 
 def _is_personalized_quantitative_dose_selection(text: str) -> bool:
@@ -535,7 +588,16 @@ def _occurrence_is_active(tokens: list[str], start: int, end: int) -> bool:
         stop=suffix_stop,
     ) >= 0:
         return False
-    if current_end < 0 and _first_marker_start(
+    has_suffix_current = (
+        _first_marker_start(
+            tokens,
+            CURRENT_STATE_MARKERS,
+            start=end,
+            stop=suffix_stop,
+        )
+        >= 0
+    )
+    if current_end < 0 and not has_suffix_current and _first_marker_start(
         tokens,
         HISTORICAL_STATE_MARKERS,
         start=end,
@@ -780,8 +842,10 @@ def _has_medication_symptom_relation(
             marker in between
             for marker in ("sau khi", "sau luc", "tu sau", "bat dau")
         )
+    context_without_ongoing = re.sub(r"\btu\s+(?:hom|toi)\s+qua\b", " ", context)
     has_historical_event = any(
-        marker in context for marker in ("hom qua", "toi qua", "truoc day", "tung")
+        marker in context_without_ongoing
+        for marker in ("hom qua", "toi qua", "truoc day", "tung")
     )
     if has_historical_event and not has_ordered_relation:
         return False

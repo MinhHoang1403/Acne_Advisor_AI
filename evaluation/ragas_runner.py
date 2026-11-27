@@ -334,7 +334,8 @@ def _extract_retrieved_contexts(agent_result: dict[str, Any]) -> list[str]:
             if isinstance(item, dict):
                 text = str(item.get("text") or item.get("content") or "").strip()
                 if text:
-                    payload = item.get("payload") if isinstance(item.get("payload"), dict) else item
+                    raw_payload = item.get("payload")
+                    payload = raw_payload if isinstance(raw_payload, dict) and raw_payload else item
                     chunk_id = str(payload.get("chunk_id") or item.get("item_id") or f"chunk-{idx}")
                     header = _render_header(payload, chunk_id, idx)
                     contexts.append(f"{header}\n{text}")
@@ -361,13 +362,19 @@ async def _warmup_reranker() -> None:
         return
 
 
-def _case_system_signature(case: EvaluationCase, llm_provider: str | None, llm_model: str | None) -> str:
+def _case_system_signature(
+    case: EvaluationCase,
+    llm_provider: str | None,
+    llm_model: str | None,
+    allow_model_fallback: bool = False,
+) -> str:
     payload = {
         "case_id": case.case_id,
         "user_input": case.user_input,
         "conversation_history": list(case.conversation_history),
         "llm_provider": llm_provider or "default",
         "llm_model": llm_model or "default",
+        "allow_model_fallback": bool(allow_model_fallback),
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()[:20]
@@ -413,7 +420,7 @@ async def run_system_on_dataset(
 
     records: list[dict[str, Any]] = []
     for idx, case in enumerate(cases, 1):
-        sig = _case_system_signature(case, llm_provider, llm_model)
+        sig = _case_system_signature(case, llm_provider, llm_model, allow_model_fallback)
         if sig in cached_by_sig:
             restored = dict(cached_by_sig[sig])
             restored["index"] = idx
@@ -441,14 +448,6 @@ async def run_system_on_dataset(
         for attempt in range(max_provider_retries + 1):
             error_text = None
             result = {}
-            prev_fb_enabled = os.environ.get("LLM_PROVIDER_FALLBACK_ENABLED")
-            prev_fb_models = os.environ.get("GOOGLE_FALLBACK_MODELS")
-            if allow_model_fallback:
-                os.environ["LLM_PROVIDER_FALLBACK_ENABLED"] = "true"
-                existing_fb = [m.strip() for m in (prev_fb_models or "gemini-3.1-flash-lite").split(",") if m.strip()]
-                if "gemini-3-flash-preview" not in existing_fb:
-                    existing_fb.append("gemini-3-flash-preview")
-                os.environ["GOOGLE_FALLBACK_MODELS"] = ",".join(existing_fb)
             try:
                 result = await run_clinical_agent(
                     message=case.user_input,
@@ -462,16 +461,6 @@ async def run_system_on_dataset(
                 )
             except Exception as exc:
                 error_text = f"{type(exc).__name__}: {exc}"
-            finally:
-                if allow_model_fallback:
-                    if prev_fb_enabled is None:
-                        os.environ.pop("LLM_PROVIDER_FALLBACK_ENABLED", None)
-                    else:
-                        os.environ["LLM_PROVIDER_FALLBACK_ENABLED"] = prev_fb_enabled
-                    if prev_fb_models is None:
-                        os.environ.pop("GOOGLE_FALLBACK_MODELS", None)
-                    else:
-                        os.environ["GOOGLE_FALLBACK_MODELS"] = prev_fb_models
             daily_quota_detail = _extract_daily_quota_detail(result, error_text)
             if daily_quota_detail is not None and (not allow_model_fallback or attempt >= max_provider_retries):
                 raise RuntimeError(
@@ -482,6 +471,7 @@ async def run_system_on_dataset(
             transient_fallback = result.get("fallback_reason_code") in {
                 "provider_unavailable",
                 "generation_unavailable",
+                "retrieval_unavailable",
             }
             transient_error = error_text is not None and _is_rate_limit_error(RuntimeError(error_text))
             if (transient_fallback or transient_error) and attempt < max_provider_retries:
@@ -523,6 +513,8 @@ async def run_system_on_dataset(
             "safety_rule_id": str(safety_dec.get("rule_id") or "") or None,
             "actual_provider": result.get("actual_provider"),
             "actual_model": result.get("actual_model"),
+            "requested_model": result.get("requested_model") or llm_model,
+            "llm_fallback_used": bool(result.get("llm_fallback_used")),
             "latency_ms": elapsed_ms,
             "token_usage": dict(token_usage) if isinstance(token_usage, dict) else {},
             "error": error_text,
@@ -748,6 +740,8 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
             "timeout",
             "timed out",
             "timeouterror",
+            "retryexhaustederror",
+            "retry exhausted",
             "instructorretryexception",
             "validationerror",
             "jsondecodeerror",
@@ -1004,15 +998,19 @@ async def score_records_with_ragas(
                     )
                 continue
 
-            enriched["abstention_correct"] = None
-            unexpected_abstain = (
-                rec.get("action") == "abstain"
-                or (bool(rec.get("fallback_applied")) and not bool(rec.get("safety_override")))
-            )
-            enriched["unexpected_abstention"] = unexpected_abstain
-
             response_text = _strip_presentation_disclaimer(str(rec.get("response") or ""))
             contexts = list(rec.get("retrieved_contexts") or [])
+            # Mọi ca expected="answer" bị từ chối, vướng safety nhầm, rỗng câu trả lời hoặc lỗi runtime
+            # đều tính là không hoàn thành trả lời (0.0 cho các metric sinh câu trả lời thay vì bỏ qua mẫu số).
+            unexpected_abstain = (
+                bool(rec.get("error"))
+                or bool(rec.get("safety_override"))
+                or rec.get("action") == "abstain"
+                or bool(rec.get("fallback_applied"))
+                or not response_text
+            )
+            enriched["abstention_correct"] = None
+            enriched["unexpected_abstention"] = unexpected_abstain
             # Với ca hội thoại đa lượt, dùng câu hỏi độc lập đã giải chiếu đại từ để các metric
             # RAGAS (đặc biệt AnswerRelevancy & ContextPrecision) đối chiếu ngữ nghĩa chính xác.
             eval_question = str(
@@ -1023,81 +1021,93 @@ async def score_records_with_ragas(
             ).strip()
             reference = str(rec.get("reference") or "")
 
-            if unexpected_abstain:
-                # Không chấm boilerplate từ chối bằng LLM để tránh lãng phí API và không làm sai lệch trung bình.
-                scores = {
-                    "faithfulness": 0.0,
-                    "answer_relevancy": 0.0,
-                    "context_precision": 0.0 if not contexts else None,
-                    "context_recall": 0.0 if not contexts else None,
-                    "answer_correctness": 0.0,
-                }
-            elif response_text and contexts:
-                def _make_call(mset: dict[str, Any], key: str) -> Any:
-                    if key == "faithfulness":
-                        return mset[key].ascore(
-                            user_input=eval_question,
-                            response=response_text,
-                            retrieved_contexts=contexts,
-                        )
-                    if key == "answer_relevancy":
-                        return mset[key].ascore(user_input=eval_question, response=response_text)
-                    if key == "context_precision":
-                        return mset[key].ascore(
-                            user_input=eval_question,
-                            reference=reference,
-                            retrieved_contexts=contexts,
-                        )
-                    if key == "context_recall":
-                        return mset[key].ascore(
-                            user_input=eval_question,
-                            retrieved_contexts=contexts,
-                            reference=reference,
-                        )
+            def _make_call(mset: dict[str, Any], key: str) -> Any:
+                if key == "faithfulness":
                     return mset[key].ascore(
                         user_input=eval_question,
                         response=response_text,
+                        retrieved_contexts=contexts,
+                    )
+                if key == "answer_relevancy":
+                    return mset[key].ascore(user_input=eval_question, response=response_text)
+                if key == "context_precision":
+                    return mset[key].ascore(
+                        user_input=eval_question,
+                        reference=reference,
+                        retrieved_contexts=contexts,
+                    )
+                if key == "context_recall":
+                    return mset[key].ascore(
+                        user_input=eval_question,
+                        retrieved_contexts=contexts,
                         reference=reference,
                     )
+                return mset[key].ascore(
+                    user_input=eval_question,
+                    response=response_text,
+                    reference=reference,
+                )
 
-                sem = asyncio.Semaphore(effective_concurrency)
+            sem = asyncio.Semaphore(effective_concurrency)
 
-                async def _score_one_metric(key: str) -> Any:
-                    async with sem:
-                        last_exc: Exception | None = None
-                        for idx_j, (model_name, mset) in enumerate(judge_chain):
-                            if model_name in exhausted_daily_models:
+            async def _score_one_metric(key: str) -> Any:
+                async with sem:
+                    last_exc: Exception | None = None
+                    for idx_j, (model_name, mset) in enumerate(judge_chain):
+                        if model_name in exhausted_daily_models:
+                            continue
+                        try:
+                            res = await _run_metric_with_retry(
+                                lambda ms=mset, k=key: _make_call(ms, k),
+                                max_retries=max_rate_limit_retries if idx_j == 0 else 1,
+                                metric_timeout_seconds=metric_timeout_seconds,
+                            )
+                            if pacing_delay > 0:
+                                await asyncio.sleep(pacing_delay)
+                            return res
+                        except Exception as exc:
+                            last_exc = exc
+                            exc_lower = f"{type(exc).__name__}: {exc}".lower()
+                            is_foreign_embed_quota = (
+                                provider_norm != "google" and "google genai" in exc_lower
+                            )
+                            if _is_daily_quota_error(exc) and not is_foreign_embed_quota:
+                                exhausted_daily_models.add(model_name)
+                                if verbose:
+                                    print(
+                                        f"  [Judge] {model_name} hết quota theo ngày -> chuyển sang model dự phòng.",
+                                        flush=True,
+                                    )
                                 continue
-                            try:
-                                res = await _run_metric_with_retry(
-                                    lambda ms=mset, k=key: _make_call(ms, k),
-                                    max_retries=max_rate_limit_retries if idx_j == 0 else 1,
-                                    metric_timeout_seconds=metric_timeout_seconds,
-                                )
-                                if pacing_delay > 0:
-                                    await asyncio.sleep(pacing_delay)
-                                return res
-                            except Exception as exc:
-                                last_exc = exc
-                                exc_lower = f"{type(exc).__name__}: {exc}".lower()
-                                is_foreign_embed_quota = (
-                                    provider_norm != "google" and "google genai" in exc_lower
-                                )
-                                if _is_daily_quota_error(exc) and not is_foreign_embed_quota:
-                                    exhausted_daily_models.add(model_name)
-                                    if verbose:
-                                        print(
-                                            f"  [Judge] {model_name} hết quota theo ngày -> chuyển sang model dự phòng.",
-                                            flush=True,
-                                        )
-                                    continue
-                                if _is_rate_limit_error(exc) and not is_foreign_embed_quota:
-                                    continue
-                                raise
-                        if last_exc is not None:
-                            raise last_exc
-                        raise RuntimeError("Tất cả judge model đều đã cạn quota theo ngày.")
+                            if _is_rate_limit_error(exc) and not is_foreign_embed_quota:
+                                continue
+                            raise
+                    if last_exc is not None:
+                        raise last_exc
+                    raise RuntimeError("Tất cả judge model đều đã cạn quota theo ngày.")
 
+            if unexpected_abstain:
+                # Không chấm boilerplate từ chối bằng LLM cho các chỉ số sinh câu trả lời (gán 0.0 trung thực);
+                # nếu tầng truy hồi vẫn lấy được ngữ cảnh hợp lệ thì vẫn chấm ContextPrecision & ContextRecall.
+                scores = {
+                    "faithfulness": 0.0,
+                    "answer_relevancy": 0.0,
+                    "context_precision": 0.0,
+                    "context_recall": 0.0,
+                    "answer_correctness": 0.0,
+                }
+                if contexts and not rec.get("error"):
+                    retrieval_keys = ("context_precision", "context_recall")
+                    ret_results = await asyncio.gather(
+                        *(_score_one_metric(k) for k in retrieval_keys),
+                        return_exceptions=True,
+                    )
+                    for k, outcome in zip(retrieval_keys, ret_results, strict=True):
+                        if isinstance(outcome, BaseException):
+                            metric_errors[k] = f"{type(outcome).__name__}: {outcome}"
+                        else:
+                            scores[k] = _clean_score(getattr(outcome, "value", outcome))
+            elif response_text and contexts:
                 if effective_concurrency > 1:
                     results = await asyncio.gather(
                         *(_score_one_metric(key) for key in RAGAS_METRIC_KEYS),
@@ -1116,7 +1126,8 @@ async def score_records_with_ragas(
                         except Exception as exc:
                             metric_errors[key] = f"{type(exc).__name__}: {exc}"
             else:
-                metric_errors["skipped"] = "Không có câu trả lời hoặc ngữ cảnh truy hồi để chấm RAGAS."
+                scores = {key: 0.0 for key in RAGAS_METRIC_KEYS}
+                metric_errors["skipped"] = "Không có ngữ cảnh truy hồi hợp lệ cho câu trả lời."
 
             enriched["ragas_scores"] = scores
             enriched["metric_errors"] = metric_errors

@@ -31,9 +31,17 @@ def verify_answer_quality(
     retrieval_trace: Any | None = None,
     final_source_ids: list[str] | None = None,
     request_shape: RequestShape | dict[str, Any] | None = None,
+    *,
+    response_profile: str | None = None,
+    fallback_applied: bool = False,
 ) -> AnswerVerificationReport:
     """Kiểm tra shape và evidence identity mà không phán xét medical truth."""
 
+    effective_profile = response_profile or infer_response_profile(
+        query,
+        fallback_type="no_retrieval_evidence" if fallback_applied else None,
+        request_shape=request_shape,
+    )
     issues = [
         _issue(
             str(item.get("code") or "presentation_contract_violation"),
@@ -44,16 +52,14 @@ def verify_answer_quality(
         for item in assess_structural_quality(
             answer or "",
             user_question=query,
-            response_profile=infer_response_profile(
-                query,
-                request_shape=request_shape,
-            ),
-            request_shape=request_shape,
+            response_profile=effective_profile,
+            request_shape=None if fallback_applied else request_shape,
         )
     ]
-    provenance_errors = _packed_context_provenance_errors(packed_context)
-    issues.extend(provenance_errors)
-    issues.extend(_requested_entity_scope_errors(query, answer or ""))
+    if not fallback_applied:
+        provenance_errors = _packed_context_provenance_errors(packed_context)
+        issues.extend(provenance_errors)
+        issues.extend(_requested_entity_scope_errors(query, answer or ""))
     has_error = any(issue.severity == ERROR for issue in issues)
     return AnswerVerificationReport(
         passed=not has_error,
@@ -143,6 +149,10 @@ def _requested_entity_scope_errors(query: str, answer: str) -> list[AnswerQualit
 def _matched_entity_names(text: str) -> dict[str, str]:
     matches: dict[str, str] = {}
     for card in _scope_normalizer().match_alias(text):
+        # Loại trừ thực thể gốc bao trùm toàn miền (acne_vulgaris) khỏi phép kiểm lệch phạm vi
+        # thực thể cụ thể để tránh phạt sai khi câu trả lời mô tả nhân mụn / biệt dược chuẩn xác.
+        if card.entity_type == "condition" and card.canonical_name.casefold() == "acne_vulgaris":
+            continue
         key = f"{card.entity_type}:{card.canonical_name.casefold()}"
         matches[key] = card.canonical_name
     return matches

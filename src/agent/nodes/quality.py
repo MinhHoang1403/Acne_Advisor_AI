@@ -77,6 +77,8 @@ async def answer_quality_node(state: ClinicalState) -> dict[str, Any]:
             retrieval_trace=state.get("retrieval_trace"),
             final_source_ids=list(state.get("sources") or []),
             request_shape=state.get("request_shape"),
+            response_profile=profile,
+            fallback_applied=bool(state.get("fallback_applied")),
         )
         report = report_model.model_dump(mode="json")
         report.setdefault("metadata", {})["source_validation"] = dict(

@@ -79,7 +79,6 @@ CALL () {
   UNION ALL
   MATCH (seed_prod:DrugProduct)-[:HAS_ACTIVE_INGREDIENT]->(prod_ing:ActiveIngredient)
   WHERE seed_prod.canonical_name IN $entity_names
-    AND NOT prod_ing.canonical_name IN $entity_names
   WITH seed_prod, prod_ing
   MATCH (prod_ing)<-[:MENTIONS_ENTITY]-(c:KnowledgeChunk)
   WHERE ($kb_version = '' OR c.kb_version = $kb_version)
@@ -95,7 +94,6 @@ CALL () {
   UNION ALL
   MATCH (seed_safe:SafetyContext)<-[:CONTRAINDICATED_IN]-(contra)
   WHERE seed_safe.canonical_name IN $entity_names
-    AND NOT contra.canonical_name IN $entity_names
   WITH seed_safe, contra
   MATCH (contra)<-[:MENTIONS_ENTITY]-(c:KnowledgeChunk)
   WHERE ($kb_version = '' OR c.kb_version = $kb_version)
@@ -104,7 +102,6 @@ CALL () {
   MATCH (seed_int)-[:CLINICAL_INTERACTION]-(inter_target)
   WHERE (seed_int:ActiveIngredient OR seed_int:DrugClass)
     AND seed_int.canonical_name IN $entity_names
-    AND NOT inter_target.canonical_name IN $entity_names
   WITH seed_int, inter_target
   MATCH (inter_target)<-[:MENTIONS_ENTITY]-(c:KnowledgeChunk)
   WHERE ($kb_version = '' OR c.kb_version = $kb_version)
