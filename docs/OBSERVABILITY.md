@@ -176,7 +176,7 @@ và dùng các widget/filter sau:
 | --- | --- |
 | Traffic, success, degraded, failed | count root `chat-request`, group/filter `metadata.status` |
 | Latency request | percentile/average latency của root; đối chiếu `metadata.duration_ms` |
-| Retrieval health | `retrieve`, `dense`, `bm25`; group `metadata.status`, `metadata.error_type` |
+| Retrieval health | `retrieve`, `dense`, `bm25`, `graph`; group `metadata.status`, `metadata.error_type` |
 | Retrieval volume | average/sum `metadata.candidate_count`, filter theo stage |
 | Agent behavior | count `agent-decision`, group `metadata.action` và `metadata.reason_code` |
 | Generation/fallback | `generation`, group `metadata.provider`, `metadata.model`, `metadata.fallback` |

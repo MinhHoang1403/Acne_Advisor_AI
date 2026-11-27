@@ -49,10 +49,11 @@ sequenceDiagram
     participant Cache as Redis
     participant Tool as retrieve_evidence
     participant Qdrant
+    participant Neo4j as Neo4j GraphRAG
     participant Reranker as Local BGE reranker
     participant LLM as Gemini/Ollama
 
-    User->>API: POST /chat
+    User->>API: POST /chat or /chat/stream (SSE)
     API->>Agent: validated state and history
     Agent->>Agent: prepare and narrow safety check
     Agent->>Agent: deterministic safety before cache
@@ -67,9 +68,14 @@ sequenceDiagram
             LLM-->>Agent: retrieve or abstain
             opt retrieve selected
                 Agent->>Tool: retrieve source evidence with attempt-scoped query
-                Tool->>Qdrant: Dense and native BM25 queries
-                Qdrant-->>Tool: ranked source chunks
-                Tool->>Reranker: full candidate union and attempt-scoped query
+                par Qdrant & Neo4j channels
+                    Tool->>Qdrant: Dense and native BM25 queries
+                    Qdrant-->>Tool: ranked source chunks
+                and
+                    Tool->>Neo4j: Lexical + Clinical Facet graph query (fail-open)
+                    Neo4j-->>Tool: graph-anchored source chunks
+                end
+                Tool->>Reranker: Tri-Channel RRF union + NEXT_CHUNK table neighbors
                 Reranker-->>Tool: reranked candidates or deterministic RRF fallback
                 Tool-->>Agent: whole-chunk bounded provenance
                 Agent->>Agent: assess evidence

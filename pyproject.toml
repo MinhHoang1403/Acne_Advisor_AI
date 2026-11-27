@@ -14,10 +14,11 @@ authors = [{ name = "Minh Hoang" }]
 [project.scripts]
 init-schema = "scripts.init_schema:cli"
 phase1 = "scripts.knowledge_build:cli"
+knowledge-build = "scripts.knowledge_build:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*", "scripts*"]
+include = ["src*", "scripts*", "evaluation*"]
 
 # ---------------------------------------------------------------------------
 # Ruff (linter + formatter)
@@ -25,7 +26,7 @@ include = ["src*", "scripts*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "scripts", "tests"]
+src = ["src", "scripts", "evaluation", "tests"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

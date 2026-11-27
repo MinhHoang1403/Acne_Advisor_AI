@@ -182,11 +182,16 @@ class CandidateReranker:
     ) -> Sequence[float]:
         pairs = [(query, candidate.text) for candidate in candidates]
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + self.settings.timeout_seconds
+        effective_timeout = (
+            max(self.settings.timeout_seconds, 30.0)
+            if self._model is None and self.settings.timeout_seconds >= 5.0
+            else self.settings.timeout_seconds
+        )
+        deadline = loop.time() + effective_timeout
         try:
             await asyncio.wait_for(
                 self._inference_gate.acquire(),
-                timeout=self.settings.timeout_seconds,
+                timeout=effective_timeout,
             )
         except TimeoutError as exc:
             raise RerankerOperationalError(

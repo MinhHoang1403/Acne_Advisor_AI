@@ -254,7 +254,131 @@ def test_build_ragas_evaluators_nvidia_uses_md_json_and_disables_thinking(
     assert captured["model"] == DEFAULT_JUDGE_MODEL
     assert captured["kwargs"]["provider"] == "openai"
     assert captured["kwargs"]["mode"] == instructor.Mode.MD_JSON
+    assert captured["kwargs"]["max_tokens"] == 8192
     assert captured["kwargs"]["extra_body"] == {
         "chat_template_kwargs": {"enable_thinking": False}
     }
     assert emb.dimensions == 3072
+
+
+@pytest.mark.asyncio
+async def test_multi_turn_case_passes_history_and_closes_judge_clients(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from evaluation.ragas_runner import (
+        EvaluationCase,
+        _evaluate_safe_abstention,
+        load_evaluation_dataset,
+        run_system_on_dataset,
+        score_records_with_ragas,
+    )
+
+    sample_ds = tmp_path / "mini_dataset.json"
+    sample_ds.write_text(
+        json.dumps(
+            {
+                "dataset_name": "acne_advisor_ragas_benchmark",
+                "cases": [
+                    {
+                        "case_id": "MT-01",
+                        "category": "safety_and_precautions",
+                        "dialogue_type": "multi_turn",
+                        "expected_behavior": "answer",
+                        "conversation_history": [
+                            {"role": "user", "content": "Bác sĩ vừa kê isotretinoin đường uống trị mụn nang cho mình."},
+                            {"role": "assistant", "content": "Isotretinoin đường uống được dùng cho mụn trứng cá nặng."},
+                        ],
+                        "user_input": "Thuốc đó có dùng chung với doxycycline được không?",
+                        "standalone_question": "Isotretinoin đường uống có dùng chung với kháng sinh doxycycline được không?",
+                        "reference": "Không được phối hợp isotretinoin đường uống với doxycycline do nguy cơ tăng áp lực nội sọ lành tính.",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    _, loaded_cases = load_evaluation_dataset(sample_ds)
+    assert len(loaded_cases) == 1
+    assert loaded_cases[0].dialogue_type == "multi_turn"
+    assert len(loaded_cases[0].conversation_history) == 2
+
+    captured_agent_kwargs: dict[str, Any] = {}
+
+    async def fake_warmup() -> None:
+        return None
+
+    async def fake_run_agent(**kwargs: Any) -> dict[str, Any]:
+        captured_agent_kwargs.update(kwargs)
+        return {
+            "answer": "Không dùng chung isotretinoin với doxycycline.",
+            "packed_context": {"items": [{"text": "Tránh phối hợp isotretinoin và doxycycline."}]},
+            "sources": ["SRC_test"],
+            "agent_decision": {"action": "generate", "reason_code": "evidence_sufficient"},
+            "fallback_applied": False,
+        }
+
+    monkeypatch.setattr("evaluation.ragas_runner._warmup_reranker", fake_warmup)
+    monkeypatch.setattr("src.agent.graph.run_clinical_agent", fake_run_agent)
+
+    sys_records = await run_system_on_dataset(loaded_cases, case_delay_seconds=0.0)
+    assert len(captured_agent_kwargs["conversation_history"]) == 2
+    assert sys_records[0]["standalone_question"].startswith("Isotretinoin")
+
+    # Kiểm tra loại trừ lỗi sập hạ tầng khỏi kết quả từ chối an toàn
+    assert _evaluate_safe_abstention(
+        {"action": "abstain", "fallback_applied": True, "fallback_reason_code": "provider_unavailable"}
+    ) is False
+    assert _evaluate_safe_abstention(
+        {"action": "abstain", "fallback_applied": True, "fallback_reason_code": "out_of_scope"}
+    ) is True
+
+    closed_count = 0
+
+    class DummyInnerHttpClient:
+        async def close(self) -> None:
+            nonlocal closed_count
+            closed_count += 1
+
+    class DummyInstructorWrapper:
+        def __init__(self) -> None:
+            self.client = DummyInnerHttpClient()
+
+    class DummyJudgeLLM:
+        def __init__(self) -> None:
+            self.client = DummyInstructorWrapper()
+
+    class DummyMetricResult:
+        def __init__(self, val: float) -> None:
+            self.value = val
+
+    captured_questions: list[str] = []
+
+    class DummyMetric:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            self.prompt = type("P", (), {"instruction": "Generate a question."})()
+
+        async def ascore(self, **kwargs: Any) -> DummyMetricResult:
+            if "user_input" in kwargs:
+                captured_questions.append(kwargs["user_input"])
+            return DummyMetricResult(0.92)
+
+    monkeypatch.setattr(
+        "evaluation.ragas_runner.build_ragas_evaluators",
+        lambda **_kw: (DummyJudgeLLM(), ProjectGeminiEmbeddings(api_key="k")),
+    )
+    for m_name in ("Faithfulness", "AnswerRelevancy", "ContextPrecision", "ContextRecall", "AnswerCorrectness"):
+        monkeypatch.setattr(f"ragas.metrics.collections.{m_name}", DummyMetric)
+
+    scored = await score_records_with_ragas(
+        sys_records,
+        judge_provider="nvidia",
+        judge_model="nvidia/nemotron-3-ultra-550b-a55b",
+        fallback_judge_models=("mistralai/mistral-large-4-1t-a52b",),
+        request_delay_seconds=0.0,
+    )
+    assert scored[0]["ragas_scores"]["faithfulness"] == 0.92
+    assert all(q.startswith("Isotretinoin") for q in captured_questions)
+    assert closed_count == 2
+    assert isinstance(EvaluationCase("X", "cat", "answer", "q", "r"), EvaluationCase)

@@ -389,6 +389,10 @@ async def generate_llm_response(
 
     last_error: BaseException = primary_error
     for fallback_provider, fallback_model in fallback_targets:
+        from src.agent.stream_events import emit_stream_reset, is_chat_stream_active
+
+        if response_schema is None and is_chat_stream_active():
+            emit_stream_reset()
         chain_entry = {
             "provider": fallback_provider,
             "model": fallback_model,

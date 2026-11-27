@@ -12,11 +12,13 @@ Neo4j không được truy vấn tại đây. Muốn đổi provider/model embed
 """
 from __future__ import annotations
 
+from collections import OrderedDict
 import asyncio
 import inspect
 import logging
 import os
 from pathlib import Path
+import threading
 from typing import Any
 
 from src.resilience.budget import DeadlineBudget
@@ -88,18 +90,48 @@ def _embed_sync(text: str, *, request_timeout: float | None = None) -> list[floa
     return vectors[0]
 
 
+_ORIGINAL_EMBED_SYNC = _embed_sync
+_QUERY_EMBEDDING_CACHE: OrderedDict[tuple[str, int, str], list[float]] = OrderedDict()
+_QUERY_EMBEDDING_CACHE_LOCK = threading.Lock()
+_QUERY_EMBEDDING_CACHE_MAX = 256
+
+
+def clear_query_embedding_cache() -> None:
+    """Xóa bộ nhớ đệm embedding câu hỏi trong tiến trình (dùng khi test hoặc reset)."""
+
+    with _QUERY_EMBEDDING_CACHE_LOCK:
+        _QUERY_EMBEDDING_CACHE.clear()
+
+
 async def embed_query(text: str) -> list[float]:
     """Nhận Dense query vector từ Gemini mà không chặn event loop.
 
-    Lỗi transport tạm thời được retry cục bộ vì thiếu query embedding sẽ buộc
-    runtime fallback dù knowledge base vẫn dùng được. Lỗi provider/configuration
-    vĩnh viễn không được retry.
-
-    Kết quả phải là Dense vector gồm ``EMBEDDING_DIMENSIONS`` số thực.
+    Áp dụng bộ nhớ đệm LRU giới hạn kích thước (256 mục) cho các truy vấn lặp lại
+    hoặc chuẩn hóa trùng khớp, tự động bỏ qua cache khi unit test monkeypatch ``_embed_sync``.
     """
+    clean_text = " ".join((text or "").split())
+    use_cache = (
+        _embed_sync is _ORIGINAL_EMBED_SYNC
+        and os.getenv("EMBEDDING_QUERY_CACHE_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    )
+    active_model = os.getenv("EMBEDDING_MODEL", EMBEDDING_MODEL)
+    active_dims = _positive_int_env("EMBEDDING_DIMENSIONS", EMBEDDING_DIMENSIONS)
+    cache_key = (
+        active_model,
+        active_dims,
+        active_query_embedding_text(clean_text) if clean_text else "",
+    )
+    if use_cache and clean_text:
+        with _QUERY_EMBEDDING_CACHE_LOCK:
+            cached_vec = _QUERY_EMBEDDING_CACHE.get(cache_key)
+            if cached_vec is not None:
+                _QUERY_EMBEDDING_CACHE.move_to_end(cache_key)
+                return list(cached_vec)
+
     settings = runtime_resilience_settings_from_env()
     max_attempts = _positive_int_env("EMBEDDING_QUERY_MAX_ATTEMPTS", 3)
     retry_base = _positive_float_env("EMBEDDING_QUERY_RETRY_BASE_DELAY", 1.0)
+    target_text = clean_text or text
 
     async def operation(effective_timeout: float) -> list[float]:
         # Chỉ truyền request_timeout nếu callable hỗ trợ (tránh vỡ test stub 1 tham số).
@@ -108,10 +140,10 @@ async def embed_query(text: str) -> list[float]:
             param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values()
         ):
             embedding = await asyncio.to_thread(
-                _embed_sync, text, request_timeout=effective_timeout
+                _embed_sync, target_text, request_timeout=effective_timeout
             )
         else:
-            embedding = await asyncio.to_thread(_embed_sync, text)
+            embedding = await asyncio.to_thread(_embed_sync, target_text)
         if len(embedding) != EMBEDDING_DIMENSIONS:
             raise ValueError(
                 f"Query embedding dimension mismatch: got {len(embedding)}, "
@@ -131,7 +163,13 @@ async def embed_query(text: str) -> list[float]:
         ),
         sleep=asyncio.sleep,
     )
-    return embedding
+    if use_cache and clean_text:
+        with _QUERY_EMBEDDING_CACHE_LOCK:
+            _QUERY_EMBEDDING_CACHE[cache_key] = list(embedding)
+            _QUERY_EMBEDDING_CACHE.move_to_end(cache_key)
+            while len(_QUERY_EMBEDDING_CACHE) > _QUERY_EMBEDDING_CACHE_MAX:
+                _QUERY_EMBEDDING_CACHE.popitem(last=False)
+    return list(embedding)
 
 
 def _positive_int_env(name: str, default: int) -> int:

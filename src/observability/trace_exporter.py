@@ -153,14 +153,17 @@ def build_observability_event(
             or decision.get("action")
         ),
         retrieval_candidates_count=sum(
-            int(_as_dict(channels.get(name)).get("count") or 0) for name in ("dense", "bm25")
+            int(_as_dict(channels.get(name)).get("count") or 0)
+            for name in ("dense", "bm25", "graph")
         ),
         packed_context_items_count=selected_count or len(packed.get("items", []) or []),
         retrieval_attempts=int(result.get("retrieval_attempt", state.get("retrieval_attempt", 0)) or 0),
         evidence_usable=assessment.get("usable") if assessment else None,
         answer_quality_passed=quality.get("passed") if quality else None,
         critical_issues_count=sum(
-            1 for issue in issues if isinstance(issue, dict) and issue.get("severity") == "critical"
+            1
+            for issue in issues
+            if isinstance(issue, dict) and issue.get("severity") in {"error", "critical"}
         ),
         warnings_count=warnings_count,
         cache_hit=result.get("cache_hit", state.get("cache_hit")),
@@ -376,11 +379,38 @@ def _build_stage_telemetry(
                 )
             )
         both_failed = all(stage.status == "failed" for stage in stages[-2:])
+        graph_succeeded_with_candidates = False
+        if "graph" in channels:
+            graph_channel = _as_dict(channels.get("graph"))
+            graph_err = _safe_error_type(graph_channel.get("error"))
+            g_family, g_owner = classify_error(graph_err, "graph") if graph_err else (None, None)
+            graph_status_raw = str(graph_channel.get("status") or "")
+            if graph_err:
+                g_stage_status = "degraded"
+            elif graph_status_raw in {"disabled", "no_anchors"}:
+                g_stage_status = "skipped"
+            else:
+                g_stage_status = "success"
+                graph_succeeded_with_candidates = int(graph_channel.get("count") or 0) > 0
+            stages.append(
+                _stage(
+                    "retrieval/neo4j",
+                    "graph",
+                    g_stage_status,
+                    _optional_float(graph_channel.get("elapsed_ms")),
+                    error_family=g_family,
+                    error_owner=g_owner,
+                    error_type=graph_err,
+                    candidate_count=int(graph_channel.get("count") or 0),
+                    candidate_ids=_candidate_ids(retrieval, "graph"),
+                )
+            )
+        all_channels_failed = both_failed and not graph_succeeded_with_candidates
         stages.append(
             _stage(
                 "retrieval/fusion",
                 "rrf",
-                "skipped" if both_failed else "success",
+                "skipped" if all_channels_failed else "success",
                 candidate_count=int(retrieval.get("fused_candidate_count") or 0),
                 candidate_ids=_candidate_ids(retrieval, "fused"),
             )
@@ -416,7 +446,7 @@ def _build_stage_telemetry(
             _stage(
                 "retrieval/context_packer",
                 "pack",
-                "skipped" if both_failed else "success",
+                "skipped" if all_channels_failed else "success",
                 candidate_count=len(retrieval.get("selected_ids") or []),
                 candidate_ids=[
                     str(item)

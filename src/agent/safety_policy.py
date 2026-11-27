@@ -75,7 +75,8 @@ def evaluate_safety(
     previous = _latest_user_message(conversation_history)
     if not previous or _evaluate_single_safety_query(previous) is not None:
         return None
-    return _evaluate_single_safety_query(f"{previous}. {query}")
+    clean_prev = previous.rstrip(".!?; ")
+    return _evaluate_single_safety_query(f"{clean_prev}. {query}")
 
 
 def _evaluate_single_safety_query(query: str) -> SafetyDecision | None:
@@ -281,7 +282,33 @@ def _acne_fulminans(text: str) -> bool:
     )
 
 
+ISOTRETINOIN_CONCEPTS: tuple[str, ...] = (
+    "isotretinoin",
+    "roaccutane",
+    "accutane",
+    "acnotin",
+    "nimegen",
+    "curacne",
+    "sotret",
+    "claravis",
+    "absorica",
+)
+
+
 def _isotretinoin_pregnancy(text: str) -> bool:
+    # Câu hỏi tra cứu khoảng thời gian chờ đào thải sau khi đã ngưng/hoàn thành isotretinoin
+    # cần được chuyển vào luồng truy xuất bằng chứng (1 tháng sau ngưng thuốc), trừ khi đang mang thai.
+    active_pregnancy_now = re.search(
+        r"\b(?:dang\s+(?:mang\s+thai|co\s+thai|co\s+bau|bau)|phat\s+hien.{0,20}(?:mang\s+thai|co\s+thai|co\s+bau)|thu\s+(?:que|thai).{0,20}2\s+vach)\b",
+        text,
+    )
+    post_stop_washout_inquiry = re.search(
+        r"\b(?:sau\s+khi|khi\s+da|da)\s+(?:ngung|nghi|dung|hoan\s+thanh|ket\s+thuc|het\s+lieu\s+trinh)\b.{0,80}\b(?:bao\s+lau|khi\s+nao|may\s+thang|may\s+tuan)\b",
+        text,
+    )
+    if post_stop_washout_inquiry is not None and active_pregnancy_now is None:
+        return False
+
     negative_pregnancy = (
         "khong mang thai",
         "khong co thai",
@@ -290,7 +317,7 @@ def _isotretinoin_pregnancy(text: str) -> bool:
         "not pregnant",
     )
     concept_groups = (
-        ("isotretinoin",),
+        ISOTRETINOIN_CONCEPTS,
         (
             "mang thai",
             "co thai",
@@ -308,6 +335,7 @@ def _isotretinoin_pregnancy(text: str) -> bool:
                 concept_groups,
                 active_group_indexes=(1,),
                 required_owner=owner,
+                max_span_tokens=36,
             )
             for owner in (True, False)
         )
@@ -315,6 +343,7 @@ def _isotretinoin_pregnancy(text: str) -> bool:
         text,
         concept_groups,
         active_group_indexes=(1,),
+        max_span_tokens=36,
     )
 
 
@@ -322,7 +351,7 @@ def _isotretinoin_neurologic(text: str) -> bool:
     return has_local_concept_groups(
         text,
         (
-            ("isotretinoin",),
+            ISOTRETINOIN_CONCEPTS,
             ("dau dau du doi", "dau dau rat nang", "severe headache"),
             ("nhin mo", "mo mat", "blurred vision", "buon non", "non"),
         ),
@@ -334,7 +363,7 @@ def _isotretinoin_pregnancy_and_mental_health(text: str) -> bool:
     return has_local_concept_groups(
         text,
         (
-            ("isotretinoin",),
+            ISOTRETINOIN_CONCEPTS,
             (
                 "mang thai",
                 "co thai",

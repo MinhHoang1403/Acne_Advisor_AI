@@ -106,7 +106,7 @@ the cache mount and `docker compose exec backend python -c "import torch; print(
 Never delete data or rebuild the knowledge index to fix DNS, GPU or credential
 errors. Retry just FE/BE with `docker compose ... up -d --no-deps backend frontend`;
 use the same GPU override as the original start. Check the active identity through
-`/api/health` -> `checks.qdrant.knowledge_build_id`, and verify counts 536/32 through
+`/api/health` -> `checks.qdrant.knowledge_build_id`, and verify counts 968/32 through
 Qdrant's API. No new database mounts or named data volumes are needed.
 
 ### Runtime audit and operational limits
@@ -280,10 +280,11 @@ recreate, or delete the Qdrant knowledge index.
 The runtime uses exact normalized answer cache `v10`. Cache identity
 includes provider, model, pipeline fingerprint, and the normalized question; no
 semantic-similarity lookup is performed. Runtime retrieval is read-only
-Dense + native BM25 + RRF, local BGE reranking, and whole-chunk packing over
-`acne_knowledge`; it does not query EntityCards or Neo4j. Knowledge compilation,
-activation, reindexing, and embedding are separate maintenance operations rather
-than application-startup steps.
+Dense + native BM25 + Neo4j Lexical/Clinical Graph + Tri-Channel RRF, local BGE
+reranking (with `NEXT_CHUNK` table continuation scoring), and whole-chunk packing
+over `acne_knowledge` (with fail-open degradation when Neo4j is unavailable).
+Knowledge compilation, activation, reindexing, and embedding are separate
+maintenance operations rather than application-startup steps.
 
 ## Request Observability
 
@@ -321,7 +322,7 @@ checks.
 
 | Script | Responsibility |
 | --- | --- |
-| `knowledge_build.py` | controlled build, validate and status |
+| `knowledge_build.py`, `sync_knowledge_graph.py` | controlled build, validate, status and Neo4j 2-layer graph sync |
 | `init_schema.py`, `init_chat_schema.py` | relational schema initialization |
 | `inspect_runtime_readiness.py`, `pre_ui_runtime_check.py` | local readiness |
 | `check_reproducible_environment.py`, `check_release_readiness.py` | environment and release-readiness checks |
@@ -393,8 +394,8 @@ Windows Application Control previously blocked the Python `select` extension.
 On 25 October 2026 the existing environment could import `select` and Torch CUDA
 again; no security policy or system DLL was changed by this task. Keep checking
 this separately from the Linux API image and GitHub Windows CI. Docker operation
-does not repair or prove the underlying Windows security policy. The isolated
-thesis evaluator recipe remains `evaluation/Dockerfile.thesis` and is not needed
+does not repair or prove the underlying Windows security policy. Quantitative
+evaluation runs locally via `evaluation/ragas_evaluation.ipynb` and is not needed
 to start the application.
 
 `.env`, provider secrets, caches, databases, snapshots and generated reports

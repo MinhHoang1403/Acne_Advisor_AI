@@ -39,8 +39,8 @@ export default function EmptyState({ onSendQuestion }) {
         Hỏi về triệu chứng, hoạt chất, routine hoặc dấu hiệu cần đi khám.
       </p>
       <div className="empty-state-suggestions">
-        {SUGGESTED_QUESTIONS.map((q, i) => (
-          <button key={i} className="suggestion-btn" onClick={() => onSendQuestion(q.prompt)}>
+        {SUGGESTED_QUESTIONS.map((q) => (
+          <button type="button" key={q.title} className="suggestion-btn" onClick={() => onSendQuestion(q.prompt)}>
             <span className="suggestion-btn-title">{q.title}</span>
             <span className="suggestion-btn-text">{q.text}</span>
           </button>

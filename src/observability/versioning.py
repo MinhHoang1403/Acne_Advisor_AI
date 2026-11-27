@@ -63,6 +63,11 @@ def build_pipeline_version_manifest(
     reranker_enabled = _env_bool(value("RERANKER_ENABLED", "false"), False)
     reranker_model = str(value("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3") or "").strip()
     reranker_precision = canonical_reranker_precision(value("RERANKER_PRECISION", "bfloat16"))
+    graph_rag_enabled = _env_bool(value("GRAPH_RAG_ENABLED", "false"), False)
+    graph_rag_weight = _env_float(value("GRAPH_RAG_WEIGHT", "0.85"), 0.85)
+    graph_rag_neighbor_expansion = _env_bool(
+        value("GRAPH_RAG_NEIGHBOR_EXPANSION_ENABLED", "true"), True
+    )
     active_manifest_path = knowledge_manifest_path or DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST
     active_build_id = resolve_active_knowledge_build_id(active_manifest_path)
     from src.ingestion.manifest import load_build_manifest
@@ -84,6 +89,11 @@ def build_pipeline_version_manifest(
         "rrf_k": 60,
         "rrf_dense_weight": 1.0,
         "rrf_bm25_weight": 1.0,
+        "graph_rag": {
+            "enabled": graph_rag_enabled,
+            "weight": round(graph_rag_weight, 4) if graph_rag_enabled else None,
+            "neighbor_expansion": graph_rag_neighbor_expansion if graph_rag_enabled else False,
+        },
         "reranker": {
             "enabled": reranker_enabled,
             "model": reranker_model if reranker_enabled else None,
@@ -92,7 +102,7 @@ def build_pipeline_version_manifest(
         "context_packer_version": "bounded_whole_chunk_admission",
         "retrieval_candidate_limit": _env_int(value("RETRIEVAL_CANDIDATE_LIMIT", "16"), 16),
         "retrieval_context_max_items": _env_int(value("RETRIEVAL_CONTEXT_MAX_ITEMS", "9"), 9),
-        "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "7000"), 7000),
+        "retrieval_context_max_chars": _env_int(value("RETRIEVAL_CONTEXT_MAX_CHARS", "10000"), 10000),
         "max_retrieval_attempts": 2,
         "retry_evidence_policy": "retain_deduplicate_retry_query_rerank_repack",
         "agent_decision_version": "direct_proposition_support_action_decision",
@@ -244,6 +254,13 @@ def _effective_contract_version(configured: Any, *, legacy: set[str], default: s
 def _env_int(value: Any, default: int) -> int:
     try:
         return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
     except (TypeError, ValueError):
         return default
 

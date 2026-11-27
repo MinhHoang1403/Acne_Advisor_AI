@@ -99,9 +99,23 @@ def _effective_scope_query(query: str) -> str:
 def _requested_entity_scope_errors(query: str, answer: str) -> list[AnswerQualityIssue]:
     """Catch explicit entity omissions without claiming semantic entailment."""
 
-    requested = _matched_entity_names(_effective_scope_query(query))
+    effective_query = _effective_scope_query(query)
+    requested = _matched_entity_names(effective_query)
     addressed = _matched_entity_names(answer)
-    missing = sorted(set(requested) - set(addressed))
+    satisfied_keys = set(addressed)
+    # Nếu câu hỏi nêu tên biệt dược (DrugProduct) còn câu trả lời thảo luận trực tiếp
+    # toàn bộ hoạt chất chuẩn (active_ingredients) cấu thành biệt dược đó, coi thực thể đã được đáp ứng.
+    for card in _scope_normalizer().match_alias(effective_query):
+        if card.entity_type == "drug_product" and card.active_ingredients:
+            ing_keys = {
+                f"active_ingredient:{ing.casefold()}"
+                for ing in card.active_ingredients
+                if ing
+            }
+            if ing_keys and ing_keys.issubset(satisfied_keys):
+                satisfied_keys.add(f"{card.entity_type}:{card.canonical_name.casefold()}")
+
+    missing = sorted(set(requested) - satisfied_keys)
     if len(requested) >= 2 and missing:
         return [
             _issue(
@@ -216,7 +230,15 @@ def _evidence_locality_diagnostics(
     return {
         "diagnostic_only": True,
         "semantic_entailment_checked": False,
-        "retrieval_attempt": trace.get("attempt") or trace.get("retrieval_attempt"),
+        "retrieval_attempt": (
+            trace.get("attempt")
+            or trace.get("retrieval_attempt")
+            or (
+                trace.get("retry_evidence", {}).get("retrieval_attempt")
+                if isinstance(trace.get("retry_evidence"), dict)
+                else None
+            )
+        ),
         "selected_ids": list(trace.get("selected_ids") or []),
         "final_cited_source_ids": list(dict.fromkeys(final_source_ids)),
         "items": items,

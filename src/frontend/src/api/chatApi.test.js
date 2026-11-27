@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-import { checkBackendHealth, fetchModels, fetchMessages, parseApiError, sendChatMessage } from './chatApi.js';
+import { checkBackendHealth, fetchModels, fetchMessages, parseApiError, sendChatMessage, streamChatMessage } from './chatApi.js';
 
 function jsonResponse(status, body) {
   return new Response(JSON.stringify(body), {
@@ -271,3 +271,49 @@ test('frontend model selector keeps fallback routing details internal', () => {
   assert.match(messageSource, /answerModelDisplayName/);
   assert.doesNotMatch(messageSource, /responseBadgeLabel|requested_provider|requested_model|dự phòng từ/);
 });
+
+test('streamChatMessage parses SSE stage, delta, and complete frames', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const sseBody = [
+    'event: stage\ndata: {"stage":"retrieve","label":"Đang tra cứu..."}\n\n',
+    'event: delta\ndata: {"delta":"Xin "}\n\n',
+    'event: delta\ndata: {"delta":"chào"}\n\n',
+    'event: complete\ndata: {"answer":"Xin chào","session_id":"s-1","sources":["AAD"]}\n\n',
+  ].join('');
+
+  globalThis.fetch = async (url) => {
+    assert.match(String(url), /\/chat\/stream$/);
+    const encoder = new TextEncoder();
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(sseBody));
+          controller.close();
+        },
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+      },
+    );
+  };
+
+  const stages = [];
+  const deltas = [];
+  const result = await streamChatMessage({
+    message: 'Tư vấn mụn',
+    sessionId: 's-1',
+    onStage: (s) => stages.push(s.label),
+    onDelta: (d) => deltas.push(d),
+  });
+
+  assert.deepEqual(stages, ['Đang tra cứu...']);
+  assert.equal(deltas.join(''), 'Xin chào');
+  assert.equal(result.answer, 'Xin chào');
+  assert.equal(result.session_id, 's-1');
+});
+

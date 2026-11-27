@@ -34,6 +34,8 @@ CURRENT_STATE_MARKERS = (
     "bay gio",
     "luc nay",
     "den gio van",
+    "tu hom qua",
+    "tu toi qua",
     "hien",
     "nhung gio",
     "gio minh",
@@ -307,13 +309,28 @@ def is_prescription_execution_request(text: str) -> bool:
         ("ke", "toi", "thuoc"),
         ("ke", "don", "toi"),
         ("ke", "thuoc", "toi"),
+        ("ke", "toa", "toi"),
         ("chon", "toi", "lieu"),
         ("chon", "lieu", "toi"),
         ("cho", "toi", "lieu"),
         ("cho", "toi", "toa"),
         ("cho", "toi", "don"),
     )
-    return any(contains_bounded_sequence(normalized, pattern, max_gap=3) for pattern in patterns)
+    if any(contains_bounded_sequence(normalized, pattern, max_gap=3) for pattern in patterns):
+        return True
+    # Bắt các câu mệnh lệnh tiếng Việt đặt "cho tôi / cho em / giúp tôi" ở cuối mệnh đề sau động từ kê đơn / tính liều.
+    trailing_beneficiary_patterns = (
+        ("ke", "don", "cho"),
+        ("ke", "toa", "cho"),
+        ("tinh", "lieu", "cho"),
+        ("cho", "toi", "ke", "don"),
+        ("cho", "em", "ke", "don"),
+    )
+    return any(
+        contains_bounded_sequence(normalized, pattern, max_gap=12)
+        and any(f"{prep} {fp}" in normalized for prep in ("cho", "giup") for fp in FIRST_PERSON)
+        for pattern in trailing_beneficiary_patterns
+    )
 
 
 def _is_personalized_quantitative_dose_selection(text: str) -> bool:
@@ -662,7 +679,9 @@ def _is_reported_first_person(
 
 @lru_cache(maxsize=1)
 def _canonical_medication_phrases() -> tuple[tuple[str, ...], ...]:
-    """Lấy identity thuốc từ taxonomy owner hiện có, không duy trì allowlist thứ hai."""
+    """Lấy identity thuốc từ taxonomy owner và cầu nối biệt dược thương mại."""
+
+    from src.knowledge.lexical_graph import EXTENDED_CLINICAL_BRAND_SYNONYMS
 
     normalizer = DrugEntityNormalizer()
     supported_types = {"drug_product", "active_ingredient", "drug_class"}
@@ -673,6 +692,11 @@ def _canonical_medication_phrases() -> tuple[tuple[str, ...], ...]:
         and any(card.entity_type in supported_types for card in cards)
         and normalize_text(alias)
     }
+    for _brand_display, aliases, _targets in EXTENDED_CLINICAL_BRAND_SYNONYMS:
+        for alias in aliases:
+            norm_alias = normalize_text(alias)
+            if norm_alias:
+                phrases.add(tuple(norm_alias.split()))
     phrases.add(("thuoc",))
     return tuple(sorted(phrases, key=lambda phrase: (-len(phrase), phrase)))
 

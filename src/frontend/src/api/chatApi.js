@@ -69,8 +69,10 @@ export async function parseApiError(response, fallbackPrefix = 'Lỗi server') {
 
   const backendMessage = typeof detail === 'object' && detail?.message ? detail.message : null;
   let message = STATUS_MESSAGES[response.status] || `${fallbackPrefix}: ${response.status}`;
-  if ((response.status === 400 || response.status === 422) && backendMessage) {
+  if ((response.status === 400 || response.status === 409 || response.status === 422) && backendMessage) {
     message = backendMessage;
+  } else if (response.status === 409) {
+    message = 'Yêu cầu trước đang được xử lý hoặc xung đột trạng thái. Vui lòng thử lại sau giây lát.';
   } else if (response.status === 400 || response.status === 422) {
     message = 'Yêu cầu không hợp lệ. Vui lòng kiểm tra nội dung và thử lại.';
   }
@@ -148,6 +150,167 @@ export async function sendChatMessage({
     throw error;
   }
 
+}
+
+function parseSseBlocks(buffer) {
+  const normalized = buffer.replace(/\r\n/g, '\n');
+  const blocks = normalized.split('\n\n');
+  const remainder = blocks.pop() || '';
+  const events = [];
+
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+    let eventName = 'message';
+    const dataLines = [];
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    }
+    if (dataLines.length === 0) continue;
+    try {
+      events.push({ event: eventName, data: JSON.parse(dataLines.join('\n')) });
+    } catch {
+      // Bỏ qua frame rỗng hoặc comment keep-alive không phải JSON.
+    }
+  }
+  return { events, remainder };
+}
+
+/**
+ * Gửi chat request qua SSE (`/chat/stream`) để hiển thị tiến độ và từng cụm từ thời gian thực,
+ * tự động fallback sang JSON nếu môi trường mock/proxy không trả `text/event-stream`.
+ */
+export async function streamChatMessage({
+  message,
+  sessionId,
+  conversationHistory = [],
+  llmProvider,
+  llmModel,
+  allowModelFallback,
+  bypassCache = false,
+  requestId = globalThis.crypto.randomUUID(),
+  signal,
+  timeoutMs = CHAT_TIMEOUT_MS,
+  onStage,
+  onDelta,
+  onReset,
+}) {
+  const payloadBody = JSON.stringify({
+    request_id: requestId,
+    message,
+    user_id: null,
+    session_id: sessionId,
+    conversation_history: conversationHistory,
+    llm_provider: llmProvider,
+    llm_model: llmModel,
+    allow_model_fallback: allowModelFallback,
+    bypass_cache: bypassCache,
+  });
+
+  try {
+    return await fetchWithTimeout(
+      buildApiUrl('/chat/stream'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream, application/json',
+        },
+        signal,
+        body: payloadBody,
+      },
+      timeoutMs,
+      async (response) => {
+        if (!response.ok) throw await parseApiError(response);
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('text/event-stream') || !response.body) {
+          return await response.json();
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let completedPayload = null;
+
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parsed = parseSseBlocks(buffer);
+            buffer = parsed.remainder;
+
+            for (const frame of parsed.events) {
+              if (frame.event === 'stage') {
+                onStage?.(frame.data);
+              } else if (frame.event === 'delta' && typeof frame.data?.delta === 'string') {
+                onDelta?.(frame.data.delta);
+              } else if (frame.event === 'reset') {
+                onReset?.();
+              } else if (frame.event === 'complete') {
+                completedPayload = frame.data;
+              } else if (frame.event === 'error') {
+                const status = Number(frame.data?.status) || 500;
+                const detailMsg = frame.data?.detail?.message;
+                const err = new Error(
+                  (status === 400 || status === 409 || status === 422) && detailMsg
+                    ? detailMsg
+                    : STATUS_MESSAGES[status] || detailMsg || 'Backend không thể xử lý yêu cầu. Vui lòng thử lại.',
+                );
+                err.status = status;
+                err.code = frame.data?.detail?.code;
+                throw err;
+              }
+            }
+          }
+        } finally {
+          try {
+            reader.releaseLock();
+          } catch {
+            // Reader có thể đã đóng khi stream kết thúc hoặc bị hủy.
+          }
+        }
+
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+          const tail = parseSseBlocks(`${buffer}\n\n`);
+          for (const frame of tail.events) {
+            if (frame.event === 'complete') completedPayload = frame.data;
+          }
+        }
+
+        if (!completedPayload) {
+          const err = new Error('Luồng phản hồi bị ngắt trước khi hoàn tất. Vui lòng thử lại.');
+          err.status = 502;
+          err.code = 'incomplete_stream';
+          throw err;
+        }
+        return completedPayload;
+      },
+    );
+  } catch (err) {
+    if (err?.status) throw err;
+    if (signal?.aborted) {
+      const error = new Error('Yêu cầu đã được hủy.');
+      error.isCanceled = true;
+      throw error;
+    }
+    const timedOut = err?.name === 'TimeoutError';
+    const error = new Error(
+      timedOut
+        ? 'Yêu cầu xử lý quá thời gian. Vui lòng thử lại hoặc chọn mô hình khác.'
+        : `Không thể kết nối tới backend. Hãy kiểm tra FastAPI tại ${API_BASE_URL}.`,
+    );
+    error.cause = err;
+    error.status = timedOut ? 504 : null;
+    error.isNetworkError = !timedOut;
+    error.isTimeout = timedOut;
+    throw error;
+  }
 }
 
 /**

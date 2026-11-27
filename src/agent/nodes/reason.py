@@ -72,21 +72,16 @@ def _prioritize_supporting_contexts(
 
     matched_items = [item for item in packed_items if _packed_item_id(item) in order_map]
     if matched_items:
+        from src.retrieval.context_packer import _render_header
+
         matched_items.sort(key=lambda item: order_map.get(_packed_item_id(item), len(order_map)))
         rebuilt_blocks: list[str] = []
         for idx, item in enumerate(matched_items, 1):
             payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
-            source_id = str(
-                payload.get("source_id")
-                or payload.get("source_path")
-                or payload.get("source_file")
-                or payload.get("document_id")
-                or "unknown"
-            )
             chunk_id = str(payload.get("chunk_id") or item.get("item_id") or f"chunk-{idx}")
             text = str(item.get("text") or "").strip()
             if text:
-                rebuilt_blocks.append(f"[Evidence {idx} | source={source_id} | chunk={chunk_id}]\n{text}")
+                rebuilt_blocks.append(f"{_render_header(payload, chunk_id, idx)}\n{text}")
         updated_packed["items"] = matched_items
         updated_packed["chunk_items_count"] = len(matched_items)
         if rebuilt_blocks:
@@ -136,6 +131,12 @@ async def generate_answer_node(state: ClinicalState) -> dict:
         packed_items = packed_context.get("items") or []
         context_limit = len(packed_items) if packed_items else 5
         answer_contexts = _select_answer_contexts(contexts, limit=context_limit, query=question)
+        if isinstance(supporting_ids, list) and supporting_ids and answer_contexts:
+            from src.agent.source_presentation import build_source_allowlist
+
+            narrowed_allowlist = build_source_allowlist(None, answer_contexts)
+            if narrowed_allowlist:
+                source_allowlist = narrowed_allowlist
         # Chỉ truyền packed_context_text khi thực sự có nội dung, tránh che mất fallback legacy contexts.
         packed_context_text = str(packed_context.get("context_text") or "") or None
 
@@ -190,6 +191,7 @@ async def generate_answer_node(state: ClinicalState) -> dict:
             "draft_answer": draft,
             "vector_contexts": answer_contexts,
             "packed_context": packed_context,
+            "source_allowlist": source_allowlist,
             "sources": [
                 str(entry.get("source_id"))
                 for entry in source_allowlist

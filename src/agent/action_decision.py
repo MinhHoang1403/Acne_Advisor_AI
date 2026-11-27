@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 AGENT_DECISION_VERSION = "direct_proposition_support_action_decision"
 DECISION_EVIDENCE_MAX_ITEMS = 8
 _EXPLICIT_TOPIC_RESET = re.compile(
-    r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b[^.!?;\n]*[.!?;\n]+\s*(?P<question>.+)$",
+    r"^\s*(?:bỏ\s+qua|bo\s+qua|ignore)\b(?P<superseded>[^.!?;\n]*)[.!?;\n]+\s*(?P<question>.+)$",
     flags=re.IGNORECASE | re.DOTALL,
 )
 
@@ -87,11 +87,13 @@ def build_agent_decision_prompt(state: ClinicalState) -> tuple[str, str]:
         "state medical facts, provide treatment advice, or reveal reasoning. "
         "For retrieve and retry, retrieval_query must be a concise, self-contained search query "
         "that works without conversation history. It must preserve the current intent, name the "
-        "primary medical entities, requested relationship, and material qualifiers. Always keep the "
-        "user's original language (Vietnamese) keywords in retrieval_query so lexical BM25 matches "
-        "Vietnamese clinical documents; do not replace a Vietnamese question with an English-only "
-        "query (you may optionally append canonical English medical terms alongside the Vietnamese "
-        "keywords when helpful). "
+        "primary medical entities, requested relationship, and material qualifiers. Because the "
+        "curated dermatology corpus combines international English guidelines (~91%) and Vietnamese "
+        "clinical guidelines (~9%), when the user's question is in Vietnamese you MUST construct a "
+        "concise bilingual retrieval_query that keeps the core Vietnamese keywords AND appends "
+        "canonical English medical terms for the entities, mechanisms, skin-care formulations, "
+        "procedures, or safety concepts (do not emit a Vietnamese-only or English-only query for a "
+        "Vietnamese question). "
         "At retrieval_attempt 0, choose retrieve with an effective standalone search query or "
         "abstain; for retrieve, set missing_evidence to null. After the first retrieval execution, "
         "use retry, never retrieve, for a later "
@@ -530,12 +532,31 @@ def _apply_explicit_topic_reset(
     decision: AgentDecision,
     state: ClinicalState,
 ) -> AgentDecision:
-    current_question, reset_requested = _decision_question(state)
+    raw_question = str(state.get("normalized_question") or state.get("user_question") or "").strip()
+    match = _EXPLICIT_TOPIC_RESET.match(raw_question)
     if (
-        reset_requested
-        and int(state.get("retrieval_attempt", 0) or 0) == 0
-        and decision.action == "retrieve"
+        not match
+        or int(state.get("retrieval_attempt", 0) or 0) != 0
+        or decision.action != "retrieve"
     ):
+        return decision
+    current_question = " ".join((match.group("question") or "").split())
+    if not current_question:
+        return decision
+    superseded_raw = " ".join((match.group("superseded") or "").split())
+    ignore_words = {"chuyện", "chuyen", "việc", "viec", "phần", "phan", "câu", "cau", "đó", "do", "này", "nay", "đi", "di", "nhé", "nhe"}
+    superseded_tokens = {
+        tok
+        for tok in re.findall(r"\w+", superseded_raw.casefold(), flags=re.UNICODE)
+        if len(tok) >= 3 and tok not in ignore_words
+    }
+    proposed_query = (decision.retrieval_query or "").strip()
+    if not proposed_query:
+        return decision.model_copy(update={"retrieval_query": current_question})
+    proposed_tokens = set(re.findall(r"\w+", proposed_query.casefold(), flags=re.UNICODE))
+    # Chỉ ghi đè bằng câu hỏi gốc khi model làm rò rỉ chủ đề đã yêu cầu bỏ qua vào retrieval_query;
+    # nếu model đã tuân thủ loại bỏ chủ đề cũ thì giữ nguyên truy vấn song ngữ đã tối ưu.
+    if not superseded_tokens or (superseded_tokens & proposed_tokens):
         return decision.model_copy(update={"retrieval_query": current_question})
     return decision
 

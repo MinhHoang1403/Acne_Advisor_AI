@@ -23,19 +23,22 @@ async def clear_cache():
         return
         
     print("Clearing cache keys: cache:answer:*")
-    
-    # Use scan to find keys and delete them
-    cursor = 0
-    deleted_count = 0
-    while True:
-        cursor, keys = await redis.scan(cursor, match="cache:answer:*", count=100)
-        if keys:
-            await redis.delete(*keys)
-            deleted_count += len(keys)
-        if cursor == 0:
-            break
-            
-    print(f"Deleted {deleted_count} cache keys.")
+
+    try:
+        # Use scan to find keys and delete them
+        cursor = 0
+        deleted_count = 0
+        while True:
+            cursor, keys = await redis.scan(cursor, match="cache:answer:*", count=100)
+            if keys:
+                await redis.delete(*keys)
+                deleted_count += len(keys)
+            if cursor == 0:
+                break
+
+        print(f"Deleted {deleted_count} cache keys.")
+    finally:
+        await redis.aclose()
 
 if __name__ == "__main__":
     asyncio.run(clear_cache())
