@@ -12,6 +12,7 @@ Thư mục này chứa quy trình đánh giá định lượng toàn diện hệ
 | `evaluation/judge_reliability.py` | Kiểm định độ tin cậy của judge trên bản ghi đã có: `rescore` (chấm lại bằng một judge cố định, tắt chuỗi dự phòng) và `planted` (chèn mệnh đề y khoa sai có chủ đích để đo độ nhạy của Faithfulness). |
 | `evaluation/ablation.py` | Thí nghiệm ablation 3 cấu hình lồng nhau (`dense_bm25`, `dense_bm25_rerank`, `full_graphrag`) với một judge cố định, checkpoint riêng cho từng cấu hình. |
 | `evaluation/paired_comparison.py` | So sánh ghép cặp hai lần chấm theo từng ca: chênh lệch trung bình, tương quan hạng Spearman, số ca thắng/hòa/thua và sign test chính xác. |
+| `evaluation/safety_adversarial.json`, `evaluation/safety_adversarial.py` | Bộ câu đối kháng có nhãn cho 10 luật an toàn deterministic (không dấu, văn nói, tên biệt dược, tách ý 2 lượt + ca đối chứng) và script đo offline tỷ lệ bỏ sót / báo động nhầm. Chỉ dùng để đo, không dùng để tinh chỉnh luật. |
 | `evaluation/results/` | Thư mục chứa kết quả xuất ra sau mỗi lần chạy: `ragas_evaluation_report.md`, `ragas_evaluation_raw.json` cùng các file checkpoint tiến trình. |
 
 ## 2. Các chỉ số đánh giá
@@ -39,6 +40,7 @@ Các lệnh dưới đây đọc `.env` giống notebook và ghi kết quả và
 | Đồng thuận giữa các judge | `rescore` với `--judge mistralai/mistral-large-4-1t-a52b --label mistral` (hoặc judge khác) | Như trên |
 | Độ nhạy với lỗi cài sẵn | `python -m evaluation.judge_reliability planted --input evaluation/results/ragas_evaluation_raw.json --limit 20` | Chỉ NVIDIA (chỉ chấm Faithfulness) |
 | Ablation | `python -m evaluation.ablation run --config dense_bm25` (lặp lại với `dense_bm25_rerank`, `full_graphrag`) | Khoảng 250 lượt gọi Gemini mỗi cấu hình |
+| Lỗ hổng của luật an toàn | `python -m evaluation.safety_adversarial` | Không (chạy offline) |
 | So sánh hai lần chấm bất kỳ | `python -m evaluation.paired_comparison --baseline A.json --candidate B.json --baseline-label ... --candidate-label ... --title ... --output report.md` | Không |
 
 **Cách đọc kết quả:**
