@@ -972,12 +972,17 @@ async def score_records_with_ragas(
             enriched = dict(rec)
             scores: dict[str, float | None] = {key: None for key in RAGAS_METRIC_KEYS}
             metric_errors: dict[str, str] = {}
+            # Ghi lại chính xác judge model nào đã trả điểm cho từng metric. Chuỗi dự phòng
+            # và circuit-breaker có thể đổi judge giữa chừng; thiếu thông tin này thì không
+            # thể biết một lần chạy có bị trộn nhiều "giám khảo" khác nhau hay không.
+            metric_judge_models: dict[str, str] = {}
 
             if rec["expected_behavior"] == "abstain":
                 enriched["abstention_correct"] = _evaluate_safe_abstention(rec)
                 enriched["unexpected_abstention"] = False
                 enriched["ragas_scores"] = scores
                 enriched["metric_errors"] = metric_errors
+                enriched["metric_judge_models"] = metric_judge_models
                 scored_records.append(enriched)
                 continue
 
@@ -988,6 +993,9 @@ async def score_records_with_ragas(
                 enriched["unexpected_abstention"] = bool(cached_item.get("unexpected_abstention"))
                 enriched["ragas_scores"] = dict(cached_item["ragas_scores"])
                 enriched["metric_errors"] = {}
+                # Checkpoint cũ (trước khi có trường này) không biết judge thực tế -> để rỗng,
+                # tuyệt đối không tự gán judge chính để tránh ghi nhận sai nguồn điểm.
+                enriched["metric_judge_models"] = dict(cached_item.get("metric_judge_models") or {})
                 enriched["score_signature"] = score_sig
                 scored_records.append(enriched)
                 if verbose:
@@ -1073,6 +1081,7 @@ async def score_records_with_ragas(
                             )
                             consecutive_transient_failures[model_name] = 0
                             degraded_timeout_models.discard(model_name)
+                            metric_judge_models[key] = model_name
                             if pacing_delay > 0:
                                 await asyncio.sleep(pacing_delay)
                             return res
@@ -1156,6 +1165,7 @@ async def score_records_with_ragas(
 
             enriched["ragas_scores"] = scores
             enriched["metric_errors"] = metric_errors
+            enriched["metric_judge_models"] = metric_judge_models
             enriched["score_signature"] = score_sig
             scored_records.append(enriched)
             if resolved_checkpoint is not None:
@@ -1275,10 +1285,22 @@ def summarize_evaluation(
     )
     total_tokens = sum(int((r.get("token_usage") or {}).get("total") or 0) for r in scored_records)
 
+    # Đếm số lượt điểm metric do từng judge model trả về; điểm không rõ nguồn (checkpoint cũ)
+    # được tách riêng thành "unknown" để báo cáo không ngầm quy hết cho judge chính.
+    judge_model_usage: dict[str, int] = {}
+    for rec in answer_cases:
+        recorded = rec.get("metric_judge_models") or {}
+        for key in RAGAS_METRIC_KEYS:
+            if not isinstance(rec.get("ragas_scores", {}).get(key), (int, float)):
+                continue
+            owner = str(recorded.get(key) or "unknown")
+            judge_model_usage[owner] = judge_model_usage.get(owner, 0) + 1
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dataset_name": (dataset_meta or {}).get("dataset_name", "acne_advisor_ragas_benchmark"),
         "judge_model": judge_model,
+        "judge_model_usage": dict(sorted(judge_model_usage.items())),
         "embedding_model": embedding_model,
         "kb_build_id": kb_build_id,
         "counts": {
@@ -1340,6 +1362,12 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
     latency = summary["latency_ms"]
     tokens = summary["token_usage"]
     abstention = summary["safe_abstention"]
+    usage = summary.get("judge_model_usage") or {}
+    usage_text = (
+        ", ".join(f"`{model}`: {count}" for model, count in usage.items())
+        if usage
+        else "không có dữ liệu"
+    )
 
     lines: list[str] = [
         "# Báo cáo Đánh giá Hệ thống Acne Advisor AI (RAGAS)",
@@ -1347,6 +1375,7 @@ def render_markdown_report(summary: dict[str, Any]) -> str:
         f"- **Thời điểm chạy (UTC):** `{summary['generated_at']}`",
         f"- **Bộ dữ liệu đánh giá:** `{summary['dataset_name']}` ({counts['total_cases']} câu hỏi: {counts['answer_cases']} câu trả lời, {counts['abstain_cases']} câu từ chối an toàn, {counts.get('multi_turn_cases', 0)} ca đa lượt)",
         f"- **Judge LLM (RAGAS):** `{summary['judge_model']}`",
+        f"- **Judge thực tế đã chấm (số lượt điểm metric):** {usage_text}",
         f"- **Embedding Model:** `{summary['embedding_model']}`",
         f"- **Knowledge Build ID:** `{summary.get('kb_build_id') or 'unknown'}`",
         "",

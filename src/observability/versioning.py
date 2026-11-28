@@ -19,6 +19,7 @@ from src.knowledge.versioning import (
     DEFAULT_ACTIVE_KNOWLEDGE_MANIFEST,
     resolve_active_knowledge_build_id,
 )
+from src.retrieval.graph_retriever import GRAPH_RAG_ENABLED_DEFAULT, GRAPH_RAG_WEIGHT_DEFAULT
 from src.retrieval.reranker import canonical_reranker_precision
 
 DEFAULT_ANSWER_CACHE_VERSION = "v10"
@@ -63,8 +64,12 @@ def build_pipeline_version_manifest(
     reranker_enabled = _env_bool(value("RERANKER_ENABLED", "false"), False)
     reranker_model = str(value("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3") or "").strip()
     reranker_precision = canonical_reranker_precision(value("RERANKER_PRECISION", "bfloat16"))
-    graph_rag_enabled = _env_bool(value("GRAPH_RAG_ENABLED", "false"), False)
-    graph_rag_weight = _env_float(value("GRAPH_RAG_WEIGHT", "0.85"), 0.85)
+    # Dùng chung default với retriever: nếu lệch, fingerprint sẽ ghi GraphRAG tắt trong khi
+    # retriever vẫn bật kênh Graph, làm cache identity không còn phản ánh đúng pipeline.
+    graph_rag_enabled = _env_bool(value("GRAPH_RAG_ENABLED", None), GRAPH_RAG_ENABLED_DEFAULT)
+    graph_rag_weight = _env_float(
+        value("GRAPH_RAG_WEIGHT", GRAPH_RAG_WEIGHT_DEFAULT), GRAPH_RAG_WEIGHT_DEFAULT
+    )
     graph_rag_neighbor_expansion = _env_bool(
         value("GRAPH_RAG_NEIGHBOR_EXPANSION_ENABLED", "true"), True
     )

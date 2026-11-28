@@ -351,3 +351,23 @@ async def test_cache_store_metadata_has_production_fingerprint_and_v10(
     assert captured["args"][3]["pipeline_fingerprint"] == "abc123fingerprint"
     assert captured["args"][3]["answer_version"] == "v10"
     assert captured["args"][3]["selected_evidence_ids"] == ["chunk-1"]
+
+
+def test_graph_rag_fingerprint_default_matches_retriever_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Khi thiếu biến môi trường, fingerprint phải ghi GraphRAG đúng như retriever thực sự chạy."""
+
+    from src.retrieval.graph_retriever import (
+        GRAPH_RAG_ENABLED_DEFAULT,
+        GRAPH_RAG_WEIGHT_DEFAULT,
+    )
+
+    monkeypatch.delenv("GRAPH_RAG_ENABLED", raising=False)
+    monkeypatch.delenv("GRAPH_RAG_WEIGHT", raising=False)
+    graph = build_pipeline_version_manifest()["graph_rag"]
+    assert graph["enabled"] is GRAPH_RAG_ENABLED_DEFAULT
+    assert graph["weight"] == GRAPH_RAG_WEIGHT_DEFAULT
+
+    disabled = build_pipeline_version_manifest({"GRAPH_RAG_ENABLED": "false"})["graph_rag"]
+    assert disabled == {"enabled": False, "weight": None, "neighbor_expansion": False}

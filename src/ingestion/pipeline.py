@@ -70,8 +70,8 @@ DEFAULT_BUILD_MANIFEST = Path("data/knowledge_build_manifest.json")
 LEGACY_INGESTION_MANIFEST = Path("data/ingestion_manifest.json")
 KNOWLEDGE_LOGICAL_COLLECTION = "acne_knowledge"
 ENTITY_LOGICAL_COLLECTION = "acne_entities"
-EXPECTED_KNOWLEDGE_POINTS = 536
-EXPECTED_ENTITY_POINTS = 32
+# Số điểm Qdrant kỳ vọng luôn đọc từ ``counts`` của build manifest đang kích hoạt; không giữ
+# hằng số dự phòng vì số chunk thay đổi theo từng build và hằng số cố định sẽ bị lỗi thời.
 EXPECTED_GRAPH_NODES = 32
 EXPECTED_GRAPH_RELATIONSHIPS = 27
 
@@ -535,6 +535,9 @@ async def activate_knowledge(
         "knowledge_alias": KNOWLEDGE_LOGICAL_COLLECTION,
         "entity_alias": ENTITY_LOGICAL_COLLECTION,
         "graph": graph_result,
+        # Ghi kết quả đồng bộ đồ thị từ vựng (số nút/quan hệ + hash bộ luật) để tầng GraphRAG
+        # được quản lý phiên bản ngang hàng với collection Qdrant của cùng build.
+        "lexical_graph": lexical_graph_result,
         "validation": cutover_validation,
     }
     save_build_manifest(manifest_path, manifest)
@@ -630,6 +633,19 @@ async def finalize_knowledge_activation(
     }
 
 
+def _positive_manifest_count(counts: dict[str, Any], key: str) -> int | None:
+    """Đọc một số lượng dương từ ``manifest.counts``; trả ``None`` nếu thiếu hoặc không hợp lệ."""
+
+    value = counts.get(key)
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return None
+    try:
+        parsed = int(value)
+    except ValueError:
+        return None
+    return parsed if parsed > 0 else None
+
+
 async def _validate_activated_live_state(manifest: dict[str, Any]) -> dict[str, Any]:
     """Read aliases, Qdrant schema/counts and Neo4j identity/counts only."""
 
@@ -662,10 +678,15 @@ async def _validate_activated_live_state(manifest: dict[str, Any]) -> dict[str, 
                 alias_errors.append(
                     f"Qdrant alias {alias_name} does not resolve to {expected_target}"
                 )
-        if not alias_errors:
-            counts = manifest.get("counts") or {}
-            expected_knowledge = int(counts.get("knowledge_chunks") or EXPECTED_KNOWLEDGE_POINTS)
-            expected_entities = int(counts.get("entities") or EXPECTED_ENTITY_POINTS)
+        counts = manifest.get("counts") or {}
+        expected_knowledge = _positive_manifest_count(counts, "knowledge_chunks")
+        expected_entities = _positive_manifest_count(counts, "entities")
+        if expected_knowledge is None or expected_entities is None:
+            # Fail-closed: thiếu số lượng kỳ vọng thì không thể kiểm định collection live.
+            alias_errors.append(
+                "Manifest counts.knowledge_chunks and counts.entities must be positive integers"
+            )
+        if not alias_errors and expected_knowledge is not None and expected_entities is not None:
             qdrant_layers.extend(
                 [
                     await validate_qdrant_collection(

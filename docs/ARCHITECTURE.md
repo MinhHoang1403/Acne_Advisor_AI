@@ -210,7 +210,8 @@ Deterministic checks remain authoritative for safety outcomes, evidence-gap
 classification, citation IDs, provenance, pipeline identity, retry accounting,
 provider/fallback identity, latency, and runtime errors. Quantitative RAG
 evaluation uses RAGAS (`evaluation/ragas_runner.py`, `evaluation/ragas_evaluation.ipynb`)
-with an independent NVIDIA NIM judge (`nvidia/nemotron-3-ultra-550b-a55b`), while
+with an independent NVIDIA NIM judge (primary `nvidia/nemotron-3.5-super-vl-120b-a12b`,
+fallbacks `mistralai/mistral-large-4-1t-a52b` and `nvidia/nemotron-3-ultra-550b-a55b`), while
 historical RAGChecker experiments remain archived under `research/`.
 
 PostgreSQL stores chat history, Redis stores versioned eligible answers,

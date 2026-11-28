@@ -33,6 +33,12 @@ from src.knowledge.lexical_graph import (
 
 logger = logging.getLogger(__name__)
 
+# Nguồn sự thật duy nhất cho giá trị mặc định của kênh GraphRAG khi thiếu biến môi trường.
+# Retriever (src/retrieval/service.py) và pipeline fingerprint (src/observability/versioning.py)
+# cùng đọc các hằng số này để cache identity luôn phản ánh đúng cấu hình truy xuất thực tế.
+GRAPH_RAG_ENABLED_DEFAULT = True
+GRAPH_RAG_WEIGHT_DEFAULT = 0.85
+
 
 @dataclass
 class GraphSearchResult:
@@ -361,6 +367,8 @@ class Neo4jGraphStore:
 
 
 __all__ = [
+    "GRAPH_RAG_ENABLED_DEFAULT",
+    "GRAPH_RAG_WEIGHT_DEFAULT",
     "GraphSearchResult",
     "Neo4jGraphStore",
 ]

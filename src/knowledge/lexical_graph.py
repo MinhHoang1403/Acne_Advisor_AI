@@ -26,7 +26,8 @@ Thiết kế tuân thủ nghiêm ngặt hợp đồng bất biến của dự á
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+import hashlib
 import json
 import re
 from typing import Any, Iterable, Mapping
@@ -943,6 +944,26 @@ def _normalize_point_record(raw: Mapping[str, Any]) -> tuple[str, dict[str, Any]
     return point_id, payload
 
 
+def lexical_graph_catalog_hash() -> str:
+    """Băm SHA-256 toàn bộ bộ luật dựng đồ thị (facet, tương tác lâm sàng, cầu nối biệt dược).
+
+    Hash được ghi vào build manifest để mỗi đồ thị Neo4j đang chạy truy ngược được về đúng
+    phiên bản bộ luật đã dựng ra nó; sửa bất kỳ alias/facet/tương tác nào đều đổi hash.
+    """
+
+    payload = {
+        "graph_contract_version": GRAPH_CONTRACT_VERSION,
+        "facets": [asdict(spec) for spec in CLINICAL_FACET_CATALOG],
+        "interactions": [dict(item) for item in CLINICAL_INTERACTION_CATALOG],
+        "brand_bridges": [
+            {"brand": brand, "aliases": list(aliases), "targets": [list(t) for t in targets]}
+            for brand, aliases, targets in EXTENDED_CLINICAL_BRAND_SYNONYMS
+        ],
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def build_lexical_graph_records(
     chunk_records: Iterable[Mapping[str, Any]],
     *,
@@ -1452,6 +1473,7 @@ async def sync_lexical_graph_to_neo4j(
 
     return {
         "build_id": clean_build_id,
+        "catalog_hash": lexical_graph_catalog_hash(),
         "counts": {
             "sources": len(sources),
             "documents": len(documents),
@@ -1549,6 +1571,7 @@ __all__ = [
     "extract_clinical_facets_from_text",
     "extract_query_graph_anchors",
     "fold_ascii_text",
+    "lexical_graph_catalog_hash",
     "sync_lexical_graph_to_neo4j",
     "validate_lexical_graph_in_neo4j",
 ]

@@ -15,7 +15,7 @@ Hệ thống chính thức chỉ có **một** bản triển khai duy nhất tro
 | --- | --- | --- |
 | Local RAGChecker 4B (`0a598a8`) | `LOCAL_EVALUATOR_QUALITY_FAILED`; chưa đạt hiệu chuẩn | Không áp dụng |
 | Local RAGChecker 9B (`9e52989`) | Cải thiện kiểm tra nhưng cổng trích xuất chưa đạt | Không áp dụng |
-| RAGAS shadow (`1c4748c`) | `RAGAS_CALIBRATION_BLOCKER` ở thời điểm thử nghiệm cũ | Đã thay bằng bộ RAGAS 50 ca mới ở thư mục `evaluation/` |
+| RAGAS shadow (`1c4748c`) | `RAGAS_CALIBRATION_BLOCKER` ở thời điểm thử nghiệm cũ | Đã thay bằng bộ RAGAS 100 ca ở thư mục `evaluation/` |
 | Focused evidence selector (`104c4fe`) | Thiếu tập kiểm định holdout độc lập; loại prototype facet/BGE | Không áp dụng |
 | GPU evidence selection (`ed0b469`) | Chưa đủ cơ sở kết luận; cần rà soát nhãn thêm | Không áp dụng |
 | Information-need decomposition (`7806b52`) | Chưa đạt ngưỡng ổn định (`3/13` ca phát triển đạt) | Giữ nguyên routing hiện tại |
@@ -29,4 +29,4 @@ Hệ thống chính thức chỉ có **một** bản triển khai duy nhất tro
 
 ## 3. Quan hệ với bộ đánh giá chính thức hiện tại
 
-Bộ đánh giá RAGChecker luận văn trước đây đã được thay thế trên `main` bằng **bộ đánh giá định lượng RAGAS 50 ca** sử dụng Judge độc lập qua NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`). Xem chi tiết cấu trúc, cách chạy và báo cáo hiện hành tại [evaluation/README.md](../evaluation/README.md) và [evaluation/ragas_evaluation.ipynb](../evaluation/ragas_evaluation.ipynb). Toàn bộ báo cáo và dữ liệu trong `research/` chỉ giữ lại làm tài liệu tham khảo lịch sử.
+Bộ đánh giá RAGChecker luận văn trước đây đã được thay thế trên `main` bằng **bộ đánh giá định lượng RAGAS 100 ca** sử dụng Judge độc lập qua NVIDIA NIM (judge chính `nvidia/nemotron-3.5-super-vl-120b-a12b`). Xem chi tiết cấu trúc, cách chạy và báo cáo hiện hành tại [evaluation/README.md](../evaluation/README.md) và [evaluation/ragas_evaluation.ipynb](../evaluation/ragas_evaluation.ipynb). Toàn bộ báo cáo và dữ liệu trong `research/` chỉ giữ lại làm tài liệu tham khảo lịch sử.

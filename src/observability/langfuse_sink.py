@@ -19,13 +19,16 @@ from src.observability.contracts import ObservabilityEvent, StageTelemetry
 
 logger = logging.getLogger(__name__)
 
+# Đúng bộ chỉ số đánh giá chính thức hiện hành của dự án (RAGAS, evaluation/ragas_runner.py):
+# 5 chỉ số RAGAS + Safe Abstention Accuracy. Bộ RAGChecker cũ đã ngừng sử dụng.
 SUPPORTED_EVALUATION_SCORES = frozenset(
     {
-        "Claim Recall",
-        "Context Precision",
         "Faithfulness",
-        "Claim F1",
-        "Negative Rejection Rate",
+        "Answer Relevancy",
+        "Context Precision",
+        "Context Recall",
+        "Answer Correctness",
+        "Safe Abstention Accuracy",
     }
 )
 

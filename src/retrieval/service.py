@@ -33,7 +33,12 @@ from src.database.vector_store import QdrantVectorStore, embed_query
 from src.quality.safe_fallback import sanitize_fallback_reason
 from src.retrieval.context_packer import pack_context, packed_context_to_response_contexts
 from src.retrieval.contracts import NormalizedQuery, RetrievedCandidate
-from src.retrieval.graph_retriever import GraphSearchResult, Neo4jGraphStore
+from src.retrieval.graph_retriever import (
+    GRAPH_RAG_ENABLED_DEFAULT,
+    GRAPH_RAG_WEIGHT_DEFAULT,
+    GraphSearchResult,
+    Neo4jGraphStore,
+)
 from src.retrieval.reranker import (
     CandidateReranker,
     CandidateScorer,
@@ -47,7 +52,7 @@ logger = logging.getLogger(__name__)
 RRF_K = 60
 RRF_DENSE_WEIGHT = 1.0
 RRF_BM25_WEIGHT = 1.0
-RRF_GRAPH_WEIGHT = 0.85
+RRF_GRAPH_WEIGHT = GRAPH_RAG_WEIGHT_DEFAULT
 # Đây là engineering parameters cho rank fusion đa kênh, không phải confidence threshold.
 
 _process_reranker: CandidateScorer | None = None
@@ -99,7 +104,7 @@ class EvidenceRetriever:
             # Giữ unit test offline truyền fake vector_store không bị gọi ra Neo4j thật.
             resolved_graph_enabled = False
         else:
-            resolved_graph_enabled = _bool_env("GRAPH_RAG_ENABLED", True)
+            resolved_graph_enabled = _bool_env("GRAPH_RAG_ENABLED", GRAPH_RAG_ENABLED_DEFAULT)
         self._graph_enabled = resolved_graph_enabled
         self._graph_store = graph_store or (Neo4jGraphStore() if self._graph_enabled else None)
 

@@ -7,7 +7,7 @@ Thư mục này chứa quy trình đánh giá định lượng toàn diện hệ
 | Thành phần | Chức năng |
 | --- | --- |
 | `evaluation/dataset.json` | Bộ benchmark chuẩn **100 câu hỏi tiếng Việt** bám sát 53 nguồn y khoa trong kho dữ liệu (`b768fae999391f47760a`), bao phủ **7 nhóm chủ đề lâm sàng** và **5 dạng hội thoại** (`single_turn`, `colloquial_patient`, `brand_bridge`, `multi_turn`, `safety_abstention`). |
-| `evaluation/ragas_runner.py` | Module lõi gọi trực tiếp `run_clinical_agent` (hỗ trợ cả câu đơn lượt và hội thoại đa lượt có `conversation_history`), chấm 5 chỉ số RAGAS bằng Judge LLM độc lập qua NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b`, dự phòng `nvidia/nemotron-3.5-super-vl-120b-a12b` & `mistralai/mistral-large-4-1t-a52b`), hỗ trợ cả `models/gemini-embedding-2` (3.072 chiều) và `nvidia/nemotron-3.5-embed-8b` (4.096 chiều), xuất báo cáo Markdown/JSON. |
+| `evaluation/ragas_runner.py` | Module lõi gọi trực tiếp `run_clinical_agent` (hỗ trợ cả câu đơn lượt và hội thoại đa lượt có `conversation_history`), chấm 5 chỉ số RAGAS bằng Judge LLM độc lập qua NVIDIA NIM (judge chính `nvidia/nemotron-3.5-super-vl-120b-a12b`, dự phòng `mistralai/mistral-large-4-1t-a52b` → `nvidia/nemotron-3-ultra-550b-a55b`; ghi lại judge thực tế đã chấm từng metric), hỗ trợ cả `models/gemini-embedding-2` (3.072 chiều) và `nvidia/nemotron-3.5-embed-8b` (4.096 chiều), xuất báo cáo Markdown/JSON. |
 | `evaluation/ragas_evaluation.ipynb` | Jupyter Notebook trực quan để chạy toàn bộ quy trình đánh giá 100 ca có lưu checkpoint tự động và xuất kết quả ra file `.md` / `.json`. |
 | `evaluation/results/` | Thư mục chứa kết quả xuất ra sau mỗi lần chạy: `ragas_evaluation_report.md`, `ragas_evaluation_raw.json` cùng các file checkpoint tiến trình. |
 

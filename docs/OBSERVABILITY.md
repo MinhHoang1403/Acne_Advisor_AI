@@ -154,13 +154,16 @@ JSONL sink không bị phụ thuộc vào Langfuse.
 ## Evaluation scores
 
 `submit_evaluation_score(request_id, name, value)` chỉ nhận số hữu hạn và đúng một
-trong năm metric chính thức của project:
+trong sáu metric đánh giá chính thức hiện hành của project (RAGAS, xem `evaluation/README.md`):
 
-- `Claim Recall`
-- `Context Precision`
 - `Faithfulness`
-- `Claim F1`
-- `Negative Rejection Rate`
+- `Answer Relevancy`
+- `Context Precision`
+- `Context Recall`
+- `Answer Correctness`
+- `Safe Abstention Accuracy`
+
+Tên chỉ số RAGChecker cũ (`Claim Recall`, `Claim F1`, `Negative Rejection Rate`) đã ngừng sử dụng và bị từ chối.
 
 Giá trị và đơn vị được giữ nguyên; integration không tự scale, normalize, invent score
 hay backfill run cũ. Hàm dùng cùng deterministic trace ID từ `request_id`, nên score

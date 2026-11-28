@@ -397,3 +397,24 @@ def test_activated_graph_validation_rejects_mixed_build_identity(
     assert result["nodes"] == 32
     assert result["relationships"] == 27
     assert "build identity" in result["errors"][0]
+
+
+@pytest.mark.parametrize(
+    ("counts", "expected"),
+    [
+        ({"knowledge_chunks": 968}, 968),
+        ({"knowledge_chunks": "968"}, 968),
+        ({}, None),
+        ({"knowledge_chunks": 0}, None),
+        ({"knowledge_chunks": True}, None),
+        ({"knowledge_chunks": "abc"}, None),
+    ],
+)
+def test_positive_manifest_count_rejects_missing_or_invalid_counts(
+    counts: dict[str, object],
+    expected: int | None,
+) -> None:
+    # Số điểm kỳ vọng chỉ được lấy từ manifest; thiếu/không hợp lệ thì fail-closed (None).
+    from src.ingestion.pipeline import _positive_manifest_count
+
+    assert _positive_manifest_count(counts, "knowledge_chunks") == expected
