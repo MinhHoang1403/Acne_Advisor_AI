@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+from src.ingestion.manifest import load_build_manifest, save_build_manifest  # noqa: E402
 from src.knowledge.entity_cards import build_entity_cards_from_taxonomy  # noqa: E402
 from src.knowledge.graph_index import (  # noqa: E402
     get_neo4j_driver,
@@ -107,6 +108,13 @@ async def sync_live_knowledge_graph(
         for item in points
         if item["payload"].get("build_id")
     }
+    # Fail-closed: không dựng đồ thị gắn nhãn build của manifest từ các điểm Qdrant thuộc build
+    # khác, nếu không tầng GraphRAG sẽ lệch phiên bản với tầng Dense/BM25 mà không ai phát hiện.
+    if manifest_build_id and detected_build_ids and detected_build_ids != {manifest_build_id}:
+        raise RuntimeError(
+            "Qdrant points do not belong to the manifest build: "
+            f"manifest={manifest_build_id}, qdrant={sorted(detected_build_ids)}"
+        )
     build_id = manifest_build_id or (sorted(detected_build_ids)[0] if detected_build_ids else "")
     if not build_id:
         raise RuntimeError("Could not determine active kb build_id from manifest or Qdrant points")
@@ -141,6 +149,17 @@ async def sync_live_knowledge_graph(
             f"Canonical entity graph check failed after lexical sync: {entity_post_check['errors']}"
         )
 
+    manifest_recorded = False
+    if manifest_file.is_file() and manifest_build_id == build_id:
+        # Ghi lại kết quả đồng bộ vào manifest đang kích hoạt để đồ thị từ vựng được quản lý
+        # phiên bản giống hệt luồng activate_knowledge (activation.lexical_graph).
+        manifest = load_build_manifest(manifest_file)
+        activation = dict(manifest.get("activation") or {})
+        activation["lexical_graph"] = lexical_sync
+        manifest["activation"] = activation
+        save_build_manifest(manifest_file, manifest)
+        manifest_recorded = True
+
     return {
         "passed": True,
         "build_id": build_id,
@@ -152,7 +171,9 @@ async def sync_live_knowledge_graph(
             "passed": entity_post_check["passed"],
         },
         "lexical_clinical_graph": lexical_sync["counts"],
+        "lexical_catalog_hash": lexical_sync["catalog_hash"],
         "lexical_validation_passed": lexical_sync["validation"]["passed"],
+        "manifest_recorded": manifest_recorded,
     }
 
 

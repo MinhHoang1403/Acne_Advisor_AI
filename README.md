@@ -47,18 +47,21 @@ Hệ thống tiếp nhận câu hỏi tiếng Việt qua giao diện web, thực
 
 Hệ thống tích hợp bộ benchmark chuẩn **100 kịch bản tiếng Việt** tại [`evaluation/dataset.json`](evaluation/dataset.json) (84 câu có bằng chứng thuộc 6 nhóm chủ đề lâm sàng + 16 câu kiểm thử từ chối/cảnh báo an toàn; bao phủ 5 dạng hội thoại gồm đơn lượt, ngôn ngữ đời thường người bệnh, cầu nối biệt dược thương mại, hội thoại nối tiếp đa lượt có `conversation_history` và từ chối an toàn) theo khung **RAGAS** (*Retrieval Augmented Generation Assessment*, Es et al., 2023, `arXiv:2309.15217`).
 
-Để tránh thiên vị tự chấm, quá trình đánh giá tách biệt hoàn toàn giữa **System LLM** (`gemini-3.5-flash-lite`) và **Judge LLM độc lập** qua NVIDIA NIM (`nvidia/nemotron-3-ultra-550b-a55b` 550B / 55B active, dự phòng `nvidia/nemotron-3.5-super-vl-120b-a12b` & `mistralai/mistral-large-4-1t-a52b`) trên Knowledge Build **`b768fae999391f47760a`**. Số liệu baseline đã xác minh trên tập 50 ca trước khi mở rộng lên 100 ca:
+Để tránh thiên vị tự chấm, quá trình đánh giá tách biệt hoàn toàn giữa **System LLM** (`gemini-3.5-flash-lite`) và **Judge LLM độc lập** qua NVIDIA NIM (judge chính `nvidia/nemotron-3.5-super-vl-120b-a12b`; dự phòng `mistralai/mistral-large-4-1t-a52b` → `nvidia/nemotron-3-ultra-550b-a55b`), embedding `models/gemini-embedding-2`, trên Knowledge Build **`b768fae999391f47760a`**. Kết quả lần chạy 100 ca chính thức (`2026-11-27T17:21Z`):
 
-| Chỉ số | Trung bình | Thấp nhất | Cao nhất | Số ca chấm | Đánh giá |
-| --- | :---: | :---: | :---: | :---: | --- |
-| **Faithfulness** (*Độ trung thực với bằng chứng*) | **0.910** | 0.200 | 1.000 | 41/42 | Tốt (>= 0.80) |
-| **Answer Relevancy** (*Độ liên quan câu trả lời*) | **0.931** | 0.825 | 1.000 | 42/42 | Tốt (>= 0.80) |
-| **Context Precision** (*Độ chính xác ngữ cảnh*) | **0.980** | 0.500 | 1.000 | 42/42 | Tốt (>= 0.80) |
-| **Context Recall** (*Độ bao phủ ngữ cảnh*) | **0.894** | 0.000 | 1.000 | 42/42 | Tốt (>= 0.80) |
-| **Answer Correctness** (*Độ chính xác câu trả lời*) | **0.739** | 0.353 | 0.993 | 42/42 | Khá (0.65 - 0.79) |
-| **Safe Abstention Accuracy** (*Tỷ lệ từ chối an toàn*) | **1.000** | — | — | **8/8** | Tuyệt đối (100%) |
+| Chỉ số | Trung bình | Trung vị | Thấp nhất | Cao nhất | Số ca chấm | Đánh giá |
+| --- | :---: | :---: | :---: | :---: | :---: | --- |
+| **Faithfulness** (*Độ trung thực với bằng chứng*) | **0.916** | 1.000 | 0.000 | 1.000 | 84/84 | Tốt (>= 0.80) |
+| **Answer Relevancy** (*Độ liên quan câu trả lời*) | **0.875** | 0.904 | 0.000 | 1.000 | 84/84 | Tốt (>= 0.80) |
+| **Context Precision** (*Độ chính xác ngữ cảnh*) | **0.975** | 1.000 | 0.500 | 1.000 | 84/84 | Tốt (>= 0.80) |
+| **Context Recall** (*Độ bao phủ ngữ cảnh*) | **0.908** | 1.000 | 0.000 | 1.000 | 84/84 | Tốt (>= 0.80) |
+| **Answer Correctness** (*Độ chính xác câu trả lời*) | **0.780** | 0.824 | 0.000 | 0.988 | 84/84 | Khá (0.65 - 0.79) |
+| **Safe Abstention Accuracy** (*Tỷ lệ từ chối an toàn*) | **1.000** | — | — | — | **16/16** | Đạt toàn bộ |
+| **Answer Completion Rate** (*Tỷ lệ trả lời được ca có bằng chứng*) | **0.976** | — | — | — | **82/84** | 2 ca từ chối ngoài dự kiến (`CMP-11`, `TRT-06`) |
 
-- **Chỉ số vận hành baseline (50 ca):** **0 lỗi runtime**; độ trễ trung bình `10,597.8 ms` (P50 `11,505.0 ms`, P95 `16,615.9 ms`); tổng token sinh câu trả lời `106,669`.
+- **Chỉ số vận hành:** **0 lỗi runtime** trên 100 ca; độ trễ trung bình `9,905.9 ms` (P50 `11,232.8 ms`, P95 `12,335.4 ms`); tổng token sinh câu trả lời `221,308`.
+- **Quy ước chấm:** ca cần trả lời nhưng hệ thống từ chối/fallback bị tính `0.0` cho Faithfulness, Answer Relevancy và Answer Correctness (không loại khỏi mẫu số). Từ phiên bản runner hiện tại, file kết quả ghi rõ judge thực tế đã chấm từng metric (`metric_judge_models`, `judge_model_usage`).
+- **Giới hạn cần lưu ý:** điểm do LLM judge chấm tự động, chưa được hiệu chuẩn với người chấm trên dữ liệu y khoa tiếng Việt; bộ 100 ca được xây cùng thời điểm với các thành phần hệ thống nên chưa phải tập kiểm định độc lập (holdout). Kết quả 100 ca không so sánh trực tiếp được với bộ 50 ca trước đây (khác dữ liệu, judge, quy ước chấm và pipeline).
 - **Hướng dẫn chạy bộ đánh giá 100 ca mới nhất:** xem [tài liệu đánh giá RAGAS](evaluation/README.md) và [notebook đánh giá 100 ca](evaluation/ragas_evaluation.ipynb).
 
 ---
@@ -127,7 +130,7 @@ flowchart TD
 | --- | :---: | --- |
 | Số lần truy xuất tối đa | **2 lần** | 1 lần tìm chính + tối đa 1 lần tìm bổ sung (`retry`) |
 | Số ứng viên mỗi kênh | **16 đoạn** | Đầu vào từ mỗi kênh Dense, BM25 và Neo4j Graph trước khi hợp nhất |
-| Ngữ cảnh đưa vào LLM | **Tối đa 5–9 đoạn / 6.500–10.000 ký tự** | Giữ nguyên vẹn đoạn văn kèm metadata nguồn; hỗ trợ nối bảng liền kề (`NEXT_CHUNK`) |
+| Ngữ cảnh đưa vào LLM | **Tối đa 9 đoạn / 10.000 ký tự** | Giữ nguyên vẹn đoạn văn kèm metadata nguồn; hỗ trợ nối bảng liền kề (`NEXT_CHUNK`) |
 | Thuật toán hợp nhất | **Tri-Channel RRF (`k=60`, `1.0 : 1.0 : 0.85`)** | Kết hợp thứ hạng từ Dense, BM25 và Neo4j Graph độc lập với thang điểm |
 | Timeout mỗi kênh truy xuất | **20 giây (Qdrant) / 8 giây (Neo4j)** | Ba kênh chạy song song độc lập; lỗi 1 kênh tự động fail-open giữ kết quả còn lại |
 | Tổng ngân sách xử lý Agent | **210 giây** | Dùng chung `DeadlineBudget` xuyên suốt toàn bộ 8 node |
@@ -143,7 +146,7 @@ Thông tin build đang kích hoạt được lưu trong [`data/knowledge_build_m
 | **Gói nguồn chuẩn hóa** | 1 gói nguồn tổng hợp ([`Acne_data_source.json`](sample_data/Acne_data_source.json), quy tụ **53 nguồn y khoa**) |
 | **Knowledge chunks** | **968 đoạn** văn bản y khoa chuẩn hóa |
 | **EntityCards** | **32 thẻ** thực thể |
-| **Đồ thị Neo4j (2 tầng)** | **1.132 node / 5.279 quan hệ** (gồm **32 node / 27 quan hệ** thực thể gốc + **968 `KnowledgeChunk`**, **53 nguồn/tài liệu**, **26 `ClinicalFacet`**) |
+| **Đồ thị Neo4j (2 tầng)** | **1.132 node / 5.289 quan hệ** (gồm **32 node / 27 quan hệ** thực thể gốc + **968 `KnowledgeChunk`**, **53 nguồn/tài liệu**, **26 `ClinicalFacet`**) |
 | **Vector Dense** | `models/gemini-embedding-2`, **3.072 chiều**, khoảng cách `cosine` |
 | **Vector Sparse** | **BM25 gốc của Qdrant** (tokenizer `word`, lowercase + ASCII folding) |
 | **Alias logic** | `acne_knowledge`, `acne_entities` |
@@ -155,6 +158,11 @@ Các nguồn y khoa trong bộ dữ liệu gồm hướng dẫn lâm sàng và t
 > ```powershell
 > .\.venv\Scripts\python.exe scripts\knowledge_build.py status
 > .\.venv\Scripts\python.exe scripts\knowledge_build.py validate
+> ```
+>
+> Khi cần dựng lại đồ thị 2 tầng trên Neo4j từ dữ liệu Qdrant đã kích hoạt (không gọi Embedding API), chạy `scripts\sync_knowledge_graph.py`. Lệnh này **ghi** vào Neo4j, từ chối chạy nếu điểm Qdrant không thuộc build trong manifest, và lưu số nút/quan hệ cùng hash bộ luật đồ thị (`catalog_hash`) vào `activation.lexical_graph` của [`data/knowledge_build_manifest.json`](data/knowledge_build_manifest.json).
+>
+> ```powershell
 > .\.venv\Scripts\python.exe scripts\sync_knowledge_graph.py
 > ```
 
@@ -167,7 +175,7 @@ Các nguồn y khoa trong bộ dữ liệu gồm hướng dẫn lâm sàng và t
 - **Git** và **Docker Desktop** (đã bật Linux containers / WSL 2 trên Windows).
 - **Python 3.11** (khuyên dùng đúng bản **`3.11.9`** theo [`.python-version`](.python-version)) và **Node.js 24** (`npm`) nếu chạy trực tiếp trên máy host hoặc phát triển code.
 - **API Key bắt buộc:** `GOOGLE_API_KEY` (từ Google AI Studio để dùng `gemini-3.5-flash-lite` và `models/gemini-embedding-2`).
-- **API Key tùy chọn:** `NVIDIA_API_KEY` (nếu chạy đánh giá RAGAS 50 ca bằng Judge NIM), `LLAMA_CLOUD_API_KEY` (nếu parse PDF nguồn mới).
+- **API Key tùy chọn:** `NVIDIA_API_KEY` (nếu chạy đánh giá RAGAS 100 ca bằng Judge NIM), `LLAMA_CLOUD_API_KEY` (nếu parse PDF nguồn mới).
 - **Phần cứng:** RAM tối thiểu 16 GB khuyến nghị; có GPU NVIDIA hỗ trợ CUDA giúp reranker BGE chạy nhanh hơn (tự động fallback về CPU/FP32 nếu không có GPU).
 
 ---
@@ -296,7 +304,7 @@ File [`.env.example`](.env.example) chứa đầy đủ toàn bộ mẫu biến 
 | --- | --- | --- |
 | **LLM Hệ thống (Gemini)** | `GOOGLE_API_KEY`, `GOOGLE_MODEL`, `GOOGLE_FALLBACK_MODELS` | Model trả lời chính mặc định `gemini-3.5-flash-lite`; model dự phòng `gemini-3.1-flash-lite` |
 | **Embedding** | `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Phải giữ `models/gemini-embedding-2` và `3072` để khớp với chỉ mục Qdrant |
-| **Đánh giá RAGAS (NVIDIA NIM)** | `NVIDIA_API_KEY`, `NVIDIA_BASE_URL`, `RAGAS_JUDGE_PROVIDER`, `RAGAS_JUDGE_MODEL`, `RAGAS_FALLBACK_JUDGE_MODELS` | Judge độc lập mặc định `nvidia/nemotron-3-ultra-550b-a55b` (dự phòng `mistralai/mistral-large-4-1t-a52b`) |
+| **Đánh giá RAGAS (NVIDIA NIM)** | `NVIDIA_API_KEY`, `NVIDIA_BASE_URL`, `RAGAS_JUDGE_PROVIDER`, `RAGAS_JUDGE_MODEL`, `RAGAS_FALLBACK_JUDGE_MODELS` | Judge độc lập mặc định `nvidia/nemotron-3.5-super-vl-120b-a12b` (dự phòng `mistralai/mistral-large-4-1t-a52b`, `nvidia/nemotron-3-ultra-550b-a55b`) |
 | **LLM Cục bộ (Ollama)** | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | Mặc định `qwen3:8b`; tùy chọn thay thế hoặc fallback khi cài Ollama trên host |
 | **Reranker & GraphRAG** | `RERANKER_MODEL`, `RERANKER_DEVICE`, `GRAPH_RAG_ENABLED`, `GRAPH_RAG_WEIGHT`, `GRAPH_RAG_NEIGHBOR_EXPANSION_ENABLED` | Cross-Encoder `BAAI/bge-reranker-v2-m3` (`cuda`/`bfloat16`) kết hợp kênh đồ thị Neo4j (trọng số `0.85`, fail-open) |
 | **Datastore** | `DATABASE_URL`, `REDIS_URL`, `QDRANT_URL`, `NEO4J_URI` | Kết nối PostgreSQL, Redis, Qdrant và Neo4j (Compose tự override URL nội bộ Docker) |

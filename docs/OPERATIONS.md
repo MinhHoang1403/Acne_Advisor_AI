@@ -322,7 +322,7 @@ checks.
 
 | Script | Responsibility |
 | --- | --- |
-| `knowledge_build.py`, `sync_knowledge_graph.py` | controlled build, validate, status and Neo4j 2-layer graph sync |
+| `knowledge_build.py`, `sync_knowledge_graph.py` | controlled build, validate, status and Neo4j 2-layer graph sync (sync refuses Qdrant points from another build and records counts + `catalog_hash` in `activation.lexical_graph`) |
 | `init_schema.py`, `init_chat_schema.py` | relational schema initialization |
 | `inspect_runtime_readiness.py`, `pre_ui_runtime_check.py` | local readiness |
 | `check_reproducible_environment.py`, `check_release_readiness.py` | environment and release-readiness checks |

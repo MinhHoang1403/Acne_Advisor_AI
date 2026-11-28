@@ -429,6 +429,56 @@
       }
     },
     "knowledge_alias": "acne_knowledge",
+    "lexical_graph": {
+      "build_id": "b768fae999391f47760a",
+      "catalog_hash": "f4cb376550edf0a789903ebf488661e2fc7afa52a8a6b36e17bec3bb6ec8f64e",
+      "counts": {
+        "chunks": 968,
+        "documents": 53,
+        "facets": 26,
+        "has_chunk_edges": 968,
+        "has_facet_edges": 971,
+        "interaction_edges": 10,
+        "mentions_entity_edges": 2345,
+        "next_chunk_edges": 915,
+        "published_edges": 53,
+        "sources": 53
+      },
+      "validation": {
+        "actual_nodes": {
+          "ClinicalFacet": 26,
+          "KnowledgeChunk": 968,
+          "KnowledgeDocument": 53,
+          "KnowledgeSource": 53
+        },
+        "actual_relationships": {
+          "CLINICAL_INTERACTION": 10,
+          "HAS_CHUNK": 968,
+          "HAS_CLINICAL_FACET": 971,
+          "MENTIONS_ENTITY": 2345,
+          "NEXT_CHUNK": 915,
+          "PUBLISHED_DOCUMENT": 53
+        },
+        "build_id": "b768fae999391f47760a",
+        "errors": [],
+        "expected_nodes": {
+          "ClinicalFacet": 26,
+          "KnowledgeChunk": 968,
+          "KnowledgeDocument": 53,
+          "KnowledgeSource": 53
+        },
+        "expected_relationships": {
+          "CLINICAL_INTERACTION": 10,
+          "HAS_CHUNK": 968,
+          "HAS_CLINICAL_FACET": 971,
+          "MENTIONS_ENTITY": 2345,
+          "NEXT_CHUNK": 915,
+          "PUBLISHED_DOCUMENT": 53
+        },
+        "layer": "neo4j_lexical_graph",
+        "passed": true
+      }
+    },
     "rollback_root": "empty_bootstrap",
     "validation": {
       "errors": [],

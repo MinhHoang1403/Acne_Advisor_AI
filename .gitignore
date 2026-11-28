@@ -159,6 +159,8 @@ reports/
 # Local reports and maintenance audit artifacts
 # ---------------------------------------------------------------------------
 /output/
+# Tài liệu handoff nội bộ phục vụ viết báo cáo thực tập (chứa chi tiết môi trường local)
+/HANDOFF_BAO_CAO.md
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx

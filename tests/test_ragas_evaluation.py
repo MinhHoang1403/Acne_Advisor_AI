@@ -420,3 +420,96 @@ def test_lexical_graph_brand_bridges_and_mixed_accent_facets() -> None:
         fallback_applied=True,
     )
     assert report.passed is True
+
+
+@pytest.mark.asyncio
+async def test_metric_judge_models_record_fallback_judge_per_metric(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Khi judge chính lỗi tạm thời, điểm phải được ghi đúng tên judge dự phòng đã chấm."""
+
+    from evaluation.ragas_runner import score_records_with_ragas
+
+    primary = "judge/primary"
+    backup = "judge/backup"
+
+    class DummyJudgeLLM:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+    class DummyMetricResult:
+        def __init__(self, val: float) -> None:
+            self.value = val
+
+    class DummyMetric:
+        def __init__(self, *_args: Any, llm: Any = None, **_kwargs: Any) -> None:
+            self.llm = llm
+            self.prompt = type("P", (), {"instruction": "Generate a question."})()
+
+        async def ascore(self, **_kwargs: Any) -> DummyMetricResult:
+            # Judge chính luôn trả lỗi tạm thời (503) để buộc chuỗi dự phòng hoạt động.
+            if self.llm.name == primary:
+                raise RuntimeError("503 service unavailable")
+            return DummyMetricResult(0.8)
+
+    monkeypatch.setattr(
+        "evaluation.ragas_runner.build_ragas_evaluators",
+        lambda **kw: (DummyJudgeLLM(kw["judge_model"]), ProjectGeminiEmbeddings(api_key="k")),
+    )
+    for m_name in ("Faithfulness", "AnswerRelevancy", "ContextPrecision", "ContextRecall", "AnswerCorrectness"):
+        monkeypatch.setattr(f"ragas.metrics.collections.{m_name}", DummyMetric)
+
+    records = [
+        {
+            "case_id": "SYM-01",
+            "category": "symptoms_and_types",
+            "expected_behavior": "answer",
+            "user_input": "Mụn đầu trắng là gì?",
+            "reference": "Mụn nhân đóng do tắc lỗ chân lông.",
+            "response": "Mụn đầu trắng là mụn nhân đóng.",
+            "retrieved_contexts": ["Mụn đầu trắng là mụn nhân đóng."],
+            "action": "generate",
+            "fallback_applied": False,
+            "error": None,
+        }
+    ]
+    scored = await score_records_with_ragas(
+        records,
+        judge_provider="nvidia",
+        judge_model=primary,
+        fallback_judge_models=(backup,),
+        request_delay_seconds=0.0,
+        max_rate_limit_retries=0,
+    )
+
+    assert scored[0]["ragas_scores"]["faithfulness"] == 0.8
+    assert scored[0]["metric_judge_models"] == {
+        "faithfulness": backup,
+        "answer_relevancy": backup,
+        "context_precision": backup,
+        "context_recall": backup,
+        "answer_correctness": backup,
+    }
+
+    summary = summarize_evaluation(scored, judge_model=primary)
+    assert summary["judge_model_usage"] == {backup: 5}
+    assert f"`{backup}`: 5" in render_markdown_report(summary)
+
+
+def test_summary_marks_scores_without_recorded_judge_as_unknown() -> None:
+    """Điểm từ checkpoint cũ không có nguồn judge phải hiện là unknown, không quy cho judge chính."""
+
+    record = {
+        "case_id": "SYM-02",
+        "category": "symptoms_and_types",
+        "expected_behavior": "answer",
+        "ragas_scores": {
+            "faithfulness": 1.0,
+            "answer_relevancy": None,
+            "context_precision": 1.0,
+            "context_recall": 1.0,
+            "answer_correctness": 0.9,
+        },
+    }
+    summary = summarize_evaluation([record], judge_model="judge/primary")
+    assert summary["judge_model_usage"] == {"unknown": 4}

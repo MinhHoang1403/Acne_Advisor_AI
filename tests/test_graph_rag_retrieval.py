@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,6 +13,7 @@ from src.knowledge.lexical_graph import (
     LEXICAL_GRAPH_RELATIONSHIPS,
     build_lexical_graph_records,
     extract_query_graph_anchors,
+    lexical_graph_catalog_hash,
     sync_lexical_graph_to_neo4j,
 )
 from src.knowledge.graph_schema import (
@@ -482,6 +485,57 @@ async def test_sync_lexical_graph_to_neo4j_validates_expected_counts() -> None:
     summary = await sync_lexical_graph_to_neo4j(driver, records, build_id="b_sync_01")
     assert summary["validation"]["passed"] is True
     assert summary["counts"]["chunks"] == 1
+    assert summary["catalog_hash"] == lexical_graph_catalog_hash()
+
+
+def test_lexical_graph_catalog_hash_is_deterministic_and_tracks_rule_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Hash phải ổn định giữa các lần gọi và đổi ngay khi bộ luật dựng đồ thị thay đổi.
+    from src.knowledge import lexical_graph
+
+    baseline = lexical_graph_catalog_hash()
+    assert baseline == lexical_graph_catalog_hash()
+    assert len(baseline) == 64
+
+    monkeypatch.setattr(
+        lexical_graph,
+        "CLINICAL_INTERACTION_CATALOG",
+        lexical_graph.CLINICAL_INTERACTION_CATALOG[:-1],
+    )
+    assert lexical_graph_catalog_hash() != baseline
+
+
+@pytest.mark.asyncio
+async def test_sync_script_refuses_qdrant_points_from_another_build(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # Không được dựng đồ thị gắn nhãn build của manifest từ điểm Qdrant thuộc build khác.
+    from scripts import sync_knowledge_graph
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps({"build_id": "build_active"}), encoding="utf-8")
+
+    class _DummyQdrant:
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
+        async def close(self) -> None:
+            return None
+
+    async def _fake_scroll(_client: Any, _collection: str) -> list[dict[str, Any]]:
+        return [{"id": "p-1", "payload": {"build_id": "build_other"}}]
+
+    def _driver_must_not_open() -> Any:
+        raise AssertionError("Neo4j must not be touched when build identities disagree")
+
+    monkeypatch.setattr(sync_knowledge_graph, "AsyncQdrantClient", _DummyQdrant)
+    monkeypatch.setattr(sync_knowledge_graph, "_scroll_all_qdrant_points", _fake_scroll)
+    monkeypatch.setattr(sync_knowledge_graph, "get_neo4j_driver", _driver_must_not_open)
+
+    with pytest.raises(RuntimeError, match="do not belong to the manifest build"):
+        await sync_knowledge_graph.sync_live_knowledge_graph(manifest_path=manifest_path)
 
 
 def test_brand_query_augmentation_and_submodular_anchor_coverage_promote_uncovered_facets() -> None:

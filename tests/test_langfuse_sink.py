@@ -476,7 +476,14 @@ def test_unsupported_score_name_is_rejected():
 @pytest.mark.parametrize("value", [True, float("nan"), float("inf")])
 def test_invalid_score_value_is_rejected(value):
     with pytest.raises(ValueError, match="score value"):
-        submit_evaluation_score(REQUEST_ID, "Claim F1", value)
+        submit_evaluation_score(REQUEST_ID, "Answer Correctness", value)
+
+
+def test_retired_ragchecker_score_names_are_rejected():
+    # Tên chỉ số RAGChecker cũ không còn là metric chính thức nên phải bị từ chối.
+    for retired in ("Claim Recall", "Claim F1", "Negative Rejection Rate"):
+        with pytest.raises(ValueError, match="unsupported"):
+            submit_evaluation_score(REQUEST_ID, retired, 0.5)
 
 
 def test_optional_backend_outage_does_not_mark_application_dependency_required(
