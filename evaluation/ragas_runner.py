@@ -367,9 +367,14 @@ def _case_system_signature(
     llm_provider: str | None,
     llm_model: str | None,
     allow_model_fallback: bool = False,
+    pipeline_fingerprint: str | None = None,
 ) -> str:
+    # Chữ ký checkpoint phải gồm cả pipeline fingerprint (GraphRAG, reranker, context budget, KB
+    # build...) để khi đổi cấu hình (vd ablation tắt GraphRAG) runner không lặng lẽ dùng lại
+    # câu trả lời đã sinh bởi một cấu hình khác.
     payload = {
         "case_id": case.case_id,
+        "pipeline_fingerprint": pipeline_fingerprint or "unknown",
         "user_input": case.user_input,
         "conversation_history": list(case.conversation_history),
         "llm_provider": llm_provider or "default",
@@ -400,7 +405,10 @@ async def run_system_on_dataset(
 
     from src.agent.graph import run_clinical_agent
 
+    from src.observability.versioning import current_pipeline_fingerprint
+
     await _warmup_reranker()
+    pipeline_fingerprint = current_pipeline_fingerprint()
 
     cached_by_sig: dict[str, dict[str, Any]] = {}
     if checkpoint_path is not None and Path(checkpoint_path).is_file():
@@ -420,7 +428,13 @@ async def run_system_on_dataset(
 
     records: list[dict[str, Any]] = []
     for idx, case in enumerate(cases, 1):
-        sig = _case_system_signature(case, llm_provider, llm_model, allow_model_fallback)
+        sig = _case_system_signature(
+            case,
+            llm_provider,
+            llm_model,
+            allow_model_fallback,
+            pipeline_fingerprint=pipeline_fingerprint,
+        )
         if sig in cached_by_sig:
             restored = dict(cached_by_sig[sig])
             restored["index"] = idx
@@ -518,6 +532,7 @@ async def run_system_on_dataset(
             "latency_ms": elapsed_ms,
             "token_usage": dict(token_usage) if isinstance(token_usage, dict) else {},
             "error": error_text,
+            "pipeline_fingerprint": pipeline_fingerprint,
             "system_signature": sig,
         }
         records.append(record)
@@ -830,10 +845,23 @@ async def score_records_with_ragas(
     max_rate_limit_retries: int = 1,
     metric_timeout_seconds: float = 180.0,
     metric_concurrency: int | None = None,
+    metric_keys: tuple[str, ...] | list[str] | None = None,
     checkpoint_path: Path | None = None,
     verbose: bool = False,
 ) -> list[dict[str, Any]]:
-    """Chấm 5 chỉ số RAGAS trên các ca cần trả lời và kiểm tra tỷ lệ từ chối an toàn."""
+    """Chấm 5 chỉ số RAGAS trên các ca cần trả lời và kiểm tra tỷ lệ từ chối an toàn.
+
+    ``metric_keys`` cho phép chỉ chấm một tập con chỉ số (vd chỉ ``faithfulness`` cho bài kiểm
+    tra cài lỗi có chủ đích) để tiết kiệm quota judge; chỉ số không được chọn giữ giá trị ``None``.
+    """
+
+    # Giữ đúng thứ tự chuẩn của RAGAS_METRIC_KEYS; từ chối tên chỉ số không tồn tại để tránh
+    # chạy nhầm một lần chấm "rỗng" mà vẫn tưởng là đã đánh giá.
+    requested_keys = set(metric_keys) if metric_keys is not None else set(RAGAS_METRIC_KEYS)
+    unknown_keys = requested_keys - set(RAGAS_METRIC_KEYS)
+    if unknown_keys or not requested_keys:
+        raise ValueError(f"metric_keys không hợp lệ: {sorted(unknown_keys) or 'rỗng'}")
+    active_keys = tuple(key for key in RAGAS_METRIC_KEYS if key in requested_keys)
 
     from ragas.metrics.collections import (
         AnswerCorrectness,
@@ -953,7 +981,7 @@ async def score_records_with_ragas(
                         sig = str(item.get("score_signature") or "")
                         sc_map = item.get("ragas_scores") or {}
                         errs = item.get("metric_errors") or {}
-                        if sig and not errs and all(isinstance(sc_map.get(k), (int, float)) for k in RAGAS_METRIC_KEYS):
+                        if sig and not errs and all(isinstance(sc_map.get(k), (int, float)) for k in active_keys):
                             cached_by_sig[sig] = item
             except Exception:
                 cached_by_sig = {}
@@ -1123,15 +1151,12 @@ async def score_records_with_ragas(
             if unexpected_abstain:
                 # Không chấm boilerplate từ chối bằng LLM cho các chỉ số sinh câu trả lời (gán 0.0 trung thực);
                 # nếu tầng truy hồi vẫn lấy được ngữ cảnh hợp lệ thì vẫn chấm ContextPrecision & ContextRecall.
-                scores = {
-                    "faithfulness": 0.0,
-                    "answer_relevancy": 0.0,
-                    "context_precision": 0.0,
-                    "context_recall": 0.0,
-                    "answer_correctness": 0.0,
-                }
-                if contexts and not rec.get("error"):
-                    retrieval_keys = ("context_precision", "context_recall")
+                for key in active_keys:
+                    scores[key] = 0.0
+                retrieval_keys = tuple(
+                    key for key in ("context_precision", "context_recall") if key in active_keys
+                )
+                if contexts and not rec.get("error") and retrieval_keys:
                     ret_results = await asyncio.gather(
                         *(_score_one_metric(k) for k in retrieval_keys),
                         return_exceptions=True,
@@ -1144,23 +1169,24 @@ async def score_records_with_ragas(
             elif response_text and contexts:
                 if effective_concurrency > 1:
                     results = await asyncio.gather(
-                        *(_score_one_metric(key) for key in RAGAS_METRIC_KEYS),
+                        *(_score_one_metric(key) for key in active_keys),
                         return_exceptions=True,
                     )
-                    for key, outcome in zip(RAGAS_METRIC_KEYS, results, strict=True):
+                    for key, outcome in zip(active_keys, results, strict=True):
                         if isinstance(outcome, BaseException):
                             metric_errors[key] = f"{type(outcome).__name__}: {outcome}"
                         else:
                             scores[key] = _clean_score(getattr(outcome, "value", outcome))
                 else:
-                    for key in RAGAS_METRIC_KEYS:
+                    for key in active_keys:
                         try:
                             outcome = await _score_one_metric(key)
                             scores[key] = _clean_score(getattr(outcome, "value", outcome))
                         except Exception as exc:
                             metric_errors[key] = f"{type(exc).__name__}: {exc}"
             else:
-                scores = {key: 0.0 for key in RAGAS_METRIC_KEYS}
+                for key in active_keys:
+                    scores[key] = 0.0
                 metric_errors["skipped"] = "Không có ngữ cảnh truy hồi hợp lệ cho câu trả lời."
 
             enriched["ragas_scores"] = scores
